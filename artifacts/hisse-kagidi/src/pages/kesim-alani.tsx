@@ -66,6 +66,12 @@ import {
   Filter,
   MoveRight,
   X,
+  HelpCircle,
+  Keyboard,
+  Map as MapIcon,
+  Maximize,
+  Minimize,
+  Save,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag } from "@/lib/types";
 import { getKesimAlani, updateKesimAlani } from "@/lib/storage";
@@ -129,6 +135,7 @@ export default function KesimAlaniPage() {
     donationId: string;
     field: string;
   } | null>(null);
+  const [editDraft, setEditDraft] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [groupingInProgress, setGroupingInProgress] = useState(false);
@@ -188,8 +195,14 @@ export default function KesimAlaniPage() {
       toName: string;
     }>;
   }>>([]);
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  const [minimapOpen, setMinimapOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const jumpInputRef = useRef<HTMLInputElement>(null);
+  const groupsHeaderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (params.id) {
@@ -220,6 +233,9 @@ export default function KesimAlaniPage() {
       if (e.key === "Escape" && fullscreenMode) {
         setFullscreenMode(false);
       }
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
         handleUndo();
@@ -228,10 +244,45 @@ export default function KesimAlaniPage() {
         e.preventDefault();
         handleRedo();
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (kesim) {
+          updateKesimAlani(kesim);
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "g") {
+        e.preventDefault();
+        jumpInputRef.current?.focus();
+        jumpInputRef.current?.select();
+      }
+      if (e.key === "F11") {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+      if (e.key === "?" && !isInput) {
+        e.preventDefault();
+        setShortcutHelpOpen(prev => !prev);
+      }
+      if (e.key === "Escape") {
+        if (editingCell) {
+          cancelEdit();
+        }
+        if (shortcutHelpOpen) {
+          setShortcutHelpOpen(false);
+        }
+        if (minimapOpen) {
+          setMinimapOpen(false);
+        }
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [fullscreenMode]);
+  }, [kesim, editingCell, shortcutHelpOpen, minimapOpen, fullscreenMode]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -252,6 +303,22 @@ export default function KesimAlaniPage() {
       window.removeEventListener("mouseup", handleMouseUp);
     };
   }, [isDraggingSplit]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }, []);
 
   const save = useCallback(
     (updated: KesimAlani, desc?: string) => {
@@ -571,8 +638,15 @@ export default function KesimAlaniPage() {
     save({ ...kesim, animalGroups: groups }, `Grup içi taşıma yapıldı`);
   }
 
-  function handleDragStart(groupIdx: number, donationIdx: number) {
+  const [dragOverGroup, setDragOverGroup] = useState<number | null>(null);
+
+  function handleDragStart(groupIdx: number, donationIdx: number, e?: React.DragEvent) {
     setDragItem({ groupIdx, donationIdx });
+    if (e?.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      const target = e.currentTarget as HTMLElement;
+      target.style.opacity = "0.5";
+    }
   }
 
   function handleDragOver(
@@ -581,7 +655,17 @@ export default function KesimAlaniPage() {
     donationIdx: number
   ) {
     e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
     setDragOverItem({ groupIdx, donationIdx });
+    setDragOverGroup(groupIdx);
+  }
+
+  function handleDragLeave(e: React.DragEvent, groupIdx: number) {
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    const currentTarget = e.currentTarget as HTMLElement;
+    if (!currentTarget.contains(relatedTarget)) {
+      if (dragOverGroup === groupIdx) setDragOverGroup(null);
+    }
   }
 
   function handleDrop(groupIdx: number, donationIdx: number) {
@@ -595,6 +679,131 @@ export default function KesimAlaniPage() {
     }
     setDragItem(null);
     setDragOverItem(null);
+    setDragOverGroup(null);
+  }
+
+  function handleDragEnd(e: React.DragEvent) {
+    (e.currentTarget as HTMLElement).style.opacity = "1";
+    setDragItem(null);
+    setDragOverItem(null);
+    setDragOverGroup(null);
+  }
+
+  function startEditing(donationId: string, field: string) {
+    if (!kesim) return;
+    const donation = kesim.donations.find(d => d.id === donationId);
+    if (!donation) return;
+    const currentVal = String((donation as any)[field] || "");
+    setEditDraft(currentVal);
+    setEditingCell({ donationId, field });
+  }
+
+  function commitEdit() {
+    if (!editingCell || !kesim) { setEditingCell(null); return; }
+    const donation = kesim.donations.find(d => d.id === editingCell.donationId);
+    if (!donation) { setEditingCell(null); return; }
+    const currentVal = String((donation as any)[editingCell.field] || "");
+    if (editDraft !== currentVal) {
+      updateDonationField(editingCell.donationId, editingCell.field as keyof Donation, editDraft);
+    }
+    setEditingCell(null);
+  }
+
+  function cancelEdit() {
+    setEditingCell(null);
+    setEditDraft("");
+  }
+
+  const DONOR_EDITABLE_FIELDS = ["vekalet", "description", "name", "donationType", "notes"] as const;
+
+  function handleDonorCellKeyDown(
+    e: React.KeyboardEvent<HTMLInputElement>,
+    donationId: string,
+    field: string
+  ) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commitEdit();
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEdit();
+      return;
+    }
+    if (e.key === "Tab") {
+      e.preventDefault();
+      commitEdit();
+      const currentFieldIdx = DONOR_EDITABLE_FIELDS.indexOf(field as any);
+      if (currentFieldIdx < 0) return;
+      const donations = searchQuery.trim()
+        ? kesim!.donations.filter(d => {
+            const q = searchQuery.trim().toLowerCase();
+            return d.name.toLowerCase().includes(q) ||
+              d.description.toLowerCase().includes(q) ||
+              d.vekalet.toLowerCase().includes(q) ||
+              d.donationType.toLowerCase().includes(q) ||
+              (d.notes || "").toLowerCase().includes(q);
+          })
+        : kesim!.donations;
+      const donationIdx = donations.findIndex(d => d.id === donationId);
+      if (donationIdx < 0) return;
+
+      if (e.shiftKey) {
+        if (currentFieldIdx > 0) {
+          setTimeout(() => startEditing(donationId, DONOR_EDITABLE_FIELDS[currentFieldIdx - 1]), 0);
+        } else if (donationIdx > 0) {
+          setTimeout(() => startEditing(donations[donationIdx - 1].id, DONOR_EDITABLE_FIELDS[DONOR_EDITABLE_FIELDS.length - 1]), 0);
+        }
+      } else {
+        if (currentFieldIdx < DONOR_EDITABLE_FIELDS.length - 1) {
+          setTimeout(() => startEditing(donationId, DONOR_EDITABLE_FIELDS[currentFieldIdx + 1]), 0);
+        } else if (donationIdx < donations.length - 1) {
+          setTimeout(() => startEditing(donations[donationIdx + 1].id, DONOR_EDITABLE_FIELDS[0]), 0);
+        }
+      }
+    }
+  }
+
+  const EDITABLE_COLUMN_KEYS: ColumnKey[] = ["vekalet", "description", "name", "donationType", "notes"];
+  const editableVisibleColumns = workspace.visibleColumns.filter(k => EDITABLE_COLUMN_KEYS.includes(k));
+
+  function handleGroupCellTab(
+    e: React.KeyboardEvent<HTMLInputElement>,
+    groupIdx: number,
+    dIdx: number,
+    colKey: ColumnKey
+  ) {
+    if (e.key !== "Tab") return;
+    e.preventDefault();
+    if (!kesim) return;
+    const group = kesim.animalGroups[groupIdx];
+    if (!group) return;
+
+    const fieldIdx = editableVisibleColumns.indexOf(colKey);
+    if (fieldIdx === -1) return;
+
+    if (e.shiftKey) {
+      if (fieldIdx > 0) {
+        const prevField = editableVisibleColumns[fieldIdx - 1];
+        const target = document.querySelector(`[data-group-cell="${groupIdx}-${dIdx}-${prevField}"] input`) as HTMLInputElement;
+        target?.focus();
+      } else if (dIdx > 0) {
+        const prevField = editableVisibleColumns[editableVisibleColumns.length - 1];
+        const target = document.querySelector(`[data-group-cell="${groupIdx}-${dIdx - 1}-${prevField}"] input`) as HTMLInputElement;
+        target?.focus();
+      }
+    } else {
+      if (fieldIdx < editableVisibleColumns.length - 1) {
+        const nextField = editableVisibleColumns[fieldIdx + 1];
+        const target = document.querySelector(`[data-group-cell="${groupIdx}-${dIdx}-${nextField}"] input`) as HTMLInputElement;
+        target?.focus();
+      } else if (dIdx < group.donations.length - 1) {
+        const nextField = editableVisibleColumns[0];
+        const target = document.querySelector(`[data-group-cell="${groupIdx}-${dIdx + 1}-${nextField}"] input`) as HTMLInputElement;
+        target?.focus();
+      }
+    }
   }
 
   function removeFromGroup(groupIdx: number, donationIdx: number) {
@@ -1337,55 +1546,60 @@ export default function KesimAlaniPage() {
         );
       case "vekalet":
         return (
-          <td key={colKey} className={cellPad}>
+          <td key={colKey} className={cellPad} data-group-cell={`${groupIdx}-${dIdx}-vekalet`}>
             <Input
-              className={`${inputH} border-0 bg-transparent p-0`}
+              className={`${inputH} border-0 bg-transparent p-0 focus:bg-primary/5 focus:ring-1 focus:ring-primary/30 rounded transition-colors`}
               value={d.vekalet || ""}
               onChange={(e) => updateGroupDonation(groupIdx, dIdx, "vekalet", e.target.value)}
+              onKeyDown={(e) => handleGroupCellTab(e, groupIdx, dIdx, "vekalet")}
               placeholder="—"
             />
           </td>
         );
       case "description":
         return (
-          <td key={colKey} className={cellPad}>
+          <td key={colKey} className={cellPad} data-group-cell={`${groupIdx}-${dIdx}-description`}>
             <Input
-              className={`${inputH} border-0 bg-transparent p-0`}
+              className={`${inputH} border-0 bg-transparent p-0 focus:bg-primary/5 focus:ring-1 focus:ring-primary/30 rounded transition-colors`}
               value={d.description}
               onChange={(e) => updateGroupDonation(groupIdx, dIdx, "description", e.target.value)}
+              onKeyDown={(e) => handleGroupCellTab(e, groupIdx, dIdx, "description")}
               placeholder="—"
             />
           </td>
         );
       case "name":
         return (
-          <td key={colKey} className={cellPad}>
+          <td key={colKey} className={cellPad} data-group-cell={`${groupIdx}-${dIdx}-name`}>
             <Input
-              className={`${inputH} border-0 bg-transparent p-0`}
+              className={`${inputH} border-0 bg-transparent p-0 focus:bg-primary/5 focus:ring-1 focus:ring-primary/30 rounded transition-colors`}
               value={d.name}
               onChange={(e) => updateGroupDonation(groupIdx, dIdx, "name", e.target.value)}
+              onKeyDown={(e) => handleGroupCellTab(e, groupIdx, dIdx, "name")}
               placeholder="—"
             />
           </td>
         );
       case "donationType":
         return (
-          <td key={colKey} className={cellPad}>
+          <td key={colKey} className={cellPad} data-group-cell={`${groupIdx}-${dIdx}-donationType`}>
             <Input
-              className={`${inputH} border-0 bg-transparent p-0`}
+              className={`${inputH} border-0 bg-transparent p-0 focus:bg-primary/5 focus:ring-1 focus:ring-primary/30 rounded transition-colors`}
               value={d.donationType}
               onChange={(e) => updateGroupDonation(groupIdx, dIdx, "donationType", e.target.value)}
+              onKeyDown={(e) => handleGroupCellTab(e, groupIdx, dIdx, "donationType")}
               placeholder="—"
             />
           </td>
         );
       case "notes":
         return (
-          <td key={colKey} className={cellPad}>
+          <td key={colKey} className={cellPad} data-group-cell={`${groupIdx}-${dIdx}-notes`}>
             <Input
-              className={`${inputH} border-0 bg-transparent p-0`}
+              className={`${inputH} border-0 bg-transparent p-0 focus:bg-primary/5 focus:ring-1 focus:ring-primary/30 rounded transition-colors`}
               value={d.notes || ""}
               onChange={(e) => updateGroupDonation(groupIdx, dIdx, "notes", e.target.value)}
+              onKeyDown={(e) => handleGroupCellTab(e, groupIdx, dIdx, "notes")}
               placeholder="—"
             />
           </td>
@@ -1488,6 +1702,22 @@ export default function KesimAlaniPage() {
                 <History className="w-4 h-4" />
               </Button>
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShortcutHelpOpen(true)}
+              title="Klavye Kısayolları (?)"
+            >
+              <Keyboard className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleFullscreen}
+              title="Tam Ekran (F11)"
+            >
+              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            </Button>
             <Button variant="outline" size="sm" onClick={exportDonorsExcel} title="Bağışçı Listesi Excel">
               <FileSpreadsheet className="w-4 h-4" />
             </Button>
@@ -1645,8 +1875,9 @@ export default function KesimAlaniPage() {
                 <div className="relative">
                   <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <Input
+                    ref={searchInputRef}
                     className="h-8 text-sm pl-8 w-48"
-                    placeholder="Ara..."
+                    placeholder="Ara... (Ctrl+F)"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -2060,20 +2291,17 @@ export default function KesimAlaniPage() {
                             {editingCell?.donationId === d.id &&
                             editingCell?.field === "vekalet" ? (
                               <Input
-                                className="h-7 text-sm"
-                                value={d.vekalet || ""}
-                                onChange={(e) =>
-                                  updateDonationField(d.id, "vekalet", e.target.value)
-                                }
-                                onBlur={() => setEditingCell(null)}
+                                className="h-7 text-sm ring-2 ring-primary/40 bg-primary/5"
+                                value={editDraft}
+                                onChange={(e) => setEditDraft(e.target.value)}
+                                onBlur={() => commitEdit()}
+                                onKeyDown={(e) => handleDonorCellKeyDown(e, d.id, "vekalet")}
                                 autoFocus
                               />
                             ) : (
                               <span
-                                className="cursor-text"
-                                onClick={() =>
-                                  setEditingCell({ donationId: d.id, field: "vekalet" })
-                                }
+                                className="cursor-text block px-1 py-0.5 rounded hover:bg-muted/50 transition-colors"
+                                onClick={() => startEditing(d.id, "vekalet")}
                               >
                                 {d.vekalet || "—"}
                               </span>
@@ -2083,28 +2311,18 @@ export default function KesimAlaniPage() {
                             {editingCell?.donationId === d.id &&
                             editingCell?.field === "description" ? (
                               <Input
-                                className="h-7 text-sm"
-                                value={d.description}
-                                onChange={(e) =>
-                                  updateDonationField(
-                                    d.id,
-                                    "description",
-                                    e.target.value
-                                  )
-                                }
-                                onBlur={() => setEditingCell(null)}
+                                className="h-7 text-sm ring-2 ring-primary/40 bg-primary/5"
+                                value={editDraft}
+                                onChange={(e) => setEditDraft(e.target.value)}
+                                onBlur={() => commitEdit()}
+                                onKeyDown={(e) => handleDonorCellKeyDown(e, d.id, "description")}
                                 autoFocus
                               />
                             ) : (
                               <div className="flex items-center gap-1">
                                 <span
-                                  className="cursor-text flex-1"
-                                  onClick={() =>
-                                    setEditingCell({
-                                      donationId: d.id,
-                                      field: "description",
-                                    })
-                                  }
+                                  className="cursor-text flex-1 block px-1 py-0.5 rounded hover:bg-muted/50 transition-colors"
+                                  onClick={() => startEditing(d.id, "description")}
                                 >
                                   {d.description || "—"}
                                 </span>
@@ -2126,20 +2344,17 @@ export default function KesimAlaniPage() {
                             {editingCell?.donationId === d.id &&
                             editingCell?.field === "name" ? (
                               <Input
-                                className="h-7 text-sm"
-                                value={d.name}
-                                onChange={(e) =>
-                                  updateDonationField(d.id, "name", e.target.value)
-                                }
-                                onBlur={() => setEditingCell(null)}
+                                className="h-7 text-sm ring-2 ring-primary/40 bg-primary/5"
+                                value={editDraft}
+                                onChange={(e) => setEditDraft(e.target.value)}
+                                onBlur={() => commitEdit()}
+                                onKeyDown={(e) => handleDonorCellKeyDown(e, d.id, "name")}
                                 autoFocus
                               />
                             ) : (
                               <span
-                                className="cursor-text"
-                                onClick={() =>
-                                  setEditingCell({ donationId: d.id, field: "name" })
-                                }
+                                className="cursor-text block px-1 py-0.5 rounded hover:bg-muted/50 transition-colors"
+                                onClick={() => startEditing(d.id, "name")}
                               >
                                 {d.name || "—"}
                               </span>
@@ -2149,27 +2364,17 @@ export default function KesimAlaniPage() {
                             {editingCell?.donationId === d.id &&
                             editingCell?.field === "donationType" ? (
                               <Input
-                                className="h-7 text-sm"
-                                value={d.donationType}
-                                onChange={(e) =>
-                                  updateDonationField(
-                                    d.id,
-                                    "donationType",
-                                    e.target.value
-                                  )
-                                }
-                                onBlur={() => setEditingCell(null)}
+                                className="h-7 text-sm ring-2 ring-primary/40 bg-primary/5"
+                                value={editDraft}
+                                onChange={(e) => setEditDraft(e.target.value)}
+                                onBlur={() => commitEdit()}
+                                onKeyDown={(e) => handleDonorCellKeyDown(e, d.id, "donationType")}
                                 autoFocus
                               />
                             ) : (
                               <span
-                                className="cursor-text"
-                                onClick={() =>
-                                  setEditingCell({
-                                    donationId: d.id,
-                                    field: "donationType",
-                                  })
-                                }
+                                className="cursor-text block px-1 py-0.5 rounded hover:bg-muted/50 transition-colors"
+                                onClick={() => startEditing(d.id, "donationType")}
                               >
                                 {d.donationType || "—"}
                               </span>
@@ -2179,20 +2384,17 @@ export default function KesimAlaniPage() {
                             {editingCell?.donationId === d.id &&
                             editingCell?.field === "notes" ? (
                               <Input
-                                className="h-7 text-sm"
-                                value={d.notes || ""}
-                                onChange={(e) =>
-                                  updateDonationField(d.id, "notes", e.target.value)
-                                }
-                                onBlur={() => setEditingCell(null)}
+                                className="h-7 text-sm ring-2 ring-primary/40 bg-primary/5"
+                                value={editDraft}
+                                onChange={(e) => setEditDraft(e.target.value)}
+                                onBlur={() => commitEdit()}
+                                onKeyDown={(e) => handleDonorCellKeyDown(e, d.id, "notes")}
                                 autoFocus
                               />
                             ) : (
                               <span
-                                className="cursor-text"
-                                onClick={() =>
-                                  setEditingCell({ donationId: d.id, field: "notes" })
-                                }
+                                className="cursor-text block px-1 py-0.5 rounded hover:bg-muted/50 transition-colors"
+                                onClick={() => startEditing(d.id, "notes")}
                               >
                                 {d.notes || "—"}
                               </span>
@@ -2289,7 +2491,7 @@ export default function KesimAlaniPage() {
           )}
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div ref={groupsHeaderRef} className="flex items-center justify-between mb-4 flex-wrap gap-2 sticky top-0 z-20 bg-background py-2 -mt-2 border-b border-transparent" style={{ backdropFilter: "blur(8px)" }}>
               <div className="flex items-center gap-2 flex-wrap">
                 {!fullscreenMode && (
                   <Button
@@ -2300,6 +2502,17 @@ export default function KesimAlaniPage() {
                     title={donorListVisible ? "Bağışçı Listesini Gizle" : "Bağışçı Listesini Göster"}
                   >
                     {donorListVisible ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+                  </Button>
+                )}
+                {kesim.animalGroups.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => setMinimapOpen(!minimapOpen)}
+                    title="Mini Harita"
+                  >
+                    <MapIcon className="w-4 h-4" />
                   </Button>
                 )}
                 <h2 className="text-lg font-semibold">
@@ -2428,8 +2641,9 @@ export default function KesimAlaniPage() {
                 <div className="flex gap-2 items-center">
                   <div className="flex items-center gap-1">
                     <Input
+                      ref={jumpInputRef}
                       className="h-8 w-20 text-sm text-center"
-                      placeholder="No"
+                      placeholder="No (Ctrl+G)"
                       value={jumpToAnimal}
                       onChange={(e) => setJumpToAnimal(e.target.value)}
                       onKeyDown={(e) => {
@@ -2561,6 +2775,48 @@ export default function KesimAlaniPage() {
                   </Button>
                 </div>
               </div>
+            )}
+
+            {minimapOpen && kesim.animalGroups.length > 0 && (
+              <Card className="p-3 mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                    <MapIcon className="w-4 h-4" />
+                    Genel Bakış
+                  </h3>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setMinimapOpen(false)}>✕</Button>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {kesim.animalGroups.map((group) => {
+                    const filled = group.donations.filter(d => d.name.trim() !== "").length;
+                    const ratio = filled / 7;
+                    let bg = "#ef4444";
+                    if (ratio >= 1) bg = "#22c55e";
+                    else if (ratio >= 0.5) bg = "#eab308";
+                    else if (ratio > 0) bg = "#f97316";
+                    return (
+                      <button
+                        key={group.id}
+                        className="w-7 h-7 rounded text-[10px] font-bold text-white flex items-center justify-center transition-transform hover:scale-110 hover:shadow-md"
+                        style={{ backgroundColor: bg }}
+                        title={`Hayvan ${group.animalNo}: ${filled}/7 dolu`}
+                        onClick={() => {
+                          const el = document.getElementById(`animal-group-${group.animalNo}`);
+                          if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }}
+                      >
+                        {group.animalNo}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded" style={{backgroundColor:"#22c55e"}} /> Dolu (7/7)</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded" style={{backgroundColor:"#eab308"}} /> Yarı dolu</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded" style={{backgroundColor:"#f97316"}} /> Az dolu</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded" style={{backgroundColor:"#ef4444"}} /> Boş</span>
+                </div>
+              </Card>
             )}
 
             {selectedGroupIds.size > 0 && (
@@ -2778,7 +3034,14 @@ export default function KesimAlaniPage() {
                   const compact = workspace.prefs.compactMode;
                   const isIncomplete = filledCount < 7;
                   return (
-                    <Card key={group.id} id={`animal-group-${group.animalNo}`} className={`overflow-hidden ${swapSelection?.groupIdx === groupIdx ? "ring-2 ring-purple-400" : ""} ${highlightIncomplete && isIncomplete ? "ring-2 ring-orange-400" : ""}`} style={group.colorTag ? { borderLeft: `4px solid ${colorMap[group.colorTag]}` } : (highlightIncomplete && isIncomplete ? { borderLeft: "4px solid #f97316" } : {})}>
+                    <Card
+                      key={group.id}
+                      id={`animal-group-${group.animalNo}`}
+                      className={`overflow-hidden transition-all ${swapSelection?.groupIdx === groupIdx ? "ring-2 ring-purple-400" : ""} ${highlightIncomplete && isIncomplete ? "ring-2 ring-orange-400" : ""} ${dragItem && dragItem.groupIdx !== groupIdx && dragOverGroup === groupIdx ? "ring-2 ring-primary shadow-lg scale-[1.01]" : ""} ${dragItem && dragItem.groupIdx !== groupIdx && !isGroupLocked(groupIdx) ? "border-dashed border-2 border-primary/30" : ""}`}
+                      style={group.colorTag ? { borderLeft: `4px solid ${colorMap[group.colorTag]}` } : (highlightIncomplete && isIncomplete ? { borderLeft: "4px solid #f97316" } : {})}
+                      onDragOver={(e) => { e.preventDefault(); setDragOverGroup(groupIdx); }}
+                      onDragLeave={(e) => handleDragLeave(e, groupIdx)}
+                    >
                       <div
                         className={`flex items-center justify-between ${compact ? "p-2" : "p-3"} bg-primary/10 cursor-pointer`}
                         onClick={() => toggleGroupCollapse(group.id)}
@@ -2869,28 +3132,25 @@ export default function KesimAlaniPage() {
                             {group.donations.map((d, dIdx) => (
                               <tr
                                 key={d.id}
-                                className={`border-b transition-colors ${
+                                className={`border-b transition-all duration-150 ${
                                   dragOverItem?.groupIdx === groupIdx &&
                                   dragOverItem?.donationIdx === dIdx
-                                    ? "bg-primary/20"
+                                    ? "bg-primary/20 shadow-inner"
                                     : isGroupSearchMatch(groupIdx, dIdx)
                                     ? "bg-yellow-100 dark:bg-yellow-900/40"
                                     : selectedGroupDonations.has(d.id)
                                     ? "bg-blue-50 dark:bg-blue-950/40"
                                     : "hover:bg-muted/20"
-                                }`}
+                                } ${dragItem?.groupIdx === groupIdx && dragItem?.donationIdx === dIdx ? "opacity-50 scale-95" : ""}`}
                                 draggable
-                                onDragStart={() =>
-                                  handleDragStart(groupIdx, dIdx)
+                                onDragStart={(e) =>
+                                  handleDragStart(groupIdx, dIdx, e)
                                 }
                                 onDragOver={(e) =>
                                   handleDragOver(e, groupIdx, dIdx)
                                 }
                                 onDrop={() => handleDrop(groupIdx, dIdx)}
-                                onDragEnd={() => {
-                                  setDragItem(null);
-                                  setDragOverItem(null);
-                                }}
+                                onDragEnd={handleDragEnd}
                               >
                                 <td className={compact ? "p-0.5" : "p-1.5"}>
                                   {d.name.trim() && (
@@ -3179,6 +3439,39 @@ export default function KesimAlaniPage() {
                 </div>
               </>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={shortcutHelpOpen} onOpenChange={setShortcutHelpOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Keyboard className="w-5 h-5" />
+              Klavye Kısayolları
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            {[
+              { keys: "Ctrl + Z", desc: "Geri Al" },
+              { keys: "Ctrl + Y", desc: "İleri Al" },
+              { keys: "Ctrl + S", desc: "Kaydet" },
+              { keys: "Ctrl + F", desc: "Bağışçı Ara" },
+              { keys: "Ctrl + G", desc: "Gruba Atla" },
+              { keys: "F11", desc: "Tam Ekran" },
+              { keys: "?", desc: "Bu yardım panelini aç/kapat" },
+              { keys: "Escape", desc: "Düzenlemeyi iptal et / paneli kapat" },
+              { keys: "Tab", desc: "Sonraki hücreye geç" },
+              { keys: "Shift + Tab", desc: "Önceki hücreye geç" },
+              { keys: "Enter", desc: "Düzenlemeyi onayla" },
+            ].map((shortcut, i) => (
+              <div key={i} className="flex items-center justify-between py-1.5 border-b last:border-0">
+                <span className="text-sm text-muted-foreground">{shortcut.desc}</span>
+                <kbd className="px-2 py-1 text-xs font-mono bg-muted rounded border border-border">
+                  {shortcut.keys}
+                </kbd>
+              </div>
+            ))}
           </div>
         </DialogContent>
       </Dialog>
