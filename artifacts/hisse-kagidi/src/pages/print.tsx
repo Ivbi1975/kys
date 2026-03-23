@@ -510,7 +510,7 @@ export default function PrintPage() {
                       <div className="summary-stat-label">Boş Slot</div>
                     </div>
                     <div className="summary-stat-card">
-                      <div className="summary-stat-value">{totalGroups > 0 ? Math.round((filledSlots / totalSlots) * 100) : 0}%</div>
+                      <div className="summary-stat-value">{totalSlots > 0 ? Math.round((filledSlots / totalSlots) * 100) : 0}%</div>
                       <div className="summary-stat-label">Doluluk Oranı</div>
                     </div>
                   </div>
