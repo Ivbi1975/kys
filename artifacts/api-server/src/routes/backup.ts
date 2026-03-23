@@ -240,6 +240,12 @@ router.post("/backup/import", async (req, res) => {
             }
             if (d.tags && d.tags.length > 0) {
               for (const tagId of d.tags) {
+                if (mode === "merge") {
+                  const existing = await tx.select().from(donationTagsTable)
+                    .where(eq(donationTagsTable.donationId, donationId))
+                    .limit(100);
+                  if (existing.some(e => e.tagId === tagId)) continue;
+                }
                 await tx.insert(donationTagsTable).values({ donationId, tagId })
                   .onConflictDoNothing();
               }
@@ -267,6 +273,12 @@ router.post("/backup/import", async (req, res) => {
             }
             if (g.donations && g.donations.length > 0) {
               for (let j = 0; j < g.donations.length; j++) {
+                if (mode === "merge") {
+                  const existing = await tx.select().from(animalGroupDonationsTable)
+                    .where(eq(animalGroupDonationsTable.groupId, groupId))
+                    .limit(100);
+                  if (existing.some(e => e.donationId === g.donations[j].id)) continue;
+                }
                 await tx.insert(animalGroupDonationsTable).values({
                   groupId,
                   donationId: g.donations[j].id,
@@ -281,7 +293,7 @@ router.post("/backup/import", async (req, res) => {
       if (data.logo) {
         await tx.insert(appSettingsTable).values({ key: "logo", value: data.logo })
           .onConflictDoUpdate({ target: appSettingsTable.key, set: { value: data.logo } });
-      } else {
+      } else if (mode === "replace") {
         await tx.delete(appSettingsTable).where(eq(appSettingsTable.key, "logo"));
       }
     });
