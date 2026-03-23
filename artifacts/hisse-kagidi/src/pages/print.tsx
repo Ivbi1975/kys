@@ -1,10 +1,30 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Printer, Settings2, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Printer, Settings2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff } from "lucide-react";
 import type { KesimAlani, AnimalGroup } from "@/lib/types";
-import { getKesimAlani, loadLogo } from "@/lib/storage";
+import {
+  getKesimAlani,
+  loadLogo,
+  loadPrintPreferences,
+  savePrintPreferences,
+  resetPrintPreferences,
+  DEFAULT_PRINT_PREFS,
+} from "@/lib/storage";
+import type { PrintPreferences } from "@/lib/storage";
+
+const COLUMNS = [
+  { key: "hayvan", label: "HAYVAN" },
+  { key: "sira", label: "SIRA" },
+  { key: "vekalet", label: "VEKALET" },
+  { key: "vekaleti-veren", label: "VEKALETİ VEREN" },
+  { key: "adina-kesilen", label: "ADINA KESİLEN" },
+  { key: "cinsi", label: "CİNSİ" },
+  { key: "notlar", label: "NOTLAR" },
+] as const;
+
+type ColumnKey = (typeof COLUMNS)[number]["key"];
 
 export default function PrintPage() {
   const params = useParams<{ id: string }>();
@@ -12,7 +32,8 @@ export default function PrintPage() {
   const [kesim, setKesim] = useState<KesimAlani | null>(null);
   const [logo, setLogo] = useState<string | null>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
-  const [hideVekaletTypes, setHideVekaletTypes] = useState<Set<string>>(new Set(["Vacip", "VACİB", "vacib", "Vacib"]));
+  const [contentRulesOpen, setContentRulesOpen] = useState<string | null>(null);
+  const [prefs, setPrefs] = useState<PrintPreferences>(() => loadPrintPreferences());
 
   useEffect(() => {
     if (params.id) {
@@ -22,6 +43,14 @@ export default function PrintPage() {
     }
     setLogo(loadLogo());
   }, [params.id, setLocation]);
+
+  const updatePrefs = useCallback((updater: (prev: PrintPreferences) => PrintPreferences) => {
+    setPrefs((prev) => {
+      const next = updater(prev);
+      savePrintPreferences(next);
+      return next;
+    });
+  }, []);
 
   const allCinsTypes = useMemo(() => {
     if (!kesim) return [];
@@ -41,22 +70,67 @@ export default function PrintPage() {
     return kesim.animalGroups;
   }, [kesim]);
 
-  function toggleHideType(type: string) {
-    setHideVekaletTypes((prev) => {
-      const next = new Set(prev);
-      if (next.has(type)) next.delete(type);
-      else next.add(type);
-      return next;
+  const isColumnHidden = useCallback(
+    (key: string) => prefs.hiddenColumns.includes(key),
+    [prefs.hiddenColumns]
+  );
+
+  const visibleColumns = useMemo(
+    () => COLUMNS.filter((c) => !isColumnHidden(c.key)),
+    [isColumnHidden]
+  );
+
+  function toggleColumnVisibility(key: string) {
+    updatePrefs((prev) => {
+      if (!prev.hiddenColumns.includes(key)) {
+        const wouldBeHidden = [...prev.hiddenColumns, key];
+        if (wouldBeHidden.length >= COLUMNS.length) return prev;
+        return { ...prev, hiddenColumns: wouldBeHidden };
+      }
+      return { ...prev, hiddenColumns: prev.hiddenColumns.filter((k) => k !== key) };
     });
   }
 
-  function shouldHideVekaleti(cinsi: string): boolean {
+  function shouldHideContent(columnKey: string, cinsi: string): boolean {
     if (!cinsi) return false;
-    const normalized = cinsi.trim();
-    for (const type of hideVekaletTypes) {
-      if (normalized.toLowerCase() === type.toLowerCase()) return true;
+    const rules = prefs.contentHideRules[columnKey];
+    if (!rules || rules.length === 0) return false;
+    const normalized = cinsi.trim().toLowerCase();
+    return rules.some((r) => r.toLowerCase() === normalized);
+  }
+
+  function toggleContentHideRule(columnKey: string, cinsType: string) {
+    updatePrefs((prev) => {
+      const rules = { ...prev.contentHideRules };
+      const existing = rules[columnKey] || [];
+      const hasRule = existing.some((r) => r.toLowerCase() === cinsType.toLowerCase());
+      if (hasRule) {
+        rules[columnKey] = existing.filter((r) => r.toLowerCase() !== cinsType.toLowerCase());
+        if (rules[columnKey].length === 0) delete rules[columnKey];
+      } else {
+        rules[columnKey] = [...existing, cinsType];
+      }
+      return { ...prev, contentHideRules: rules };
+    });
+  }
+
+  function handleReset() {
+    resetPrintPreferences();
+    setPrefs({
+      ...DEFAULT_PRINT_PREFS,
+      contentHideRules: { ...DEFAULT_PRINT_PREFS.contentHideRules },
+    });
+  }
+
+  function getCellContent(columnKey: ColumnKey, d: AnimalGroup["donations"][0]): string {
+    switch (columnKey) {
+      case "vekalet": return d.vekalet || "";
+      case "vekaleti-veren": return d.description || "";
+      case "adina-kesilen": return d.name || "";
+      case "cinsi": return d.donationType || "";
+      case "notlar": return d.notes || "";
+      default: return "";
     }
-    return false;
   }
 
   function handlePrint() {
@@ -98,40 +172,110 @@ export default function PrintPage() {
         <div className="print:hidden border-b bg-muted/30 px-4 py-4">
           <div className="max-w-4xl mx-auto space-y-4">
             <Card className="p-4">
-              <h3 className="text-sm font-semibold mb-3">Vekaleti Veren Gizleme</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold">Sütun Görünürlüğü</h3>
+                <Button variant="outline" size="sm" onClick={handleReset}>
+                  <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                  Ayarları Sıfırla
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground mb-3">
-                Seçili cinslerde "Vekaleti Veren" sütunu yazdırmada boş bırakılır.
+                Gizlenen sütunlar yazdırma çıktısından tamamen kaldırılır. Kalan sütunlar genişleyerek boş alanı doldurur.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {COLUMNS.map((col) => {
+                  const hidden = isColumnHidden(col.key);
+                  const isLastVisible = !hidden && visibleColumns.length === 1;
+                  return (
+                    <button
+                      key={col.key}
+                      onClick={() => toggleColumnVisibility(col.key)}
+                      disabled={isLastVisible}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
+                        isLastVisible
+                          ? "bg-muted border-border text-muted-foreground cursor-not-allowed opacity-50"
+                          : hidden
+                            ? "bg-destructive/10 border-destructive/30 text-destructive cursor-pointer"
+                            : "bg-primary/10 border-primary/30 text-primary cursor-pointer"
+                      }`}
+                    >
+                      {hidden ? (
+                        <EyeOff className="w-3 h-3" />
+                      ) : (
+                        <Eye className="w-3 h-3" />
+                      )}
+                      {col.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <h3 className="text-sm font-semibold mb-3">Koşullu İçerik Gizleme</h3>
+              <p className="text-xs text-muted-foreground mb-3">
+                Belirli cinslerde sütun içeriğini boş bırakmak için sütunu seçin ve cins türlerini işaretleyin.
               </p>
               {allCinsTypes.length === 0 ? (
                 <p className="text-xs text-muted-foreground italic">Henüz cinsi bilgisi olan bağışçı yok.</p>
               ) : (
-                <div className="flex flex-wrap gap-2">
-                  {allCinsTypes.map((type) => {
-                    const isChecked = shouldHideVekaleti(type);
+                <div className="space-y-2">
+                  {COLUMNS.filter((c) => c.key !== "hayvan").map((col) => {
+                    const isOpen = contentRulesOpen === col.key;
+                    const rules = prefs.contentHideRules[col.key] || [];
+                    const activeCount = rules.length;
                     return (
-                      <label
-                        key={type}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium cursor-pointer transition-colors ${
-                          isChecked
-                            ? "bg-destructive/10 border-destructive/30 text-destructive"
-                            : "bg-background border-border text-foreground hover:bg-muted"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleHideType(type)}
-                          className="rounded w-3 h-3"
-                        />
-                        {type}
-                        {isChecked && <span className="text-[10px]">(gizle)</span>}
-                      </label>
+                      <div key={col.key} className="border rounded-lg">
+                        <button
+                          onClick={() => setContentRulesOpen(isOpen ? null : col.key)}
+                          className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium hover:bg-muted/50 transition-colors"
+                        >
+                          <span className="flex items-center gap-2">
+                            {col.label}
+                            {activeCount > 0 && (
+                              <span className="bg-destructive/10 text-destructive px-1.5 py-0.5 rounded-full text-[10px] font-semibold">
+                                {activeCount} cins gizli
+                              </span>
+                            )}
+                          </span>
+                          {isOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        </button>
+                        {isOpen && (
+                          <div className="px-3 pb-3 pt-1 border-t">
+                            <div className="flex flex-wrap gap-2">
+                              {allCinsTypes.map((type) => {
+                                const isChecked = rules.some(
+                                  (r) => r.toLowerCase() === type.toLowerCase()
+                                );
+                                return (
+                                  <label
+                                    key={type}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium cursor-pointer transition-colors ${
+                                      isChecked
+                                        ? "bg-destructive/10 border-destructive/30 text-destructive"
+                                        : "bg-background border-border text-foreground hover:bg-muted"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => toggleContentHideRule(col.key, type)}
+                                      className="rounded w-3 h-3"
+                                    />
+                                    {type}
+                                    {isChecked && <span className="text-[10px]">(gizle)</span>}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
               )}
             </Card>
-
           </div>
         </div>
       )}
@@ -147,34 +291,42 @@ export default function PrintPage() {
             </div>
 
             <div className="page-content">
-              <table className="kesim-table">
+              <table className="kesim-table dynamic-columns">
                 <thead>
                   <tr>
-                    <th className="col-hayvan">HAYVAN</th>
-                    <th className="col-sira">SIRA</th>
-                    <th className="col-vekalet">VEKALET</th>
-                    <th className="col-vekaleti-veren">VEKALETİ VEREN</th>
-                    <th className="col-adina-kesilen">ADINA KESİLEN</th>
-                    <th className="col-cinsi">CİNSİ</th>
-                    <th className="col-notlar">NOTLAR</th>
+                    {visibleColumns.map((col) => (
+                      <th key={col.key} className={`col-${col.key}`}>
+                        {col.label}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {group.donations.map((d, idx) => (
                     <tr key={d.id}>
-                      {idx === 0 && (
+                      {!isColumnHidden("hayvan") && idx === 0 && (
                         <td className="hayvan-cell" rowSpan={7}>
                           <div className="hayvan-number">{group.animalNo}</div>
                         </td>
                       )}
-                      <td className="sira-cell">{idx + 1}</td>
-                      <td className="vekalet-cell">{d.vekalet || ""}</td>
-                      <td className="vekaleti-veren-cell">
-                        {shouldHideVekaleti(d.donationType) ? "" : (d.description || "")}
-                      </td>
-                      <td className="adina-kesilen-cell">{d.name || ""}</td>
-                      <td className="cinsi-cell">{d.donationType || ""}</td>
-                      <td className="notlar-cell">{d.notes || ""}</td>
+                      {visibleColumns
+                        .filter((col) => col.key !== "hayvan")
+                        .map((col) => {
+                          if (col.key === "sira") {
+                            return (
+                              <td key={col.key} className="sira-cell">
+                                {shouldHideContent("sira", d.donationType) ? "" : idx + 1}
+                              </td>
+                            );
+                          }
+                          const content = getCellContent(col.key, d);
+                          const hidden = shouldHideContent(col.key, d.donationType);
+                          return (
+                            <td key={col.key} className={`${col.key}-cell`}>
+                              {hidden ? "" : content}
+                            </td>
+                          );
+                        })}
                     </tr>
                   ))}
                 </tbody>

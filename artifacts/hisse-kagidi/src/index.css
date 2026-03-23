@@ -323,6 +323,10 @@
 .kesim-table .col-cinsi { width: 80px; }
 .kesim-table .col-notlar { width: 140px; }
 
+.kesim-table.dynamic-columns {
+  table-layout: auto;
+}
+
 .kesim-table td {
   padding: 0 8px;
   border: 1.5px solid #9ca3af;
