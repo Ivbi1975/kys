@@ -240,7 +240,7 @@ export default function KesimAlaniPage() {
 
       for (let c = 0; c < columnMappings.length; c++) {
         const mapping = columnMappings[c];
-        const cellValue = (row[c] || "").trim();
+        const cellValue = String(row[c] ?? "").trim();
         if (mapping === "skip" || !cellValue) continue;
         if (mapping === "shareCount") {
           donation.shareCount = Math.max(1, Math.min(7, parseInt(cellValue, 10) || 1));
