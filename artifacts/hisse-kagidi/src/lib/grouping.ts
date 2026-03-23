@@ -239,29 +239,40 @@ export function getRequiredAnimals(donations: Donation[]): number {
 export interface ConflictInfo {
   description: string;
   animalNos: number[];
+  totalShares: number;
+  isExpected: boolean;
 }
 
 export function checkGroupConflicts(groups: AnimalGroup[]): ConflictInfo[] {
   const descToAnimals = new Map<string, Set<number>>();
+  const descToCount = new Map<string, number>();
   for (const group of groups) {
     for (const d of group.donations) {
       const key = d.description.trim().toLowerCase();
       if (!key) continue;
       if (!descToAnimals.has(key)) descToAnimals.set(key, new Set());
       descToAnimals.get(key)!.add(group.animalNo);
+      descToCount.set(key, (descToCount.get(key) || 0) + 1);
     }
   }
   const conflicts: ConflictInfo[] = [];
   for (const [desc, animals] of descToAnimals) {
     if (animals.size > 1) {
+      const totalShares = descToCount.get(desc) || 0;
       const originalDesc = groups
         .flatMap(g => g.donations)
         .find(d => d.description.trim().toLowerCase() === desc)?.description || desc;
       conflicts.push({
         description: originalDesc,
         animalNos: Array.from(animals).sort((a, b) => a - b),
+        totalShares,
+        isExpected: totalShares > 7,
       });
     }
   }
+  conflicts.sort((a, b) => {
+    if (a.isExpected !== b.isExpected) return a.isExpected ? 1 : -1;
+    return a.description.localeCompare(b.description, "tr");
+  });
   return conflicts;
 }

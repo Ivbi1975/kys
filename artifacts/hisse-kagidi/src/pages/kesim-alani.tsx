@@ -100,6 +100,8 @@ export default function KesimAlaniPage() {
   const [showConflicts, setShowConflicts] = useState(false);
   const [personEditDesc, setPersonEditDesc] = useState<string | null>(null);
   const [personSearchQuery, setPersonSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [jumpToAnimal, setJumpToAnimal] = useState("");
   const [dragItem, setDragItem] = useState<{
     groupIdx: number;
     donationIdx: number;
@@ -185,12 +187,61 @@ export default function KesimAlaniPage() {
 
   function updateDonationField(id: string, field: keyof Donation, value: string | number | boolean) {
     if (!kesim) return;
+    if (field === "excluded" && value === true) {
+      const target = kesim.donations.find(d => d.id === id);
+      if (target && target.description.trim()) {
+        const key = target.description.trim().toLowerCase();
+        save({
+          ...kesim,
+          donations: kesim.donations.map((d) =>
+            d.description.trim().toLowerCase() === key ? { ...d, excluded: true } : d
+          ),
+        });
+        return;
+      }
+    }
+    if (field === "excluded" && value === false) {
+      const target = kesim.donations.find(d => d.id === id);
+      if (target && target.description.trim()) {
+        const key = target.description.trim().toLowerCase();
+        save({
+          ...kesim,
+          donations: kesim.donations.map((d) =>
+            d.description.trim().toLowerCase() === key ? { ...d, excluded: false } : d
+          ),
+        });
+        return;
+      }
+    }
     save({
       ...kesim,
       donations: kesim.donations.map((d) =>
         d.id === id ? { ...d, [field]: value } : d
       ),
     });
+  }
+
+  function bulkExcludeByDesc(description: string, excluded: boolean) {
+    if (!kesim) return;
+    const key = description.trim().toLowerCase();
+    save({
+      ...kesim,
+      donations: kesim.donations.map((d) =>
+        d.description.trim().toLowerCase() === key ? { ...d, excluded } : d
+      ),
+    });
+  }
+
+  function bulkDeleteByDesc(description: string) {
+    if (!kesim) return;
+    const key = description.trim().toLowerCase();
+    save({
+      ...kesim,
+      donations: kesim.donations.filter((d) =>
+        d.description.trim().toLowerCase() !== key
+      ),
+    });
+    setPersonEditDesc(null);
   }
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -438,6 +489,17 @@ export default function KesimAlaniPage() {
     }
   }
 
+  const filteredDonations = searchQuery.trim()
+    ? kesim.donations.filter(d => {
+        const q = searchQuery.trim().toLowerCase();
+        return d.name.toLowerCase().includes(q) ||
+          d.description.toLowerCase().includes(q) ||
+          d.vekalet.toLowerCase().includes(q) ||
+          d.donationType.toLowerCase().includes(q) ||
+          (d.notes || "").toLowerCase().includes(q);
+      })
+    : kesim.donations;
+
   const displayPreviewRows = hasHeaderRow ? previewData.slice(1) : previewData;
   const headerRow = hasHeaderRow && previewData.length > 0 ? previewData[0] : null;
 
@@ -472,7 +534,16 @@ export default function KesimAlaniPage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Bağışçı Listesi</h2>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    className="h-8 text-sm pl-8 w-48"
+                    placeholder="Ara..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
                 <Dialog open={bulkDialogOpen} onOpenChange={(open) => { if (!open) resetBulkDialog(); else setBulkDialogOpen(true); }}>
                   <DialogTrigger asChild>
                     <Button variant="outline" size="sm">
@@ -820,14 +891,14 @@ export default function KesimAlaniPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {kesim.donations.length === 0 ? (
+                    {filteredDonations.length === 0 ? (
                       <tr>
                         <td colSpan={9} className="p-8 text-center text-muted-foreground">
-                          Henüz bağışçı eklenmedi. "Toplu Ekle" ile Excel yükleyin veya yapıştırın.
+                          {searchQuery.trim() ? `"${searchQuery}" için sonuç bulunamadı` : 'Henüz bağışçı eklenmedi. "Toplu Ekle" ile Excel yükleyin veya yapıştırın.'}
                         </td>
                       </tr>
                     ) : (
-                      kesim.donations.map((d, idx) => {
+                      filteredDonations.map((d, idx) => {
                         const descCount = d.excluded ? 0 : (descCountMap.get(d.description.trim().toLowerCase()) || 1);
                         const effectiveShare = descCount > 1 ? descCount : d.shareCount;
                         return (
@@ -1075,7 +1146,32 @@ export default function KesimAlaniPage() {
                 )}
               </h2>
               {kesim.animalGroups.length > 0 && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                  <div className="flex items-center gap-1">
+                    <Input
+                      className="h-8 w-20 text-sm text-center"
+                      placeholder="No"
+                      value={jumpToAnimal}
+                      onChange={(e) => setJumpToAnimal(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const el = document.getElementById(`animal-group-${jumpToAnimal}`);
+                          if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      onClick={() => {
+                        const el = document.getElementById(`animal-group-${jumpToAnimal}`);
+                        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }}
+                    >
+                      Git
+                    </Button>
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"
@@ -1103,13 +1199,13 @@ export default function KesimAlaniPage() {
                       ) : (
                         <>
                           <p className="text-sm text-amber-800 font-medium mb-2">
-                            {conflicts.length} kişi farklı hayvanlara dağılmış:
+                            {conflicts.filter(c => !c.isExpected).length} kişi beklenmeyen şekilde farklı hayvanlara dağılmış:
                           </p>
                           <ul className="space-y-1">
-                            {conflicts.map((c, i) => (
-                              <li key={i} className="text-sm text-amber-700 flex items-center gap-2">
+                            {conflicts.filter(c => !c.isExpected).map((c, i) => (
+                              <li key={i} className="text-sm text-amber-700 flex items-center gap-2 flex-wrap">
                                 <span className="font-semibold">{c.description}</span>
-                                <span className="text-xs">→ Hayvan No: {c.animalNos.join(", ")}</span>
+                                <span className="text-xs">({c.totalShares} hisse) → Hayvan No: {c.animalNos.join(", ")}</span>
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -1122,6 +1218,19 @@ export default function KesimAlaniPage() {
                               </li>
                             ))}
                           </ul>
+                          {conflicts.some(c => c.isExpected) && (
+                            <div className="mt-3 pt-2 border-t border-amber-200">
+                              <p className="text-xs text-amber-600 mb-1">7+ hisseli (normal dağılım):</p>
+                              <ul className="space-y-0.5">
+                                {conflicts.filter(c => c.isExpected).map((c, i) => (
+                                  <li key={i} className="text-xs text-amber-500 flex items-center gap-2">
+                                    <span>{c.description}</span>
+                                    <span>({c.totalShares} hisse) → Hayvan No: {c.animalNos.join(", ")}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
@@ -1146,7 +1255,7 @@ export default function KesimAlaniPage() {
                     (d) => d.name.trim() !== ""
                   ).length;
                   return (
-                    <Card key={group.id} className="overflow-hidden">
+                    <Card key={group.id} id={`animal-group-${group.animalNo}`} className="overflow-hidden">
                       <div
                         className="flex items-center justify-between p-3 bg-primary/10 cursor-pointer"
                         onClick={() => toggleGroupCollapse(group.id)}
@@ -1324,6 +1433,7 @@ export default function KesimAlaniPage() {
             const matchingDonations = kesim.donations.filter(
               d => d.description.trim().toLowerCase() === key
             );
+            const allExcluded = matchingDonations.length > 0 && matchingDonations.every(d => d.excluded);
             const matchingGroupEntries: { groupIdx: number; dIdx: number; donation: Donation; animalNo: number }[] = [];
             kesim.animalGroups.forEach((group, groupIdx) => {
               group.donations.forEach((d, dIdx) => {
@@ -1336,7 +1446,33 @@ export default function KesimAlaniPage() {
               <div className="space-y-4">
                 {matchingDonations.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-semibold mb-2">Bağışçı Listesindeki Kayıtlar ({matchingDonations.length})</h3>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold">Bağışçı Listesindeki Kayıtlar ({matchingDonations.length})</h3>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => bulkExcludeByDesc(personEditDesc, !allExcluded)}
+                        >
+                          {allExcluded ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
+                          {allExcluded ? "Tümünü Dahil Et" : "Tümünü Hariç Tut"}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => {
+                            if (confirm(`"${personEditDesc}" adlı kişinin tüm ${matchingDonations.length} kaydı silinecek. Emin misiniz?`)) {
+                              bulkDeleteByDesc(personEditDesc);
+                            }
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          Tümünü Sil
+                        </Button>
+                      </div>
+                    </div>
                     <table className="w-full text-sm border">
                       <thead>
                         <tr className="border-b bg-muted/30">
