@@ -239,13 +239,14 @@ router.post("/backup/import", async (req, res) => {
               await tx.insert(donationsTable).values(dValues);
             }
             if (d.tags && d.tags.length > 0) {
+              let existingTagIds: Set<string> | undefined;
+              if (mode === "merge") {
+                const existing = await tx.select().from(donationTagsTable)
+                  .where(eq(donationTagsTable.donationId, donationId));
+                existingTagIds = new Set(existing.map(e => e.tagId));
+              }
               for (const tagId of d.tags) {
-                if (mode === "merge") {
-                  const existing = await tx.select().from(donationTagsTable)
-                    .where(eq(donationTagsTable.donationId, donationId))
-                    .limit(100);
-                  if (existing.some(e => e.tagId === tagId)) continue;
-                }
+                if (existingTagIds?.has(tagId)) continue;
                 await tx.insert(donationTagsTable).values({ donationId, tagId })
                   .onConflictDoNothing();
               }
@@ -272,13 +273,14 @@ router.post("/backup/import", async (req, res) => {
               await tx.insert(animalGroupsTable).values(gValues);
             }
             if (g.donations && g.donations.length > 0) {
+              let existingDonationIds: Set<string> | undefined;
+              if (mode === "merge") {
+                const existing = await tx.select().from(animalGroupDonationsTable)
+                  .where(eq(animalGroupDonationsTable.groupId, groupId));
+                existingDonationIds = new Set(existing.map(e => e.donationId));
+              }
               for (let j = 0; j < g.donations.length; j++) {
-                if (mode === "merge") {
-                  const existing = await tx.select().from(animalGroupDonationsTable)
-                    .where(eq(animalGroupDonationsTable.groupId, groupId))
-                    .limit(100);
-                  if (existing.some(e => e.donationId === g.donations[j].id)) continue;
-                }
+                if (existingDonationIds?.has(g.donations[j].id)) continue;
                 await tx.insert(animalGroupDonationsTable).values({
                   groupId,
                   donationId: g.donations[j].id,
