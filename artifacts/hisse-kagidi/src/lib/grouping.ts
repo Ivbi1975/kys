@@ -235,3 +235,33 @@ export function getTotalShares(donations: Donation[]): number {
 export function getRequiredAnimals(donations: Donation[]): number {
   return Math.ceil(getTotalShares(donations) / 7);
 }
+
+export interface ConflictInfo {
+  description: string;
+  animalNos: number[];
+}
+
+export function checkGroupConflicts(groups: AnimalGroup[]): ConflictInfo[] {
+  const descToAnimals = new Map<string, Set<number>>();
+  for (const group of groups) {
+    for (const d of group.donations) {
+      const key = d.description.trim().toLowerCase();
+      if (!key) continue;
+      if (!descToAnimals.has(key)) descToAnimals.set(key, new Set());
+      descToAnimals.get(key)!.add(group.animalNo);
+    }
+  }
+  const conflicts: ConflictInfo[] = [];
+  for (const [desc, animals] of descToAnimals) {
+    if (animals.size > 1) {
+      const originalDesc = groups
+        .flatMap(g => g.donations)
+        .find(d => d.description.trim().toLowerCase() === desc)?.description || desc;
+      conflicts.push({
+        description: originalDesc,
+        animalNos: Array.from(animals).sort((a, b) => a - b),
+      });
+    }
+  }
+  return conflicts;
+}

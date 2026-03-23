@@ -36,11 +36,14 @@ import {
   EyeOff,
   Eye,
   Loader2,
+  AlertTriangle,
+  Search,
+  UserCog,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani } from "@/lib/types";
 import { getKesimAlani, updateKesimAlani } from "@/lib/storage";
-import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals } from "@/lib/grouping";
-import type { GroupingProgress } from "@/lib/grouping";
+import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts } from "@/lib/grouping";
+import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
 import * as XLSX from "xlsx";
 
 type SortField = "name" | "description" | "donationType" | "shareCount";
@@ -93,6 +96,10 @@ export default function KesimAlaniPage() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [groupingInProgress, setGroupingInProgress] = useState(false);
   const [groupingProgress, setGroupingProgress] = useState<GroupingProgress | null>(null);
+  const [conflicts, setConflicts] = useState<ConflictInfo[]>([]);
+  const [showConflicts, setShowConflicts] = useState(false);
+  const [personEditDesc, setPersonEditDesc] = useState<string | null>(null);
+  const [personSearchQuery, setPersonSearchQuery] = useState("");
   const [dragItem, setDragItem] = useState<{
     groupIdx: number;
     donationIdx: number;
@@ -284,6 +291,9 @@ export default function KesimAlaniPage() {
         setGroupingProgress({ ...progress });
       });
       save({ ...kesim, animalGroups: groups });
+      const found = checkGroupConflicts(groups);
+      setConflicts(found);
+      if (found.length > 0) setShowConflicts(true);
     } finally {
       setGroupingInProgress(false);
       setGroupingProgress(null);
@@ -874,17 +884,30 @@ export default function KesimAlaniPage() {
                                 autoFocus
                               />
                             ) : (
-                              <span
-                                className="cursor-text"
-                                onClick={() =>
-                                  setEditingCell({
-                                    donationId: d.id,
-                                    field: "description",
-                                  })
-                                }
-                              >
-                                {d.description || "—"}
-                              </span>
+                              <div className="flex items-center gap-1">
+                                <span
+                                  className="cursor-text flex-1"
+                                  onClick={() =>
+                                    setEditingCell({
+                                      donationId: d.id,
+                                      field: "description",
+                                    })
+                                  }
+                                >
+                                  {d.description || "—"}
+                                </span>
+                                {d.description && descCount > 1 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 w-5 p-0 shrink-0"
+                                    title="Bu kişinin tüm kayıtlarını düzenle"
+                                    onClick={() => setPersonEditDesc(d.description)}
+                                  >
+                                    <UserCog className="w-3 h-3 text-muted-foreground" />
+                                  </Button>
+                                )}
+                              </div>
                             )}
                           </td>
                           <td className="p-2">
@@ -1051,7 +1074,62 @@ export default function KesimAlaniPage() {
                   </span>
                 )}
               </h2>
+              {kesim.animalGroups.length > 0 && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const found = checkGroupConflicts(kesim.animalGroups);
+                      setConflicts(found);
+                      setShowConflicts(true);
+                    }}
+                  >
+                    <Search className="w-4 h-4 mr-1" />
+                    Çakışma Kontrol
+                  </Button>
+                </div>
+              )}
             </div>
+
+            {showConflicts && (
+              <Card className={`p-4 mb-4 ${conflicts.length > 0 ? "border-amber-300 bg-amber-50" : "border-green-300 bg-green-50"}`}>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className={`w-5 h-5 mt-0.5 ${conflicts.length > 0 ? "text-amber-600" : "text-green-600"}`} />
+                    <div>
+                      {conflicts.length === 0 ? (
+                        <p className="text-sm text-green-800 font-medium">Çakışma bulunamadı. Tüm vekaleti veren kişiler aynı hayvanda.</p>
+                      ) : (
+                        <>
+                          <p className="text-sm text-amber-800 font-medium mb-2">
+                            {conflicts.length} kişi farklı hayvanlara dağılmış:
+                          </p>
+                          <ul className="space-y-1">
+                            {conflicts.map((c, i) => (
+                              <li key={i} className="text-sm text-amber-700 flex items-center gap-2">
+                                <span className="font-semibold">{c.description}</span>
+                                <span className="text-xs">→ Hayvan No: {c.animalNos.join(", ")}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={() => setPersonEditDesc(c.description)}
+                                >
+                                  <UserCog className="w-3 h-3 mr-1" />
+                                  Düzenle
+                                </Button>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setShowConflicts(false)}>×</Button>
+                </div>
+              </Card>
+            )}
 
             {kesim.animalGroups.length === 0 ? (
               <Card className="p-8 text-center">
@@ -1232,6 +1310,130 @@ export default function KesimAlaniPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={personEditDesc !== null} onOpenChange={(open) => { if (!open) setPersonEditDesc(null); }}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCog className="w-5 h-5" />
+              Kişi Düzenleme: {personEditDesc}
+            </DialogTitle>
+          </DialogHeader>
+          {personEditDesc && kesim && (() => {
+            const key = personEditDesc.trim().toLowerCase();
+            const matchingDonations = kesim.donations.filter(
+              d => d.description.trim().toLowerCase() === key
+            );
+            const matchingGroupEntries: { groupIdx: number; dIdx: number; donation: Donation; animalNo: number }[] = [];
+            kesim.animalGroups.forEach((group, groupIdx) => {
+              group.donations.forEach((d, dIdx) => {
+                if (d.description.trim().toLowerCase() === key) {
+                  matchingGroupEntries.push({ groupIdx, dIdx, donation: d, animalNo: group.animalNo });
+                }
+              });
+            });
+            return (
+              <div className="space-y-4">
+                {matchingDonations.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">Bağışçı Listesindeki Kayıtlar ({matchingDonations.length})</h3>
+                    <table className="w-full text-sm border">
+                      <thead>
+                        <tr className="border-b bg-muted/30">
+                          <th className="p-2 text-left">Vekalet</th>
+                          <th className="p-2 text-left">Vekaleti Veren</th>
+                          <th className="p-2 text-left">Adına Kesilen</th>
+                          <th className="p-2 text-left">Cinsi</th>
+                          <th className="p-2 text-left">Notlar</th>
+                          <th className="p-2 text-center">Durum</th>
+                          <th className="p-2 w-10"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {matchingDonations.map((d) => (
+                          <tr key={d.id} className={`border-b ${d.excluded ? "opacity-40" : ""}`}>
+                            <td className="p-2">
+                              <Input className="h-7 text-sm" value={d.vekalet || ""} onChange={(e) => updateDonationField(d.id, "vekalet", e.target.value)} />
+                            </td>
+                            <td className="p-2">
+                              <Input className="h-7 text-sm" value={d.description} onChange={(e) => updateDonationField(d.id, "description", e.target.value)} />
+                            </td>
+                            <td className="p-2">
+                              <Input className="h-7 text-sm" value={d.name} onChange={(e) => updateDonationField(d.id, "name", e.target.value)} />
+                            </td>
+                            <td className="p-2">
+                              <Input className="h-7 text-sm" value={d.donationType} onChange={(e) => updateDonationField(d.id, "donationType", e.target.value)} />
+                            </td>
+                            <td className="p-2">
+                              <Input className="h-7 text-sm" value={d.notes || ""} onChange={(e) => updateDonationField(d.id, "notes", e.target.value)} />
+                            </td>
+                            <td className="p-2 text-center">
+                              <Button variant="ghost" size="sm" className="h-7" onClick={() => updateDonationField(d.id, "excluded", !d.excluded)}>
+                                {d.excluded ? <Eye className="w-4 h-4 text-green-600" /> : <EyeOff className="w-4 h-4 text-muted-foreground" />}
+                              </Button>
+                            </td>
+                            <td className="p-2">
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => deleteDonation(d.id)}>
+                                <Trash2 className="w-3 h-3 text-destructive" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {matchingGroupEntries.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">Hayvan Gruplarındaki Konumu ({matchingGroupEntries.length} satır)</h3>
+                    <table className="w-full text-sm border">
+                      <thead>
+                        <tr className="border-b bg-muted/30">
+                          <th className="p-2 text-left">Hayvan No</th>
+                          <th className="p-2 text-left">Sıra</th>
+                          <th className="p-2 text-left">Vekalet</th>
+                          <th className="p-2 text-left">Vekaleti Veren</th>
+                          <th className="p-2 text-left">Adına Kesilen</th>
+                          <th className="p-2 text-left">Cinsi</th>
+                          <th className="p-2 text-left">Notlar</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {matchingGroupEntries.map((entry, i) => (
+                          <tr key={i} className="border-b">
+                            <td className="p-2 font-semibold text-primary">{entry.animalNo}</td>
+                            <td className="p-2">{entry.dIdx + 1}</td>
+                            <td className="p-2">
+                              <Input className="h-7 text-sm" value={entry.donation.vekalet || ""} onChange={(e) => updateGroupDonation(entry.groupIdx, entry.dIdx, "vekalet", e.target.value)} />
+                            </td>
+                            <td className="p-2">
+                              <Input className="h-7 text-sm" value={entry.donation.description} onChange={(e) => updateGroupDonation(entry.groupIdx, entry.dIdx, "description", e.target.value)} />
+                            </td>
+                            <td className="p-2">
+                              <Input className="h-7 text-sm" value={entry.donation.name} onChange={(e) => updateGroupDonation(entry.groupIdx, entry.dIdx, "name", e.target.value)} />
+                            </td>
+                            <td className="p-2">
+                              <Input className="h-7 text-sm" value={entry.donation.donationType} onChange={(e) => updateGroupDonation(entry.groupIdx, entry.dIdx, "donationType", e.target.value)} />
+                            </td>
+                            <td className="p-2">
+                              <Input className="h-7 text-sm" value={entry.donation.notes || ""} onChange={(e) => updateGroupDonation(entry.groupIdx, entry.dIdx, "notes", e.target.value)} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {matchingDonations.length === 0 && matchingGroupEntries.length === 0 && (
+                  <p className="text-muted-foreground text-center py-4">Bu kişiye ait kayıt bulunamadı.</p>
+                )}
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
