@@ -6,6 +6,7 @@ export interface Donation {
   shareCount: number;
   vekalet: string;
   notes: string;
+  excluded?: boolean;
 }
 
 export interface AnimalGroup {

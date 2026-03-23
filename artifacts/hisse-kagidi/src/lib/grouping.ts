@@ -5,43 +5,45 @@ function generateId(): string {
 }
 
 export function computeEffectiveShares(donations: Donation[]): Map<string, number> {
-  const nameCount = new Map<string, number>();
-  for (const d of donations) {
-    const key = d.name.trim().toLowerCase();
+  const activeDonations = donations.filter(d => !d.excluded);
+  const descCount = new Map<string, number>();
+  for (const d of activeDonations) {
+    const key = d.description.trim().toLowerCase();
     if (key) {
-      nameCount.set(key, (nameCount.get(key) || 0) + 1);
+      descCount.set(key, (descCount.get(key) || 0) + 1);
     }
   }
   const result = new Map<string, number>();
-  for (const d of donations) {
-    const key = d.name.trim().toLowerCase();
-    const count = nameCount.get(key) || 1;
+  for (const d of activeDonations) {
+    const key = d.description.trim().toLowerCase();
+    const count = descCount.get(key) || 1;
     result.set(d.id, count > 1 ? count : d.shareCount);
   }
   return result;
 }
 
 export function autoGroupDonations(donations: Donation[]): AnimalGroup[] {
-  if (donations.length === 0) return [];
+  const activeDonations = donations.filter(d => !d.excluded);
+  if (activeDonations.length === 0) return [];
 
-  const effectiveShares = computeEffectiveShares(donations);
+  const effectiveShares = computeEffectiveShares(activeDonations);
 
-  const nameGroups = new Map<string, Donation[]>();
-  for (const d of donations) {
-    const key = d.name.trim().toLowerCase();
-    if (!nameGroups.has(key)) nameGroups.set(key, []);
-    nameGroups.get(key)!.push(d);
+  const descGroups = new Map<string, Donation[]>();
+  for (const d of activeDonations) {
+    const key = d.description.trim().toLowerCase();
+    if (!descGroups.has(key)) descGroups.set(key, []);
+    descGroups.get(key)!.push(d);
   }
 
   const donorUnits: { donations: Donation[]; totalShares: number }[] = [];
-  const processedNames = new Set<string>();
+  const processedDescs = new Set<string>();
 
-  for (const d of donations) {
-    const key = d.name.trim().toLowerCase();
-    if (processedNames.has(key)) continue;
-    processedNames.add(key);
+  for (const d of activeDonations) {
+    const key = d.description.trim().toLowerCase();
+    if (processedDescs.has(key)) continue;
+    processedDescs.add(key);
 
-    const group = nameGroups.get(key) || [d];
+    const group = descGroups.get(key) || [d];
     const shareCount = effectiveShares.get(d.id) || 1;
     donorUnits.push({ donations: group, totalShares: shareCount });
   }
@@ -105,13 +107,14 @@ export function autoGroupDonations(donations: Donation[]): AnimalGroup[] {
 }
 
 export function getTotalShares(donations: Donation[]): number {
-  const effectiveShares = computeEffectiveShares(donations);
-  const nameProcessed = new Set<string>();
+  const activeDonations = donations.filter(d => !d.excluded);
+  const effectiveShares = computeEffectiveShares(activeDonations);
+  const descProcessed = new Set<string>();
   let total = 0;
-  for (const d of donations) {
-    const key = d.name.trim().toLowerCase();
-    if (key && nameProcessed.has(key)) continue;
-    nameProcessed.add(key);
+  for (const d of activeDonations) {
+    const key = d.description.trim().toLowerCase();
+    if (key && descProcessed.has(key)) continue;
+    descProcessed.add(key);
     total += effectiveShares.get(d.id) || 1;
   }
   return total;

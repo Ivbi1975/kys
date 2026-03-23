@@ -33,6 +33,8 @@ import {
   FileSpreadsheet,
   ClipboardPaste,
   Settings2,
+  EyeOff,
+  Eye,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani } from "@/lib/types";
 import { getKesimAlani, updateKesimAlani } from "@/lib/storage";
@@ -170,7 +172,7 @@ export default function KesimAlaniPage() {
     }
   }
 
-  function updateDonationField(id: string, field: keyof Donation, value: string | number) {
+  function updateDonationField(id: string, field: keyof Donation, value: string | number | boolean) {
     if (!kesim) return;
     save({
       ...kesim,
@@ -403,11 +405,12 @@ export default function KesimAlaniPage() {
   const totalShares = getTotalShares(kesim.donations);
   const requiredAnimals = getRequiredAnimals(kesim.donations);
 
-  const nameCountMap = new Map<string, number>();
+  const descCountMap = new Map<string, number>();
   for (const d of kesim.donations) {
-    const normalizedName = d.name.trim().toLowerCase();
-    if (normalizedName) {
-      nameCountMap.set(normalizedName, (nameCountMap.get(normalizedName) || 0) + 1);
+    if (d.excluded) continue;
+    const normalizedDesc = d.description.trim().toLowerCase();
+    if (normalizedDesc) {
+      descCountMap.set(normalizedDesc, (descCountMap.get(normalizedDesc) || 0) + 1);
     }
   }
 
@@ -801,12 +804,12 @@ export default function KesimAlaniPage() {
                       </tr>
                     ) : (
                       kesim.donations.map((d, idx) => {
-                        const nameCount = nameCountMap.get(d.name.trim().toLowerCase()) || 1;
-                        const effectiveShare = nameCount > 1 ? nameCount : d.shareCount;
+                        const descCount = d.excluded ? 0 : (descCountMap.get(d.description.trim().toLowerCase()) || 1);
+                        const effectiveShare = descCount > 1 ? descCount : d.shareCount;
                         return (
                         <tr
                           key={d.id}
-                          className={`border-b hover:bg-muted/30 transition-colors ${selectedIds.has(d.id) ? "bg-primary/5" : ""}`}
+                          className={`border-b hover:bg-muted/30 transition-colors ${selectedIds.has(d.id) ? "bg-primary/5" : ""} ${d.excluded ? "opacity-40 line-through" : ""}`}
                         >
                           <td className="p-2">
                             <input
@@ -947,7 +950,7 @@ export default function KesimAlaniPage() {
                             )}
                           </td>
                           <td className="p-2 text-center">
-                            {nameCount > 1 ? (
+                            {descCount > 1 ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">
                                 {effectiveShare}
                               </span>
@@ -975,7 +978,16 @@ export default function KesimAlaniPage() {
                               </Select>
                             )}
                           </td>
-                          <td className="p-2">
+                          <td className="p-2 flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              title={d.excluded ? "Dahil et" : "Hariç tut"}
+                              onClick={() => updateDonationField(d.id, "excluded", !d.excluded)}
+                            >
+                              {d.excluded ? <Eye className="w-3 h-3 text-green-600" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
