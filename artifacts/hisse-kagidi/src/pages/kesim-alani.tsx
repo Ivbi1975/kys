@@ -1618,13 +1618,21 @@ export default function KesimAlaniPage() {
       return;
     }
     const basketIdSet = new Set(basketItems);
-    let totalSlotsNeeded = 0;
+    const groupedBasketIds = new Set<string>();
+    const ungroupedBasketDonors: Donation[] = [];
     for (let gi = 0; gi < groups.length; gi++) {
       if (isGroupLocked(gi) || gi === targetGroupIdx) continue;
       for (const d of groups[gi].donations) {
-        if (basketIdSet.has(d.id)) totalSlotsNeeded++;
+        if (basketIdSet.has(d.id)) groupedBasketIds.add(d.id);
       }
     }
+    for (const id of basketItems) {
+      if (!groupedBasketIds.has(id)) {
+        const donor = kesim.donations.find(d => d.id === id);
+        if (donor && !donor.excluded) ungroupedBasketDonors.push(donor);
+      }
+    }
+    const totalSlotsNeeded = groupedBasketIds.size + ungroupedBasketDonors.length;
     if (totalSlotsNeeded > emptySlots) {
       toast({
         title: "Yetersiz Alan",
@@ -1646,15 +1654,30 @@ export default function KesimAlaniPage() {
         }
       }
     }
+    for (const donor of ungroupedBasketDonors) {
+      itemsToMove.push({ ...donor });
+    }
+    const transferredIds = new Set<string>();
     for (const item of itemsToMove) {
       const emptyIdx = groups[targetGroupIdx].donations.findIndex(d => !d.name.trim());
       if (emptyIdx >= 0) {
         groups[targetGroupIdx].donations[emptyIdx] = item;
+        transferredIds.add(item.id);
       }
     }
-    save({ ...kesim, animalGroups: groups }, `Sepetten ${itemsToMove.length} bağışçı Hayvan ${groups[targetGroupIdx].animalNo}'e aktarıldı`);
-    setBasketItems(prev => prev.filter(id => !basketIdSet.has(id)));
+    if (transferredIds.size === 0) {
+      toast({ title: "Aktarım yapılamadı.", variant: "destructive" });
+      return;
+    }
+    save({ ...kesim, animalGroups: groups }, `Sepetten ${transferredIds.size} bağışçı Hayvan ${groups[targetGroupIdx].animalNo}'e aktarıldı`);
+    setBasketItems(prev => prev.filter(id => !transferredIds.has(id)));
     setBasketTransferTarget(-1);
+    if (transferredIds.size < basketIdSet.size) {
+      toast({
+        title: "Kısmi Aktarım",
+        description: `${transferredIds.size}/${basketIdSet.size} bağışçı aktarıldı, ${basketIdSet.size - transferredIds.size} tanesi aktarılamadı.`,
+      });
+    }
   }
 
   function addEmptyGroup() {
