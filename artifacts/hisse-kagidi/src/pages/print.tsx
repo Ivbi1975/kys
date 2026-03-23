@@ -229,7 +229,7 @@ export default function PrintPage() {
         </Button>
         <Button variant="outline" size="sm" onClick={handlePdfDownload} disabled={processedGroups.length === 0} title="Tarayıcı yazdırma diyaloğunda PDF olarak kaydedin">
           <FileText className="w-4 h-4 mr-1" />
-          PDF
+          PDF İndir
         </Button>
         <Button onClick={handlePrint}>
           <Printer className="w-4 h-4 mr-2" />

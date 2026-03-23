@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, ChevronRight, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, Users, PieChart } from "lucide-react";
+import { Plus, Trash2, ChevronRight, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, PieChart } from "lucide-react";
 import type { KesimAlani, CustomTag } from "@/lib/types";
 import {
   fetchKesimAlanlari,
@@ -495,7 +495,7 @@ export default function Home() {
           </Card>
         ) : (
           <>
-            {kesimAlanlari.length > 1 && (() => {
+            {kesimAlanlari.length >= 1 && (() => {
               const totals = kesimAlanlari.reduce((acc, k) => {
                 const shares = getTotalShares(k.donations);
                 const animals = getRequiredAnimals(k.donations);
