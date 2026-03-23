@@ -604,12 +604,13 @@ export default function KesimAlaniPage() {
     setGroupingProgress(null);
     try {
       await new Promise(resolve => setTimeout(resolve, 0));
-      const lockedGroups = kesim.animalGroups.filter(g => g.locked);
       const lockedDonationIds = new Set<string>();
-      for (const lg of lockedGroups) {
-        for (const d of lg.donations) {
-          if (d.name.trim() || d.description.trim()) {
-            lockedDonationIds.add(d.id);
+      for (const g of kesim.animalGroups) {
+        if (g.locked) {
+          for (const d of g.donations) {
+            if (d.name.trim() || d.description.trim()) {
+              lockedDonationIds.add(d.id);
+            }
           }
         }
       }
@@ -617,16 +618,9 @@ export default function KesimAlaniPage() {
       const newGroups = await autoGroupDonationsAsync(donationsToGroup, (progress) => {
         setGroupingProgress({ ...progress });
       });
-      let animalNo = 1;
-      const finalGroups: AnimalGroup[] = [];
-      for (const lg of lockedGroups) {
-        finalGroups.push({ ...lg, animalNo });
-        animalNo++;
-      }
-      for (const ng of newGroups) {
-        finalGroups.push({ ...ng, animalNo });
-        animalNo++;
-      }
+      const lockedGroups = kesim.animalGroups.filter(g => g.locked);
+      const finalGroups: AnimalGroup[] = [...lockedGroups, ...newGroups];
+      finalGroups.forEach((g, i) => { g.animalNo = i + 1; });
       save({ ...kesim, animalGroups: finalGroups }, `Otomatik gruplama yapıldı: ${finalGroups.length} hayvan (${lockedGroups.length} kilitli korundu)`);
       const found = checkGroupConflicts(finalGroups);
       setConflicts(found);
