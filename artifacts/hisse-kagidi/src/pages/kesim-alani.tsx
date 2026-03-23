@@ -744,15 +744,13 @@ export default function KesimAlaniPage() {
       const tgtGroup = kesim.animalGroups[groupIdx];
       if (srcGroup && tgtGroup && dragItem.groupIdx !== groupIdx) {
         const dragDonation = srcGroup.donations[dragItem.donationIdx];
-        if (dragDonation?.name.trim()) {
-          const dragShares = effectiveShareMap.get(dragDonation.id) || dragDonation.shareCount;
+        const tgtDonation = tgtGroup.donations[donationIdx];
+        if (dragDonation?.name.trim() && !tgtDonation?.name.trim()) {
           const tgtFilledCount = tgtGroup.donations.filter(d => d.name.trim()).length;
-          const tgtDonation = tgtGroup.donations[donationIdx];
-          const isSwap = tgtDonation?.name.trim();
-          if (!isSwap && tgtFilledCount + dragShares > 7) {
+          if (tgtFilledCount + 1 > 7) {
             toast({
               title: "Kapasite Aşımı",
-              description: `Bu bağışçının ${dragShares} hissesi var, ancak hedef grupta sadece ${7 - tgtFilledCount} boş slot mevcut.`,
+              description: `Hedef grupta boş slot kalmadı.`,
               variant: "destructive",
             });
             setDragItem(null);
@@ -1592,6 +1590,11 @@ export default function KesimAlaniPage() {
     if (isGroupLocked(groupIdx)) return;
     if (basketItems.includes(d.id)) return;
     setBasketItems(prev => [...prev, d.id]);
+  }
+
+  function addDonorToBasket(donationId: string) {
+    if (basketItems.includes(donationId)) return;
+    setBasketItems(prev => [...prev, donationId]);
   }
 
   function removeFromBasket(donationId: string) {
@@ -3106,6 +3109,17 @@ export default function KesimAlaniPage() {
                                   </PopoverContent>
                                 </Popover>
                               )}
+                              {!d.excluded && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className={`h-7 w-7 p-0 ${basketItems.includes(d.id) ? "bg-emerald-100 dark:bg-emerald-900" : ""}`}
+                                  title={basketItems.includes(d.id) ? "Sepetten Çıkar" : "Sepete Ekle"}
+                                  onClick={() => basketItems.includes(d.id) ? removeFromBasket(d.id) : addDonorToBasket(d.id)}
+                                >
+                                  <ShoppingBag className={`w-3 h-3 ${basketItems.includes(d.id) ? "text-emerald-600" : "text-muted-foreground"}`} />
+                                </Button>
+                              )}
                               {!d.excluded && !groupedDonorIds.has(d.id) && (
                                 <Button
                                   variant="ghost"
@@ -3845,12 +3859,7 @@ export default function KesimAlaniPage() {
                     <Card
                       key={group.id}
                       id={`animal-group-${group.animalNo}`}
-                      className={`overflow-hidden transition-all ${swapSelection?.groupIdx === groupIdx ? "ring-2 ring-purple-400" : ""} ${highlightIncomplete && isIncomplete ? "ring-2 ring-orange-400" : ""} ${dragItem && dragItem.groupIdx !== groupIdx && dragOverGroup === groupIdx ? (() => {
-                        const dragDonation = kesim.animalGroups[dragItem.groupIdx]?.donations[dragItem.donationIdx];
-                        const dragShares = dragDonation ? (effectiveShareMap.get(dragDonation.id) || dragDonation.shareCount) : 1;
-                        const wouldOverflow = filledCount + dragShares > 7;
-                        return wouldOverflow ? "ring-2 ring-red-500 shadow-lg scale-[1.01] bg-red-50/50 dark:bg-red-950/30" : "ring-2 ring-primary shadow-lg scale-[1.01]";
-                      })() : ""} ${dragItem && dragItem.groupIdx !== groupIdx && !isGroupLocked(groupIdx) ? "border-dashed border-2 border-primary/30" : ""}`}
+                      className={`overflow-hidden transition-all ${swapSelection?.groupIdx === groupIdx ? "ring-2 ring-purple-400" : ""} ${highlightIncomplete && isIncomplete ? "ring-2 ring-orange-400" : ""} ${dragItem && dragItem.groupIdx !== groupIdx && dragOverGroup === groupIdx ? (filledCount >= 7 ? "ring-2 ring-red-500 shadow-lg scale-[1.01] bg-red-50/50 dark:bg-red-950/30" : "ring-2 ring-primary shadow-lg scale-[1.01]") : ""} ${dragItem && dragItem.groupIdx !== groupIdx && !isGroupLocked(groupIdx) ? "border-dashed border-2 border-primary/30" : ""}`}
                       style={group.colorTag ? { borderLeft: `4px solid ${colorMap[group.colorTag]}` } : (highlightIncomplete && isIncomplete ? { borderLeft: "4px solid #f97316" } : {})}
                       onDragOver={(e) => { e.preventDefault(); setDragOverGroup(groupIdx); }}
                       onDragLeave={(e) => handleDragLeave(e, groupIdx)}
