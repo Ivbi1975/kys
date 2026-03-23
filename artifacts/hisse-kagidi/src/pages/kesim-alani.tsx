@@ -1478,10 +1478,12 @@ export default function KesimAlaniPage() {
 
   function bulkRemoveFromGroups() {
     if (!kesim || selectedGroupDonations.size === 0) return;
+    const removedIds = new Set<string>();
     const groups = kesim.animalGroups.map(g => ({
       ...g,
       donations: g.donations.map(d => {
         if (selectedGroupDonations.has(d.id) && d.name.trim()) {
+          removedIds.add(d.id);
           return {
             id: generateId(),
             name: "",
@@ -1495,8 +1497,17 @@ export default function KesimAlaniPage() {
         return { ...d };
       }),
     }));
+    setRemovedFromGroupIds(prev => {
+      const next = new Set(prev);
+      removedIds.forEach(id => next.add(id));
+      return next;
+    });
     save({ ...kesim, animalGroups: groups }, `${selectedGroupDonations.size} bağışçı gruplardan çıkarıldı`);
     setSelectedGroupDonations(new Set());
+    toast({
+      title: "Gruptan Çıkarıldı",
+      description: `${removedIds.size} bağışçı gruplardan çıkarıldı. "Gruptan Çıkarılanlar" filtresinden erişebilirsiniz.`,
+    });
   }
 
   function bulkMoveToGroup(targetGroupIdx: number) {
@@ -1600,16 +1611,31 @@ export default function KesimAlaniPage() {
     }));
     const emptySlots = groups[targetGroupIdx].donations.filter(d => !d.name.trim()).length;
     if (emptySlots === 0) {
-      alert("Hedef grupta boş slot yok.");
+      toast({ title: "Hedef grupta boş slot yok.", variant: "destructive" });
+      return;
+    }
+    const basketIdSet = new Set(basketItems);
+    let totalSlotsNeeded = 0;
+    for (let gi = 0; gi < groups.length; gi++) {
+      if (isGroupLocked(gi) || gi === targetGroupIdx) continue;
+      for (const d of groups[gi].donations) {
+        if (basketIdSet.has(d.id)) totalSlotsNeeded++;
+      }
+    }
+    if (totalSlotsNeeded > emptySlots) {
+      toast({
+        title: "Yetersiz Alan",
+        description: `Sepetteki bağışçılar ${totalSlotsNeeded} slot gerektiriyor, ancak hedef grupta sadece ${emptySlots} boş slot var.`,
+        variant: "destructive",
+      });
       return;
     }
     const itemsToMove: Donation[] = [];
-    const idsToMove = new Set(basketItems.slice(0, emptySlots));
     for (let gi = 0; gi < groups.length; gi++) {
       if (isGroupLocked(gi) || gi === targetGroupIdx) continue;
       for (let di = groups[gi].donations.length - 1; di >= 0; di--) {
         const d = groups[gi].donations[di];
-        if (idsToMove.has(d.id)) {
+        if (basketIdSet.has(d.id)) {
           itemsToMove.push(d);
           groups[gi].donations[di] = {
             id: generateId(), name: "", description: "", donationType: "", shareCount: 1, vekalet: "", notes: "",
@@ -1624,7 +1650,7 @@ export default function KesimAlaniPage() {
       }
     }
     save({ ...kesim, animalGroups: groups }, `Sepetten ${itemsToMove.length} bağışçı Hayvan ${groups[targetGroupIdx].animalNo}'e aktarıldı`);
-    setBasketItems(prev => prev.filter(id => !idsToMove.has(id)));
+    setBasketItems(prev => prev.filter(id => !basketIdSet.has(id)));
     setBasketTransferTarget(-1);
   }
 
