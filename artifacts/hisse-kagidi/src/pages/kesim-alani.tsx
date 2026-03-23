@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -110,6 +111,7 @@ function generateId(): string {
 export default function KesimAlaniPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [kesim, setKesim] = useState<KesimAlani | null>(null);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -737,7 +739,29 @@ export default function KesimAlaniPage() {
   }
 
   function handleDrop(groupIdx: number, donationIdx: number) {
-    if (dragItem) {
+    if (dragItem && kesim) {
+      const srcGroup = kesim.animalGroups[dragItem.groupIdx];
+      const tgtGroup = kesim.animalGroups[groupIdx];
+      if (srcGroup && tgtGroup && dragItem.groupIdx !== groupIdx) {
+        const dragDonation = srcGroup.donations[dragItem.donationIdx];
+        if (dragDonation?.name.trim()) {
+          const dragShares = effectiveShareMap.get(dragDonation.id) || dragDonation.shareCount;
+          const tgtFilledCount = tgtGroup.donations.filter(d => d.name.trim()).length;
+          const tgtDonation = tgtGroup.donations[donationIdx];
+          const isSwap = tgtDonation?.name.trim();
+          if (!isSwap && tgtFilledCount + dragShares > 7) {
+            toast({
+              title: "Kapasite Aşımı",
+              description: `Bu bağışçının ${dragShares} hissesi var, ancak hedef grupta sadece ${7 - tgtFilledCount} boş slot mevcut.`,
+              variant: "destructive",
+            });
+            setDragItem(null);
+            setDragOverItem(null);
+            setDragOverGroup(null);
+            return;
+          }
+        }
+      }
       moveGroupDonation(
         dragItem.groupIdx,
         dragItem.donationIdx,
@@ -1657,6 +1681,69 @@ export default function KesimAlaniPage() {
       .filter(g => g.emptySlots >= effectiveShares && !isGroupLocked(g.groupIdx));
   }
 
+  function getSwapSuggestions(donorId: string): { groupIdx: number; animalNo: number; swapOutIds: string[]; swapOutNames: string[]; description: string }[] {
+    if (!kesim) return [];
+    const donor = kesim.donations.find(d => d.id === donorId);
+    if (!donor) return [];
+    const sharesMap = computeEffectiveShares(kesim.donations);
+    const effectiveShares = sharesMap.get(donorId) || donor.shareCount;
+    if (effectiveShares <= 1) return [];
+    const suggestions: { groupIdx: number; animalNo: number; swapOutIds: string[]; swapOutNames: string[]; description: string }[] = [];
+    for (let gi = 0; gi < kesim.animalGroups.length; gi++) {
+      const g = kesim.animalGroups[gi];
+      if (isGroupLocked(gi)) continue;
+      const emptySlots = g.donations.filter(d => !d.name.trim()).length;
+      if (emptySlots >= effectiveShares) continue;
+      const slotsNeeded = effectiveShares - emptySlots;
+      const singleShareDonors = g.donations.filter(d => {
+        if (!d.name.trim()) return false;
+        const dShares = sharesMap.get(d.id) || d.shareCount;
+        return dShares === 1;
+      });
+      if (singleShareDonors.length >= slotsNeeded) {
+        const toSwap = singleShareDonors.slice(0, slotsNeeded);
+        suggestions.push({
+          groupIdx: gi,
+          animalNo: g.animalNo,
+          swapOutIds: toSwap.map(d => d.id),
+          swapOutNames: toSwap.map(d => d.description || d.name),
+          description: `${toSwap.length} tekli hisse çıkar → ${effectiveShares} hisseli yerleş`,
+        });
+      }
+    }
+    return suggestions;
+  }
+
+  function executeSwapSuggestion(donorId: string, groupIdx: number, swapOutIds: string[]) {
+    if (!kesim) return;
+    if (isGroupLocked(groupIdx)) return;
+    const donor = kesim.donations.find(d => d.id === donorId);
+    if (!donor) return;
+    const sharesMap = computeEffectiveShares(kesim.donations);
+    const effectiveShares = sharesMap.get(donorId) || donor.shareCount;
+    const groups = kesim.animalGroups.map(g => ({
+      ...g,
+      donations: g.donations.map(d => ({ ...d })),
+    }));
+    const swapSet = new Set(swapOutIds);
+    for (let di = 0; di < groups[groupIdx].donations.length; di++) {
+      if (swapSet.has(groups[groupIdx].donations[di].id)) {
+        groups[groupIdx].donations[di] = {
+          id: generateId(), name: "", description: "", donationType: "", shareCount: 1, vekalet: "", notes: "",
+        };
+      }
+    }
+    let placed = 0;
+    for (let di = 0; di < groups[groupIdx].donations.length && placed < effectiveShares; di++) {
+      if (!groups[groupIdx].donations[di].name.trim()) {
+        groups[groupIdx].donations[di] = { ...donor };
+        placed++;
+      }
+    }
+    save({ ...kesim, animalGroups: groups }, `${donor.description || donor.name}: Hayvan ${groups[groupIdx].animalNo}'e takas ile yerleştirildi`);
+    setSmartPlacePopover(null);
+  }
+
   function smartPlaceDonor(donorId: string, targetGroupIdx: number) {
     if (!kesim) return;
     if (isGroupLocked(targetGroupIdx) || targetGroupIdx < 0 || targetGroupIdx >= kesim.animalGroups.length) return;
@@ -1717,12 +1804,18 @@ export default function KesimAlaniPage() {
     if (isGroupLocked(groupIdx)) return;
     const d = kesim.animalGroups[groupIdx]?.donations[donationIdx];
     if (!d || !d.name.trim()) return;
+    const donorName = d.description || d.name;
+    const groupNo = kesim.animalGroups[groupIdx]?.animalNo;
     setRemovedFromGroupIds(prev => {
       const next = new Set(prev);
       next.add(d.id);
       return next;
     });
     removeFromGroup(groupIdx, donationIdx);
+    toast({
+      title: "Gruptan Çıkarıldı",
+      description: `${donorName} Hayvan ${groupNo}'den çıkarıldı. "Gruptan Çıkarılanlar" filtresinden erişebilirsiniz.`,
+    });
   }
 
   if (!kesim) return null;
@@ -4241,29 +4334,56 @@ export default function KesimAlaniPage() {
             const donor = kesim.donations.find(d => d.id === smartPlacePopover);
             if (!donor) return null;
             const available = getAvailableGroupsForDonor(smartPlacePopover);
+            const swapSuggestions = getSwapSuggestions(smartPlacePopover);
+            const effectiveShares = computeEffectiveShares(kesim.donations).get(donor.id) || donor.shareCount;
             return (
               <div className="space-y-4 pt-2">
                 <p className="text-sm text-muted-foreground">
-                  <strong>{donor.description || donor.name}</strong> ({computeEffectiveShares(kesim.donations).get(donor.id) || donor.shareCount} hisse) nereye yerleştirilsin?
+                  <strong>{donor.description || donor.name}</strong> ({effectiveShares} hisse) nereye yerleştirilsin?
                 </p>
-                {available.length === 0 ? (
+                {available.length > 0 && (
+                  <>
+                    <p className="text-xs font-semibold text-primary">Doğrudan Yerleştirme</p>
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {available.map(g => (
+                        <Button
+                          key={g.groupIdx}
+                          variant="outline"
+                          className="w-full justify-between h-auto py-2"
+                          onClick={() => smartPlaceDonor(smartPlacePopover, g.groupIdx)}
+                        >
+                          <span className="font-semibold">Hayvan {g.animalNo}</span>
+                          <span className="text-xs text-muted-foreground">{g.emptySlots} boş slot</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {swapSuggestions.length > 0 && (
+                  <>
+                    <p className="text-xs font-semibold text-amber-600">Takas Önerileri</p>
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {swapSuggestions.map((s, i) => (
+                        <Button
+                          key={`swap-${i}`}
+                          variant="outline"
+                          className="w-full justify-between h-auto py-2 border-amber-300"
+                          onClick={() => executeSwapSuggestion(smartPlacePopover, s.groupIdx, s.swapOutIds)}
+                        >
+                          <div className="text-left">
+                            <span className="font-semibold block">Hayvan {s.animalNo}</span>
+                            <span className="text-[10px] text-muted-foreground">{s.description}</span>
+                          </div>
+                          <span className="text-[10px] text-amber-600">{s.swapOutNames.join(", ")}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {available.length === 0 && swapSuggestions.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-4">
-                    Uygun boşluğu olan hayvan grubu bulunamadı.
+                    Uygun boşluğu olan veya takas yapılabilecek hayvan grubu bulunamadı.
                   </p>
-                ) : (
-                  <div className="space-y-1 max-h-60 overflow-y-auto">
-                    {available.map(g => (
-                      <Button
-                        key={g.groupIdx}
-                        variant="outline"
-                        className="w-full justify-between h-auto py-2"
-                        onClick={() => smartPlaceDonor(smartPlacePopover, g.groupIdx)}
-                      >
-                        <span className="font-semibold">Hayvan {g.animalNo}</span>
-                        <span className="text-xs text-muted-foreground">{g.emptySlots} boş slot</span>
-                      </Button>
-                    ))}
-                  </div>
                 )}
               </div>
             );
