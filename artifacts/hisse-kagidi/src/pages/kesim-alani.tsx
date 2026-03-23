@@ -47,6 +47,14 @@ import {
   Sun,
   Moon,
   Download,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Scissors,
+  Merge,
+  ArrowLeftRight,
+  Sparkles,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag } from "@/lib/types";
 import { getKesimAlani, updateKesimAlani } from "@/lib/storage";
@@ -125,6 +133,29 @@ export default function KesimAlaniPage() {
     groupIdx: number;
     donationIdx: number;
   } | null>(null);
+  const [donorListVisible, setDonorListVisible] = useState(true);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
+  const [swapSelection, setSwapSelection] = useState<{
+    groupIdx: number;
+    donationIdx: number;
+  } | null>(null);
+  const [swapPreviewOpen, setSwapPreviewOpen] = useState(false);
+  const [swapTarget, setSwapTarget] = useState<{
+    groupIdx: number;
+    donationIdx: number;
+  } | null>(null);
+  const [autoResolveOpen, setAutoResolveOpen] = useState(false);
+  const [resolveResults, setResolveResults] = useState<Array<{
+    desc: string;
+    swaps: Array<{
+      fromGroup: number;
+      fromIdx: number;
+      toGroup: number;
+      toIdx: number;
+      fromName: string;
+      toName: string;
+    }>;
+  }>>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -139,6 +170,18 @@ export default function KesimAlaniPage() {
       }
     }
   }, [params.id, setLocation]);
+
+  useEffect(() => {
+    setSwapSelection(null);
+    setSwapTarget(null);
+    setSwapPreviewOpen(false);
+    setSelectedGroupIds(prev => {
+      if (!kesim || prev.size === 0) return prev;
+      const validIds = new Set(kesim.animalGroups.map(g => g.id));
+      const filtered = new Set([...prev].filter(id => validIds.has(id)));
+      return filtered.size === prev.size ? prev : filtered;
+    });
+  }, [kesim?.animalGroups]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -578,6 +621,309 @@ export default function KesimAlaniPage() {
     save({ ...kesim, animalGroups: groups }, `Grup ${target.locked ? "kilidi açıldı" : "kilitlendi"}: Hayvan ${target.animalNo}`);
   }
 
+  function splitGroup(groupIdx: number) {
+    if (!kesim) return;
+    if (isGroupLocked(groupIdx)) return;
+    const group = kesim.animalGroups[groupIdx];
+    const filled = group.donations.filter(d => d.name.trim() !== "");
+    if (filled.length <= 1) return;
+
+    const midpoint = Math.ceil(filled.length / 2);
+    const firstHalf = filled.slice(0, midpoint);
+    const secondHalf = filled.slice(midpoint);
+
+    const emptyDonation = (): Donation => ({
+      id: generateId(),
+      name: "",
+      description: "",
+      donationType: "",
+      shareCount: 1,
+      vekalet: "",
+      notes: "",
+    });
+
+    while (firstHalf.length < 7) firstHalf.push(emptyDonation());
+    while (secondHalf.length < 7) secondHalf.push(emptyDonation());
+
+    const newGroups = [...kesim.animalGroups];
+    newGroups[groupIdx] = {
+      ...group,
+      donations: firstHalf.slice(0, 7),
+    };
+
+    const newGroup: AnimalGroup = {
+      id: generateId(),
+      animalNo: kesim.animalGroups.length + 1,
+      donations: secondHalf.slice(0, 7),
+    };
+
+    newGroups.splice(groupIdx + 1, 0, newGroup);
+
+    const renumbered = newGroups.map((g, i) => ({ ...g, animalNo: i + 1 }));
+    save({ ...kesim, animalGroups: renumbered }, `Grup bölündü: Hayvan ${group.animalNo}`);
+  }
+
+  function toggleGroupSelect(groupId: string) {
+    setSelectedGroupIds(prev => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }
+
+  function mergeSelectedGroups() {
+    if (!kesim || selectedGroupIds.size < 2) return;
+    const groupsToMerge = kesim.animalGroups.filter(g => selectedGroupIds.has(g.id));
+    if (groupsToMerge.some(g => g.locked)) return;
+
+    const allDonations = groupsToMerge.flatMap(g => g.donations).filter(d => d.name.trim() !== "");
+    const remainingGroups = kesim.animalGroups.filter(g => !selectedGroupIds.has(g.id));
+
+    const emptyDonation = (): Donation => ({
+      id: generateId(),
+      name: "",
+      description: "",
+      donationType: "",
+      shareCount: 1,
+      vekalet: "",
+      notes: "",
+    });
+
+    const newGroups: AnimalGroup[] = [];
+    let currentBatch: Donation[] = [];
+
+    for (const d of allDonations) {
+      currentBatch.push(d);
+      if (currentBatch.length === 7) {
+        newGroups.push({
+          id: generateId(),
+          animalNo: 0,
+          donations: [...currentBatch],
+        });
+        currentBatch = [];
+      }
+    }
+
+    if (currentBatch.length > 0) {
+      while (currentBatch.length < 7) currentBatch.push(emptyDonation());
+      newGroups.push({
+        id: generateId(),
+        animalNo: 0,
+        donations: currentBatch,
+      });
+    }
+
+    const firstMergedIdx = kesim.animalGroups.findIndex(g => selectedGroupIds.has(g.id));
+    const finalGroups = [...remainingGroups];
+    finalGroups.splice(firstMergedIdx, 0, ...newGroups);
+    const renumbered = finalGroups.map((g, i) => ({ ...g, animalNo: i + 1 }));
+
+    save({ ...kesim, animalGroups: renumbered }, `${groupsToMerge.length} grup birleştirildi`);
+    setSelectedGroupIds(new Set());
+  }
+
+  function handleSwapSelect(groupIdx: number, donationIdx: number) {
+    if (!kesim) return;
+    const d = kesim.animalGroups[groupIdx]?.donations[donationIdx];
+    if (!d || !d.name.trim()) return;
+    if (isGroupLocked(groupIdx)) return;
+
+    if (!swapSelection) {
+      setSwapSelection({ groupIdx, donationIdx });
+    } else {
+      if (swapSelection.groupIdx === groupIdx) {
+        setSwapSelection({ groupIdx, donationIdx });
+        return;
+      }
+      if (isGroupLocked(swapSelection.groupIdx)) {
+        setSwapSelection(null);
+        return;
+      }
+      setSwapTarget({ groupIdx, donationIdx });
+      setSwapPreviewOpen(true);
+    }
+  }
+
+  function executeSwap() {
+    if (!kesim || !swapSelection || !swapTarget) return;
+    if (isGroupLocked(swapSelection.groupIdx) || isGroupLocked(swapTarget.groupIdx)) {
+      cancelSwap();
+      return;
+    }
+    const sg = kesim.animalGroups[swapSelection.groupIdx];
+    const tg = kesim.animalGroups[swapTarget.groupIdx];
+    if (!sg?.donations[swapSelection.donationIdx] || !tg?.donations[swapTarget.donationIdx]) {
+      cancelSwap();
+      return;
+    }
+    const groups = kesim.animalGroups.map(g => ({
+      ...g,
+      donations: g.donations.map(d => ({ ...d })),
+    }));
+
+    const temp = { ...groups[swapSelection.groupIdx].donations[swapSelection.donationIdx] };
+    groups[swapSelection.groupIdx].donations[swapSelection.donationIdx] = {
+      ...groups[swapTarget.groupIdx].donations[swapTarget.donationIdx],
+    };
+    groups[swapTarget.groupIdx].donations[swapTarget.donationIdx] = temp;
+
+    save({ ...kesim, animalGroups: groups }, `Takas yapıldı: Hayvan ${groups[swapSelection.groupIdx].animalNo} ↔ Hayvan ${groups[swapTarget.groupIdx].animalNo}`);
+    setSwapSelection(null);
+    setSwapTarget(null);
+    setSwapPreviewOpen(false);
+  }
+
+  function cancelSwap() {
+    setSwapSelection(null);
+    setSwapTarget(null);
+    setSwapPreviewOpen(false);
+  }
+
+  function computeAutoResolve(): typeof resolveResults {
+    if (!kesim) return [];
+    const groups = kesim.animalGroups;
+    const unexpectedConflicts = checkGroupConflicts(groups).filter(c => !c.isExpected);
+    if (unexpectedConflicts.length === 0) return [];
+
+    const workingCopy = groups.map(g => ({
+      ...g,
+      donations: g.donations.map(d => ({ ...d })),
+    }));
+
+    const globalUsedSlots = new Set<string>();
+    const results: typeof resolveResults = [];
+
+    for (const conflict of unexpectedConflicts) {
+      const key = conflict.description.trim().toLowerCase();
+      const entriesByGroup: Map<number, Array<{ groupIdx: number; dIdx: number }>> = new Map();
+
+      workingCopy.forEach((group, groupIdx) => {
+        group.donations.forEach((d, dIdx) => {
+          if (d.description.trim().toLowerCase() === key) {
+            if (!entriesByGroup.has(groupIdx)) entriesByGroup.set(groupIdx, []);
+            entriesByGroup.get(groupIdx)!.push({ groupIdx, dIdx });
+          }
+        });
+      });
+
+      const groupIndices = Array.from(entriesByGroup.keys());
+      if (groupIndices.length <= 1) continue;
+
+      let targetGroupIdx = -1;
+      for (const gi of groupIndices) {
+        if (!workingCopy[gi].locked) { targetGroupIdx = gi; break; }
+      }
+      if (targetGroupIdx < 0) continue;
+
+      const swaps: typeof resolveResults[0]["swaps"] = [];
+
+      for (const sourceGroupIdx of groupIndices) {
+        if (sourceGroupIdx === targetGroupIdx) continue;
+        if (workingCopy[sourceGroupIdx].locked) continue;
+
+        const sourceEntries = entriesByGroup.get(sourceGroupIdx)!;
+        for (const srcEntry of sourceEntries) {
+          const slotKey = (g: number, i: number) => `${g}:${i}`;
+          if (globalUsedSlots.has(slotKey(srcEntry.groupIdx, srcEntry.dIdx))) continue;
+
+          const emptySlotIdx = workingCopy[targetGroupIdx].donations.findIndex(
+            (d, idx) => d.name.trim() === "" && !globalUsedSlots.has(slotKey(targetGroupIdx, idx))
+          );
+
+          if (emptySlotIdx >= 0) {
+            swaps.push({
+              fromGroup: sourceGroupIdx,
+              fromIdx: srcEntry.dIdx,
+              toGroup: targetGroupIdx,
+              toIdx: emptySlotIdx,
+              fromName: workingCopy[sourceGroupIdx].donations[srcEntry.dIdx].description,
+              toName: "(boş slot)",
+            });
+            globalUsedSlots.add(slotKey(sourceGroupIdx, srcEntry.dIdx));
+            globalUsedSlots.add(slotKey(targetGroupIdx, emptySlotIdx));
+
+            const tempD = { ...workingCopy[sourceGroupIdx].donations[srcEntry.dIdx] };
+            workingCopy[sourceGroupIdx].donations[srcEntry.dIdx] = { ...workingCopy[targetGroupIdx].donations[emptySlotIdx] };
+            workingCopy[targetGroupIdx].donations[emptySlotIdx] = tempD;
+          } else {
+            const swappableIdx = workingCopy[targetGroupIdx].donations.findIndex(
+              (d, idx) => {
+                if (!d.name.trim()) return false;
+                if (d.description.trim().toLowerCase() === key) return false;
+                return !globalUsedSlots.has(slotKey(targetGroupIdx, idx));
+              }
+            );
+
+            if (swappableIdx >= 0) {
+              swaps.push({
+                fromGroup: sourceGroupIdx,
+                fromIdx: srcEntry.dIdx,
+                toGroup: targetGroupIdx,
+                toIdx: swappableIdx,
+                fromName: workingCopy[sourceGroupIdx].donations[srcEntry.dIdx].description,
+                toName: workingCopy[targetGroupIdx].donations[swappableIdx].description,
+              });
+              globalUsedSlots.add(slotKey(sourceGroupIdx, srcEntry.dIdx));
+              globalUsedSlots.add(slotKey(targetGroupIdx, swappableIdx));
+
+              const tempD = { ...workingCopy[sourceGroupIdx].donations[srcEntry.dIdx] };
+              workingCopy[sourceGroupIdx].donations[srcEntry.dIdx] = { ...workingCopy[targetGroupIdx].donations[swappableIdx] };
+              workingCopy[targetGroupIdx].donations[swappableIdx] = tempD;
+            }
+          }
+        }
+      }
+
+      if (swaps.length > 0) {
+        results.push({ desc: conflict.description, swaps });
+      }
+    }
+
+    return results;
+  }
+
+  function openAutoResolve() {
+    const results = computeAutoResolve();
+    setResolveResults(results);
+    setAutoResolveOpen(true);
+  }
+
+  function applyAutoResolve() {
+    if (!kesim || resolveResults.length === 0) return;
+    const groups = kesim.animalGroups.map(g => ({
+      ...g,
+      donations: g.donations.map(d => ({ ...d })),
+    }));
+
+    let appliedCount = 0;
+    for (const result of resolveResults) {
+      for (const swap of result.swaps) {
+        if (swap.fromGroup >= groups.length || swap.toGroup >= groups.length) continue;
+        if (groups[swap.fromGroup].locked || groups[swap.toGroup].locked) continue;
+        if (!groups[swap.fromGroup].donations[swap.fromIdx] || !groups[swap.toGroup].donations[swap.toIdx]) continue;
+        const temp = { ...groups[swap.fromGroup].donations[swap.fromIdx] };
+        groups[swap.fromGroup].donations[swap.fromIdx] = { ...groups[swap.toGroup].donations[swap.toIdx] };
+        groups[swap.toGroup].donations[swap.toIdx] = temp;
+        appliedCount++;
+      }
+    }
+
+    if (appliedCount === 0) {
+      setAutoResolveOpen(false);
+      setResolveResults([]);
+      return;
+    }
+
+    save({ ...kesim, animalGroups: groups }, `Otomatik çakışma çözümü: ${resolveResults.length} kişi düzeltildi`);
+    setAutoResolveOpen(false);
+    setResolveResults([]);
+
+    const newConflicts = checkGroupConflicts(groups);
+    setConflicts(newConflicts);
+    if (newConflicts.length > 0) setShowConflicts(true);
+  }
+
   function exportDonorsExcel() {
     if (!kesim) return;
     const data = kesim.donations.map((d, i) => ({
@@ -770,8 +1116,8 @@ export default function KesimAlaniPage() {
           </Card>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div>
+        <div className={`grid gap-6 ${donorListVisible ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"}`}>
+          {donorListVisible && <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Bağışçı Listesi</h2>
               <div className="flex gap-2 items-center">
@@ -1407,11 +1753,20 @@ export default function KesimAlaniPage() {
                 </Button>
               </div>
             )}
-          </div>
+          </div>}
 
           <div>
             <div className="flex items-center justify-between mb-4">
-              <div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setDonorListVisible(!donorListVisible)}
+                  title={donorListVisible ? "Bağışçı Listesini Gizle" : "Bağışçı Listesini Göster"}
+                >
+                  {donorListVisible ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+                </Button>
                 <h2 className="text-lg font-semibold">
                   Hayvan Grupları
                   {kesim.animalGroups.length > 0 && (
@@ -1498,6 +1853,41 @@ export default function KesimAlaniPage() {
               )}
             </div>
 
+            {selectedGroupIds.size > 0 && (
+              <div className="flex items-center gap-3 p-2 mb-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg flex-wrap">
+                <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                  {selectedGroupIds.size} grup seçildi
+                </span>
+                {selectedGroupIds.size >= 2 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={mergeSelectedGroups}
+                    disabled={kesim.animalGroups.filter(g => selectedGroupIds.has(g.id)).some(g => g.locked)}
+                  >
+                    <Merge className="w-3 h-3 mr-1" />
+                    Birleştir
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => setSelectedGroupIds(new Set())}>
+                  Seçimi Kaldır
+                </Button>
+              </div>
+            )}
+
+            {swapSelection && (
+              <div className="flex items-center gap-3 p-2 mb-3 bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg">
+                <ArrowLeftRight className="w-4 h-4 text-purple-600" />
+                <span className="text-sm text-purple-800 dark:text-purple-200">
+                  <strong>Takas modu:</strong> Hayvan {kesim.animalGroups[swapSelection.groupIdx]?.animalNo}, Sıra {swapSelection.donationIdx + 1} seçildi.
+                  Başka bir gruptaki bağışçıya tıklayın.
+                </span>
+                <Button variant="ghost" size="sm" onClick={cancelSwap}>
+                  İptal
+                </Button>
+              </div>
+            )}
+
             {showConflicts && (
               <Card className={`p-4 mb-4 ${conflicts.length > 0 ? "border-amber-300 bg-amber-50" : "border-green-300 bg-green-50"}`}>
                 <div className="flex items-start justify-between">
@@ -1545,7 +1935,20 @@ export default function KesimAlaniPage() {
                       )}
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setShowConflicts(false)}>×</Button>
+                  <div className="flex items-center gap-1">
+                    {conflicts.filter(c => !c.isExpected).length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs border-amber-400 text-amber-700 hover:bg-amber-100"
+                        onClick={openAutoResolve}
+                      >
+                        <Sparkles className="w-3 h-3 mr-1" />
+                        Otomatik Çöz
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setShowConflicts(false)}>×</Button>
+                  </div>
                 </div>
               </Card>
             )}
@@ -1575,12 +1978,22 @@ export default function KesimAlaniPage() {
                     red: "#ef4444",
                   };
                   return (
-                    <Card key={group.id} id={`animal-group-${group.animalNo}`} className="overflow-hidden" style={group.colorTag ? { borderLeft: `4px solid ${colorMap[group.colorTag]}` } : {}}>
+                    <Card key={group.id} id={`animal-group-${group.animalNo}`} className={`overflow-hidden ${swapSelection?.groupIdx === groupIdx ? "ring-2 ring-purple-400" : ""}`} style={group.colorTag ? { borderLeft: `4px solid ${colorMap[group.colorTag]}` } : {}}>
                       <div
                         className="flex items-center justify-between p-3 bg-primary/10 cursor-pointer"
                         onClick={() => toggleGroupCollapse(group.id)}
                       >
                         <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); if (!group.locked) toggleGroupSelect(group.id); }}
+                            className={`flex-shrink-0 ${group.locked ? "opacity-30 cursor-not-allowed" : ""}`}
+                            title={group.locked ? "Kilitli grup seçilemez" : "Seç"}
+                          >
+                            {selectedGroupIds.has(group.id)
+                              ? <CheckSquare className="w-4 h-4 text-primary" />
+                              : <Square className="w-4 h-4 text-muted-foreground" />
+                            }
+                          </button>
                           {isCollapsed ? (
                             <ChevronDown className="w-4 h-4" />
                           ) : (
@@ -1607,6 +2020,14 @@ export default function KesimAlaniPage() {
                           <span className="text-xs text-muted-foreground">
                             {filledCount}/7 dolu
                           </span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); splitGroup(groupIdx); }}
+                            className={`p-0.5 rounded transition-colors ${group.locked || filledCount <= 1 ? "opacity-30 cursor-not-allowed" : "text-muted-foreground/60 hover:text-muted-foreground"}`}
+                            title={group.locked ? "Kilitli grup bölünemez" : filledCount <= 1 ? "Bölmek için en az 2 bağışçı gerekli" : "Grubu Böl"}
+                            disabled={group.locked || filledCount <= 1}
+                          >
+                            <Scissors className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); toggleGroupLock(groupIdx); }}
                             className={`p-0.5 rounded transition-colors ${group.locked ? "text-amber-500" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
@@ -1736,18 +2157,35 @@ export default function KesimAlaniPage() {
                                   />
                                 </td>
                                 <td className="p-1.5">
-                                  {d.name.trim() && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-5 w-5 p-0"
-                                      onClick={() =>
-                                        removeFromGroup(groupIdx, dIdx)
-                                      }
-                                    >
-                                      <Trash2 className="w-3 h-3 text-destructive" />
-                                    </Button>
-                                  )}
+                                  <div className="flex gap-0.5">
+                                    {d.name.trim() && (
+                                      <>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className={`h-5 w-5 p-0 ${
+                                            swapSelection?.groupIdx === groupIdx && swapSelection?.donationIdx === dIdx
+                                              ? "bg-purple-200 dark:bg-purple-800"
+                                              : ""
+                                          }`}
+                                          onClick={() => handleSwapSelect(groupIdx, dIdx)}
+                                          title="Takas için seç"
+                                        >
+                                          <ArrowLeftRight className="w-3 h-3 text-purple-500" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-5 w-5 p-0"
+                                          onClick={() =>
+                                            removeFromGroup(groupIdx, dIdx)
+                                          }
+                                        >
+                                          <Trash2 className="w-3 h-3 text-destructive" />
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             ))}
@@ -1921,6 +2359,109 @@ export default function KesimAlaniPage() {
               </div>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={swapPreviewOpen} onOpenChange={(open) => { if (!open) cancelSwap(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowLeftRight className="w-5 h-5 text-purple-600" />
+              Takas Önizleme
+            </DialogTitle>
+          </DialogHeader>
+          {swapSelection && swapTarget && kesim && (
+            <div className="space-y-4 pt-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 border rounded-lg bg-purple-50 dark:bg-purple-950">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Hayvan {kesim.animalGroups[swapSelection.groupIdx]?.animalNo}, Sıra {swapSelection.donationIdx + 1}
+                  </p>
+                  <p className="font-semibold text-sm">
+                    {kesim.animalGroups[swapSelection.groupIdx]?.donations[swapSelection.donationIdx]?.description || "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {kesim.animalGroups[swapSelection.groupIdx]?.donations[swapSelection.donationIdx]?.name || "—"}
+                  </p>
+                </div>
+                <div className="p-3 border rounded-lg bg-purple-50 dark:bg-purple-950">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Hayvan {kesim.animalGroups[swapTarget.groupIdx]?.animalNo}, Sıra {swapTarget.donationIdx + 1}
+                  </p>
+                  <p className="font-semibold text-sm">
+                    {kesim.animalGroups[swapTarget.groupIdx]?.donations[swapTarget.donationIdx]?.description || "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {kesim.animalGroups[swapTarget.groupIdx]?.donations[swapTarget.donationIdx]?.name || "—"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-center">
+                <ArrowLeftRight className="w-6 h-6 text-purple-400" />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={cancelSwap} className="flex-1">
+                  İptal
+                </Button>
+                <Button onClick={executeSwap} className="flex-1">
+                  <ArrowLeftRight className="w-4 h-4 mr-1" />
+                  Takas Et
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={autoResolveOpen} onOpenChange={setAutoResolveOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-600" />
+              Otomatik Çakışma Çözümü
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {resolveResults.length === 0 ? (
+              <p className="text-muted-foreground text-center py-4">
+                Otomatik çözülebilecek çakışma bulunamadı. Bazı gruplar kilitli olabilir veya uygun takas bulunamadı.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  {resolveResults.length} kişi için toplam {resolveResults.reduce((sum, r) => sum + r.swaps.length, 0)} takas öneriliyor:
+                </p>
+                <div className="space-y-3">
+                  {resolveResults.map((result, i) => (
+                    <Card key={i} className="p-3">
+                      <p className="font-semibold text-sm mb-2">{result.desc}</p>
+                      <div className="space-y-1">
+                        {result.swaps.map((swap, j) => (
+                          <div key={j} className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>Hayvan {kesim!.animalGroups[swap.fromGroup]?.animalNo} #{swap.fromIdx + 1}</span>
+                            <ArrowLeftRight className="w-3 h-3" />
+                            <span>Hayvan {kesim!.animalGroups[swap.toGroup]?.animalNo} #{swap.toIdx + 1}</span>
+                            <span className="text-xs opacity-60">
+                              ({swap.fromName} ↔ {swap.toName})
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setAutoResolveOpen(false)} className="flex-1">
+                    İptal
+                  </Button>
+                  <Button onClick={applyAutoResolve} className="flex-1">
+                    <Sparkles className="w-4 h-4 mr-1" />
+                    Tümünü Uygula
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
