@@ -57,6 +57,7 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - Statistics dashboard (active donors, total shares, required animals, empty slots)
 - JSON backup/restore for all data
 - Print A4 landscape pages matching Excel "Kesim Kağıdı" format with columns: HAYVAN (merged vertically), SIRA, VEKALET, VEKALETİ VEREN, ADINA KESİLEN, CİNSİ, NOTLAR
+- Flexible workspace layout: multi-column grid (1/2/3 columns), column hide/show popover, compact mode, fullscreen mode (ESC to exit), collapse all/expand all, column drag-and-drop reorder, resizable split pane between donor list and animal groups — all preferences saved to localStorage via `useWorkspacePreferences` hook
 - Donor list hide/show toggle (panel collapses, groups reflow to full width)
 - Group split (scissors icon, divides filled donors into two renumbered groups)
 - Group merge (checkbox selection + toolbar, handles 7-share overflow into new groups)
@@ -76,6 +77,7 @@ Key files:
 - `src/lib/grouping.ts` - Auto-grouping algorithm (bin-packing, name-based effective shares)
 - `src/lib/useHistory.ts` - Snapshot-based undo/redo hook (80 steps, structuredClone)
 - `src/lib/useTheme.ts` - Dark theme toggle hook
+- `src/lib/useWorkspacePreferences.ts` - Workspace layout preferences hook (columnCount, hiddenColumns, compactMode, columnOrder, splitRatio) with localStorage persistence
 - `src/pages/home.tsx` - Home page with kesim alanı list, settings (logo, backup)
 - `src/pages/kesim-alani.tsx` - Main editing page with donor table, animal groups, stats, export
 - `src/pages/print.tsx` - Print-optimized A4 landscape view matching Excel design

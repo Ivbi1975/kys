@@ -55,12 +55,26 @@ import {
   Sparkles,
   CheckSquare,
   Square,
+  Columns,
+  Minimize2,
+  Maximize2,
+  ChevronsUpDown,
+  ChevronsDownUp,
+  Columns3,
+  LayoutGrid,
+  SlidersHorizontal,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag } from "@/lib/types";
 import { getKesimAlani, updateKesimAlani } from "@/lib/storage";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
 import { useHistory } from "@/lib/useHistory";
+import { useWorkspacePreferences, ALL_GROUP_COLUMNS, type ColumnKey } from "@/lib/useWorkspacePreferences";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import * as XLSX from "xlsx";
 
 type SortField = "name" | "description" | "donationType" | "shareCount";
@@ -134,6 +148,11 @@ export default function KesimAlaniPage() {
     donationIdx: number;
   } | null>(null);
   const [donorListVisible, setDonorListVisible] = useState(true);
+  const [fullscreenMode, setFullscreenMode] = useState(false);
+  const workspace = useWorkspacePreferences();
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+  const [columnDragItem, setColumnDragItem] = useState<ColumnKey | null>(null);
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
   const [swapSelection, setSwapSelection] = useState<{
     groupIdx: number;
@@ -185,6 +204,9 @@ export default function KesimAlaniPage() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && fullscreenMode) {
+        setFullscreenMode(false);
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
         handleUndo();
@@ -196,7 +218,27 @@ export default function KesimAlaniPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [fullscreenMode]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingSplit || !splitContainerRef.current) return;
+      const rect = splitContainerRef.current.getBoundingClientRect();
+      const ratio = ((e.clientX - rect.left) / rect.width) * 100;
+      workspace.setSplitRatio(ratio);
+    };
+    const handleMouseUp = () => {
+      setIsDraggingSplit(false);
+    };
+    if (isDraggingSplit) {
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDraggingSplit]);
 
   const save = useCallback(
     (updated: KesimAlani, desc?: string) => {
@@ -1010,9 +1052,177 @@ export default function KesimAlaniPage() {
   const displayPreviewRows = hasHeaderRow ? previewData.slice(1) : previewData;
   const headerRow = hasHeaderRow && previewData.length > 0 ? previewData[0] : null;
 
+  const collapseAll = () => {
+    if (!kesim) return;
+    setCollapsedGroups(new Set(kesim.animalGroups.map(g => g.id)));
+  };
+  const expandAll = () => {
+    setCollapsedGroups(new Set());
+  };
+
+  const handleColumnDragStart = (key: ColumnKey) => {
+    setColumnDragItem(key);
+  };
+  const handleColumnDragOver = (e: React.DragEvent, targetKey: ColumnKey) => {
+    e.preventDefault();
+  };
+  const handleColumnDrop = (targetKey: ColumnKey) => {
+    if (!columnDragItem || columnDragItem === targetKey) {
+      setColumnDragItem(null);
+      return;
+    }
+    const order = [...workspace.prefs.columnOrder];
+    const fromIdx = order.indexOf(columnDragItem);
+    const toIdx = order.indexOf(targetKey);
+    if (fromIdx < 0 || toIdx < 0) {
+      setColumnDragItem(null);
+      return;
+    }
+    order.splice(fromIdx, 1);
+    order.splice(toIdx, 0, columnDragItem);
+    workspace.setColumnOrder(order);
+    setColumnDragItem(null);
+  };
+  const handleColumnDragEnd = () => {
+    setColumnDragItem(null);
+  };
+
+  const renderGroupTableCell = (
+    colKey: ColumnKey,
+    d: Donation,
+    dIdx: number,
+    groupIdx: number,
+    group: AnimalGroup,
+  ) => {
+    const compact = workspace.prefs.compactMode;
+    const cellPad = compact ? "p-0.5" : "p-1.5";
+    const inputH = compact ? "h-5 text-[10px]" : "h-6 text-xs";
+    switch (colKey) {
+      case "drag":
+        return (
+          <td key={colKey} className={`${cellPad} cursor-grab`}>
+            <GripVertical className={compact ? "w-2.5 h-2.5 text-muted-foreground" : "w-3 h-3 text-muted-foreground"} />
+          </td>
+        );
+      case "index":
+        return (
+          <td key={colKey} className={`${cellPad} text-muted-foreground`}>
+            {dIdx + 1}
+          </td>
+        );
+      case "vekalet":
+        return (
+          <td key={colKey} className={cellPad}>
+            <Input
+              className={`${inputH} border-0 bg-transparent p-0`}
+              value={d.vekalet || ""}
+              onChange={(e) => updateGroupDonation(groupIdx, dIdx, "vekalet", e.target.value)}
+              placeholder="—"
+            />
+          </td>
+        );
+      case "description":
+        return (
+          <td key={colKey} className={cellPad}>
+            <Input
+              className={`${inputH} border-0 bg-transparent p-0`}
+              value={d.description}
+              onChange={(e) => updateGroupDonation(groupIdx, dIdx, "description", e.target.value)}
+              placeholder="—"
+            />
+          </td>
+        );
+      case "name":
+        return (
+          <td key={colKey} className={cellPad}>
+            <Input
+              className={`${inputH} border-0 bg-transparent p-0`}
+              value={d.name}
+              onChange={(e) => updateGroupDonation(groupIdx, dIdx, "name", e.target.value)}
+              placeholder="—"
+            />
+          </td>
+        );
+      case "donationType":
+        return (
+          <td key={colKey} className={cellPad}>
+            <Input
+              className={`${inputH} border-0 bg-transparent p-0`}
+              value={d.donationType}
+              onChange={(e) => updateGroupDonation(groupIdx, dIdx, "donationType", e.target.value)}
+              placeholder="—"
+            />
+          </td>
+        );
+      case "notes":
+        return (
+          <td key={colKey} className={cellPad}>
+            <Input
+              className={`${inputH} border-0 bg-transparent p-0`}
+              value={d.notes || ""}
+              onChange={(e) => updateGroupDonation(groupIdx, dIdx, "notes", e.target.value)}
+              placeholder="—"
+            />
+          </td>
+        );
+      case "actions":
+        return (
+          <td key={colKey} className={cellPad}>
+            <div className="flex gap-0.5">
+              {d.name.trim() && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`${compact ? "h-4 w-4" : "h-5 w-5"} p-0 ${
+                      swapSelection?.groupIdx === groupIdx && swapSelection?.donationIdx === dIdx
+                        ? "bg-purple-200 dark:bg-purple-800"
+                        : ""
+                    }`}
+                    onClick={() => handleSwapSelect(groupIdx, dIdx)}
+                    title="Takas için seç"
+                  >
+                    <ArrowLeftRight className={compact ? "w-2.5 h-2.5 text-purple-500" : "w-3 h-3 text-purple-500"} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`${compact ? "h-4 w-4" : "h-5 w-5"} p-0`}
+                    onClick={() => removeFromGroup(groupIdx, dIdx)}
+                  >
+                    <Trash2 className={compact ? "w-2.5 h-2.5 text-destructive" : "w-3 h-3 text-destructive"} />
+                  </Button>
+                </>
+              )}
+            </div>
+          </td>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const columnHeaderLabel = (key: ColumnKey): string => {
+    const col = ALL_GROUP_COLUMNS.find(c => c.key === key);
+    return col?.label || "";
+  };
+
+  const columnHeaderWidth = (key: ColumnKey): string => {
+    switch (key) {
+      case "drag": return "w-6";
+      case "index": return "w-6";
+      case "vekalet": return "w-16";
+      case "donationType": return "w-16";
+      case "notes": return "w-20";
+      case "actions": return "w-8";
+      default: return "";
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto p-4">
+    <div className={`min-h-screen bg-background ${fullscreenMode ? "fixed inset-0 z-50 overflow-auto" : ""}`}>
+      <div className={`mx-auto p-4 ${fullscreenMode ? "max-w-full" : "max-w-7xl"}`}>
+        {!fullscreenMode && (
         <div className="flex items-center gap-3 mb-6">
           <Button variant="ghost" size="sm" onClick={() => setLocation("/")}>
             <ArrowLeft className="w-4 h-4" />
@@ -1073,7 +1283,9 @@ export default function KesimAlaniPage() {
             )}
           </div>
         </div>
+        )}
 
+        {!fullscreenMode && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <Card className="p-3 text-center">
             <div className="text-2xl font-bold text-primary">{kesim.donations.filter(d => !d.excluded).length}</div>
@@ -1096,8 +1308,9 @@ export default function KesimAlaniPage() {
             <div className="text-xs text-muted-foreground">Boş Slot</div>
           </Card>
         </div>
+        )}
 
-        {historyPanelOpen && (
+        {historyPanelOpen && !fullscreenMode && (
           <Card className="mb-4 p-3 max-h-64 overflow-y-auto">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold">İşlem Geçmişi</h3>
@@ -1124,8 +1337,12 @@ export default function KesimAlaniPage() {
           </Card>
         )}
 
-        <div className={`grid gap-6 ${donorListVisible ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"}`}>
-          {donorListVisible && <div>
+        <div
+          ref={splitContainerRef}
+          className={`flex gap-0 ${donorListVisible ? "" : ""}`}
+          style={{ position: "relative" }}
+        >
+          {donorListVisible && !fullscreenMode && <div style={{ width: donorListVisible ? `${workspace.prefs.splitRatio}%` : "0%", minWidth: 0, flexShrink: 0, paddingRight: "12px" }}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Bağışçı Listesi</h2>
               <div className="flex gap-2 items-center">
@@ -1763,18 +1980,32 @@ export default function KesimAlaniPage() {
             )}
           </div>}
 
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={() => setDonorListVisible(!donorListVisible)}
-                  title={donorListVisible ? "Bağışçı Listesini Gizle" : "Bağışçı Listesini Göster"}
-                >
-                  {donorListVisible ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
-                </Button>
+          {donorListVisible && !fullscreenMode && (
+            <div
+              className="w-2 cursor-col-resize flex-shrink-0 group relative"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setIsDraggingSplit(true);
+              }}
+            >
+              <div className={`absolute inset-y-0 left-0 right-0 rounded transition-colors ${isDraggingSplit ? "bg-primary" : "bg-border group-hover:bg-primary/50"}`} />
+            </div>
+          )}
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {!fullscreenMode && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => setDonorListVisible(!donorListVisible)}
+                    title={donorListVisible ? "Bağışçı Listesini Gizle" : "Bağışçı Listesini Göster"}
+                  >
+                    {donorListVisible ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+                  </Button>
+                )}
                 <h2 className="text-lg font-semibold">
                   Hayvan Grupları
                   {kesim.animalGroups.length > 0 && (
@@ -1787,7 +2018,7 @@ export default function KesimAlaniPage() {
                   )}
                 </h2>
                 {kesim.animalGroups.length > 0 && (
-                  <div className="flex items-center gap-1 mt-1">
+                  <div className="flex items-center gap-1">
                     <button
                       onClick={() => setColorTagFilter("all")}
                       className={`text-xs px-2 py-0.5 rounded border ${colorTagFilter === "all" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
@@ -1815,6 +2046,111 @@ export default function KesimAlaniPage() {
                       className={`w-5 h-5 rounded-full border-2 border-dashed ${colorTagFilter === "" ? "ring-2 ring-offset-1 ring-gray-400" : ""}`}
                       title="Renksiz"
                     />
+                  </div>
+                )}
+
+                <div className="flex items-center gap-1 border rounded-md px-1 ml-2">
+                  {([1, 2, 3] as const).map(n => (
+                    <Button
+                      key={n}
+                      variant={workspace.prefs.columnCount === n ? "default" : "ghost"}
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={() => workspace.setColumnCount(n)}
+                      title={`${n} Sütun`}
+                    >
+                      {n === 1 ? <Columns className="w-3.5 h-3.5" /> : n === 2 ? <Columns3 className="w-3.5 h-3.5" /> : <LayoutGrid className="w-3.5 h-3.5" />}
+                    </Button>
+                  ))}
+                </div>
+
+                <Button
+                  variant={workspace.prefs.compactMode ? "default" : "ghost"}
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={() => workspace.setCompactMode(!workspace.prefs.compactMode)}
+                  title="Kompakt Mod"
+                >
+                  <Minimize2 className="w-3.5 h-3.5" />
+                </Button>
+
+                <Button
+                  variant={fullscreenMode ? "default" : "ghost"}
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={() => setFullscreenMode(!fullscreenMode)}
+                  title={fullscreenMode ? "Tam Ekrandan Çık (ESC)" : "Tam Ekran"}
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </Button>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 px-2" title="Sütun Ayarları">
+                      <SlidersHorizontal className="w-3.5 h-3.5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-3" align="start">
+                    <p className="text-xs font-semibold mb-2">Görünür Sütunlar</p>
+                    <div className="space-y-1">
+                      {workspace.prefs.columnOrder.map(key => {
+                        const col = ALL_GROUP_COLUMNS.find(c => c.key === key);
+                        if (!col) return null;
+                        const visible = !workspace.prefs.hiddenColumns.includes(key);
+                        return (
+                          <div
+                            key={key}
+                            className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted cursor-grab text-sm"
+                            draggable
+                            onDragStart={() => handleColumnDragStart(key)}
+                            onDragOver={(e) => handleColumnDragOver(e, key)}
+                            onDrop={() => handleColumnDrop(key)}
+                            onDragEnd={handleColumnDragEnd}
+                          >
+                            <GripVertical className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                            <button
+                              className="flex items-center gap-2 flex-1 text-left"
+                              onClick={() => workspace.toggleColumn(key)}
+                              disabled={col.alwaysVisible}
+                            >
+                              {col.alwaysVisible ? (
+                                <Lock className="w-3 h-3 text-muted-foreground" />
+                              ) : visible ? (
+                                <Eye className="w-3 h-3 text-primary" />
+                              ) : (
+                                <EyeOff className="w-3 h-3 text-muted-foreground" />
+                              )}
+                              <span className={!visible && !col.alwaysVisible ? "text-muted-foreground" : ""}>
+                                {col.label}
+                              </span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {kesim.animalGroups.length > 0 && (
+                  <div className="flex items-center gap-1 ml-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2"
+                      onClick={collapseAll}
+                      title="Tümünü Daralt"
+                    >
+                      <ChevronsDownUp className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2"
+                      onClick={expandAll}
+                      title="Tümünü Genişlet"
+                    >
+                      <ChevronsUpDown className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 )}
               </div>
@@ -1969,7 +2305,11 @@ export default function KesimAlaniPage() {
                 </p>
               </Card>
             ) : (
-              <div className="space-y-4">
+              <div className={`grid gap-4 ${
+                workspace.prefs.columnCount === 3 ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" :
+                workspace.prefs.columnCount === 2 ? "grid-cols-1 md:grid-cols-2" :
+                "grid-cols-1"
+              }`}>
                 {kesim.animalGroups
                   .map((group, groupIdx) => ({ group, groupIdx }))
                   .filter(({ group }) =>
@@ -1985,10 +2325,11 @@ export default function KesimAlaniPage() {
                     orange: "#f97316",
                     red: "#ef4444",
                   };
+                  const compact = workspace.prefs.compactMode;
                   return (
                     <Card key={group.id} id={`animal-group-${group.animalNo}`} className={`overflow-hidden ${swapSelection?.groupIdx === groupIdx ? "ring-2 ring-purple-400" : ""}`} style={group.colorTag ? { borderLeft: `4px solid ${colorMap[group.colorTag]}` } : {}}>
                       <div
-                        className="flex items-center justify-between p-3 bg-primary/10 cursor-pointer"
+                        className={`flex items-center justify-between ${compact ? "p-2" : "p-3"} bg-primary/10 cursor-pointer`}
                         onClick={() => toggleGroupCollapse(group.id)}
                       >
                         <div className="flex items-center gap-2">
@@ -1998,16 +2339,16 @@ export default function KesimAlaniPage() {
                             title={group.locked ? "Kilitli grup seçilemez" : "Seç"}
                           >
                             {selectedGroupIds.has(group.id)
-                              ? <CheckSquare className="w-4 h-4 text-primary" />
-                              : <Square className="w-4 h-4 text-muted-foreground" />
+                              ? <CheckSquare className={`${compact ? "w-3.5 h-3.5" : "w-4 h-4"} text-primary`} />
+                              : <Square className={`${compact ? "w-3.5 h-3.5" : "w-4 h-4"} text-muted-foreground`} />
                             }
                           </button>
                           {isCollapsed ? (
-                            <ChevronDown className="w-4 h-4" />
+                            <ChevronDown className={compact ? "w-3.5 h-3.5" : "w-4 h-4"} />
                           ) : (
-                            <ChevronUp className="w-4 h-4" />
+                            <ChevronUp className={compact ? "w-3.5 h-3.5" : "w-4 h-4"} />
                           )}
-                          <h3 className="font-semibold text-sm">
+                          <h3 className={`font-semibold ${compact ? "text-xs" : "text-sm"}`}>
                             {kesim.name} - HAYVAN NO: {group.animalNo}
                           </h3>
                           <div className="flex items-center gap-0.5 ml-1" onClick={(e) => e.stopPropagation()}>
@@ -2015,7 +2356,7 @@ export default function KesimAlaniPage() {
                               <button
                                 key={c || "none"}
                                 onClick={() => setGroupColorTag(groupIdx, c)}
-                                className={`w-3.5 h-3.5 rounded-full border transition-transform ${
+                                className={`${compact ? "w-3 h-3" : "w-3.5 h-3.5"} rounded-full border transition-transform ${
                                   (group.colorTag || "") === c ? "scale-125 ring-1 ring-offset-1" : "opacity-50 hover:opacity-100"
                                 } ${c === "" ? "border-dashed" : ""}`}
                                 style={c ? { backgroundColor: colorMap[c] } : {}}
@@ -2025,7 +2366,7 @@ export default function KesimAlaniPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">
+                          <span className={`${compact ? "text-[10px]" : "text-xs"} text-muted-foreground`}>
                             {filledCount}/7 dolu
                           </span>
                           <button
@@ -2047,17 +2388,14 @@ export default function KesimAlaniPage() {
                       </div>
                       {!isCollapsed && (
                         <>
-                        <table className="w-full text-xs">
+                        <table className={`w-full ${compact ? "text-[10px]" : "text-xs"}`}>
                           <thead>
                             <tr className="border-b bg-muted/30">
-                              <th className="p-1.5 w-6"></th>
-                              <th className="p-1.5 text-left w-6">#</th>
-                              <th className="p-1.5 text-left w-16">Vekalet</th>
-                              <th className="p-1.5 text-left">Vekaleti Veren</th>
-                              <th className="p-1.5 text-left">Adına Kesilen</th>
-                              <th className="p-1.5 text-left w-16">Cinsi</th>
-                              <th className="p-1.5 text-left w-20">Notlar</th>
-                              <th className="p-1.5 w-8"></th>
+                              {workspace.visibleColumns.map(key => (
+                                <th key={key} className={`${compact ? "p-0.5" : "p-1.5"} text-left ${columnHeaderWidth(key)}`}>
+                                  {key === "drag" ? "" : key === "actions" ? "" : columnHeaderLabel(key)}
+                                </th>
+                              ))}
                             </tr>
                           </thead>
                           <tbody>
@@ -2083,129 +2421,20 @@ export default function KesimAlaniPage() {
                                   setDragOverItem(null);
                                 }}
                               >
-                                <td className="p-1.5 cursor-grab">
-                                  <GripVertical className="w-3 h-3 text-muted-foreground" />
-                                </td>
-                                <td className="p-1.5 text-muted-foreground">
-                                  {dIdx + 1}
-                                </td>
-                                <td className="p-1.5">
-                                  <Input
-                                    className="h-6 text-xs border-0 bg-transparent p-0"
-                                    value={d.vekalet || ""}
-                                    onChange={(e) =>
-                                      updateGroupDonation(
-                                        groupIdx,
-                                        dIdx,
-                                        "vekalet",
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder="—"
-                                  />
-                                </td>
-                                <td className="p-1.5">
-                                  <Input
-                                    className="h-6 text-xs border-0 bg-transparent p-0"
-                                    value={d.description}
-                                    onChange={(e) =>
-                                      updateGroupDonation(
-                                        groupIdx,
-                                        dIdx,
-                                        "description",
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder="—"
-                                  />
-                                </td>
-                                <td className="p-1.5">
-                                  <Input
-                                    className="h-6 text-xs border-0 bg-transparent p-0"
-                                    value={d.name}
-                                    onChange={(e) =>
-                                      updateGroupDonation(
-                                        groupIdx,
-                                        dIdx,
-                                        "name",
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder="—"
-                                  />
-                                </td>
-                                <td className="p-1.5">
-                                  <Input
-                                    className="h-6 text-xs border-0 bg-transparent p-0"
-                                    value={d.donationType}
-                                    onChange={(e) =>
-                                      updateGroupDonation(
-                                        groupIdx,
-                                        dIdx,
-                                        "donationType",
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder="—"
-                                  />
-                                </td>
-                                <td className="p-1.5">
-                                  <Input
-                                    className="h-6 text-xs border-0 bg-transparent p-0"
-                                    value={d.notes || ""}
-                                    onChange={(e) =>
-                                      updateGroupDonation(
-                                        groupIdx,
-                                        dIdx,
-                                        "notes",
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder="—"
-                                  />
-                                </td>
-                                <td className="p-1.5">
-                                  <div className="flex gap-0.5">
-                                    {d.name.trim() && (
-                                      <>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className={`h-5 w-5 p-0 ${
-                                            swapSelection?.groupIdx === groupIdx && swapSelection?.donationIdx === dIdx
-                                              ? "bg-purple-200 dark:bg-purple-800"
-                                              : ""
-                                          }`}
-                                          onClick={() => handleSwapSelect(groupIdx, dIdx)}
-                                          title="Takas için seç"
-                                        >
-                                          <ArrowLeftRight className="w-3 h-3 text-purple-500" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-5 w-5 p-0"
-                                          onClick={() =>
-                                            removeFromGroup(groupIdx, dIdx)
-                                          }
-                                        >
-                                          <Trash2 className="w-3 h-3 text-destructive" />
-                                        </Button>
-                                      </>
-                                    )}
-                                  </div>
-                                </td>
+                                {workspace.visibleColumns.map(key =>
+                                  renderGroupTableCell(key, d, dIdx, groupIdx, group)
+                                )}
                               </tr>
                             ))}
                           </tbody>
                         </table>
-                        <div className="p-2 border-t">
+                        <div className={`${compact ? "p-1" : "p-2"} border-t`}>
                           <input
                             type="text"
                             placeholder="Grup notu..."
                             value={group.notes || ""}
                             onChange={(e) => updateGroupNotes(groupIdx, e.target.value)}
-                            className="w-full text-xs bg-transparent border-0 outline-none placeholder:text-muted-foreground/50 text-muted-foreground"
+                            className={`w-full ${compact ? "text-[10px]" : "text-xs"} bg-transparent border-0 outline-none placeholder:text-muted-foreground/50 text-muted-foreground`}
                           />
                         </div>
                         </>
