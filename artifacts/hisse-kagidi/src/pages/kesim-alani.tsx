@@ -1694,18 +1694,15 @@ export default function KesimAlaniPage() {
       toast({ title: "Aktarım yapılamadı.", variant: "destructive" });
       return;
     }
-    save({ ...kesim, animalGroups: groups }, `Sepetten ${transferredIds.size} bağışçı Hayvan ${groups[targetGroupIdx].animalNo}'e aktarıldı`);
-    setBasketItems(prev => prev.filter(id => !transferredIds.has(id)));
+    const movedDonorCount = groupedBasketIds.size + ungroupedBasketDonors.length;
+    save({ ...kesim, animalGroups: groups }, `Sepetten ${movedDonorCount} bağışçı (${transferredIds.size} slot) Hayvan ${groups[targetGroupIdx].animalNo}'e aktarıldı`);
+    setBasketItems(prev => prev.filter(id => !transferredIds.has(id) && !groupedBasketIds.has(id)));
     setBasketTransferTarget(-1);
     const skipped = lockedBasketIds.size;
-    const notTransferred = basketIdSet.size - transferredIds.size - skipped;
-    if (skipped > 0 || notTransferred > 0) {
-      const parts: string[] = [];
-      if (skipped > 0) parts.push(`${skipped} kilitli grupta`);
-      if (notTransferred > 0) parts.push(`${notTransferred} aktarılamadı`);
+    if (skipped > 0) {
       toast({
         title: "Kısmi Aktarım",
-        description: `${transferredIds.size} bağışçı aktarıldı. ${parts.join(", ")}.`,
+        description: `${movedDonorCount} bağışçı aktarıldı. ${skipped} tanesi kilitli grupta, sepette kaldı.`,
       });
     }
   }
@@ -1827,8 +1824,8 @@ export default function KesimAlaniPage() {
     const remaining = basketItems.filter(id => lockedGroupDonorIds.has(id));
     setBasketItems(remaining);
     const desc = skippedCount > 0
-      ? `${placed} bağışçı dağıtıldı. ${skippedCount} tanesi kilitli grupta, sepette kaldı.`
-      : `${placed} bağışçı boş gruplara dağıtıldı.`;
+      ? `${placed} slot dağıtıldı. ${skippedCount} tanesi kilitli grupta, sepette kaldı.`
+      : `${placed} slot gruplara dağıtıldı.`;
     toast({ title: "Otomatik Dağıtım", description: desc });
   }
 
