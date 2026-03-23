@@ -218,6 +218,7 @@ export default function KesimAlaniPage() {
   const [showRemovedFilter, setShowRemovedFilter] = useState(false);
   const [smartPlacePopover, setSmartPlacePopover] = useState<string | null>(null);
   const [splitShareDialog, setSplitShareDialog] = useState<{ donationId: string; totalShares: number } | null>(null);
+  const [splitGroupDialog, setSplitGroupDialog] = useState<{ groupIdx: number; splitAt: number } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -1020,16 +1021,26 @@ export default function KesimAlaniPage() {
     save({ ...kesim, animalGroups: groups }, `Tüm grupların kilidi açıldı`);
   }
 
-  function splitGroup(groupIdx: number) {
+  function openSplitGroupDialog(groupIdx: number) {
     if (!kesim) return;
     if (isGroupLocked(groupIdx)) return;
     const group = kesim.animalGroups[groupIdx];
     const filled = group.donations.filter(d => d.name.trim() !== "");
     if (filled.length <= 1) return;
-
     const midpoint = Math.ceil(filled.length / 2);
-    const firstHalf = filled.slice(0, midpoint);
-    const secondHalf = filled.slice(midpoint);
+    setSplitGroupDialog({ groupIdx, splitAt: midpoint });
+  }
+
+  function executeSplitGroup() {
+    if (!kesim || !splitGroupDialog) return;
+    const { groupIdx, splitAt } = splitGroupDialog;
+    if (isGroupLocked(groupIdx)) return;
+    const group = kesim.animalGroups[groupIdx];
+    const filled = group.donations.filter(d => d.name.trim() !== "");
+    if (filled.length <= 1 || splitAt <= 0 || splitAt >= filled.length) return;
+
+    const firstHalf = [...filled.slice(0, splitAt)];
+    const secondHalf = [...filled.slice(splitAt)];
 
     const emptyDonation = (): Donation => ({
       id: generateId(),
@@ -1059,7 +1070,8 @@ export default function KesimAlaniPage() {
     newGroups.splice(groupIdx + 1, 0, newGroup);
 
     const renumbered = newGroups.map((g, i) => ({ ...g, animalNo: i + 1 }));
-    save({ ...kesim, animalGroups: renumbered }, `Grup bölündü: Hayvan ${group.animalNo}`);
+    save({ ...kesim, animalGroups: renumbered }, `Grup bölündü: Hayvan ${group.animalNo} → ${splitAt}/${filled.length - splitAt}`);
+    setSplitGroupDialog(null);
   }
 
   function toggleGroupSelect(groupId: string) {
@@ -1619,23 +1631,27 @@ export default function KesimAlaniPage() {
     }
     const basketIdSet = new Set(basketItems);
     const groupedBasketIds = new Set<string>();
+    const lockedBasketIds = new Set<string>();
     const ungroupedBasketDonors: Donation[] = [];
     for (let gi = 0; gi < groups.length; gi++) {
-      if (isGroupLocked(gi) || gi === targetGroupIdx) continue;
       for (const d of groups[gi].donations) {
-        if (basketIdSet.has(d.id)) groupedBasketIds.add(d.id);
+        if (!basketIdSet.has(d.id) || !d.name.trim()) continue;
+        if (isGroupLocked(gi)) {
+          lockedBasketIds.add(d.id);
+        } else if (gi !== targetGroupIdx) {
+          groupedBasketIds.add(d.id);
+        }
       }
     }
     const sharesMap = computeEffectiveShares(kesim.donations);
     let ungroupedSlots = 0;
     for (const id of basketItems) {
-      if (!groupedBasketIds.has(id)) {
-        const donor = kesim.donations.find(d => d.id === id);
-        if (donor && !donor.excluded) {
-          const effectiveShares = sharesMap.get(id) || donor.shareCount;
-          ungroupedBasketDonors.push(donor);
-          ungroupedSlots += effectiveShares;
-        }
+      if (groupedBasketIds.has(id) || lockedBasketIds.has(id)) continue;
+      const donor = kesim.donations.find(d => d.id === id);
+      if (donor && !donor.excluded) {
+        const effectiveShares = sharesMap.get(id) || donor.shareCount;
+        ungroupedBasketDonors.push(donor);
+        ungroupedSlots += effectiveShares;
       }
     }
     const totalSlotsNeeded = groupedBasketIds.size + ungroupedSlots;
@@ -1681,12 +1697,161 @@ export default function KesimAlaniPage() {
     save({ ...kesim, animalGroups: groups }, `Sepetten ${transferredIds.size} bağışçı Hayvan ${groups[targetGroupIdx].animalNo}'e aktarıldı`);
     setBasketItems(prev => prev.filter(id => !transferredIds.has(id)));
     setBasketTransferTarget(-1);
-    if (transferredIds.size < basketIdSet.size) {
+    const skipped = lockedBasketIds.size;
+    const notTransferred = basketIdSet.size - transferredIds.size - skipped;
+    if (skipped > 0 || notTransferred > 0) {
+      const parts: string[] = [];
+      if (skipped > 0) parts.push(`${skipped} kilitli grupta`);
+      if (notTransferred > 0) parts.push(`${notTransferred} aktarılamadı`);
       toast({
         title: "Kısmi Aktarım",
-        description: `${transferredIds.size}/${basketIdSet.size} bağışçı aktarıldı, ${basketIdSet.size - transferredIds.size} tanesi aktarılamadı.`,
+        description: `${transferredIds.size} bağışçı aktarıldı. ${parts.join(", ")}.`,
       });
     }
+  }
+
+  function autoDistributeBasket() {
+    if (!kesim || basketItems.length === 0) return;
+    const sharesMap = computeEffectiveShares(kesim.donations);
+
+    const lockedGroupDonorIds = new Set<string>();
+    for (const g of kesim.animalGroups) {
+      if (g.locked) {
+        for (const d of g.donations) {
+          if (d.name.trim()) lockedGroupDonorIds.add(d.id);
+        }
+      }
+    }
+
+    const movableIds = basketItems.filter(id => !lockedGroupDonorIds.has(id));
+    const skippedCount = basketItems.length - movableIds.length;
+
+    if (movableIds.length === 0) {
+      toast({
+        title: "Dağıtım Yapılamadı",
+        description: "Sepetteki tüm bağışçılar kilitli gruplarda. Önce kilidi açın.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const basketDonors: Donation[] = [];
+    for (const id of movableIds) {
+      const fromGroup = kesim.animalGroups.flatMap(g => g.donations).find(d => d.id === id);
+      const fromList = kesim.donations.find(d => d.id === id);
+      const donor = fromGroup || fromList;
+      if (donor && !donor.excluded) basketDonors.push(donor);
+    }
+    if (basketDonors.length === 0) return;
+
+    let totalShares = 0;
+    for (const d of basketDonors) {
+      const inGroup = kesim.animalGroups.some(g => g.donations.some(dd => dd.id === d.id));
+      if (inGroup) {
+        totalShares += 1;
+      } else {
+        totalShares += sharesMap.get(d.id) || d.shareCount;
+      }
+    }
+    const animalsNeeded = Math.ceil(totalShares / 7);
+
+    const groups = kesim.animalGroups.map(g => ({
+      ...g,
+      donations: g.donations.map(d => ({ ...d })),
+    }));
+
+    const movableIdSet = new Set(movableIds);
+    const itemsToPlace: Donation[] = [];
+    for (let gi = 0; gi < groups.length; gi++) {
+      if (groups[gi].locked) continue;
+      for (let di = groups[gi].donations.length - 1; di >= 0; di--) {
+        const d = groups[gi].donations[di];
+        if (movableIdSet.has(d.id)) {
+          itemsToPlace.push(d);
+          groups[gi].donations[di] = {
+            id: generateId(), name: "", description: "", donationType: "", shareCount: 1, vekalet: "", notes: "",
+          };
+        }
+      }
+    }
+    for (const donor of basketDonors) {
+      if (!itemsToPlace.find(d => d.id === donor.id)) {
+        const eff = sharesMap.get(donor.id) || donor.shareCount;
+        for (let s = 0; s < eff; s++) {
+          itemsToPlace.push({ ...donor, id: s === 0 ? donor.id : generateId() });
+        }
+      }
+    }
+
+    const emptyDonation = (): Donation => ({
+      id: generateId(), name: "", description: "", donationType: "", shareCount: 1, vekalet: "", notes: "",
+    });
+    for (let i = 0; i < animalsNeeded; i++) {
+      const hasEmptyGroup = groups.some(g => !g.locked && g.donations.every(d => !d.name.trim()));
+      if (!hasEmptyGroup) {
+        groups.push({
+          id: generateId(),
+          animalNo: groups.length + 1,
+          donations: Array.from({ length: 7 }, emptyDonation),
+        });
+      }
+    }
+
+    let placed = 0;
+    for (const item of itemsToPlace) {
+      let foundSlot = false;
+      for (const g of groups) {
+        if (g.locked) continue;
+        const emptyIdx = g.donations.findIndex(d => !d.name.trim());
+        if (emptyIdx >= 0) {
+          g.donations[emptyIdx] = item;
+          placed++;
+          foundSlot = true;
+          break;
+        }
+      }
+      if (!foundSlot) {
+        const newGroup: AnimalGroup = {
+          id: generateId(),
+          animalNo: groups.length + 1,
+          donations: Array.from({ length: 7 }, emptyDonation),
+        };
+        newGroup.donations[0] = item;
+        groups.push(newGroup);
+        placed++;
+      }
+    }
+
+    const renumbered = groups.map((g, i) => ({ ...g, animalNo: i + 1 }));
+    save({ ...kesim, animalGroups: renumbered }, `Sepet otomatik dağıtıldı: ${placed} bağışçı`);
+    const remaining = basketItems.filter(id => lockedGroupDonorIds.has(id));
+    setBasketItems(remaining);
+    const desc = skippedCount > 0
+      ? `${placed} bağışçı dağıtıldı. ${skippedCount} tanesi kilitli grupta, sepette kaldı.`
+      : `${placed} bağışçı boş gruplara dağıtıldı.`;
+    toast({ title: "Otomatik Dağıtım", description: desc });
+  }
+
+  function addSelectedToBasket() {
+    if (!kesim || selectedIds.size === 0) return;
+    setBasketItems(prev => {
+      const existing = new Set(prev);
+      const newItems = [...prev];
+      for (const id of selectedIds) {
+        if (!existing.has(id)) {
+          const d = kesim.donations.find(dd => dd.id === id);
+          if (d && !d.excluded) {
+            newItems.push(id);
+            existing.add(id);
+          }
+        }
+      }
+      return newItems;
+    });
+    toast({
+      title: "Sepete Eklendi",
+      description: `${selectedIds.size} bağışçı sepete eklendi.`,
+    });
   }
 
   function addEmptyGroup() {
@@ -2816,6 +2981,10 @@ export default function KesimAlaniPage() {
                   <Trash2 className="w-3 h-3 mr-1" />
                   Sil
                 </Button>
+                <Button variant="outline" size="sm" onClick={addSelectedToBasket}>
+                  <ShoppingBag className="w-3 h-3 mr-1" />
+                  Sepete Ekle
+                </Button>
                 <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline" size="sm">
@@ -3628,50 +3797,76 @@ export default function KesimAlaniPage() {
               </Card>
             )}
 
-            {basketItems.length > 0 && (
-              <div className="flex items-center gap-3 p-2 mb-3 bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-lg flex-wrap">
-                <ShoppingBag className="w-4 h-4 text-emerald-600" />
-                <span className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
-                  Sepet: {basketItems.length} bağışçı
-                </span>
-                <div className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300">
-                  {basketItems.slice(0, 5).map(id => {
-                    const d = kesim.animalGroups.flatMap(g => g.donations).find(dd => dd.id === id);
-                    return d ? (
-                      <span key={id} className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900 rounded text-[10px]">
-                        {d.description || d.name}
-                        <button className="ml-1 hover:text-destructive" onClick={() => removeFromBasket(id)}>×</button>
-                      </span>
-                    ) : null;
-                  })}
-                  {basketItems.length > 5 && <span className="text-[10px]">+{basketItems.length - 5}</span>}
+            {basketItems.length > 0 && (() => {
+              const sharesMap = computeEffectiveShares(kesim.donations);
+              let basketTotalShares = 0;
+              for (const id of basketItems) {
+                const grouped = kesim.animalGroups.flatMap(g => g.donations).find(d => d.id === id);
+                if (grouped) {
+                  basketTotalShares += 1;
+                } else {
+                  basketTotalShares += sharesMap.get(id) || 1;
+                }
+              }
+              const basketAnimals = Math.ceil(basketTotalShares / 7);
+              return (
+                <div className="p-2 mb-3 bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-lg space-y-2">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <ShoppingBag className="w-4 h-4 text-emerald-600" />
+                    <span className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                      Sepet: {basketItems.length} bağışçı
+                    </span>
+                    <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 rounded-full font-semibold">
+                      {basketTotalShares} hisse
+                    </span>
+                    <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 rounded-full font-semibold">
+                      ~{basketAnimals} hayvan
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300 flex-wrap">
+                    {basketItems.slice(0, 5).map(id => {
+                      const d = kesim.animalGroups.flatMap(g => g.donations).find(dd => dd.id === id)
+                        || kesim.donations.find(dd => dd.id === id);
+                      return d ? (
+                        <span key={id} className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900 rounded text-[10px]">
+                          {d.description || d.name}
+                          <button className="ml-1 hover:text-destructive" onClick={() => removeFromBasket(id)}>×</button>
+                        </span>
+                      ) : null;
+                    })}
+                    {basketItems.length > 5 && <span className="text-[10px]">+{basketItems.length - 5}</span>}
+                  </div>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <Select value={String(basketTransferTarget)} onValueChange={(v) => setBasketTransferTarget(parseInt(v))}>
+                      <SelectTrigger className="h-7 w-32 text-xs">
+                        <SelectValue placeholder="Hedef grup..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {kesim.animalGroups.map((g, i) => {
+                          const empty = g.donations.filter(d => !d.name.trim()).length;
+                          return (
+                            <SelectItem key={g.id} value={String(i)} disabled={g.locked || empty === 0}>
+                              Hayvan {g.animalNo} ({empty} boş)
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <Button variant="default" size="sm" className="h-7 text-xs" onClick={() => transferBasketToGroup(basketTransferTarget)} disabled={basketTransferTarget < 0}>
+                      <Package className="w-3 h-3 mr-1" />
+                      Yerleştir
+                    </Button>
+                    <Button variant="secondary" size="sm" className="h-7 text-xs" onClick={autoDistributeBasket}>
+                      <Wand2 className="w-3 h-3 mr-1" />
+                      Otomatik Dağıt
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={clearBasket}>
+                      Temizle
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 ml-auto">
-                  <Select value={String(basketTransferTarget)} onValueChange={(v) => setBasketTransferTarget(parseInt(v))}>
-                    <SelectTrigger className="h-7 w-32 text-xs">
-                      <SelectValue placeholder="Hedef grup..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {kesim.animalGroups.map((g, i) => {
-                        const empty = g.donations.filter(d => !d.name.trim()).length;
-                        return (
-                          <SelectItem key={g.id} value={String(i)} disabled={g.locked || empty === 0}>
-                            Hayvan {g.animalNo} ({empty} boş)
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <Button variant="default" size="sm" className="h-7 text-xs" onClick={() => transferBasketToGroup(basketTransferTarget)} disabled={basketTransferTarget < 0}>
-                    <Package className="w-3 h-3 mr-1" />
-                    Aktar
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={clearBasket}>
-                    Temizle
-                  </Button>
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             {selectedGroupIds.size > 0 && (
               <div className="flex items-center gap-3 p-2 mb-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg flex-wrap">
@@ -3960,7 +4155,7 @@ export default function KesimAlaniPage() {
                             <ArrowDown className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={(e) => { e.stopPropagation(); splitGroup(groupIdx); }}
+                            onClick={(e) => { e.stopPropagation(); openSplitGroupDialog(groupIdx); }}
                             className={`p-0.5 rounded transition-colors ${group.locked || filledCount <= 1 ? "opacity-30 cursor-not-allowed" : "text-muted-foreground/60 hover:text-muted-foreground"}`}
                             title={group.locked ? "Kilitli grup bölünemez" : filledCount <= 1 ? "Bölmek için en az 2 bağışçı gerekli" : "Grubu Böl"}
                             disabled={group.locked || filledCount <= 1}
@@ -4382,6 +4577,56 @@ export default function KesimAlaniPage() {
                       </span>
                     </Button>
                   ))}
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={splitGroupDialog !== null} onOpenChange={(open) => { if (!open) setSplitGroupDialog(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Scissors className="w-5 h-5 text-primary" />
+              Grubu Böl
+            </DialogTitle>
+          </DialogHeader>
+          {splitGroupDialog && kesim && (() => {
+            const group = kesim.animalGroups[splitGroupDialog.groupIdx];
+            if (!group) return null;
+            const filled = group.donations.filter(d => d.name.trim() !== "");
+            return (
+              <div className="space-y-4 pt-2">
+                <p className="text-sm text-muted-foreground">
+                  <strong>Hayvan {group.animalNo}</strong> — {filled.length} bağışçıyı nerede bölmek istiyorsunuz?
+                </p>
+                <div className="space-y-1">
+                  {filled.map((d, i) => {
+                    if (i === 0) return null;
+                    const isCurrent = splitGroupDialog.splitAt === i;
+                    return (
+                      <button
+                        key={d.id}
+                        className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors border ${
+                          isCurrent
+                            ? "border-primary bg-primary/10 font-medium"
+                            : "border-transparent hover:bg-muted"
+                        }`}
+                        onClick={() => setSplitGroupDialog({ ...splitGroupDialog, splitAt: i })}
+                      >
+                        <span className="text-muted-foreground mr-2">{i}/{filled.length - i}</span>
+                        İlk {i}: {filled.slice(0, i).map(dd => dd.description || dd.name).join(", ")}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={() => setSplitGroupDialog(null)}>İptal</Button>
+                  <Button onClick={executeSplitGroup}>
+                    <Scissors className="w-3 h-3 mr-1" />
+                    {splitGroupDialog.splitAt}/{filled.length - splitGroupDialog.splitAt} Olarak Böl
+                  </Button>
                 </div>
               </div>
             );
