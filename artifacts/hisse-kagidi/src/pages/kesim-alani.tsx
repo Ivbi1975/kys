@@ -923,7 +923,7 @@ export default function KesimAlaniPage() {
       return;
     }
 
-    save({ ...kesim, animalGroups: groups }, `Otomatik çakışma çözümü: ${resolveResults.length} kişi düzeltildi`);
+    save({ ...kesim, animalGroups: groups }, `Otomatik çakışma çözümü: ${appliedCount} takas uygulandı (${resolveResults.length} kişi)`);
     setAutoResolveOpen(false);
     setResolveResults([]);
 
