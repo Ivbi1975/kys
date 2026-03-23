@@ -1626,13 +1626,19 @@ export default function KesimAlaniPage() {
         if (basketIdSet.has(d.id)) groupedBasketIds.add(d.id);
       }
     }
+    const sharesMap = computeEffectiveShares(kesim.donations);
+    let ungroupedSlots = 0;
     for (const id of basketItems) {
       if (!groupedBasketIds.has(id)) {
         const donor = kesim.donations.find(d => d.id === id);
-        if (donor && !donor.excluded) ungroupedBasketDonors.push(donor);
+        if (donor && !donor.excluded) {
+          const effectiveShares = sharesMap.get(id) || donor.shareCount;
+          ungroupedBasketDonors.push(donor);
+          ungroupedSlots += effectiveShares;
+        }
       }
     }
-    const totalSlotsNeeded = groupedBasketIds.size + ungroupedBasketDonors.length;
+    const totalSlotsNeeded = groupedBasketIds.size + ungroupedSlots;
     if (totalSlotsNeeded > emptySlots) {
       toast({
         title: "Yetersiz Alan",
@@ -1655,7 +1661,10 @@ export default function KesimAlaniPage() {
       }
     }
     for (const donor of ungroupedBasketDonors) {
-      itemsToMove.push({ ...donor });
+      const effectiveShares = sharesMap.get(donor.id) || donor.shareCount;
+      for (let s = 0; s < effectiveShares; s++) {
+        itemsToMove.push({ ...donor, id: s === 0 ? donor.id : generateId() });
+      }
     }
     const transferredIds = new Set<string>();
     for (const item of itemsToMove) {
@@ -1788,7 +1797,7 @@ export default function KesimAlaniPage() {
     let placed = 0;
     for (let di = 0; di < groups[groupIdx].donations.length && placed < effectiveShares; di++) {
       if (!groups[groupIdx].donations[di].name.trim()) {
-        groups[groupIdx].donations[di] = { ...donor };
+        groups[groupIdx].donations[di] = { ...donor, id: placed === 0 ? donor.id : generateId() };
         placed++;
       }
     }
@@ -1810,7 +1819,7 @@ export default function KesimAlaniPage() {
     let placed = 0;
     for (let i = 0; i < groups[targetGroupIdx].donations.length && placed < effectiveShares; i++) {
       if (!groups[targetGroupIdx].donations[i].name.trim()) {
-        groups[targetGroupIdx].donations[i] = { ...donor };
+        groups[targetGroupIdx].donations[i] = { ...donor, id: placed === 0 ? donor.id : generateId() };
         placed++;
       }
     }
