@@ -10,12 +10,25 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, ChevronRight, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, PieChart } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Plus, Trash2, ChevronRight, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, PieChart, RotateCcw, Clock, Calendar } from "lucide-react";
 import type { KesimAlani, CustomTag } from "@/lib/types";
 import {
   fetchKesimAlanlari,
   createKesimAlani,
   apiDeleteKesimAlani,
+  apiPermanentDeleteKesimAlani,
+  apiRestoreKesimAlani,
+  fetchDeletedKesimAlanlari,
   fetchTags,
   createTag,
   updateTag,
@@ -30,10 +43,13 @@ import {
 import { useTheme } from "@/lib/useTheme";
 import type { ThemeMode } from "@/lib/useTheme";
 import { getTotalShares, getRequiredAnimals } from "@/lib/grouping";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
   const [, setLocation] = useLocation();
   const [kesimAlanlari, setKesimAlanlari] = useState<KesimAlani[]>([]);
+  const [deletedKesimAlanlari, setDeletedKesimAlanlari] = useState<KesimAlani[]>([]);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [newName, setNewName] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -49,6 +65,9 @@ export default function Home() {
   const [editTagColor, setEditTagColor] = useState("");
   const [loading, setLoading] = useState(true);
   const [migrationDone, setMigrationDone] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string; hasDonations: boolean } | null>(null);
+  const [permanentDeleteConfirm, setPermanentDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+  const { toast } = useToast();
 
   const TAG_COLORS = [
     "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
@@ -69,7 +88,11 @@ export default function Home() {
         setGlobalTags(tags);
         setLogoPreview(logo);
       } catch (err) {
-        console.error("Veri yüklenemedi:", err);
+        toast({
+          title: "Veri yüklenemedi",
+          description: err instanceof Error ? err.message : "Bilinmeyen hata",
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
@@ -77,10 +100,24 @@ export default function Home() {
     init();
   }, []);
 
+  async function loadDeletedItems() {
+    try {
+      const deleted = await fetchDeletedKesimAlanlari();
+      setDeletedKesimAlanlari(deleted);
+      setShowDeleted(true);
+    } catch (err) {
+      toast({
+        title: "Silinen öğeler yüklenemedi",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    }
+  }
+
   async function handleAddTag() {
     if (!newTagName.trim()) return;
     const tag: CustomTag = {
-      id: Math.random().toString(36).substring(2, 10),
+      id: crypto.randomUUID(),
       name: newTagName.trim(),
       color: newTagColor,
     };
@@ -89,17 +126,28 @@ export default function Home() {
       setGlobalTags([...globalTags, tag]);
       setNewTagName("");
       setNewTagColor("#3b82f6");
+      toast({ title: "Etiket oluşturuldu", description: tag.name });
     } catch (err) {
-      console.error("Etiket oluşturma hatası:", err);
+      toast({
+        title: "Etiket oluşturulamadı",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
     }
   }
 
   async function handleDeleteTag(id: string) {
+    const tag = globalTags.find(t => t.id === id);
     try {
       await deleteTagApi(id);
       setGlobalTags(globalTags.filter(t => t.id !== id));
+      toast({ title: "Etiket silindi", description: tag?.name || "" });
     } catch (err) {
-      console.error("Etiket silme hatası:", err);
+      toast({
+        title: "Etiket silinemedi",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
     }
   }
 
@@ -120,8 +168,13 @@ export default function Home() {
       setGlobalTags(globalTags.map(t =>
         t.id === editingTagId ? updated : t
       ));
+      toast({ title: "Etiket güncellendi" });
     } catch (err) {
-      console.error("Etiket güncelleme hatası:", err);
+      toast({
+        title: "Etiket güncellenemedi",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
     }
     setEditingTagId(null);
   }
@@ -129,7 +182,7 @@ export default function Home() {
   async function handleCreate() {
     if (!newName.trim()) return;
     const newKesim: KesimAlani = {
-      id: Math.random().toString(36).substring(2, 12),
+      id: crypto.randomUUID(),
       name: newName.trim(),
       donations: [],
       animalGroups: [],
@@ -139,35 +192,92 @@ export default function Home() {
       await createKesimAlani(newKesim);
       setNewName("");
       setDialogOpen(false);
+      toast({ title: "Kesim alanı oluşturuldu", description: newKesim.name });
       setLocation(`/kesim/${newKesim.id}`);
     } catch (err) {
-      console.error("Oluşturma hatası:", err);
+      toast({
+        title: "Oluşturma hatası",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
     }
   }
 
-  async function handleDelete(id: string) {
+  function requestDelete(id: string) {
     const target = kesimAlanlari.find(k => k.id === id);
-    const name = target?.name || "";
-    const hasDonations = target && target.donations.length > 0;
-    if (hasDonations) {
-      const confirmed = confirm(
-        `"${name}" kesim alanını silmek istediğinizden emin misiniz?\n\nBu işlem geri alınamaz. Silmeden önce Ayarlar > Yedekle ile yedek almanız önerilir.`
-      );
-      if (!confirmed) return;
-    }
+    if (!target) return;
+    setDeleteConfirm({
+      id,
+      name: target.name,
+      hasDonations: target.donations.length > 0,
+    });
+  }
+
+  async function executeDelete() {
+    if (!deleteConfirm) return;
     try {
-      await apiDeleteKesimAlani(id);
-      setKesimAlanlari(kesimAlanlari.filter(k => k.id !== id));
+      await apiDeleteKesimAlani(deleteConfirm.id);
+      setKesimAlanlari(kesimAlanlari.filter(k => k.id !== deleteConfirm.id));
+      toast({
+        title: "Kesim alanı silindi",
+        description: `"${deleteConfirm.name}" çöp kutusuna taşındı. Ayarlar'dan geri yükleyebilirsiniz.`,
+      });
     } catch (err) {
-      console.error("Silme hatası:", err);
+      toast({
+        title: "Silme hatası",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
     }
+    setDeleteConfirm(null);
+  }
+
+  async function handleRestore(id: string) {
+    try {
+      const restored = await apiRestoreKesimAlani(id);
+      setDeletedKesimAlanlari(deletedKesimAlanlari.filter(k => k.id !== id));
+      setKesimAlanlari(prev => [...prev, restored]);
+      toast({ title: "Geri yüklendi", description: `"${restored.name}" başarıyla geri yüklendi.` });
+    } catch (err) {
+      toast({
+        title: "Geri yükleme hatası",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function requestPermanentDelete(id: string) {
+    const target = deletedKesimAlanlari.find(k => k.id === id);
+    if (!target) return;
+    setPermanentDeleteConfirm({ id, name: target.name });
+  }
+
+  async function executePermanentDelete() {
+    if (!permanentDeleteConfirm) return;
+    try {
+      await apiPermanentDeleteKesimAlani(permanentDeleteConfirm.id);
+      setDeletedKesimAlanlari(deletedKesimAlanlari.filter(k => k.id !== permanentDeleteConfirm.id));
+      toast({ title: "Kalıcı olarak silindi", description: `"${permanentDeleteConfirm.name}" tamamen silindi.` });
+    } catch (err) {
+      toast({
+        title: "Kalıcı silme hatası",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    }
+    setPermanentDeleteConfirm(null);
   }
 
   async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      alert("Lütfen bir resim dosyası seçin.");
+      toast({ title: "Geçersiz dosya", description: "Lütfen bir resim dosyası seçin.", variant: "destructive" });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Dosya çok büyük", description: "Logo dosyası 5MB'dan küçük olmalıdır.", variant: "destructive" });
       return;
     }
     const reader = new FileReader();
@@ -176,8 +286,13 @@ export default function Home() {
       try {
         await saveLogoApi(base64);
         setLogoPreview(base64);
+        toast({ title: "Logo yüklendi" });
       } catch (err) {
-        console.error("Logo yükleme hatası:", err);
+        toast({
+          title: "Logo yüklenemedi",
+          description: err instanceof Error ? err.message : "Bilinmeyen hata",
+          variant: "destructive",
+        });
       }
     };
     reader.readAsDataURL(file);
@@ -188,8 +303,13 @@ export default function Home() {
     try {
       await deleteLogoApi();
       setLogoPreview(null);
+      toast({ title: "Logo kaldırıldı" });
     } catch (err) {
-      console.error("Logo silme hatası:", err);
+      toast({
+        title: "Logo silinemedi",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
     }
   }
 
@@ -203,8 +323,13 @@ export default function Home() {
       a.download = `kurban_yedek_${new Date().toISOString().split("T")[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
+      toast({ title: "Yedek indirildi" });
     } catch (err) {
-      console.error("Yedekleme hatası:", err);
+      toast({
+        title: "Yedekleme hatası",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
     }
   }
 
@@ -237,12 +362,64 @@ export default function Home() {
       setLogoPreview(logo);
       const tags = await fetchTags();
       setGlobalTags(tags);
-      alert(`Yedek başarıyla yüklendi: ${result.count} kesim alanı (${mode === "merge" ? "birleştirildi" : "değiştirildi"})`);
+      toast({
+        title: "Yedek başarıyla yüklendi",
+        description: `${result.count} kesim alanı ${mode === "merge" ? "birleştirildi" : "değiştirildi"}`,
+      });
     } else {
-      alert(`Hata: ${result.error}`);
+      toast({
+        title: "Yedek yükleme hatası",
+        description: result.error || "Bilinmeyen hata",
+        variant: "destructive",
+      });
     }
     setPendingImportJson(null);
     setImportModeOpen(false);
+  }
+
+  function formatDate(dateStr: string): string {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString("tr-TR", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+    } catch {
+      return dateStr;
+    }
+  }
+
+  function formatDateTime(dateStr: string): string {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString("tr-TR", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return dateStr;
+    }
+  }
+
+  function timeSince(dateStr: string): string {
+    try {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) return "Bugün";
+      if (diffDays === 1) return "Dün";
+      if (diffDays < 7) return `${diffDays} gün önce`;
+      if (diffDays < 30) return `${Math.floor(diffDays / 7)} hafta önce`;
+      if (diffDays < 365) return `${Math.floor(diffDays / 30)} ay önce`;
+      return `${Math.floor(diffDays / 365)} yıl önce`;
+    } catch {
+      return "";
+    }
   }
 
   if (loading) {
@@ -285,7 +462,7 @@ export default function Home() {
                 Ayarlar
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Ayarlar</DialogTitle>
               </DialogHeader>
@@ -334,7 +511,7 @@ export default function Home() {
                     >
                       <ImagePlus className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
                       <p className="text-sm font-medium">Logo yüklemek için tıklayın</p>
-                      <p className="text-xs text-muted-foreground mt-1">PNG, JPG, SVG desteklenir</p>
+                      <p className="text-xs text-muted-foreground mt-1">PNG, JPG, SVG desteklenir (Maks. 5MB)</p>
                     </div>
                   )}
 
@@ -475,6 +652,47 @@ export default function Home() {
                     </Button>
                   </div>
                 </div>
+
+                <div className="border-t pt-4">
+                  <label className="text-sm font-medium mb-2 block">
+                    <Trash2 className="w-4 h-4 inline mr-1" />
+                    Silinen Kesim Alanları
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Silinen kesim alanlarını görüntüleyin ve geri yükleyin.
+                  </p>
+                  <Button variant="outline" size="sm" className="w-full" onClick={loadDeletedItems}>
+                    <RotateCcw className="w-4 h-4 mr-1" />
+                    Silinenleri Göster ({deletedKesimAlanlari.length})
+                  </Button>
+
+                  {showDeleted && deletedKesimAlanlari.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {deletedKesimAlanlari.map(k => (
+                        <div key={k.id} className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{k.name}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              Silinme: {k.deletedAt ? formatDateTime(k.deletedAt) : "—"}
+                            </p>
+                          </div>
+                          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleRestore(k.id)}>
+                            <RotateCcw className="w-3 h-3 mr-1" />
+                            Geri Al
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => requestPermanentDelete(k.id)}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {showDeleted && deletedKesimAlanlari.length === 0 && (
+                    <p className="mt-3 text-xs text-muted-foreground text-center py-2">
+                      Silinen kesim alanı bulunmuyor.
+                    </p>
+                  )}
+                </div>
               </div>
             </DialogContent>
           </Dialog>
@@ -550,7 +768,7 @@ export default function Home() {
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                 autoFocus
               />
-              <Button onClick={handleCreate} className="w-full">
+              <Button onClick={handleCreate} className="w-full" disabled={!newName.trim()}>
                 Oluştur
               </Button>
             </div>
@@ -563,9 +781,18 @@ export default function Home() {
             <h3 className="text-lg font-semibold text-foreground mb-2">
               Henüz kesim alanı yok
             </h3>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground mb-4">
               Yukarıdaki butona tıklayarak ilk kesim alanınızı oluşturun
             </p>
+            <div className="text-sm text-muted-foreground space-y-2 max-w-md mx-auto text-left">
+              <p className="font-medium text-foreground">Nasıl çalışır?</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Bir kesim alanı oluşturun (örn: "Ankara 2025")</li>
+                <li>Bağışçıları tek tek veya Excel'den toplu ekleyin</li>
+                <li>Otomatik gruplama ile hayvan gruplarını oluşturun</li>
+                <li>Kesim kağıtlarını yazdırın veya Excel'e aktarın</li>
+              </ol>
+            </div>
           </Card>
         ) : (
           <>
@@ -636,14 +863,25 @@ export default function Home() {
                     onClick={() => setLocation(`/kesim/${k.id}`)}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-foreground">{k.name}</h3>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-foreground">{k.name}</h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {formatDate(k.createdAt)}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground/60">
+                            ({timeSince(k.createdAt)})
+                          </span>
+                        </div>
+                      </div>
                       <div className="flex items-center gap-2">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDelete(k.id);
+                            requestDelete(k.id);
                           }}
                         >
                           <Trash2 className="w-4 h-4 text-destructive" />
@@ -673,9 +911,6 @@ export default function Home() {
                         <div className="text-[10px] text-muted-foreground">Doluluk</div>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {new Date(k.createdAt).toLocaleDateString("tr-TR")}
-                    </p>
                   </Card>
                 );
               })}
@@ -683,6 +918,53 @@ export default function Home() {
           </>
         )}
       </div>
+
+      <AlertDialog open={deleteConfirm !== null} onOpenChange={(open) => { if (!open) setDeleteConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Kesim Alanını Sil</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirm?.hasDonations ? (
+                <>
+                  <strong>"{deleteConfirm.name}"</strong> kesim alanında bağışçılar bulunuyor.
+                  Bu alan çöp kutusuna taşınacak ve daha sonra Ayarlar'dan geri yükleyebilirsiniz.
+                  <br /><br />
+                  Silmeden önce Ayarlar &gt; Yedekle ile yedek almanız önerilir.
+                </>
+              ) : (
+                <>
+                  <strong>"{deleteConfirm?.name}"</strong> kesim alanı çöp kutusuna taşınacak.
+                  Daha sonra Ayarlar'dan geri yükleyebilirsiniz.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogAction onClick={executeDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={permanentDeleteConfirm !== null} onOpenChange={(open) => { if (!open) setPermanentDeleteConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Kalıcı Olarak Sil</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>"{permanentDeleteConfirm?.name}"</strong> kesim alanı kalıcı olarak silinecek.
+              Bu işlem geri alınamaz!
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogAction onClick={executePermanentDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Kalıcı Olarak Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -33,5 +33,6 @@ export interface KesimAlani {
   donations: Donation[];
   animalGroups: AnimalGroup[];
   createdAt: string;
+  deletedAt?: string | null;
   customTags?: CustomTag[];
 }

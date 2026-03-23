@@ -1,7 +1,7 @@
 import type { Donation, AnimalGroup } from "./types";
 
 function generateId(): string {
-  return Math.random().toString(36).substring(2, 12);
+  return crypto.randomUUID();
 }
 
 function getSurname(fullName: string): string {

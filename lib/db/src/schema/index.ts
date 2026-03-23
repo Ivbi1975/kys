@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, index, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -6,6 +6,7 @@ export const kesimAlanlariTable = pgTable("kesim_alanlari", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   createdAt: text("created_at").notNull(),
+  deletedAt: text("deleted_at"),
 });
 
 export const insertKesimAlaniSchema = createInsertSchema(kesimAlanlariTable);
@@ -23,7 +24,9 @@ export const donationsTable = pgTable("donations", {
   notes: text("notes").notNull().default(""),
   excluded: boolean("excluded").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
-});
+}, (table) => [
+  index("idx_donations_kesim_alani_id").on(table.kesimAlaniId),
+]);
 
 export const insertDonationSchema = createInsertSchema(donationsTable);
 export type InsertDonation = z.infer<typeof insertDonationSchema>;
@@ -37,7 +40,9 @@ export const animalGroupsTable = pgTable("animal_groups", {
   locked: boolean("locked").notNull().default(false),
   notes: text("notes").notNull().default(""),
   sortOrder: integer("sort_order").notNull().default(0),
-});
+}, (table) => [
+  index("idx_animal_groups_kesim_alani_id").on(table.kesimAlaniId),
+]);
 
 export const insertAnimalGroupSchema = createInsertSchema(animalGroupsTable);
 export type InsertAnimalGroup = z.infer<typeof insertAnimalGroupSchema>;
@@ -48,7 +53,11 @@ export const animalGroupDonationsTable = pgTable("animal_group_donations", {
   groupId: text("group_id").notNull().references(() => animalGroupsTable.id, { onDelete: "cascade" }),
   donationId: text("donation_id").notNull().references(() => donationsTable.id, { onDelete: "cascade" }),
   sortOrder: integer("sort_order").notNull().default(0),
-});
+}, (table) => [
+  index("idx_agd_group_id").on(table.groupId),
+  index("idx_agd_donation_id").on(table.donationId),
+  unique("uq_agd_group_donation").on(table.groupId, table.donationId),
+]);
 
 export const customTagsTable = pgTable("custom_tags", {
   id: text("id").primaryKey(),
@@ -64,7 +73,11 @@ export const donationTagsTable = pgTable("donation_tags", {
   id: serial("id").primaryKey(),
   donationId: text("donation_id").notNull().references(() => donationsTable.id, { onDelete: "cascade" }),
   tagId: text("tag_id").notNull().references(() => customTagsTable.id, { onDelete: "cascade" }),
-});
+}, (table) => [
+  index("idx_dt_donation_id").on(table.donationId),
+  index("idx_dt_tag_id").on(table.tagId),
+  unique("uq_dt_donation_tag").on(table.donationId, table.tagId),
+]);
 
 export const appSettingsTable = pgTable("app_settings", {
   key: text("key").primaryKey(),

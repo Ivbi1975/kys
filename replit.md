@@ -73,6 +73,15 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - Advanced filtering: filter donor list by cinsi (dropdown), hisse range (min/max), status (active/excluded), tags (multi-select) — combinable filters with active count badge and clear button
 - Data persisted in PostgreSQL via API server (migrated from localStorage)
 - One-time automatic localStorage → PostgreSQL migration on first load
+- Soft delete for kesim alanları (trash/restore functionality with permanent delete option)
+- Toast notifications for all user actions (success/error feedback)
+- AlertDialog for destructive operations (modern UI instead of browser confirm())
+- Save status indicator in workspace header (saving/saved/error states)
+- Creation date display on kesim alanı cards with relative time
+- crypto.randomUUID() for all ID generation (collision-safe)
+- Database indexes on foreign keys and unique constraints on join tables
+- API base path uses import.meta.env.BASE_URL for proper artifact routing
+- File size validation for logo uploads (max 5MB)
 
 Data model (Donation):
 - `id`, `name` (adına kesilen), `description` (vekaleti veren), `donationType` (cinsi), `shareCount`, `vekalet` (vekalet no), `notes` (notlar), `excluded?`, `tags?`

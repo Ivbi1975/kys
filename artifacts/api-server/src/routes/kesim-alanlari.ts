@@ -7,7 +7,7 @@ import {
   animalGroupDonationsTable,
   donationTagsTable,
 } from "@workspace/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, isNull, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -82,8 +82,16 @@ const updateKesimAlaniSchema = z.object({
 
 const router: IRouter = Router();
 
+async function requireActiveKesimAlani(id: string) {
+  const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
+  if (!existing) return { error: "Kesim alanı bulunamadı", status: 404 as const };
+  if (existing.deletedAt) return { error: "Silinmiş bir kesim alanı üzerinde işlem yapılamaz. Önce geri yükleyin.", status: 400 as const };
+  return { existing, error: null, status: 200 as const };
+}
+
 async function getFullKesimAlani(id: string) {
-  const [ka] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
+  const [ka] = await db.select().from(kesimAlanlariTable)
+    .where(eq(kesimAlanlariTable.id, id));
   if (!ka) return null;
 
   const donations = await db.select().from(donationsTable)
@@ -158,19 +166,47 @@ async function getFullKesimAlani(id: string) {
     id: ka.id,
     name: ka.name,
     createdAt: ka.createdAt,
+    deletedAt: ka.deletedAt || null,
     donations: mappedDonations,
     animalGroups: mappedGroups,
   };
 }
 
-router.get("/kesim-alanlari", async (_req, res) => {
+router.get("/kesim-alanlari", async (req, res) => {
   try {
-    const rows = await db.select().from(kesimAlanlariTable).orderBy(kesimAlanlariTable.createdAt);
+    const includeDeleted = req.query.includeDeleted === "true";
+    const whereClause = includeDeleted ? undefined : isNull(kesimAlanlariTable.deletedAt);
+
+    let rows;
+    if (whereClause) {
+      rows = await db.select().from(kesimAlanlariTable)
+        .where(whereClause)
+        .orderBy(kesimAlanlariTable.createdAt);
+    } else {
+      rows = await db.select().from(kesimAlanlariTable)
+        .orderBy(kesimAlanlariTable.createdAt);
+    }
+
     const results = await Promise.all(rows.map(r => getFullKesimAlani(r.id)));
     res.json(results.filter(Boolean));
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error("GET /kesim-alanlari error:", message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/kesim-alanlari/deleted", async (_req, res) => {
+  try {
+    const rows = await db.select().from(kesimAlanlariTable)
+      .where(isNotNull(kesimAlanlariTable.deletedAt))
+      .orderBy(kesimAlanlariTable.createdAt);
+
+    const results = await Promise.all(rows.map(r => getFullKesimAlani(r.id)));
+    res.json(results.filter(Boolean));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error("GET /kesim-alanlari/deleted error:", message);
     res.status(500).json({ error: message });
   }
 });
@@ -236,9 +272,9 @@ router.put("/kesim-alanlari/:id", async (req, res) => {
   const { name, donations, animalGroups } = parsed.data;
 
   try {
-    const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
-    if (!existing) {
-      res.status(404).json({ error: "Bulunamadı" });
+    const kaCheck = await requireActiveKesimAlani(id);
+    if (kaCheck.error) {
+      res.status(kaCheck.status).json({ error: kaCheck.error });
       return;
     }
 
@@ -298,11 +334,53 @@ router.put("/kesim-alanlari/:id", async (req, res) => {
 router.delete("/kesim-alanlari/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    await db.delete(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
+    const permanent = req.query.permanent === "true";
+
+    const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
+    if (!existing) {
+      res.status(404).json({ error: "Kesim alanı bulunamadı" });
+      return;
+    }
+
+    if (permanent) {
+      await db.delete(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
+    } else {
+      await db.update(kesimAlanlariTable)
+        .set({ deletedAt: new Date().toISOString() })
+        .where(eq(kesimAlanlariTable.id, id));
+    }
+
     res.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`DELETE /kesim-alanlari/${req.params.id} error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/kesim-alanlari/:id/restore", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
+    if (!existing) {
+      res.status(404).json({ error: "Kesim alanı bulunamadı" });
+      return;
+    }
+
+    if (!existing.deletedAt) {
+      res.status(400).json({ error: "Bu kesim alanı zaten aktif" });
+      return;
+    }
+
+    await db.update(kesimAlanlariTable)
+      .set({ deletedAt: null })
+      .where(eq(kesimAlanlariTable.id, id));
+
+    const result = await getFullKesimAlani(id);
+    res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`POST /kesim-alanlari/${req.params.id}/restore error:`, message);
     res.status(500).json({ error: message });
   }
 });
@@ -318,9 +396,9 @@ router.post("/kesim-alanlari/:id/donations", async (req, res) => {
   const donation = parsed.data;
 
   try {
-    const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, kesimAlaniId));
-    if (!existing) {
-      res.status(404).json({ error: "Kesim alanı bulunamadı" });
+    const check = await requireActiveKesimAlani(kesimAlaniId);
+    if (check.error) {
+      res.status(check.status).json({ error: check.error });
       return;
     }
 
@@ -369,6 +447,12 @@ router.put("/kesim-alanlari/:id/donations/:donationId", async (req, res) => {
   const updates = parsed.data;
 
   try {
+    const kaCheck = await requireActiveKesimAlani(kesimAlaniId);
+    if (kaCheck.error) {
+      res.status(kaCheck.status).json({ error: kaCheck.error });
+      return;
+    }
+
     const [existing] = await db.select().from(donationsTable)
       .where(eq(donationsTable.id, donationId));
     if (!existing || existing.kesimAlaniId !== kesimAlaniId) {
@@ -410,7 +494,17 @@ router.put("/kesim-alanlari/:id/donations/:donationId", async (req, res) => {
 
 router.delete("/kesim-alanlari/:id/donations/:donationId", async (req, res) => {
   try {
-    const { donationId } = req.params;
+    const { id: kesimAlaniId, donationId } = req.params;
+    const kaCheck = await requireActiveKesimAlani(kesimAlaniId);
+    if (kaCheck.error) {
+      res.status(kaCheck.status).json({ error: kaCheck.error });
+      return;
+    }
+    const [existing] = await db.select().from(donationsTable).where(eq(donationsTable.id, donationId));
+    if (!existing || existing.kesimAlaniId !== kesimAlaniId) {
+      res.status(404).json({ error: "Bağışçı bulunamadı" });
+      return;
+    }
     await db.delete(donationsTable).where(eq(donationsTable.id, donationId));
     res.json({ success: true });
   } catch (err) {
@@ -431,9 +525,9 @@ router.post("/kesim-alanlari/:id/animal-groups", async (req, res) => {
   const group = parsed.data;
 
   try {
-    const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, kesimAlaniId));
-    if (!existing) {
-      res.status(404).json({ error: "Kesim alanı bulunamadı" });
+    const kaCheck = await requireActiveKesimAlani(kesimAlaniId);
+    if (kaCheck.error) {
+      res.status(kaCheck.status).json({ error: kaCheck.error });
       return;
     }
 
@@ -457,7 +551,7 @@ router.post("/kesim-alanlari/:id/animal-groups", async (req, res) => {
             groupId: group.id,
             donationId: group.donations[j].id,
             sortOrder: j,
-          });
+          }).onConflictDoNothing();
         }
       }
     });
@@ -486,9 +580,9 @@ router.put("/kesim-alanlari/:id/animal-groups/bulk", async (req, res) => {
   const { animalGroups } = parsed.data;
 
   try {
-    const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, kesimAlaniId));
-    if (!existing) {
-      res.status(404).json({ error: "Kesim alanı bulunamadı" });
+    const kaCheck = await requireActiveKesimAlani(kesimAlaniId);
+    if (kaCheck.error) {
+      res.status(kaCheck.status).json({ error: kaCheck.error });
       return;
     }
 
@@ -522,6 +616,12 @@ router.put("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => {
   const updates = parsed.data;
 
   try {
+    const kaCheck = await requireActiveKesimAlani(kesimAlaniId);
+    if (kaCheck.error) {
+      res.status(kaCheck.status).json({ error: kaCheck.error });
+      return;
+    }
+
     const [existing] = await db.select().from(animalGroupsTable)
       .where(eq(animalGroupsTable.id, groupId));
     if (!existing || existing.kesimAlaniId !== kesimAlaniId) {
@@ -547,7 +647,7 @@ router.put("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => {
             groupId,
             donationId: updates.donations[j].id,
             sortOrder: j,
-          });
+          }).onConflictDoNothing();
         }
       }
     });
@@ -563,7 +663,17 @@ router.put("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => {
 
 router.delete("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => {
   try {
-    const { groupId } = req.params;
+    const { id: kesimAlaniId, groupId } = req.params;
+    const kaCheck = await requireActiveKesimAlani(kesimAlaniId);
+    if (kaCheck.error) {
+      res.status(kaCheck.status).json({ error: kaCheck.error });
+      return;
+    }
+    const [existing] = await db.select().from(animalGroupsTable).where(eq(animalGroupsTable.id, groupId));
+    if (!existing || existing.kesimAlaniId !== kesimAlaniId) {
+      res.status(404).json({ error: "Hayvan grubu bulunamadı" });
+      return;
+    }
     await db.delete(animalGroupsTable).where(eq(animalGroupsTable.id, groupId));
     res.json({ success: true });
   } catch (err) {
@@ -620,7 +730,7 @@ async function saveAnimalGroups(tx: Tx, kesimAlaniId: string, groups: AnimalGrou
           groupId: g.id,
           donationId: d.id,
           sortOrder: j,
-        });
+        }).onConflictDoNothing();
       }
     }
   }

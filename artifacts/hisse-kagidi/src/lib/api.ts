@@ -1,6 +1,8 @@
 import type { KesimAlani, CustomTag } from "./types";
 
-const API_BASE = "/api";
+const API_BASE = import.meta.env.BASE_URL
+  ? `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/").replace(/\/$/, "")
+  : "/api";
 
 interface ApiError {
   error: string;
@@ -24,6 +26,10 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
 export async function fetchKesimAlanlari(): Promise<KesimAlani[]> {
   return apiFetch<KesimAlani[]>("/kesim-alanlari");
+}
+
+export async function fetchDeletedKesimAlanlari(): Promise<KesimAlani[]> {
+  return apiFetch<KesimAlani[]>("/kesim-alanlari/deleted");
 }
 
 export async function fetchKesimAlani(id: string): Promise<KesimAlani | null> {
@@ -51,6 +57,14 @@ export async function apiUpdateKesimAlani(data: KesimAlani): Promise<KesimAlani>
 
 export async function apiDeleteKesimAlani(id: string): Promise<{ success: boolean }> {
   return apiFetch<{ success: boolean }>(`/kesim-alanlari/${id}`, { method: "DELETE" });
+}
+
+export async function apiPermanentDeleteKesimAlani(id: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/kesim-alanlari/${id}?permanent=true`, { method: "DELETE" });
+}
+
+export async function apiRestoreKesimAlani(id: string): Promise<KesimAlani> {
+  return apiFetch<KesimAlani>(`/kesim-alanlari/${id}/restore`, { method: "POST" });
 }
 
 export async function fetchTags(): Promise<CustomTag[]> {
@@ -155,7 +169,7 @@ export async function migrateLocalStorageToApi(): Promise<boolean> {
           await createTag(tag);
         } catch (err) {
           const msg = `Tag ${tag.id}: ${err instanceof Error ? err.message : String(err)}`;
-          console.error("Migration failed -", msg);
+          console.warn("Migration failed -", msg);
           failures.push(msg);
         }
       }
@@ -169,7 +183,7 @@ export async function migrateLocalStorageToApi(): Promise<boolean> {
           await createKesimAlani(ka);
         } catch (err) {
           const msg = `KesimAlani ${ka.id}: ${err instanceof Error ? err.message : String(err)}`;
-          console.error("Migration failed -", msg);
+          console.warn("Migration failed -", msg);
           failures.push(msg);
         }
       }
@@ -190,7 +204,7 @@ export async function migrateLocalStorageToApi(): Promise<boolean> {
       return true;
     }
 
-    console.error(`Migration incomplete: ${failures.length} item(s) failed. Will retry on next load.`);
+    console.warn(`Migration incomplete: ${failures.length} item(s) failed. Will retry on next load.`);
     return false;
   } catch (err) {
     console.error("Migration aborted:", err instanceof Error ? err.message : err);

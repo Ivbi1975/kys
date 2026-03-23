@@ -19,6 +19,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   ArrowLeft,
   Plus,
   Trash2,
@@ -105,7 +115,7 @@ const COLUMN_OPTIONS: { value: ColumnMapping; label: string }[] = [
 ];
 
 function generateId(): string {
-  return Math.random().toString(36).substring(2, 12);
+  return crypto.randomUUID();
 }
 
 export default function KesimAlaniPage() {
@@ -219,6 +229,7 @@ export default function KesimAlaniPage() {
   const [smartPlacePopover, setSmartPlacePopover] = useState<string | null>(null);
   const [splitShareDialog, setSplitShareDialog] = useState<{ donationId: string; totalShares: number } | null>(null);
   const [splitGroupDialog, setSplitGroupDialog] = useState<{ groupIdx: number; splitAt: number } | null>(null);
+  const [personBulkDeleteConfirm, setPersonBulkDeleteConfirm] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -348,9 +359,27 @@ export default function KesimAlaniPage() {
     }
   }, []);
 
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const saveToApi = useCallback((data: KesimAlani) => {
-    apiUpdateKesimAlani(data).catch(err => console.error("Kaydetme hatası:", err));
-  }, []);
+    setSaveStatus("saving");
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    apiUpdateKesimAlani(data)
+      .then(() => {
+        setSaveStatus("saved");
+        saveTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+      })
+      .catch(err => {
+        setSaveStatus("error");
+        toast({
+          title: "Kaydetme hatası",
+          description: err instanceof Error ? err.message : "Veriler kaydedilemedi",
+          variant: "destructive",
+        });
+        saveTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 5000);
+      });
+  }, [toast]);
 
   const save = useCallback(
     (updated: KesimAlani, desc?: string) => {
@@ -536,7 +565,7 @@ export default function KesimAlaniPage() {
           processRawData(rows);
         }
       } catch {
-        alert("Excel dosyası okunamadı. Lütfen geçerli bir dosya seçin.");
+        toast({ title: "Excel dosyası okunamadı", description: "Lütfen geçerli bir dosya seçin.", variant: "destructive" });
       }
     };
     reader.readAsBinaryString(file);
@@ -1540,7 +1569,7 @@ export default function KesimAlaniPage() {
     }
     const moveCount = Math.min(candidateIds.length, emptySlotCount);
     if (moveCount === 0) {
-      alert("Hedef grupta boş slot yok. Taşıma yapılamadı.");
+      toast({ title: "Taşıma yapılamadı", description: "Hedef grupta boş slot yok.", variant: "destructive" });
       return;
     }
     const idsToMove = new Set(candidateIds.slice(0, moveCount));
@@ -1573,7 +1602,7 @@ export default function KesimAlaniPage() {
     setSelectedGroupDonations(new Set());
     setBulkMoveTargetGroup(-1);
     if (moveCount < candidateIds.length) {
-      alert(`Hedef grupta yeterli boş slot olmadığı için ${moveCount}/${candidateIds.length} bağışçı taşındı.`);
+      toast({ title: "Kısmi taşıma", description: `Hedef grupta yeterli boş slot olmadığı için ${moveCount}/${candidateIds.length} bağışçı taşındı.`, variant: "destructive" });
     }
   }
 
@@ -2346,7 +2375,27 @@ export default function KesimAlaniPage() {
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold text-foreground">{kesim.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-foreground">{kesim.name}</h1>
+              {saveStatus === "saving" && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1 animate-pulse">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Kaydediliyor...
+                </span>
+              )}
+              {saveStatus === "saved" && (
+                <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                  <Save className="w-3 h-3" />
+                  Kaydedildi
+                </span>
+              )}
+              {saveStatus === "error" && (
+                <span className="text-xs text-destructive flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  Kaydetme hatası
+                </span>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground">
               {kesim.donations.length} bağışçı • {totalShares} hisse •{" "}
               {requiredAnimals} hayvan gerekli
@@ -4303,11 +4352,7 @@ export default function KesimAlaniPage() {
                           variant="destructive"
                           size="sm"
                           className="h-7 text-xs"
-                          onClick={() => {
-                            if (confirm(`"${personEditDesc}" adlı kişinin tüm ${matchingDonations.length} kaydı silinecek. Emin misiniz?`)) {
-                              bulkDeleteByDesc(personEditDesc);
-                            }
-                          }}
+                          onClick={() => setPersonBulkDeleteConfirm(personEditDesc)}
                         >
                           <Trash2 className="w-3 h-3 mr-1" />
                           Tümünü Sil
@@ -4718,6 +4763,31 @@ export default function KesimAlaniPage() {
           })()}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!personBulkDeleteConfirm} onOpenChange={(open) => { if (!open) setPersonBulkDeleteConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Toplu Silme Onayı</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{personBulkDeleteConfirm}" adlı kişinin tüm kayıtları silinecek. Bu işlem geri alınamaz. Devam etmek istiyor musunuz?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={() => {
+                if (personBulkDeleteConfirm) {
+                  bulkDeleteByDesc(personBulkDeleteConfirm);
+                }
+                setPersonBulkDeleteConfirm(null);
+              }}
+            >
+              Tümünü Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
