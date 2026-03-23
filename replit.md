@@ -53,8 +53,11 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - Animal group locking (prevents accidental changes)
 - Animal group notes
 - Dark theme support with three modes: Açık (light), Koyu (dark), Sistem (system auto-detect) — settable via header toggle or Settings > Tema
-- Excel export for donor lists and kesim kağıdı format
-- Statistics dashboard (active donors, total shares, required animals, empty slots, ungrouped donor counter)
+- Excel export for donor lists (with both Bağışçılar + Hayvan Grupları sheets) and kesim kağıdı format (with cell merges + column widths)
+- Excel export on print page matching visible column layout with HAYVAN cell merges
+- PDF export on print page (opens browser print dialog for Save as PDF)
+- Statistics dashboard — kesim detail: active donors, excluded count, total shares, required animals, empty slots, occupancy % (doluluk)
+- Statistics dashboard — home page: each card shows bağışçı/hisse/hayvan/grup/doluluk; summary row for all areas when 2+ exist
 - Share distribution panel (bar chart showing count of 1-7 share donors)
 - Group composition panel (shows share combinations per group like "3+2+1+1")
 - Ungrouped donor tracking (clickable orange counter filters donor list to show only unassigned donors)

@@ -2,9 +2,10 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Printer, Settings2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Printer, Settings2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff, FileSpreadsheet, FileText } from "lucide-react";
 import type { KesimAlani, AnimalGroup } from "@/lib/types";
 import { fetchKesimAlani, fetchLogo } from "@/lib/api";
+import * as XLSX from "xlsx";
 import {
   loadPrintPreferences,
   savePrintPreferences,
@@ -140,6 +141,63 @@ export default function PrintPage() {
     window.print();
   }
 
+  function handlePdfDownload() {
+    window.print();
+  }
+
+  function exportKesimKagidiExcel() {
+    if (!kesim || kesim.animalGroups.length === 0) return;
+    const wb = XLSX.utils.book_new();
+    const headers = visibleColumns.map(c => c.label);
+    const rows: (string | number)[][] = [];
+
+    for (const group of processedGroups) {
+      for (let idx = 0; idx < group.donations.length; idx++) {
+        const d = group.donations[idx];
+        const row: (string | number)[] = [];
+        for (const col of visibleColumns) {
+          if (col.key === "hayvan") {
+            row.push(idx === 0 ? group.animalNo : "");
+          } else if (col.key === "sira") {
+            row.push(shouldHideContent("sira", d.donationType) ? "" : idx + 1);
+          } else {
+            const content = getCellContent(col.key, d);
+            const hidden = shouldHideContent(col.key, d.donationType);
+            row.push(hidden ? "" : content);
+          }
+        }
+        rows.push(row);
+      }
+    }
+
+    const sheetData = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+    const hayvanColIdx = visibleColumns.findIndex(c => c.key === "hayvan");
+    if (hayvanColIdx >= 0) {
+      let rowIdx = 1;
+      for (const group of processedGroups) {
+        if (group.donations.length > 1) {
+          const merge = { s: { r: rowIdx, c: hayvanColIdx }, e: { r: rowIdx + group.donations.length - 1, c: hayvanColIdx } };
+          if (!ws["!merges"]) ws["!merges"] = [];
+          ws["!merges"].push(merge);
+        }
+        rowIdx += group.donations.length;
+      }
+    }
+
+    const colWidths = visibleColumns.map(c => {
+      if (c.key === "hayvan" || c.key === "sira") return { wch: 8 };
+      if (c.key === "vekalet") return { wch: 12 };
+      if (c.key === "cinsi") return { wch: 10 };
+      return { wch: 22 };
+    });
+    ws["!cols"] = colWidths;
+
+    XLSX.utils.book_append_sheet(wb, ws, "Kesim Kağıdı");
+    XLSX.writeFile(wb, `${kesim.name}_kesim_kagidi.xlsx`);
+  }
+
   if (!kesim) return null;
 
   return (
@@ -164,6 +222,14 @@ export default function PrintPage() {
           <Settings2 className="w-4 h-4 mr-1" />
           Yazdırma Seçenekleri
           {optionsOpen ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
+        </Button>
+        <Button variant="outline" size="sm" onClick={exportKesimKagidiExcel} disabled={processedGroups.length === 0}>
+          <FileSpreadsheet className="w-4 h-4 mr-1" />
+          Excel
+        </Button>
+        <Button variant="outline" size="sm" onClick={handlePdfDownload} disabled={processedGroups.length === 0} title="Tarayıcı yazdırma diyaloğunda PDF olarak kaydedin">
+          <FileText className="w-4 h-4 mr-1" />
+          PDF
         </Button>
         <Button onClick={handlePrint}>
           <Printer className="w-4 h-4 mr-2" />

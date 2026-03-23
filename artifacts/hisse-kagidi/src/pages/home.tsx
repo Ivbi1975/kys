@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, ChevronRight, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil } from "lucide-react";
+import { Plus, Trash2, ChevronRight, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, Users, PieChart } from "lucide-react";
 import type { KesimAlani, CustomTag } from "@/lib/types";
 import {
   fetchKesimAlanlari,
@@ -29,6 +29,7 @@ import {
 } from "@/lib/api";
 import { useTheme } from "@/lib/useTheme";
 import type { ThemeMode } from "@/lib/useTheme";
+import { getTotalShares, getRequiredAnimals } from "@/lib/grouping";
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -493,37 +494,119 @@ export default function Home() {
             </p>
           </Card>
         ) : (
-          <div className="space-y-3">
-            {kesimAlanlari.map((k) => (
-              <Card
-                key={k.id}
-                className="p-4 flex items-center justify-between hover:bg-accent/50 transition-colors cursor-pointer"
-                onClick={() => setLocation(`/kesim/${k.id}`)}
-              >
-                <div>
-                  <h3 className="font-semibold text-foreground">{k.name}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {k.donations.length} bağışçı •{" "}
-                    {k.animalGroups.length} hayvan grubu •{" "}
-                    {new Date(k.createdAt).toLocaleDateString("tr-TR")}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(k.id);
-                    }}
+          <>
+            {kesimAlanlari.length > 1 && (() => {
+              const totals = kesimAlanlari.reduce((acc, k) => {
+                const shares = getTotalShares(k.donations);
+                const animals = getRequiredAnimals(k.donations);
+                const activeDonors = k.donations.filter(d => !d.excluded).length;
+                const totalSlots = k.animalGroups.length * 7;
+                const filledSlots = k.animalGroups.reduce(
+                  (s, g) => s + g.donations.filter(d => d.name.trim() !== "").length, 0
+                );
+                return {
+                  donors: acc.donors + activeDonors,
+                  shares: acc.shares + shares,
+                  animals: acc.animals + animals,
+                  grouped: acc.grouped + k.animalGroups.length,
+                  totalSlots: acc.totalSlots + totalSlots,
+                  filledSlots: acc.filledSlots + filledSlots,
+                };
+              }, { donors: 0, shares: 0, animals: 0, grouped: 0, totalSlots: 0, filledSlots: 0 });
+              const occupancy = totals.totalSlots > 0 ? Math.round((totals.filledSlots / totals.totalSlots) * 100) : 0;
+              return (
+                <Card className="p-4 mb-4 bg-primary/5 border-primary/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <PieChart className="w-4 h-4 text-primary" />
+                    <h3 className="text-sm font-semibold text-foreground">Genel Özet</h3>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-primary">{totals.donors}</div>
+                      <div className="text-xs text-muted-foreground">Aktif Bağışçı</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-primary">{totals.shares}</div>
+                      <div className="text-xs text-muted-foreground">Toplam Hisse</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-primary">{totals.animals}</div>
+                      <div className="text-xs text-muted-foreground">Gereken Hayvan</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-primary">{totals.grouped}</div>
+                      <div className="text-xs text-muted-foreground">Gruplandırılmış</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-primary">%{occupancy}</div>
+                      <div className="text-xs text-muted-foreground">Doluluk Oranı</div>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })()}
+            <div className="space-y-3">
+              {kesimAlanlari.map((k) => {
+                const shares = getTotalShares(k.donations);
+                const animals = getRequiredAnimals(k.donations);
+                const activeDonors = k.donations.filter(d => !d.excluded).length;
+                const totalSlots = k.animalGroups.length * 7;
+                const filledSlots = k.animalGroups.reduce(
+                  (s, g) => s + g.donations.filter(d => d.name.trim() !== "").length, 0
+                );
+                const occupancy = totalSlots > 0 ? Math.round((filledSlots / totalSlots) * 100) : 0;
+                return (
+                  <Card
+                    key={k.id}
+                    className="p-4 hover:bg-accent/50 transition-colors cursor-pointer"
+                    onClick={() => setLocation(`/kesim/${k.id}`)}
                   >
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                </div>
-              </Card>
-            ))}
-          </div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-semibold text-foreground">{k.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(k.id);
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-center">
+                      <div>
+                        <div className="text-sm font-bold text-primary">{activeDonors}</div>
+                        <div className="text-[10px] text-muted-foreground">Bağışçı</div>
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-primary">{shares}</div>
+                        <div className="text-[10px] text-muted-foreground">Hisse</div>
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-primary">{animals}</div>
+                        <div className="text-[10px] text-muted-foreground">Hayvan</div>
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-primary">{k.animalGroups.length}</div>
+                        <div className="text-[10px] text-muted-foreground">Grup</div>
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-primary">%{occupancy}</div>
+                        <div className="text-[10px] text-muted-foreground">Doluluk</div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {new Date(k.createdAt).toLocaleDateString("tr-TR")}
+                    </p>
+                  </Card>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
     </div>

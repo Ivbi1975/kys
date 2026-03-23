@@ -1236,7 +1236,9 @@ export default function KesimAlaniPage() {
 
   function exportDonorsExcel() {
     if (!kesim) return;
-    const data = kesim.donations.map((d, i) => ({
+    const wb = XLSX.utils.book_new();
+
+    const donorData = kesim.donations.map((d, i) => ({
       "Sıra": i + 1,
       "Adına Kesilen": d.name,
       "Vekaleti Veren": d.description,
@@ -1246,9 +1248,35 @@ export default function KesimAlaniPage() {
       "Notlar": d.notes,
       "Durum": d.excluded ? "Hariç" : "Dahil",
     }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Bağışçılar");
+    const wsDonors = XLSX.utils.json_to_sheet(donorData);
+    wsDonors["!cols"] = [
+      { wch: 6 }, { wch: 22 }, { wch: 22 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 18 }, { wch: 8 },
+    ];
+    XLSX.utils.book_append_sheet(wb, wsDonors, "Bağışçılar");
+
+    if (kesim.animalGroups.length > 0) {
+      const groupData: Record<string, string | number>[] = [];
+      for (const group of kesim.animalGroups) {
+        for (let i = 0; i < group.donations.length; i++) {
+          const d = group.donations[i];
+          groupData.push({
+            "Hayvan No": group.animalNo,
+            "Sıra": i + 1,
+            "Vekalet": d.vekalet,
+            "Vekaleti Veren": d.description,
+            "Adına Kesilen": d.name,
+            "Cinsi": d.donationType,
+            "Notlar": d.notes,
+          });
+        }
+      }
+      const wsGroups = XLSX.utils.json_to_sheet(groupData);
+      wsGroups["!cols"] = [
+        { wch: 10 }, { wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 10 }, { wch: 18 },
+      ];
+      XLSX.utils.book_append_sheet(wb, wsGroups, "Hayvan Grupları");
+    }
+
     XLSX.writeFile(wb, `${kesim.name}_bagiscilar.xlsx`);
   }
 
@@ -1270,6 +1298,9 @@ export default function KesimAlaniPage() {
       }
     }
     const ws = XLSX.utils.json_to_sheet(data);
+    ws["!cols"] = [
+      { wch: 10 }, { wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 10 }, { wch: 18 },
+    ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Kesim Kağıdı");
     XLSX.writeFile(wb, `${kesim.name}_kesim_kagidi.xlsx`);
@@ -1810,11 +1841,17 @@ export default function KesimAlaniPage() {
         )}
 
         {!fullscreenMode && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-4">
           <Card className="p-3 text-center">
             <div className="text-2xl font-bold text-primary">{kesim.donations.filter(d => !d.excluded).length}</div>
             <div className="text-xs text-muted-foreground">Aktif Bağışçı</div>
           </Card>
+          {kesim.donations.filter(d => d.excluded).length > 0 && (
+            <Card className="p-3 text-center">
+              <div className="text-2xl font-bold text-destructive">{kesim.donations.filter(d => d.excluded).length}</div>
+              <div className="text-xs text-muted-foreground">Hariç Tutulan</div>
+            </Card>
+          )}
           <Card className="p-3 text-center">
             <div className="text-2xl font-bold text-primary">{totalShares}</div>
             <div className="text-xs text-muted-foreground">Toplam Hisse</div>
@@ -1831,6 +1868,14 @@ export default function KesimAlaniPage() {
             </div>
             <div className="text-xs text-muted-foreground">Boş Slot</div>
           </Card>
+          {kesim.animalGroups.length > 0 && (
+            <Card className="p-3 text-center">
+              <div className="text-2xl font-bold text-primary">
+                %{Math.round((kesim.animalGroups.reduce((s, g) => s + g.donations.filter(d => d.name.trim() !== "").length, 0) / (kesim.animalGroups.length * 7)) * 100)}
+              </div>
+              <div className="text-xs text-muted-foreground">Doluluk</div>
+            </Card>
+          )}
           {ungroupedDonors.length > 0 && (
             <Card
               className={`p-3 text-center cursor-pointer transition-colors ${filterUngrouped ? "ring-2 ring-orange-500 bg-orange-50 dark:bg-orange-950" : "hover:bg-muted"}`}
