@@ -2272,7 +2272,7 @@ export default function KesimAlaniPage() {
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Durum</label>
-                    <Select value={filterStatus} onValueChange={(v: any) => setFilterStatus(v)}>
+                    <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as "all" | "active" | "excluded")}>
                       <SelectTrigger className="h-7 text-xs w-28">
                         <SelectValue />
                       </SelectTrigger>

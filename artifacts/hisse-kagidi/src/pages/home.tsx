@@ -183,6 +183,7 @@ export default function Home() {
       if (result.success) {
         setKesimAlanlari(loadKesimAlanlari());
         setLogoPreview(loadLogo());
+        setGlobalTags(loadGlobalTags());
         alert(`Yedek başarıyla yüklendi: ${result.count} kesim alanı`);
       } else {
         alert(`Hata: ${result.error}`);
