@@ -1079,7 +1079,7 @@ export default function KesimAlaniPage() {
       const key = d.description.trim().toLowerCase() || d.id;
       shareMap.set(key, (shareMap.get(key) || 0) + 1);
     }
-    const parts = Array.from(shareMap.values()).sort((a, b) => b - a);
+    const parts = Array.from(shareMap.values()).sort((a, b) => a - b);
     const emptySlots = 7 - filled.length;
     const label = parts.length > 0
       ? (emptySlots > 0 ? [...parts, `${emptySlots}boş`].join("+") : parts.join("+"))
@@ -1384,8 +1384,8 @@ export default function KesimAlaniPage() {
               {[1, 2, 3, 4, 5, 6, 7].map(sc => {
                 const count = shareDistribution[sc] || 0;
                 if (count === 0) return null;
-                const totalActive = kesim.donations.filter(d => !d.excluded).length;
-                const pct = totalActive > 0 ? (count / totalActive) * 100 : 0;
+                const totalUnique = Object.values(shareDistribution).reduce((s, c) => s + c, 0);
+                const pct = totalUnique > 0 ? (count / totalUnique) * 100 : 0;
                 return (
                   <div key={sc} className="flex items-center gap-2 text-xs">
                     <span className="w-16 text-right text-muted-foreground">{sc} hisse:</span>
