@@ -460,14 +460,19 @@ export default function KesimAlaniPage() {
 
   function toggleDonationTag(donationId: string, tagId: string) {
     if (!kesim) return;
+    const updateTags = (d: Donation) => {
+      if (d.id !== donationId) return d;
+      const existing = d.tags || [];
+      const has = existing.includes(tagId);
+      return { ...d, tags: has ? existing.filter(t => t !== tagId) : [...existing, tagId] };
+    };
     save({
       ...kesim,
-      donations: kesim.donations.map((d) => {
-        if (d.id !== donationId) return d;
-        const existing = d.tags || [];
-        const has = existing.includes(tagId);
-        return { ...d, tags: has ? existing.filter(t => t !== tagId) : [...existing, tagId] };
-      }),
+      donations: kesim.donations.map(updateTags),
+      animalGroups: kesim.animalGroups.map(g => ({
+        ...g,
+        donations: g.donations.map(updateTags),
+      })),
     }, `Etiket güncellendi`);
   }
 
