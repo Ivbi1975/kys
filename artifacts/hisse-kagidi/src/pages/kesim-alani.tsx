@@ -66,7 +66,7 @@ import {
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag } from "@/lib/types";
 import { getKesimAlani, updateKesimAlani } from "@/lib/storage";
-import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts } from "@/lib/grouping";
+import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
 import { useHistory } from "@/lib/useHistory";
 import { useWorkspacePreferences, ALL_GROUP_COLUMNS, type ColumnKey } from "@/lib/useWorkspacePreferences";
@@ -135,6 +135,7 @@ export default function KesimAlaniPage() {
   const [personEditDesc, setPersonEditDesc] = useState<string | null>(null);
   const [personSearchQuery, setPersonSearchQuery] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterUngrouped, setFilterUngrouped] = useState(false);
   const [jumpToAnimal, setJumpToAnimal] = useState("");
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkEditField, setBulkEditField] = useState<"donationType" | "shareCount" | "notes">("donationType");
@@ -1038,8 +1039,60 @@ export default function KesimAlaniPage() {
     }
   }
 
+  const groupedDonorIds = new Set<string>();
+  for (const g of kesim.animalGroups) {
+    for (const d of g.donations) {
+      if (d.name.trim()) groupedDonorIds.add(d.id);
+    }
+  }
+  const ungroupedDonors = kesim.donations.filter(d => !d.excluded && !groupedDonorIds.has(d.id));
+
+  const ungroupedEffective = computeEffectiveShares(ungroupedDonors);
+  const ungroupedDescProcessed = new Set<string>();
+  let ungroupedShareCount = 0;
+  for (const d of ungroupedDonors) {
+    const key = d.description.trim().toLowerCase();
+    if (key && ungroupedDescProcessed.has(key)) continue;
+    ungroupedDescProcessed.add(key);
+    ungroupedShareCount += ungroupedEffective.get(d.id) || d.shareCount;
+  }
+
+  const effectiveShareMap = computeEffectiveShares(kesim.donations);
+  const shareDistribution: Record<number, number> = {};
+  for (let i = 1; i <= 7; i++) shareDistribution[i] = 0;
+  const distDescProcessed = new Set<string>();
+  for (const d of kesim.donations) {
+    if (d.excluded) continue;
+    const key = d.description.trim().toLowerCase();
+    if (key && distDescProcessed.has(key)) continue;
+    distDescProcessed.add(key);
+    const eff = effectiveShareMap.get(d.id) || d.shareCount;
+    const sc = Math.max(1, Math.min(7, eff));
+    shareDistribution[sc] = (shareDistribution[sc] || 0) + 1;
+  }
+
+  const groupCompositions = new Map<string, number>();
+  for (const g of kesim.animalGroups) {
+    const filled = g.donations.filter(d => d.name.trim());
+    const shareMap = new Map<string, number>();
+    for (const d of filled) {
+      const key = d.description.trim().toLowerCase() || d.id;
+      shareMap.set(key, (shareMap.get(key) || 0) + 1);
+    }
+    const parts = Array.from(shareMap.values()).sort((a, b) => b - a);
+    const emptySlots = 7 - filled.length;
+    const label = parts.length > 0
+      ? (emptySlots > 0 ? [...parts, `${emptySlots}boş`].join("+") : parts.join("+"))
+      : "Boş";
+    groupCompositions.set(label, (groupCompositions.get(label) || 0) + 1);
+  }
+
+  const preFilteredDonations = filterUngrouped
+    ? kesim.donations.filter(d => !d.excluded && !groupedDonorIds.has(d.id))
+    : kesim.donations;
+
   const filteredDonations = searchQuery.trim()
-    ? kesim.donations.filter(d => {
+    ? preFilteredDonations.filter(d => {
         const q = searchQuery.trim().toLowerCase();
         return d.name.toLowerCase().includes(q) ||
           d.description.toLowerCase().includes(q) ||
@@ -1047,7 +1100,7 @@ export default function KesimAlaniPage() {
           d.donationType.toLowerCase().includes(q) ||
           (d.notes || "").toLowerCase().includes(q);
       })
-    : kesim.donations;
+    : preFilteredDonations;
 
   const displayPreviewRows = hasHeaderRow ? previewData.slice(1) : previewData;
   const headerRow = hasHeaderRow && previewData.length > 0 ? previewData[0] : null;
@@ -1307,8 +1360,68 @@ export default function KesimAlaniPage() {
             </div>
             <div className="text-xs text-muted-foreground">Boş Slot</div>
           </Card>
+          {ungroupedDonors.length > 0 && (
+            <Card
+              className={`p-3 text-center cursor-pointer transition-colors ${filterUngrouped ? "ring-2 ring-orange-500 bg-orange-50 dark:bg-orange-950" : "hover:bg-muted"}`}
+              onClick={() => {
+                setFilterUngrouped(!filterUngrouped);
+                if (!donorListVisible) setDonorListVisible(true);
+              }}
+            >
+              <div className="text-2xl font-bold text-orange-600">{ungroupedDonors.length}</div>
+              <div className="text-xs text-muted-foreground">{ungroupedShareCount} hisse gruplanmamış</div>
+            </Card>
+          )}
         </div>
         )}
+
+        {!fullscreenMode && (kesim.donations.filter(d => !d.excluded).length > 0 || kesim.animalGroups.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          {kesim.donations.filter(d => !d.excluded).length > 0 && (
+          <Card className="p-3">
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2">Hisse Dağılımı</h4>
+            <div className="space-y-1">
+              {[1, 2, 3, 4, 5, 6, 7].map(sc => {
+                const count = shareDistribution[sc] || 0;
+                if (count === 0) return null;
+                const totalActive = kesim.donations.filter(d => !d.excluded).length;
+                const pct = totalActive > 0 ? (count / totalActive) * 100 : 0;
+                return (
+                  <div key={sc} className="flex items-center gap-2 text-xs">
+                    <span className="w-16 text-right text-muted-foreground">{sc} hisse:</span>
+                    <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
+                      <div
+                        className="h-full bg-primary/70 rounded-full transition-all"
+                        style={{ width: `${Math.max(pct, 2)}%` }}
+                      />
+                    </div>
+                    <span className="w-8 text-right font-medium">{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+          )}
+
+          {kesim.animalGroups.length > 0 && (
+          <Card className="p-3">
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2">Grup Kompozisyonları</h4>
+            <div className="space-y-1">
+              {Array.from(groupCompositions.entries())
+                .sort((a, b) => b[1] - a[1])
+                .map(([label, count]) => (
+                  <div key={label} className="flex items-center justify-between text-xs px-1 py-0.5 rounded hover:bg-muted">
+                    <span className="font-mono text-muted-foreground">{label}</span>
+                    <span className="font-medium">{count} grup</span>
+                  </div>
+                ))}
+            </div>
+          </Card>
+          )}
+        </div>
+        )}
+
+        
 
         {historyPanelOpen && !fullscreenMode && (
           <Card className="mb-4 p-3 max-h-64 overflow-y-auto">
@@ -1344,7 +1457,18 @@ export default function KesimAlaniPage() {
         >
           {donorListVisible && !fullscreenMode && <div style={{ width: donorListVisible ? `${workspace.prefs.splitRatio}%` : "0%", minWidth: 0, flexShrink: 0, paddingRight: "12px" }}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Bağışçı Listesi</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">Bağışçı Listesi</h2>
+                {filterUngrouped && (
+                  <button
+                    onClick={() => setFilterUngrouped(false)}
+                    className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors"
+                  >
+                    Gruplanmamış
+                    <span className="text-[10px]">✕</span>
+                  </button>
+                )}
+              </div>
               <div className="flex gap-2 items-center">
                 <div className="relative">
                   <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -1739,7 +1863,7 @@ export default function KesimAlaniPage() {
                     {filteredDonations.length === 0 ? (
                       <tr>
                         <td colSpan={9} className="p-8 text-center text-muted-foreground">
-                          {searchQuery.trim() ? `"${searchQuery}" için sonuç bulunamadı` : 'Henüz bağışçı eklenmedi. "Toplu Ekle" ile Excel yükleyin veya yapıştırın.'}
+                          {searchQuery.trim() ? `"${searchQuery}" için sonuç bulunamadı` : filterUngrouped ? "Tüm bağışçılar gruplara atanmış" : 'Henüz bağışçı eklenmedi. "Toplu Ekle" ile Excel yükleyin veya yapıştırın.'}
                         </td>
                       </tr>
                     ) : (
