@@ -81,6 +81,7 @@ export default function KesimAlaniPage() {
     donationId: string;
     field: string;
   } | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [dragItem, setDragItem] = useState<{
     groupIdx: number;
@@ -129,6 +130,38 @@ export default function KesimAlaniPage() {
       ...kesim,
       donations: kesim.donations.filter((d) => d.id !== id),
     });
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  function deleteSelected() {
+    if (!kesim || selectedIds.size === 0) return;
+    save({
+      ...kesim,
+      donations: kesim.donations.filter((d) => !selectedIds.has(d.id)),
+    });
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (!kesim) return;
+    if (selectedIds.size === kesim.donations.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(kesim.donations.map((d) => d.id)));
+    }
   }
 
   function updateDonationField(id: string, field: keyof Donation, value: string | number) {
@@ -347,6 +380,14 @@ export default function KesimAlaniPage() {
 
   const totalShares = getTotalShares(kesim.donations);
   const requiredAnimals = getRequiredAnimals(kesim.donations);
+
+  const nameCountMap = new Map<string, number>();
+  for (const d of kesim.donations) {
+    const normalizedName = d.name.trim().toLowerCase();
+    if (normalizedName) {
+      nameCountMap.set(normalizedName, (nameCountMap.get(normalizedName) || 0) + 1);
+    }
+  }
 
   const displayPreviewRows = hasHeaderRow ? previewData.slice(1) : previewData;
   const headerRow = hasHeaderRow && previewData.length > 0 ? previewData[0] : null;
@@ -630,11 +671,34 @@ export default function KesimAlaniPage() {
               </div>
             </div>
 
+            {selectedIds.size > 0 && (
+              <div className="mb-3 flex items-center gap-3 p-2 bg-primary/10 rounded-lg">
+                <span className="text-sm font-medium">
+                  {selectedIds.size} satır seçildi
+                </span>
+                <Button variant="destructive" size="sm" onClick={deleteSelected}>
+                  <Trash2 className="w-3 h-3 mr-1" />
+                  Seçilenleri Sil
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+                  Seçimi Kaldır
+                </Button>
+              </div>
+            )}
+
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/50">
+                      <th className="p-2 w-8">
+                        <input
+                          type="checkbox"
+                          checked={kesim.donations.length > 0 && selectedIds.size === kesim.donations.length}
+                          onChange={toggleSelectAll}
+                          className="rounded"
+                        />
+                      </th>
                       <th className="p-2 text-left w-8">#</th>
                       <th
                         className="p-2 text-left cursor-pointer hover:bg-muted"
@@ -690,16 +754,27 @@ export default function KesimAlaniPage() {
                   <tbody>
                     {kesim.donations.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                        <td colSpan={7} className="p-8 text-center text-muted-foreground">
                           Henüz bağışçı eklenmedi. "Toplu Ekle" ile Excel yükleyin veya yapıştırın.
                         </td>
                       </tr>
                     ) : (
-                      kesim.donations.map((d, idx) => (
+                      kesim.donations.map((d, idx) => {
+                        const nameCount = nameCountMap.get(d.name.trim().toLowerCase()) || 1;
+                        const effectiveShare = nameCount > 1 ? nameCount : d.shareCount;
+                        return (
                         <tr
                           key={d.id}
-                          className="border-b hover:bg-muted/30 transition-colors"
+                          className={`border-b hover:bg-muted/30 transition-colors ${selectedIds.has(d.id) ? "bg-primary/5" : ""}`}
                         >
+                          <td className="p-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(d.id)}
+                              onChange={() => toggleSelect(d.id)}
+                              className="rounded"
+                            />
+                          </td>
                           <td className="p-2 text-muted-foreground">{idx + 1}</td>
                           <td className="p-2">
                             {editingCell?.donationId === d.id &&
@@ -785,27 +860,33 @@ export default function KesimAlaniPage() {
                             )}
                           </td>
                           <td className="p-2 text-center">
-                            <Select
-                              value={String(d.shareCount)}
-                              onValueChange={(v) =>
-                                updateDonationField(
-                                  d.id,
-                                  "shareCount",
-                                  parseInt(v)
-                                )
-                              }
-                            >
-                              <SelectTrigger className="h-7 w-16 text-sm mx-auto">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-                                  <SelectItem key={n} value={String(n)}>
-                                    {n}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            {nameCount > 1 ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">
+                                {effectiveShare}
+                              </span>
+                            ) : (
+                              <Select
+                                value={String(d.shareCount)}
+                                onValueChange={(v) =>
+                                  updateDonationField(
+                                    d.id,
+                                    "shareCount",
+                                    parseInt(v)
+                                  )
+                                }
+                              >
+                                <SelectTrigger className="h-7 w-16 text-sm mx-auto">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                                    <SelectItem key={n} value={String(n)}>
+                                      {n}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
                           </td>
                           <td className="p-2">
                             <Button
@@ -818,7 +899,8 @@ export default function KesimAlaniPage() {
                             </Button>
                           </td>
                         </tr>
-                      ))
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
