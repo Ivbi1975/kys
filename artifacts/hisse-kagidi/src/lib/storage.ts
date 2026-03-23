@@ -28,7 +28,6 @@ export function loadKesimAlanlari(): KesimAlani[] {
           ...g,
           donations: g.donations.map(migrateDonation),
         })),
-        customTags: Array.isArray(k.customTags) ? k.customTags : [],
       }));
     }
   } catch {}
@@ -162,7 +161,6 @@ export function importBackup(json: string): { success: boolean; count: number; e
         notes: g.notes || "",
       })) : [],
       createdAt: k.createdAt || new Date().toISOString(),
-      customTags: Array.isArray(k.customTags) ? k.customTags : [],
     }));
     saveKesimAlanlari(validated);
     if (data.logo) {
@@ -170,9 +168,7 @@ export function importBackup(json: string): { success: boolean; count: number; e
     } else {
       deleteLogo();
     }
-    if (Array.isArray(data.globalTags)) {
-      saveGlobalTags(data.globalTags);
-    }
+    saveGlobalTags(Array.isArray(data.globalTags) ? data.globalTags : []);
     return { success: true, count: validated.length };
   } catch {
     return { success: false, count: 0, error: "Dosya okunamadı" };
