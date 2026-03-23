@@ -1,4 +1,4 @@
-import type { KesimAlani, Donation } from "./types";
+import type { KesimAlani, Donation, CustomTag } from "./types";
 
 const STORAGE_KEY = "hisse-kagidi-data";
 
@@ -28,6 +28,7 @@ export function loadKesimAlanlari(): KesimAlani[] {
           ...g,
           donations: g.donations.map(migrateDonation),
         })),
+        customTags: Array.isArray(k.customTags) ? k.customTags : [],
       }));
     }
   } catch {}
@@ -77,8 +78,23 @@ export function exportBackup(): string {
     timestamp: new Date().toISOString(),
     kesimAlanlari: loadKesimAlanlari(),
     logo: loadLogo(),
+    globalTags: loadGlobalTags(),
   };
   return JSON.stringify(data, null, 2);
+}
+
+const GLOBAL_TAGS_KEY = "hisse-kagidi-global-tags";
+
+export function loadGlobalTags(): CustomTag[] {
+  try {
+    const data = localStorage.getItem(GLOBAL_TAGS_KEY);
+    if (data) return JSON.parse(data);
+  } catch {}
+  return [];
+}
+
+export function saveGlobalTags(tags: CustomTag[]): void {
+  localStorage.setItem(GLOBAL_TAGS_KEY, JSON.stringify(tags));
 }
 
 const PRINT_PREFS_KEY = "hisse-kagidi-print-prefs";
@@ -146,12 +162,16 @@ export function importBackup(json: string): { success: boolean; count: number; e
         notes: g.notes || "",
       })) : [],
       createdAt: k.createdAt || new Date().toISOString(),
+      customTags: Array.isArray(k.customTags) ? k.customTags : [],
     }));
     saveKesimAlanlari(validated);
     if (data.logo) {
       saveLogo(data.logo);
     } else {
       deleteLogo();
+    }
+    if (Array.isArray(data.globalTags)) {
+      saveGlobalTags(data.globalTags);
     }
     return { success: true, count: validated.length };
   } catch {

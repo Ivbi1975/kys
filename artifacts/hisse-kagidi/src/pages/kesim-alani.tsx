@@ -73,8 +73,9 @@ import {
   Minimize,
   Save,
 } from "lucide-react";
-import type { Donation, AnimalGroup, KesimAlani, ColorTag } from "@/lib/types";
-import { getKesimAlani, updateKesimAlani } from "@/lib/storage";
+import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
+import { Tag } from "lucide-react";
+import { getKesimAlani, updateKesimAlani, loadGlobalTags } from "@/lib/storage";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
 import { useHistory } from "@/lib/useHistory";
@@ -198,6 +199,14 @@ export default function KesimAlaniPage() {
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [minimapOpen, setMinimapOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [globalTags, setGlobalTags] = useState<CustomTag[]>([]);
+  const [filterCinsi, setFilterCinsi] = useState<string>("all");
+  const [filterHisseMin, setFilterHisseMin] = useState<number>(0);
+  const [filterHisseMax, setFilterHisseMax] = useState<number>(0);
+  const [filterTags, setFilterTags] = useState<string[]>([]);
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "excluded">("all");
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+  const [tagPopoverDonorId, setTagPopoverDonorId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -214,6 +223,7 @@ export default function KesimAlaniPage() {
         setLocation("/");
       }
     }
+    setGlobalTags(loadGlobalTags());
   }, [params.id, setLocation]);
 
   useEffect(() => {
@@ -446,6 +456,19 @@ export default function KesimAlaniPage() {
         d.id === id ? { ...d, [field]: value } : d
       ),
     }, `Bağışçı güncellendi`);
+  }
+
+  function toggleDonationTag(donationId: string, tagId: string) {
+    if (!kesim) return;
+    save({
+      ...kesim,
+      donations: kesim.donations.map((d) => {
+        if (d.id !== donationId) return d;
+        const existing = d.tags || [];
+        const has = existing.includes(tagId);
+        return { ...d, tags: has ? existing.filter(t => t !== tagId) : [...existing, tagId] };
+      }),
+    }, `Etiket güncellendi`);
   }
 
   function bulkExcludeByDesc(description: string, excluded: boolean) {
@@ -1472,8 +1495,21 @@ export default function KesimAlaniPage() {
     ? kesim.donations.filter(d => !d.excluded && !groupedDonorIds.has(d.id))
     : kesim.donations;
 
+  const advancedFilteredDonations = preFilteredDonations.filter(d => {
+    if (filterStatus === "active" && d.excluded) return false;
+    if (filterStatus === "excluded" && !d.excluded) return false;
+    if (filterCinsi !== "all" && d.donationType.toLowerCase() !== filterCinsi.toLowerCase()) return false;
+    if (filterHisseMin > 0 && d.shareCount < filterHisseMin) return false;
+    if (filterHisseMax > 0 && d.shareCount > filterHisseMax) return false;
+    if (filterTags.length > 0) {
+      const donorTags = d.tags || [];
+      if (!filterTags.some(ft => donorTags.includes(ft))) return false;
+    }
+    return true;
+  });
+
   const filteredDonations = searchQuery.trim()
-    ? preFilteredDonations.filter(d => {
+    ? advancedFilteredDonations.filter(d => {
         const q = searchQuery.trim().toLowerCase();
         return d.name.toLowerCase().includes(q) ||
           d.description.toLowerCase().includes(q) ||
@@ -1481,7 +1517,25 @@ export default function KesimAlaniPage() {
           d.donationType.toLowerCase().includes(q) ||
           (d.notes || "").toLowerCase().includes(q);
       })
-    : preFilteredDonations;
+    : advancedFilteredDonations;
+
+  const uniqueDonationTypes = Array.from(new Set(
+    kesim.donations.map(d => d.donationType.trim()).filter(Boolean)
+  )).sort();
+
+  const activeFilterCount =
+    (filterCinsi !== "all" ? 1 : 0) +
+    (filterHisseMin > 0 || filterHisseMax > 0 ? 1 : 0) +
+    (filterTags.length > 0 ? 1 : 0) +
+    (filterStatus !== "all" ? 1 : 0);
+
+  function clearAdvancedFilters() {
+    setFilterCinsi("all");
+    setFilterHisseMin(0);
+    setFilterHisseMax(0);
+    setFilterTags([]);
+    setFilterStatus("all");
+  }
 
   const displayPreviewRows = hasHeaderRow ? previewData.slice(1) : previewData;
   const headerRow = hasHeaderRow && previewData.length > 0 ? previewData[0] : null;
@@ -1882,6 +1936,19 @@ export default function KesimAlaniPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
+                <Button
+                  variant={showAdvancedFilter ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
+                  title="Gelişmiş Filtre"
+                >
+                  <Filter className="w-4 h-4" />
+                  {activeFilterCount > 0 && (
+                    <span className="ml-1 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </Button>
                 <Dialog open={bulkDialogOpen} onOpenChange={(open) => { if (!open) resetBulkDialog(); else setBulkDialogOpen(true); }}>
                   <DialogTrigger asChild>
                     <Button variant="outline" size="sm">
@@ -2145,6 +2212,107 @@ export default function KesimAlaniPage() {
                 </Dialog>
               </div>
             </div>
+
+            {showAdvancedFilter && (
+              <Card className="mb-3 p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold flex items-center gap-1">
+                    <SlidersHorizontal className="w-4 h-4" />
+                    Gelişmiş Filtre
+                  </span>
+                  {activeFilterCount > 0 && (
+                    <Button variant="ghost" size="sm" onClick={clearAdvancedFilters}>
+                      <X className="w-3 h-3 mr-1" />
+                      Temizle
+                    </Button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Cinsi</label>
+                    <Select value={filterCinsi} onValueChange={setFilterCinsi}>
+                      <SelectTrigger className="h-7 text-xs w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tümü</SelectItem>
+                        {uniqueDonationTypes.map(t => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Hisse (min)</label>
+                    <Select value={String(filterHisseMin)} onValueChange={v => setFilterHisseMin(parseInt(v))}>
+                      <SelectTrigger className="h-7 text-xs w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">-</SelectItem>
+                        {[1,2,3,4,5,6,7].map(n => (
+                          <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Hisse (max)</label>
+                    <Select value={String(filterHisseMax)} onValueChange={v => setFilterHisseMax(parseInt(v))}>
+                      <SelectTrigger className="h-7 text-xs w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">-</SelectItem>
+                        {[1,2,3,4,5,6,7].map(n => (
+                          <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Durum</label>
+                    <Select value={filterStatus} onValueChange={(v: any) => setFilterStatus(v)}>
+                      <SelectTrigger className="h-7 text-xs w-28">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tümü</SelectItem>
+                        <SelectItem value="active">Aktif</SelectItem>
+                        <SelectItem value="excluded">Hariç</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {globalTags.length > 0 && (
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Etiketler</label>
+                      <div className="flex gap-1 flex-wrap">
+                        {globalTags.map(tag => {
+                          const isActive = filterTags.includes(tag.id);
+                          return (
+                            <button
+                              key={tag.id}
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${isActive ? "ring-2 ring-offset-1 ring-primary text-white" : "opacity-60 hover:opacity-100 text-white"}`}
+                              style={{ backgroundColor: tag.color }}
+                              onClick={() => setFilterTags(
+                                isActive ? filterTags.filter(t => t !== tag.id) : [...filterTags, tag.id]
+                              )}
+                            >
+                              {tag.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {activeFilterCount > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    {filteredDonations.length} / {kesim.donations.length} bağışçı gösteriliyor
+                  </div>
+                )}
+              </Card>
+            )}
 
             {selectedIds.size > 0 && (
               <div className="mb-3 flex items-center gap-3 p-2 bg-primary/10 rounded-lg flex-wrap">
@@ -2429,24 +2597,74 @@ export default function KesimAlaniPage() {
                               </Select>
                             )}
                           </td>
-                          <td className="p-2 flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              title={d.excluded ? "Dahil et" : "Hariç tut"}
-                              onClick={() => updateDonationField(d.id, "excluded", !d.excluded)}
-                            >
-                              {d.excluded ? <Eye className="w-3 h-3 text-green-600" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() => deleteDonation(d.id)}
-                            >
-                              <Trash2 className="w-3 h-3 text-destructive" />
-                            </Button>
+                          <td className="p-2">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {(d.tags || []).length > 0 && globalTags.length > 0 && (
+                                <div className="flex gap-0.5 flex-wrap mr-1">
+                                  {(d.tags || []).map(tagId => {
+                                    const tag = globalTags.find(t => t.id === tagId);
+                                    if (!tag) return null;
+                                    return (
+                                      <span
+                                        key={tagId}
+                                        className="px-1.5 py-0 rounded-full text-[9px] font-medium text-white leading-4"
+                                        style={{ backgroundColor: tag.color }}
+                                      >
+                                        {tag.name}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              {globalTags.length > 0 && (
+                                <Popover open={tagPopoverDonorId === d.id} onOpenChange={(open) => setTagPopoverDonorId(open ? d.id : null)}>
+                                  <PopoverTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Etiket ata">
+                                      <Tag className="w-3 h-3 text-muted-foreground" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-48 p-2" align="end">
+                                    <div className="space-y-1">
+                                      <p className="text-xs font-medium text-muted-foreground mb-2">Etiket Ata</p>
+                                      {globalTags.map(tag => {
+                                        const isActive = (d.tags || []).includes(tag.id);
+                                        return (
+                                          <button
+                                            key={tag.id}
+                                            className={`w-full flex items-center gap-2 px-2 py-1 rounded text-xs hover:bg-muted transition-colors ${isActive ? "bg-muted" : ""}`}
+                                            onClick={() => toggleDonationTag(d.id, tag.id)}
+                                          >
+                                            <span
+                                              className="w-3 h-3 rounded-full flex-shrink-0"
+                                              style={{ backgroundColor: tag.color }}
+                                            />
+                                            <span className="flex-1 text-left">{tag.name}</span>
+                                            {isActive && <span className="text-primary">✓</span>}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                title={d.excluded ? "Dahil et" : "Hariç tut"}
+                                onClick={() => updateDonationField(d.id, "excluded", !d.excluded)}
+                              >
+                                {d.excluded ? <Eye className="w-3 h-3 text-green-600" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => deleteDonation(d.id)}
+                              >
+                                <Trash2 className="w-3 h-3 text-destructive" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                         );

@@ -1,5 +1,11 @@
 export type ColorTag = "green" | "orange" | "red" | "";
 
+export interface CustomTag {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface Donation {
   id: string;
   name: string;
@@ -27,4 +33,5 @@ export interface KesimAlani {
   donations: Donation[];
   animalGroups: AnimalGroup[];
   createdAt: string;
+  customTags?: CustomTag[];
 }

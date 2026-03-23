@@ -10,10 +10,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, ChevronRight, Scissors, Settings, ImagePlus, X, Sun, Moon, Download, Upload } from "lucide-react";
-import type { KesimAlani } from "@/lib/types";
+import { Plus, Trash2, ChevronRight, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil } from "lucide-react";
+import type { KesimAlani, CustomTag } from "@/lib/types";
 import {
   loadKesimAlanlari,
+  saveKesimAlanlari,
   updateKesimAlani,
   deleteKesimAlani,
   saveLogo,
@@ -21,8 +22,11 @@ import {
   deleteLogo,
   exportBackup,
   importBackup,
+  loadGlobalTags,
+  saveGlobalTags as saveGlobalTagsToStorage,
 } from "@/lib/storage";
 import { useTheme } from "@/lib/useTheme";
+import type { ThemeMode } from "@/lib/useTheme";
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -33,12 +37,87 @@ export default function Home() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const backupInputRef = useRef<HTMLInputElement>(null);
-  const { isDark, toggle: toggleTheme } = useTheme();
+  const { isDark, mode: themeMode, toggle: toggleTheme, setThemeMode } = useTheme();
+  const [globalTags, setGlobalTags] = useState<CustomTag[]>([]);
+  const [newTagName, setNewTagName] = useState("");
+  const [newTagColor, setNewTagColor] = useState("#3b82f6");
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
+  const [editTagName, setEditTagName] = useState("");
+  const [editTagColor, setEditTagColor] = useState("");
+
+  const TAG_COLORS = [
+    "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
+    "#ec4899", "#06b6d4", "#84cc16", "#f97316", "#6366f1",
+  ];
 
   useEffect(() => {
     setKesimAlanlari(loadKesimAlanlari());
     setLogoPreview(loadLogo());
+    setGlobalTags(loadGlobalTags());
   }, []);
+
+  function saveGlobalTags(tags: CustomTag[]) {
+    setGlobalTags(tags);
+    saveGlobalTagsToStorage(tags);
+  }
+
+  function addTag() {
+    if (!newTagName.trim()) return;
+    const tag: CustomTag = {
+      id: Math.random().toString(36).substring(2, 10),
+      name: newTagName.trim(),
+      color: newTagColor,
+    };
+    saveGlobalTags([...globalTags, tag]);
+    setNewTagName("");
+    setNewTagColor("#3b82f6");
+  }
+
+  function deleteTag(id: string) {
+    saveGlobalTags(globalTags.filter(t => t.id !== id));
+    const allKesim = loadKesimAlanlari();
+    let changed = false;
+    const updated = allKesim.map(k => {
+      const newDonations = k.donations.map(d => {
+        if (d.tags && d.tags.includes(id)) {
+          changed = true;
+          return { ...d, tags: d.tags.filter(t => t !== id) };
+        }
+        return d;
+      });
+      const newGroups = k.animalGroups.map(g => ({
+        ...g,
+        donations: g.donations.map(d => {
+          if (d.tags && d.tags.includes(id)) {
+            changed = true;
+            return { ...d, tags: d.tags.filter(t => t !== id) };
+          }
+          return d;
+        }),
+      }));
+      return { ...k, donations: newDonations, animalGroups: newGroups };
+    });
+    if (changed) {
+      saveKesimAlanlari(updated);
+    }
+  }
+
+  function startEditTag(tag: CustomTag) {
+    setEditingTagId(tag.id);
+    setEditTagName(tag.name);
+    setEditTagColor(tag.color);
+  }
+
+  function commitEditTag() {
+    if (!editingTagId || !editTagName.trim()) {
+      setEditingTagId(null);
+      return;
+    }
+    saveGlobalTags(globalTags.map(t =>
+      t.id === editingTagId ? { ...t, name: editTagName.trim(), color: editTagColor } : t
+    ));
+    setEditingTagId(null);
+  }
 
   function handleCreate() {
     if (!newName.trim()) return;
@@ -127,8 +206,8 @@ export default function Home() {
               yazdırın
             </p>
           </div>
-          <Button variant="ghost" size="sm" onClick={toggleTheme} title={isDark ? "Açık Tema" : "Koyu Tema"}>
-            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          <Button variant="ghost" size="sm" onClick={toggleTheme} title={themeMode === "light" ? "Açık" : themeMode === "dark" ? "Koyu" : "Sistem"}>
+            {themeMode === "light" ? <Sun className="w-5 h-5" /> : themeMode === "dark" ? <Moon className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
           </Button>
           <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
             <DialogTrigger asChild>
@@ -223,6 +302,109 @@ export default function Home() {
                     className="hidden"
                     onChange={handleImportBackup}
                   />
+                </div>
+
+                <div className="border-t pt-4">
+                  <label className="text-sm font-medium mb-2 block">
+                    Tema
+                  </label>
+                  <div className="flex gap-2">
+                    {([
+                      { value: "light" as ThemeMode, label: "Açık", icon: <Sun className="w-4 h-4" /> },
+                      { value: "dark" as ThemeMode, label: "Koyu", icon: <Moon className="w-4 h-4" /> },
+                      { value: "system" as ThemeMode, label: "Sistem", icon: <Monitor className="w-4 h-4" /> },
+                    ]).map(opt => (
+                      <Button
+                        key={opt.value}
+                        variant={themeMode === opt.value ? "default" : "outline"}
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setThemeMode(opt.value)}
+                      >
+                        {opt.icon}
+                        <span className="ml-1">{opt.label}</span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <label className="text-sm font-medium mb-2 block">
+                    <Tag className="w-4 h-4 inline mr-1" />
+                    Etiketler
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Bağışçılara atayabileceğiniz özel etiketler tanımlayın (VIP, Ödenmedi, Teslim Edildi vb.)
+                  </p>
+
+                  {globalTags.length > 0 && (
+                    <div className="space-y-2 mb-3">
+                      {globalTags.map(tag => (
+                        <div key={tag.id} className="flex items-center gap-2">
+                          {editingTagId === tag.id ? (
+                            <>
+                              <div className="flex gap-1 flex-shrink-0">
+                                {TAG_COLORS.map(c => (
+                                  <button
+                                    key={c}
+                                    className={`w-5 h-5 rounded-full border-2 ${editTagColor === c ? "ring-2 ring-offset-1 ring-primary" : "border-transparent"}`}
+                                    style={{ backgroundColor: c }}
+                                    onClick={() => setEditTagColor(c)}
+                                  />
+                                ))}
+                              </div>
+                              <Input
+                                className="h-7 text-sm flex-1"
+                                value={editTagName}
+                                onChange={(e) => setEditTagName(e.target.value)}
+                                onBlur={commitEditTag}
+                                onKeyDown={(e) => e.key === "Enter" && commitEditTag()}
+                                autoFocus
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white flex-1"
+                                style={{ backgroundColor: tag.color }}
+                              >
+                                {tag.name}
+                              </span>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => startEditTag(tag)}>
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => deleteTag(tag.id)}>
+                                <Trash2 className="w-3 h-3 text-destructive" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 items-center">
+                    <div className="flex gap-1 flex-shrink-0">
+                      {TAG_COLORS.slice(0, 5).map(c => (
+                        <button
+                          key={c}
+                          className={`w-5 h-5 rounded-full border-2 ${newTagColor === c ? "ring-2 ring-offset-1 ring-primary" : "border-transparent"}`}
+                          style={{ backgroundColor: c }}
+                          onClick={() => setNewTagColor(c)}
+                        />
+                      ))}
+                    </div>
+                    <Input
+                      className="h-7 text-sm flex-1"
+                      placeholder="Yeni etiket adı"
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && addTag()}
+                    />
+                    <Button variant="outline" size="sm" onClick={addTag} disabled={!newTagName.trim()}>
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </DialogContent>
