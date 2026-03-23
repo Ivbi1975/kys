@@ -3973,7 +3973,7 @@ export default function KesimAlaniPage() {
                   <ArrowLeftRight className="w-4 h-4 text-purple-600" />
                   <span className="text-sm text-purple-800 dark:text-purple-200">
                     <strong>Takas modu:</strong> Hayvan {kesim.animalGroups[swapSelection.groupIdx]?.animalNo}, Sıra {swapSelection.donationIdx + 1}
-                    {selDonor ? ` — ${selDonor.description || selDonor.name} (${selDonor.shareCount} hisse)` : ""} seçildi.
+                    {selDonor ? ` — ${selDonor.description || selDonor.name} (${selDonor.shareCount || 1} hisse)` : ""} seçildi.
                     Başka bir gruptaki bağışçıya tıklayın.
                   </span>
                   <Button variant="ghost" size="sm" onClick={cancelSwap}>
