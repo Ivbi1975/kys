@@ -21,7 +21,8 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 ```text
 artifacts-monorepo/
 ├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
+│   ├── api-server/         # Express API server
+│   └── hisse-kagidi/       # Kurban Hisse Kağıdı - React + Vite web app
 ├── lib/                    # Shared libraries
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
@@ -34,6 +35,27 @@ artifacts-monorepo/
 ├── tsconfig.json           # Root TS project references
 └── package.json            # Root package with hoisted devDeps
 ```
+
+## Artifacts
+
+### Kurban Hisse Kağıdı (`artifacts/hisse-kagidi`)
+
+Frontend-only React + Vite app for managing Kurban Bayramı share certificates. Features:
+- Create cutting areas (kesim alanları)
+- Add donors via manual entry or Excel paste (tab-separated: name, description, donation type, share count)
+- Smart auto-grouping: distributes donors into groups of 7 (one animal per group)
+- Drag-and-drop between animal groups
+- Sort by any column (name, description, donation type, share count)
+- Print A4 landscape pages with logo, titles, and 7-row tables
+- Data persisted in localStorage
+
+Key files:
+- `src/lib/types.ts` - TypeScript types (Donation, AnimalGroup, KesimAlani)
+- `src/lib/storage.ts` - localStorage persistence
+- `src/lib/grouping.ts` - Auto-grouping algorithm (bin-packing for 7-share animals)
+- `src/pages/home.tsx` - Home page with kesim alanı list
+- `src/pages/kesim-alani.tsx` - Main editing page with donor table and animal groups
+- `src/pages/print.tsx` - Print-optimized A4 landscape view
 
 ## TypeScript & Composite Projects
 

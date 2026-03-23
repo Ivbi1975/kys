@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Kurban Hisse Kağıdı"
+version = "1.0.0"
+id = "artifacts/hisse-kagidi"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18604
+
+[services.development]
+run = "pnpm --filter @workspace/hisse-kagidi run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/hisse-kagidi", "run", "build" ]
+publicDir = "artifacts/hisse-kagidi/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18604"
+BASE_PATH = "/"
