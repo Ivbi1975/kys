@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Printer, Settings2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff, FileSpreadsheet, FileText, LayoutTemplate, BarChart3 } from "lucide-react";
+import { ArrowLeft, Printer, Settings2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff, FileSpreadsheet, FileText, LayoutTemplate } from "lucide-react";
 import type { KesimAlani, AnimalGroup } from "@/lib/types";
 import { fetchKesimAlani, fetchLogo } from "@/lib/api";
 import * as XLSX from "xlsx";
@@ -640,42 +640,28 @@ export default function PrintPage() {
         <div className="print:hidden border-b bg-muted/30 px-4 py-4">
           <div className="max-w-4xl mx-auto space-y-4">
             <Card className="p-4">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold flex items-center gap-1.5">
                   <LayoutTemplate className="w-4 h-4" />
                   Şablon Seçimi
                 </h3>
+                <select
+                  value={prefs.template}
+                  onChange={(e) => setTemplate(e.target.value as PrintTemplate)}
+                  className="border rounded-md px-3 py-1.5 text-sm bg-background"
+                >
+                  {PRINT_TEMPLATES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {PRINT_TEMPLATES.map((t) => (
-                  <button
-                    key={t.value}
-                    onClick={() => setTemplate(t.value)}
-                    className={`p-3 rounded-lg border-2 text-left transition-colors ${
-                      prefs.template === t.value
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:border-muted-foreground/30 hover:bg-muted/50"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className={`w-6 h-8 rounded border flex items-center justify-center text-[8px] font-bold ${
-                        t.value === "standard" ? "border-primary" :
-                        t.value === "portrait" ? "border-primary w-5 h-7" :
-                        t.value === "compact" ? "border-primary" :
-                        "border-primary"
-                      }`}>
-                        {t.value === "standard" && <span className="rotate-90">A4</span>}
-                        {t.value === "portrait" && "A4"}
-                        {t.value === "compact" && <span className="text-[6px]">☰</span>}
-                        {t.value === "namelist" && <span className="text-[6px]">☰</span>}
-                        {t.value === "summary" && <BarChart3 className="w-3 h-3" />}
-                      </div>
-                      <span className="text-xs font-semibold">{t.label}</span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground leading-tight">{t.description}</p>
-                  </button>
-                ))}
-              </div>
+              {PRINT_TEMPLATES.find(t => t.value === prefs.template) && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  {PRINT_TEMPLATES.find(t => t.value === prefs.template)!.description}
+                </p>
+              )}
             </Card>
 
             {prefs.template !== "namelist" && (

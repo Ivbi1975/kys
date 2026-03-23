@@ -17,7 +17,7 @@ export const DEFAULT_PRINT_PREFS: PrintPreferences = {
 };
 
 export const PRINT_TEMPLATES: { value: PrintTemplate; label: string; description: string }[] = [
-  { value: "standard", label: "Standart A4 Yatay", description: "Her hayvan grubu ayrı A4 yatay sayfada" },
+  { value: "standard", label: "Kesim Kağıdı", description: "Her hayvan grubu ayrı A4 yatay sayfada" },
   { value: "portrait", label: "A4 Dikey", description: "Her hayvan grubu ayrı A4 dikey sayfada" },
   { value: "compact", label: "Kompakt Liste", description: "Her grup tek satırda, isimler virgülle ayrılmış" },
   { value: "namelist", label: "Sadece İsim Listesi", description: "Basit bağışçı adı ve hisse tablosu" },
