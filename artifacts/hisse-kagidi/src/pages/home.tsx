@@ -146,6 +146,15 @@ export default function Home() {
   }
 
   async function handleDelete(id: string) {
+    const target = kesimAlanlari.find(k => k.id === id);
+    const name = target?.name || "";
+    const hasDonations = target && target.donations.length > 0;
+    if (hasDonations) {
+      const confirmed = confirm(
+        `"${name}" kesim alanını silmek istediğinizden emin misiniz?\n\nBu işlem geri alınamaz. Silmeden önce Ayarlar > Yedekle ile yedek almanız önerilir.`
+      );
+      if (!confirmed) return;
+    }
     try {
       await apiDeleteKesimAlani(id);
       setKesimAlanlari(kesimAlanlari.filter(k => k.id !== id));
@@ -202,6 +211,15 @@ export default function Home() {
   async function handleImportBackup(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (kesimAlanlari.length > 0) {
+      const confirmed = confirm(
+        `Mevcut ${kesimAlanlari.length} kesim alanınız var. Yedek yüklemek mevcut verilerin üzerine yazabilir.\n\nDevam etmeden önce mevcut verilerinizi yedeklemeniz önerilir. Devam etmek istiyor musunuz?`
+      );
+      if (!confirmed) {
+        if (backupInputRef.current) backupInputRef.current.value = "";
+        return;
+      }
+    }
     const reader = new FileReader();
     reader.onload = async (evt) => {
       const json = evt.target?.result as string;
