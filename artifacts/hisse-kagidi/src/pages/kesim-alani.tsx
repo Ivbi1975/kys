@@ -75,7 +75,7 @@ import {
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
 import { Tag } from "lucide-react";
-import { getKesimAlani, updateKesimAlani, loadGlobalTags } from "@/lib/storage";
+import { fetchKesimAlani, apiUpdateKesimAlani, fetchTags } from "@/lib/api";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
 import { useHistory } from "@/lib/useHistory";
@@ -214,16 +214,22 @@ export default function KesimAlaniPage() {
   const groupsHeaderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (params.id) {
-      const data = getKesimAlani(params.id);
-      if (data) {
-        setKesim(data);
-        history.initialize(data);
-      } else {
-        setLocation("/");
+    async function loadData() {
+      if (params.id) {
+        const data = await fetchKesimAlani(params.id);
+        if (data) {
+          setKesim(data);
+          history.initialize(data);
+        } else {
+          setLocation("/");
+        }
       }
+      try {
+        const tags = await fetchTags();
+        setGlobalTags(tags);
+      } catch {}
     }
-    setGlobalTags(loadGlobalTags());
+    loadData();
   }, [params.id, setLocation]);
 
   useEffect(() => {
@@ -257,7 +263,7 @@ export default function KesimAlaniPage() {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
         if (kesim) {
-          updateKesimAlani(kesim);
+          saveToApi(kesim);
         }
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "f") {
@@ -330,40 +336,44 @@ export default function KesimAlaniPage() {
     }
   }, []);
 
+  const saveToApi = useCallback((data: KesimAlani) => {
+    apiUpdateKesimAlani(data).catch(err => console.error("Kaydetme hatası:", err));
+  }, []);
+
   const save = useCallback(
     (updated: KesimAlani, desc?: string) => {
       setKesim(updated);
-      updateKesimAlani(updated);
+      saveToApi(updated);
       if (desc) {
         history.push(updated, desc);
       }
     },
-    []
+    [saveToApi]
   );
 
   const handleUndo = useCallback(() => {
     const prev = history.undo();
     if (prev) {
       setKesim(prev);
-      updateKesimAlani(prev);
+      saveToApi(prev);
     }
-  }, [history]);
+  }, [history, saveToApi]);
 
   const handleRedo = useCallback(() => {
     const next = history.redo();
     if (next) {
       setKesim(next);
-      updateKesimAlani(next);
+      saveToApi(next);
     }
-  }, [history]);
+  }, [history, saveToApi]);
 
   const handleGoToStep = useCallback((index: number) => {
     const target = history.goToStep(index);
     if (target) {
       setKesim(target);
-      updateKesimAlani(target);
+      saveToApi(target);
     }
-  }, [history]);
+  }, [history, saveToApi]);
 
   function addDonation() {
     if (!kesim || !newDonation.name.trim()) return;

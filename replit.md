@@ -68,7 +68,8 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - Auto conflict resolver ("Otomatik Çöz" button, optimally consolidates same-vekalet donors by choosing the target group with most existing matches to minimize swaps)
 - Custom tag system: global tag definitions (name + color) managed in Settings, assignable to donors via popover, displayed as colored badges, included in backup/restore, orphaned tags cleaned on deletion
 - Advanced filtering: filter donor list by cinsi (dropdown), hisse range (min/max), status (active/excluded), tags (multi-select) — combinable filters with active count badge and clear button
-- Data persisted in localStorage with backward-compatible migration
+- Data persisted in PostgreSQL via API server (migrated from localStorage)
+- One-time automatic localStorage → PostgreSQL migration on first load
 
 Data model (Donation):
 - `id`, `name` (adına kesilen), `description` (vekaleti veren), `donationType` (cinsi), `shareCount`, `vekalet` (vekalet no), `notes` (notlar), `excluded?`, `tags?`
@@ -78,7 +79,8 @@ Data model (AnimalGroup):
 
 Key files:
 - `src/lib/types.ts` - TypeScript types (Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag)
-- `src/lib/storage.ts` - localStorage persistence with data migration, backup/restore (includes global tags)
+- `src/lib/api.ts` - API client functions for all CRUD operations (PostgreSQL backend)
+- `src/lib/storage.ts` - Print preferences (localStorage, UI-only settings)
 - `src/lib/grouping.ts` - Auto-grouping algorithm (bin-packing, name-based effective shares)
 - `src/lib/useHistory.ts` - Snapshot-based undo/redo hook (80 steps, structuredClone)
 - `src/lib/useTheme.ts` - Theme hook supporting light/dark/system modes with system preference detection
@@ -108,7 +110,7 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
 
 - Entry: `src/index.ts` — reads `PORT`, starts Express
 - App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
+- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` (`GET /api/healthz`); `src/routes/kesim-alanlari.ts` (full CRUD for kesim alanları with nested donation/animal-group endpoints and bulk updates, zod-validated); `src/routes/tags.ts` (custom tag CRUD, zod-validated); `src/routes/settings.ts` (logo management, zod-validated); `src/routes/backup.ts` (export/import with transactions, zod-validated)
 - Depends on: `@workspace/db`, `@workspace/api-zod`
 - `pnpm --filter @workspace/api-server run dev` — run the dev server
 - `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
@@ -119,8 +121,8 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
 Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
 
 - `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
+- `src/schema/index.ts` — table definitions with Drizzle-Zod insert schemas: `kesimAlanlariTable`, `donationsTable`, `animalGroupsTable`, `animalGroupDonationsTable`, `customTagsTable`, `donationTagsTable`, `appSettingsTable`
+- `drizzle/` — generated migration files
 - `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
 - Exports: `.` (pool, db, schema), `./schema` (schema only)
 

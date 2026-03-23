@@ -1,0 +1,629 @@
+import { Router, type IRouter } from "express";
+import { db } from "@workspace/db";
+import {
+  kesimAlanlariTable,
+  donationsTable,
+  animalGroupsTable,
+  animalGroupDonationsTable,
+  donationTagsTable,
+} from "@workspace/db/schema";
+import { eq, inArray } from "drizzle-orm";
+import { z } from "zod";
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+interface DonationPayload {
+  id: string;
+  name?: string;
+  description?: string;
+  donationType?: string;
+  shareCount?: number;
+  vekalet?: string;
+  notes?: string;
+  excluded?: boolean;
+  tags?: string[];
+}
+
+interface AnimalGroupPayload {
+  id: string;
+  animalNo?: number;
+  colorTag?: string;
+  locked?: boolean;
+  notes?: string;
+  donations?: DonationPayload[];
+}
+
+interface DonationOutput {
+  id: string;
+  name: string;
+  description: string;
+  donationType: string;
+  shareCount: number;
+  vekalet: string;
+  notes: string;
+  excluded: boolean;
+  tags: string[];
+}
+
+const donationPayloadSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().optional().default(""),
+  description: z.string().optional().default(""),
+  donationType: z.string().optional().default(""),
+  shareCount: z.number().int().min(1).optional().default(1),
+  vekalet: z.string().optional().default(""),
+  notes: z.string().optional().default(""),
+  excluded: z.boolean().optional().default(false),
+  tags: z.array(z.string()).optional().default([]),
+});
+
+const animalGroupPayloadSchema = z.object({
+  id: z.string().min(1),
+  animalNo: z.number().int().optional().default(0),
+  colorTag: z.string().optional().default(""),
+  locked: z.boolean().optional().default(false),
+  notes: z.string().optional().default(""),
+  donations: z.array(donationPayloadSchema).optional().default([]),
+});
+
+const createKesimAlaniSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  createdAt: z.string().optional(),
+  donations: z.array(donationPayloadSchema).optional().default([]),
+  animalGroups: z.array(animalGroupPayloadSchema).optional().default([]),
+});
+
+const updateKesimAlaniSchema = z.object({
+  name: z.string().min(1).optional(),
+  donations: z.array(donationPayloadSchema).optional(),
+  animalGroups: z.array(animalGroupPayloadSchema).optional(),
+});
+
+const router: IRouter = Router();
+
+async function getFullKesimAlani(id: string) {
+  const [ka] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
+  if (!ka) return null;
+
+  const donations = await db.select().from(donationsTable)
+    .where(eq(donationsTable.kesimAlaniId, id))
+    .orderBy(donationsTable.sortOrder);
+
+  const donationIds = donations.map(d => d.id);
+  let donationTags: { donationId: string; tagId: string }[] = [];
+  if (donationIds.length > 0) {
+    donationTags = await db.select({
+      donationId: donationTagsTable.donationId,
+      tagId: donationTagsTable.tagId,
+    }).from(donationTagsTable).where(inArray(donationTagsTable.donationId, donationIds));
+  }
+
+  const tagsByDonation: Record<string, string[]> = {};
+  for (const dt of donationTags) {
+    if (!tagsByDonation[dt.donationId]) tagsByDonation[dt.donationId] = [];
+    tagsByDonation[dt.donationId].push(dt.tagId);
+  }
+
+  const groups = await db.select().from(animalGroupsTable)
+    .where(eq(animalGroupsTable.kesimAlaniId, id))
+    .orderBy(animalGroupsTable.sortOrder);
+
+  const groupIds = groups.map(g => g.id);
+  let groupDonationLinks: { groupId: string; donationId: string; sortOrder: number }[] = [];
+  if (groupIds.length > 0) {
+    groupDonationLinks = await db.select({
+      groupId: animalGroupDonationsTable.groupId,
+      donationId: animalGroupDonationsTable.donationId,
+      sortOrder: animalGroupDonationsTable.sortOrder,
+    }).from(animalGroupDonationsTable).where(inArray(animalGroupDonationsTable.groupId, groupIds));
+  }
+
+  const donationsById: Record<string, DonationOutput> = {};
+  for (const d of donations) {
+    donationsById[d.id] = {
+      id: d.id,
+      name: d.name,
+      description: d.description,
+      donationType: d.donationType,
+      shareCount: d.shareCount,
+      vekalet: d.vekalet,
+      notes: d.notes,
+      excluded: d.excluded,
+      tags: tagsByDonation[d.id] || [],
+    };
+  }
+
+  const groupDonationsByGroup: Record<string, { donationId: string; sortOrder: number }[]> = {};
+  for (const link of groupDonationLinks) {
+    if (!groupDonationsByGroup[link.groupId]) groupDonationsByGroup[link.groupId] = [];
+    groupDonationsByGroup[link.groupId].push(link);
+  }
+
+  const mappedDonations = donations.map(d => donationsById[d.id]);
+
+  const mappedGroups = groups.map(g => {
+    const links = (groupDonationsByGroup[g.id] || []).sort((a, b) => a.sortOrder - b.sortOrder);
+    return {
+      id: g.id,
+      animalNo: g.animalNo,
+      colorTag: g.colorTag,
+      locked: g.locked,
+      notes: g.notes,
+      donations: links.map(l => donationsById[l.donationId]).filter(Boolean),
+    };
+  });
+
+  return {
+    id: ka.id,
+    name: ka.name,
+    createdAt: ka.createdAt,
+    donations: mappedDonations,
+    animalGroups: mappedGroups,
+  };
+}
+
+router.get("/kesim-alanlari", async (_req, res) => {
+  try {
+    const rows = await db.select().from(kesimAlanlariTable).orderBy(kesimAlanlariTable.createdAt);
+    const results = await Promise.all(rows.map(r => getFullKesimAlani(r.id)));
+    res.json(results.filter(Boolean));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error("GET /kesim-alanlari error:", message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/kesim-alanlari/:id", async (req, res) => {
+  try {
+    const result = await getFullKesimAlani(req.params.id);
+    if (!result) {
+      res.status(404).json({ error: "Bulunamadı" });
+      return;
+    }
+    res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`GET /kesim-alanlari/${req.params.id} error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/kesim-alanlari", async (req, res) => {
+  const parsed = createKesimAlaniSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
+  const { id, name, createdAt, donations, animalGroups } = parsed.data;
+
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(kesimAlanlariTable).values({
+        id,
+        name,
+        createdAt: createdAt || new Date().toISOString(),
+      });
+
+      if (donations.length > 0) {
+        await saveDonations(tx, id, donations);
+      }
+
+      if (animalGroups.length > 0) {
+        await saveAnimalGroups(tx, id, animalGroups);
+      }
+    });
+
+    const result = await getFullKesimAlani(id);
+    res.status(201).json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error("POST /kesim-alanlari error:", message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.put("/kesim-alanlari/:id", async (req, res) => {
+  const parsed = updateKesimAlaniSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
+  const { id } = req.params;
+  const { name, donations, animalGroups } = parsed.data;
+
+  try {
+    const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
+    if (!existing) {
+      res.status(404).json({ error: "Bulunamadı" });
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      if (name !== undefined) {
+        await tx.update(kesimAlanlariTable).set({ name }).where(eq(kesimAlanlariTable.id, id));
+      }
+
+      if (donations !== undefined && animalGroups !== undefined) {
+        await tx.delete(donationTagsTable).where(
+          inArray(donationTagsTable.donationId,
+            tx.select({ id: donationsTable.id }).from(donationsTable).where(eq(donationsTable.kesimAlaniId, id))
+          )
+        );
+        await tx.delete(animalGroupDonationsTable).where(
+          inArray(animalGroupDonationsTable.groupId,
+            tx.select({ id: animalGroupsTable.id }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id))
+          )
+        );
+        await tx.delete(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id));
+        await tx.delete(donationsTable).where(eq(donationsTable.kesimAlaniId, id));
+        await saveDonations(tx, id, donations);
+        await saveAnimalGroups(tx, id, animalGroups);
+      } else if (donations !== undefined) {
+        await tx.delete(donationTagsTable).where(
+          inArray(donationTagsTable.donationId,
+            tx.select({ id: donationsTable.id }).from(donationsTable).where(eq(donationsTable.kesimAlaniId, id))
+          )
+        );
+        await tx.delete(animalGroupDonationsTable).where(
+          inArray(animalGroupDonationsTable.groupId,
+            tx.select({ id: animalGroupsTable.id }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id))
+          )
+        );
+        await tx.delete(donationsTable).where(eq(donationsTable.kesimAlaniId, id));
+        await saveDonations(tx, id, donations);
+      } else if (animalGroups !== undefined) {
+        await tx.delete(animalGroupDonationsTable).where(
+          inArray(animalGroupDonationsTable.groupId,
+            tx.select({ id: animalGroupsTable.id }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id))
+          )
+        );
+        await tx.delete(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id));
+        await saveAnimalGroups(tx, id, animalGroups);
+      }
+    });
+
+    const result = await getFullKesimAlani(id);
+    res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`PUT /kesim-alanlari/${id} error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.delete("/kesim-alanlari/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.delete(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
+    res.json({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`DELETE /kesim-alanlari/${req.params.id} error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/kesim-alanlari/:id/donations", async (req, res) => {
+  const parsed = donationPayloadSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
+  const { id: kesimAlaniId } = req.params;
+  const donation = parsed.data;
+
+  try {
+    const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, kesimAlaniId));
+    if (!existing) {
+      res.status(404).json({ error: "Kesim alanı bulunamadı" });
+      return;
+    }
+
+    const existingDonations = await db.select().from(donationsTable).where(eq(donationsTable.kesimAlaniId, kesimAlaniId));
+    const sortOrder = existingDonations.length;
+
+    await db.transaction(async (tx) => {
+      await tx.insert(donationsTable).values({
+        id: donation.id,
+        kesimAlaniId,
+        name: donation.name || "",
+        description: donation.description || "",
+        donationType: donation.donationType || "",
+        shareCount: donation.shareCount || 1,
+        vekalet: donation.vekalet || "",
+        notes: donation.notes || "",
+        excluded: donation.excluded || false,
+        sortOrder,
+      });
+
+      if (donation.tags && donation.tags.length > 0) {
+        for (const tagId of donation.tags) {
+          await tx.insert(donationTagsTable).values({ donationId: donation.id, tagId })
+            .onConflictDoNothing();
+        }
+      }
+    });
+
+    const result = await getFullKesimAlani(kesimAlaniId);
+    res.status(201).json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`POST /kesim-alanlari/${kesimAlaniId}/donations error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.put("/kesim-alanlari/:id/donations/:donationId", async (req, res) => {
+  const parsed = donationPayloadSchema.partial().safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
+  const { id: kesimAlaniId, donationId } = req.params;
+  const updates = parsed.data;
+
+  try {
+    const [existing] = await db.select().from(donationsTable)
+      .where(eq(donationsTable.id, donationId));
+    if (!existing || existing.kesimAlaniId !== kesimAlaniId) {
+      res.status(404).json({ error: "Bağışçı bulunamadı" });
+      return;
+    }
+
+    const dbUpdates: Record<string, string | number | boolean> = {};
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.donationType !== undefined) dbUpdates.donationType = updates.donationType;
+    if (updates.shareCount !== undefined) dbUpdates.shareCount = updates.shareCount;
+    if (updates.vekalet !== undefined) dbUpdates.vekalet = updates.vekalet;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+    if (updates.excluded !== undefined) dbUpdates.excluded = updates.excluded;
+
+    await db.transaction(async (tx) => {
+      if (Object.keys(dbUpdates).length > 0) {
+        await tx.update(donationsTable).set(dbUpdates).where(eq(donationsTable.id, donationId));
+      }
+
+      if (updates.tags !== undefined) {
+        await tx.delete(donationTagsTable).where(eq(donationTagsTable.donationId, donationId));
+        for (const tagId of updates.tags) {
+          await tx.insert(donationTagsTable).values({ donationId, tagId })
+            .onConflictDoNothing();
+        }
+      }
+    });
+
+    const result = await getFullKesimAlani(kesimAlaniId);
+    res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`PUT /kesim-alanlari/${kesimAlaniId}/donations/${donationId} error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.delete("/kesim-alanlari/:id/donations/:donationId", async (req, res) => {
+  try {
+    const { donationId } = req.params;
+    await db.delete(donationsTable).where(eq(donationsTable.id, donationId));
+    res.json({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`DELETE donation ${req.params.donationId} error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/kesim-alanlari/:id/animal-groups", async (req, res) => {
+  const parsed = animalGroupPayloadSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
+  const { id: kesimAlaniId } = req.params;
+  const group = parsed.data;
+
+  try {
+    const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, kesimAlaniId));
+    if (!existing) {
+      res.status(404).json({ error: "Kesim alanı bulunamadı" });
+      return;
+    }
+
+    const existingGroups = await db.select().from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId));
+    const sortOrder = existingGroups.length;
+
+    await db.transaction(async (tx) => {
+      await tx.insert(animalGroupsTable).values({
+        id: group.id,
+        kesimAlaniId,
+        animalNo: group.animalNo || 0,
+        colorTag: group.colorTag || "",
+        locked: group.locked || false,
+        notes: group.notes || "",
+        sortOrder,
+      });
+
+      if (group.donations && group.donations.length > 0) {
+        for (let j = 0; j < group.donations.length; j++) {
+          await tx.insert(animalGroupDonationsTable).values({
+            groupId: group.id,
+            donationId: group.donations[j].id,
+            sortOrder: j,
+          });
+        }
+      }
+    });
+
+    const result = await getFullKesimAlani(kesimAlaniId);
+    res.status(201).json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`POST /kesim-alanlari/${kesimAlaniId}/animal-groups error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+const bulkAnimalGroupsSchema = z.object({
+  animalGroups: z.array(animalGroupPayloadSchema),
+});
+
+router.put("/kesim-alanlari/:id/animal-groups/bulk", async (req, res) => {
+  const parsed = bulkAnimalGroupsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
+  const { id: kesimAlaniId } = req.params;
+  const { animalGroups } = parsed.data;
+
+  try {
+    const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, kesimAlaniId));
+    if (!existing) {
+      res.status(404).json({ error: "Kesim alanı bulunamadı" });
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      await tx.delete(animalGroupDonationsTable).where(
+        inArray(animalGroupDonationsTable.groupId,
+          tx.select({ id: animalGroupsTable.id }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId))
+        )
+      );
+      await tx.delete(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId));
+      await saveAnimalGroups(tx, kesimAlaniId, animalGroups);
+    });
+
+    const result = await getFullKesimAlani(kesimAlaniId);
+    res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`PUT /kesim-alanlari/${kesimAlaniId}/animal-groups/bulk error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.put("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => {
+  const parsed = animalGroupPayloadSchema.partial().safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
+  const { id: kesimAlaniId, groupId } = req.params;
+  const updates = parsed.data;
+
+  try {
+    const [existing] = await db.select().from(animalGroupsTable)
+      .where(eq(animalGroupsTable.id, groupId));
+    if (!existing || existing.kesimAlaniId !== kesimAlaniId) {
+      res.status(404).json({ error: "Hayvan grubu bulunamadı" });
+      return;
+    }
+
+    const dbUpdates: Record<string, string | number | boolean> = {};
+    if (updates.animalNo !== undefined) dbUpdates.animalNo = updates.animalNo;
+    if (updates.colorTag !== undefined) dbUpdates.colorTag = updates.colorTag;
+    if (updates.locked !== undefined) dbUpdates.locked = updates.locked;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+
+    await db.transaction(async (tx) => {
+      if (Object.keys(dbUpdates).length > 0) {
+        await tx.update(animalGroupsTable).set(dbUpdates).where(eq(animalGroupsTable.id, groupId));
+      }
+
+      if (updates.donations !== undefined) {
+        await tx.delete(animalGroupDonationsTable).where(eq(animalGroupDonationsTable.groupId, groupId));
+        for (let j = 0; j < updates.donations.length; j++) {
+          await tx.insert(animalGroupDonationsTable).values({
+            groupId,
+            donationId: updates.donations[j].id,
+            sortOrder: j,
+          });
+        }
+      }
+    });
+
+    const result = await getFullKesimAlani(kesimAlaniId);
+    res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`PUT /kesim-alanlari/${kesimAlaniId}/animal-groups/${groupId} error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.delete("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    await db.delete(animalGroupsTable).where(eq(animalGroupsTable.id, groupId));
+    res.json({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`DELETE animal-group ${req.params.groupId} error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+async function saveDonations(tx: Tx, kesimAlaniId: string, donations: DonationPayload[]) {
+  for (let i = 0; i < donations.length; i++) {
+    const d = donations[i];
+    await tx.insert(donationsTable).values({
+      id: d.id,
+      kesimAlaniId,
+      name: d.name || "",
+      description: d.description || "",
+      donationType: d.donationType || "",
+      shareCount: d.shareCount || 1,
+      vekalet: d.vekalet || "",
+      notes: d.notes || "",
+      excluded: d.excluded || false,
+      sortOrder: i,
+    });
+
+    if (d.tags && d.tags.length > 0) {
+      for (const tagId of d.tags) {
+        await tx.insert(donationTagsTable).values({
+          donationId: d.id,
+          tagId,
+        }).onConflictDoNothing();
+      }
+    }
+  }
+}
+
+async function saveAnimalGroups(tx: Tx, kesimAlaniId: string, groups: AnimalGroupPayload[]) {
+  for (let i = 0; i < groups.length; i++) {
+    const g = groups[i];
+    await tx.insert(animalGroupsTable).values({
+      id: g.id,
+      kesimAlaniId,
+      animalNo: g.animalNo || 0,
+      colorTag: g.colorTag || "",
+      locked: g.locked || false,
+      notes: g.notes || "",
+      sortOrder: i,
+    });
+
+    if (g.donations && g.donations.length > 0) {
+      for (let j = 0; j < g.donations.length; j++) {
+        const d = g.donations[j];
+        await tx.insert(animalGroupDonationsTable).values({
+          groupId: g.id,
+          donationId: d.id,
+          sortOrder: j,
+        });
+      }
+    }
+  }
+}
+
+export default router;

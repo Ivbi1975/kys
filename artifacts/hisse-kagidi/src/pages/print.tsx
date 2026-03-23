@@ -4,9 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, Printer, Settings2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff } from "lucide-react";
 import type { KesimAlani, AnimalGroup } from "@/lib/types";
+import { fetchKesimAlani, fetchLogo } from "@/lib/api";
 import {
-  getKesimAlani,
-  loadLogo,
   loadPrintPreferences,
   savePrintPreferences,
   resetPrintPreferences,
@@ -36,12 +35,16 @@ export default function PrintPage() {
   const [prefs, setPrefs] = useState<PrintPreferences>(() => loadPrintPreferences());
 
   useEffect(() => {
-    if (params.id) {
-      const data = getKesimAlani(params.id);
-      if (data) setKesim(data);
-      else setLocation("/");
+    async function loadData() {
+      if (params.id) {
+        const data = await fetchKesimAlani(params.id);
+        if (data) setKesim(data);
+        else setLocation("/");
+      }
+      const logoData = await fetchLogo();
+      setLogo(logoData);
     }
-    setLogo(loadLogo());
+    loadData();
   }, [params.id, setLocation]);
 
   const updatePrefs = useCallback((updater: (prev: PrintPreferences) => PrintPreferences) => {

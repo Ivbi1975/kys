@@ -13,18 +13,20 @@ import {
 import { Plus, Trash2, ChevronRight, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil } from "lucide-react";
 import type { KesimAlani, CustomTag } from "@/lib/types";
 import {
-  loadKesimAlanlari,
-  saveKesimAlanlari,
-  updateKesimAlani,
-  deleteKesimAlani,
-  saveLogo,
-  loadLogo,
-  deleteLogo,
-  exportBackup,
-  importBackup,
-  loadGlobalTags,
-  saveGlobalTags as saveGlobalTagsToStorage,
-} from "@/lib/storage";
+  fetchKesimAlanlari,
+  createKesimAlani,
+  apiDeleteKesimAlani,
+  fetchTags,
+  createTag,
+  updateTag,
+  deleteTagApi,
+  fetchLogo,
+  saveLogoApi,
+  deleteLogoApi,
+  exportBackupApi,
+  importBackupApi,
+  migrateLocalStorageToApi,
+} from "@/lib/api";
 import { useTheme } from "@/lib/useTheme";
 import type { ThemeMode } from "@/lib/useTheme";
 
@@ -44,6 +46,8 @@ export default function Home() {
   const [editingTagId, setEditingTagId] = useState<string | null>(null);
   const [editTagName, setEditTagName] = useState("");
   const [editTagColor, setEditTagColor] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [migrationDone, setMigrationDone] = useState(false);
 
   const TAG_COLORS = [
     "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
@@ -51,54 +55,50 @@ export default function Home() {
   ];
 
   useEffect(() => {
-    setKesimAlanlari(loadKesimAlanlari());
-    setLogoPreview(loadLogo());
-    setGlobalTags(loadGlobalTags());
+    async function init() {
+      try {
+        const migrated = await migrateLocalStorageToApi();
+        if (migrated) setMigrationDone(true);
+        const [ka, tags, logo] = await Promise.all([
+          fetchKesimAlanlari(),
+          fetchTags(),
+          fetchLogo(),
+        ]);
+        setKesimAlanlari(ka);
+        setGlobalTags(tags);
+        setLogoPreview(logo);
+      } catch (err) {
+        console.error("Veri yüklenemedi:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    init();
   }, []);
 
-  function saveGlobalTags(tags: CustomTag[]) {
-    setGlobalTags(tags);
-    saveGlobalTagsToStorage(tags);
-  }
-
-  function addTag() {
+  async function handleAddTag() {
     if (!newTagName.trim()) return;
     const tag: CustomTag = {
       id: Math.random().toString(36).substring(2, 10),
       name: newTagName.trim(),
       color: newTagColor,
     };
-    saveGlobalTags([...globalTags, tag]);
-    setNewTagName("");
-    setNewTagColor("#3b82f6");
+    try {
+      await createTag(tag);
+      setGlobalTags([...globalTags, tag]);
+      setNewTagName("");
+      setNewTagColor("#3b82f6");
+    } catch (err) {
+      console.error("Etiket oluşturma hatası:", err);
+    }
   }
 
-  function deleteTag(id: string) {
-    saveGlobalTags(globalTags.filter(t => t.id !== id));
-    const allKesim = loadKesimAlanlari();
-    let changed = false;
-    const updated = allKesim.map(k => {
-      const newDonations = k.donations.map(d => {
-        if (d.tags && d.tags.includes(id)) {
-          changed = true;
-          return { ...d, tags: d.tags.filter(t => t !== id) };
-        }
-        return d;
-      });
-      const newGroups = k.animalGroups.map(g => ({
-        ...g,
-        donations: g.donations.map(d => {
-          if (d.tags && d.tags.includes(id)) {
-            changed = true;
-            return { ...d, tags: d.tags.filter(t => t !== id) };
-          }
-          return d;
-        }),
-      }));
-      return { ...k, donations: newDonations, animalGroups: newGroups };
-    });
-    if (changed) {
-      saveKesimAlanlari(updated);
+  async function handleDeleteTag(id: string) {
+    try {
+      await deleteTagApi(id);
+      setGlobalTags(globalTags.filter(t => t.id !== id));
+    } catch (err) {
+      console.error("Etiket silme hatası:", err);
     }
   }
 
@@ -108,18 +108,24 @@ export default function Home() {
     setEditTagColor(tag.color);
   }
 
-  function commitEditTag() {
+  async function commitEditTag() {
     if (!editingTagId || !editTagName.trim()) {
       setEditingTagId(null);
       return;
     }
-    saveGlobalTags(globalTags.map(t =>
-      t.id === editingTagId ? { ...t, name: editTagName.trim(), color: editTagColor } : t
-    ));
+    const updated = { id: editingTagId, name: editTagName.trim(), color: editTagColor };
+    try {
+      await updateTag(updated);
+      setGlobalTags(globalTags.map(t =>
+        t.id === editingTagId ? updated : t
+      ));
+    } catch (err) {
+      console.error("Etiket güncelleme hatası:", err);
+    }
     setEditingTagId(null);
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!newName.trim()) return;
     const newKesim: KesimAlani = {
       id: Math.random().toString(36).substring(2, 12),
@@ -128,19 +134,26 @@ export default function Home() {
       animalGroups: [],
       createdAt: new Date().toISOString(),
     };
-    updateKesimAlani(newKesim);
-    setKesimAlanlari(loadKesimAlanlari());
-    setNewName("");
-    setDialogOpen(false);
-    setLocation(`/kesim/${newKesim.id}`);
+    try {
+      await createKesimAlani(newKesim);
+      setNewName("");
+      setDialogOpen(false);
+      setLocation(`/kesim/${newKesim.id}`);
+    } catch (err) {
+      console.error("Oluşturma hatası:", err);
+    }
   }
 
-  function handleDelete(id: string) {
-    deleteKesimAlani(id);
-    setKesimAlanlari(loadKesimAlanlari());
+  async function handleDelete(id: string) {
+    try {
+      await apiDeleteKesimAlani(id);
+      setKesimAlanlari(kesimAlanlari.filter(k => k.id !== id));
+    } catch (err) {
+      console.error("Silme hatası:", err);
+    }
   }
 
-  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
@@ -148,42 +161,57 @@ export default function Home() {
       return;
     }
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       const base64 = evt.target?.result as string;
-      saveLogo(base64);
-      setLogoPreview(base64);
+      try {
+        await saveLogoApi(base64);
+        setLogoPreview(base64);
+      } catch (err) {
+        console.error("Logo yükleme hatası:", err);
+      }
     };
     reader.readAsDataURL(file);
     if (logoInputRef.current) logoInputRef.current.value = "";
   }
 
-  function handleDeleteLogo() {
-    deleteLogo();
-    setLogoPreview(null);
+  async function handleDeleteLogo() {
+    try {
+      await deleteLogoApi();
+      setLogoPreview(null);
+    } catch (err) {
+      console.error("Logo silme hatası:", err);
+    }
   }
 
-  function handleExportBackup() {
-    const json = exportBackup();
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `kurban_yedek_${new Date().toISOString().split("T")[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  async function handleExportBackup() {
+    try {
+      const json = await exportBackupApi();
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `kurban_yedek_${new Date().toISOString().split("T")[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Yedekleme hatası:", err);
+    }
   }
 
-  function handleImportBackup(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImportBackup(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       const json = evt.target?.result as string;
-      const result = importBackup(json);
+      const result = await importBackupApi(json);
       if (result.success) {
-        setKesimAlanlari(loadKesimAlanlari());
-        setLogoPreview(loadLogo());
-        setGlobalTags(loadGlobalTags());
+        const ka = await fetchKesimAlanlari();
+        setKesimAlanlari(ka);
+        const logo = await fetchLogo();
+        setLogoPreview(logo);
+        const tags = await fetchTags();
+        setGlobalTags(tags);
         alert(`Yedek başarıyla yüklendi: ${result.count} kesim alanı`);
       } else {
         alert(`Hata: ${result.error}`);
@@ -193,9 +221,25 @@ export default function Home() {
     if (backupInputRef.current) backupInputRef.current.value = "";
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Scissors className="w-12 h-12 text-primary mx-auto mb-4 animate-pulse" />
+          <p className="text-muted-foreground">Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto p-6">
+        {migrationDone && (
+          <div className="mb-4 p-3 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-lg text-sm text-green-800 dark:text-green-200">
+            Mevcut verileriniz veritabanına başarıyla aktarıldı. Artık verileriniz kalıcı olarak saklanmaktadır.
+          </div>
+        )}
         <div className="flex items-center gap-3 mb-8">
           <Scissors className="w-8 h-8 text-primary" />
           <div className="flex-1">
@@ -374,7 +418,7 @@ export default function Home() {
                               <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => startEditTag(tag)}>
                                 <Pencil className="w-3 h-3" />
                               </Button>
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => deleteTag(tag.id)}>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleDeleteTag(tag.id)}>
                                 <Trash2 className="w-3 h-3 text-destructive" />
                               </Button>
                             </>
@@ -400,9 +444,9 @@ export default function Home() {
                       placeholder="Yeni etiket adı"
                       value={newTagName}
                       onChange={(e) => setNewTagName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && addTag()}
+                      onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
                     />
-                    <Button variant="outline" size="sm" onClick={addTag} disabled={!newTagName.trim()}>
+                    <Button variant="outline" size="sm" onClick={handleAddTag} disabled={!newTagName.trim()}>
                       <Plus className="w-4 h-4" />
                     </Button>
                   </div>
