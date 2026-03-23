@@ -811,8 +811,16 @@ export default function KesimAlaniPage() {
       if (groupIndices.length <= 1) continue;
 
       let targetGroupIdx = -1;
+      let maxExisting = -1;
       for (const gi of groupIndices) {
-        if (!workingCopy[gi].locked) { targetGroupIdx = gi; break; }
+        if (workingCopy[gi].locked) continue;
+        const count = entriesByGroup.get(gi)!.length;
+        const emptySlots = workingCopy[gi].donations.filter(d => d.name.trim() === "").length;
+        const score = count * 1000 + emptySlots;
+        if (score > maxExisting) {
+          maxExisting = score;
+          targetGroupIdx = gi;
+        }
       }
       if (targetGroupIdx < 0) continue;
 

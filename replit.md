@@ -61,7 +61,7 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - Group split (scissors icon, divides filled donors into two renumbered groups)
 - Group merge (checkbox selection + toolbar, handles 7-share overflow into new groups)
 - Manual swap mode (ArrowLeftRight icon, preview dialog before executing)
-- Auto conflict resolver ("Otomatik Çöz" button, finds minimum swaps to co-locate same-vekalet donors)
+- Auto conflict resolver ("Otomatik Çöz" button, optimally consolidates same-vekalet donors by choosing the target group with most existing matches to minimize swaps)
 - Data persisted in localStorage with backward-compatible migration
 
 Data model (Donation):
