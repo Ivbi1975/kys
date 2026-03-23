@@ -325,26 +325,41 @@ export default function PrintPage() {
               <table className="compact-list-table">
                 <thead>
                   <tr>
-                    <th style={{ width: "45px" }}>Hayvan</th>
+                    {!isColumnHidden("hayvan") && <th style={{ width: "45px" }}>Hayvan</th>}
                     <th style={{ width: "55px" }}>Dolu/Top</th>
-                    <th>Bağışçılar (Adına Kesilen)</th>
-                    <th style={{ width: "80px" }}>Cinsler</th>
-                    <th style={{ width: "120px" }}>Notlar</th>
+                    {!isColumnHidden("adina-kesilen") && <th>Bağışçılar (Adına Kesilen)</th>}
+                    {!isColumnHidden("vekaleti-veren") && <th>Vekaleti Veren</th>}
+                    {!isColumnHidden("cinsi") && <th style={{ width: "80px" }}>Cinsler</th>}
+                    {!isColumnHidden("notlar") && <th style={{ width: "120px" }}>Notlar</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {pageGroups.map((group) => {
                     const filledDonors = group.donations.filter(d => d.name.trim());
-                    const donorNames = filledDonors.map(d => d.name).join(", ");
-                    const cinsTypes = [...new Set(filledDonors.map(d => d.donationType).filter(Boolean))].join(", ");
-                    const groupNotes = [...new Set(filledDonors.map(d => d.notes).filter(Boolean))].join("; ");
+                    const donorNames = filledDonors
+                      .filter(d => !shouldHideContent("adina-kesilen", d.donationType))
+                      .map(d => d.name).join(", ");
+                    const vekaletNames = filledDonors
+                      .filter(d => !shouldHideContent("vekaleti-veren", d.donationType))
+                      .map(d => d.description).filter(Boolean).join(", ");
+                    const cinsTypes = [...new Set(
+                      filledDonors
+                        .filter(d => !shouldHideContent("cinsi", d.donationType))
+                        .map(d => d.donationType).filter(Boolean)
+                    )].join(", ");
+                    const groupNotes = [...new Set(
+                      filledDonors
+                        .filter(d => !shouldHideContent("notlar", d.donationType))
+                        .map(d => d.notes).filter(Boolean)
+                    )].join("; ");
                     return (
                       <tr key={group.id}>
-                        <td className="compact-list-animal">{group.animalNo}</td>
+                        {!isColumnHidden("hayvan") && <td className="compact-list-animal">{group.animalNo}</td>}
                         <td className="compact-list-count">{filledDonors.length}/{group.donations.length}</td>
-                        <td className="compact-list-names">{donorNames || <span style={{ color: "#9ca3af", fontStyle: "italic" }}>Boş</span>}</td>
-                        <td className="compact-list-types">{cinsTypes}</td>
-                        <td className="compact-list-notes">{groupNotes}</td>
+                        {!isColumnHidden("adina-kesilen") && <td className="compact-list-names">{donorNames || <span style={{ color: "#9ca3af", fontStyle: "italic" }}>Boş</span>}</td>}
+                        {!isColumnHidden("vekaleti-veren") && <td className="compact-list-names">{vekaletNames}</td>}
+                        {!isColumnHidden("cinsi") && <td className="compact-list-types">{cinsTypes}</td>}
+                        {!isColumnHidden("notlar") && <td className="compact-list-notes">{groupNotes}</td>}
                       </tr>
                     );
                   })}
@@ -443,94 +458,133 @@ export default function PrintPage() {
     const emptySlots = totalSlots - filledSlots;
     const cinsBreakdown = new Map<string, number>();
     for (const d of allDonors) {
-      const cins = d.donationType?.trim() || "Belirtilmemiş";
-      cinsBreakdown.set(cins, (cinsBreakdown.get(cins) || 0) + 1);
+      if (!shouldHideContent("cinsi", d.donationType)) {
+        const cins = d.donationType?.trim() || "Belirtilmemiş";
+        cinsBreakdown.set(cins, (cinsBreakdown.get(cins) || 0) + 1);
+      }
     }
+
+    const showHayvan = !isColumnHidden("hayvan");
+    const showNames = !isColumnHidden("adina-kesilen");
+    const showCins = !isColumnHidden("cinsi");
+    const showNotes = !isColumnHidden("notlar");
+    const showVekalet = !isColumnHidden("vekaleti-veren");
+
+    const groupsPerPage = 25;
+    const pages: AnimalGroup[][] = [];
+    for (let i = 0; i < processedGroups.length; i += groupsPerPage) {
+      pages.push(processedGroups.slice(i, i + groupsPerPage));
+    }
+    const totalPages = Math.max(1, pages.length);
 
     return (
       <div className="print-pages template-summary">
-        <div className="print-page print-page-compact">
-          <div className="page-header-row">
-            {logo && <img src={logo} alt="Logo" className="page-logo-img" style={{ maxHeight: "12mm" }} />}
-            <div className="page-header-title" style={{ fontSize: "16px" }}>{kesim.name} - Özet Rapor</div>
-          </div>
-          <div className="page-content">
-            <div className="summary-stats-grid">
-              <div className="summary-stat-card">
-                <div className="summary-stat-value">{totalGroups}</div>
-                <div className="summary-stat-label">Toplam Hayvan</div>
-              </div>
-              <div className="summary-stat-card">
-                <div className="summary-stat-value">{totalDonors}</div>
-                <div className="summary-stat-label">Toplam Bağışçı</div>
-              </div>
-              <div className="summary-stat-card">
-                <div className="summary-stat-value">{totalShares}</div>
-                <div className="summary-stat-label">Toplam Hisse</div>
-              </div>
-              <div className="summary-stat-card">
-                <div className="summary-stat-value">{filledSlots}/{totalSlots}</div>
-                <div className="summary-stat-label">Dolu/Toplam Slot</div>
-              </div>
-              <div className="summary-stat-card">
-                <div className="summary-stat-value">{emptySlots}</div>
-                <div className="summary-stat-label">Boş Slot</div>
-              </div>
-              <div className="summary-stat-card">
-                <div className="summary-stat-value">{totalGroups > 0 ? Math.round((filledSlots / totalSlots) * 100) : 0}%</div>
-                <div className="summary-stat-label">Doluluk Oranı</div>
-              </div>
+        {pages.map((pageGroups, pageIdx) => (
+          <div key={pageIdx} className="print-page print-page-compact">
+            <div className="page-header-row">
+              {logo && <img src={logo} alt="Logo" className="page-logo-img" style={{ maxHeight: "12mm" }} />}
+              <div className="page-header-title" style={{ fontSize: "16px" }}>{kesim.name} - Özet Rapor</div>
             </div>
-
-            {cinsBreakdown.size > 0 && (
-              <div className="summary-section">
-                <h3 className="summary-section-title">Cins Dağılımı</h3>
-                <div className="summary-cins-grid">
-                  {[...cinsBreakdown.entries()].sort((a, b) => b[1] - a[1]).map(([cins, count]) => (
-                    <div key={cins} className="summary-cins-item">
-                      <span className="summary-cins-name">{cins}</span>
-                      <span className="summary-cins-count">{count}</span>
+            <div className="page-content">
+              {pageIdx === 0 && (
+                <>
+                  <div className="summary-stats-grid">
+                    <div className="summary-stat-card">
+                      <div className="summary-stat-value">{totalGroups}</div>
+                      <div className="summary-stat-label">Toplam Hayvan</div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                    <div className="summary-stat-card">
+                      <div className="summary-stat-value">{totalDonors}</div>
+                      <div className="summary-stat-label">Toplam Bağışçı</div>
+                    </div>
+                    <div className="summary-stat-card">
+                      <div className="summary-stat-value">{totalShares}</div>
+                      <div className="summary-stat-label">Toplam Hisse</div>
+                    </div>
+                    <div className="summary-stat-card">
+                      <div className="summary-stat-value">{filledSlots}/{totalSlots}</div>
+                      <div className="summary-stat-label">Dolu/Toplam Slot</div>
+                    </div>
+                    <div className="summary-stat-card">
+                      <div className="summary-stat-value">{emptySlots}</div>
+                      <div className="summary-stat-label">Boş Slot</div>
+                    </div>
+                    <div className="summary-stat-card">
+                      <div className="summary-stat-value">{totalGroups > 0 ? Math.round((filledSlots / totalSlots) * 100) : 0}%</div>
+                      <div className="summary-stat-label">Doluluk Oranı</div>
+                    </div>
+                  </div>
 
-            <div className="summary-section">
-              <h3 className="summary-section-title">Grup Detayları</h3>
-              <table className="summary-groups-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: "50px" }}>Hayvan</th>
-                    <th style={{ width: "60px" }}>Dolu/Top</th>
-                    <th>Bağışçılar</th>
-                    <th style={{ width: "80px" }}>Cinsler</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {processedGroups.map((group) => {
-                    const filled = group.donations.filter(d => d.name.trim());
-                    const names = filled.map(d => d.name).join(", ");
-                    const types = [...new Set(filled.map(d => d.donationType).filter(Boolean))].join(", ");
-                    return (
-                      <tr key={group.id}>
-                        <td style={{ textAlign: "center", fontWeight: 700, color: "#1e3a5f" }}>{group.animalNo}</td>
-                        <td style={{ textAlign: "center" }}>{filled.length}/{group.donations.length}</td>
-                        <td>{names || "—"}</td>
-                        <td style={{ textAlign: "center", fontSize: "10px" }}>{types}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                  {showCins && cinsBreakdown.size > 0 && (
+                    <div className="summary-section">
+                      <h3 className="summary-section-title">Cins Dağılımı</h3>
+                      <div className="summary-cins-grid">
+                        {[...cinsBreakdown.entries()].sort((a, b) => b[1] - a[1]).map(([cins, count]) => (
+                          <div key={cins} className="summary-cins-item">
+                            <span className="summary-cins-name">{cins}</span>
+                            <span className="summary-cins-count">{count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="summary-section">
+                <h3 className="summary-section-title">Grup Detayları</h3>
+                <table className="summary-groups-table">
+                  <thead>
+                    <tr>
+                      {showHayvan && <th style={{ width: "50px" }}>Hayvan</th>}
+                      <th style={{ width: "60px" }}>Dolu/Top</th>
+                      {showNames && <th>Bağışçılar</th>}
+                      {showVekalet && <th>Vekaleti Veren</th>}
+                      {showCins && <th style={{ width: "80px" }}>Cinsler</th>}
+                      {showNotes && <th style={{ width: "100px" }}>Notlar</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageGroups.map((group) => {
+                      const filled = group.donations.filter(d => d.name.trim());
+                      const names = filled
+                        .filter(d => !shouldHideContent("adina-kesilen", d.donationType))
+                        .map(d => d.name).join(", ");
+                      const vekalets = filled
+                        .filter(d => !shouldHideContent("vekaleti-veren", d.donationType))
+                        .map(d => d.description).filter(Boolean).join(", ");
+                      const types = [...new Set(
+                        filled
+                          .filter(d => !shouldHideContent("cinsi", d.donationType))
+                          .map(d => d.donationType).filter(Boolean)
+                      )].join(", ");
+                      const notes = [...new Set(
+                        filled
+                          .filter(d => !shouldHideContent("notlar", d.donationType))
+                          .map(d => d.notes).filter(Boolean)
+                      )].join("; ");
+                      return (
+                        <tr key={group.id}>
+                          {showHayvan && <td style={{ textAlign: "center", fontWeight: 700, color: "#1e3a5f" }}>{group.animalNo}</td>}
+                          <td style={{ textAlign: "center" }}>{filled.length}/{group.donations.length}</td>
+                          {showNames && <td>{names || "—"}</td>}
+                          {showVekalet && <td>{vekalets}</td>}
+                          {showCins && <td style={{ textAlign: "center", fontSize: "10px" }}>{types}</td>}
+                          {showNotes && <td style={{ fontSize: "10px", color: "#6b7280" }}>{notes}</td>}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="page-footer">
+              <span>{kesim.name}</span>
+              <span>Sayfa {pageIdx + 1} / {totalPages}</span>
+              <span>{new Date().toLocaleDateString("tr-TR")}</span>
             </div>
           </div>
-          <div className="page-footer">
-            <span>{kesim.name}</span>
-            <span>Özet Rapor</span>
-            <span>{new Date().toLocaleDateString("tr-TR")}</span>
-          </div>
-        </div>
+        ))}
       </div>
     );
   }
@@ -624,7 +678,7 @@ export default function PrintPage() {
               </div>
             </Card>
 
-            {prefs.template !== "namelist" && prefs.template !== "summary" && prefs.template !== "compact" && (
+            {prefs.template !== "namelist" && (
               <>
                 <Card className="p-4">
                   <div className="flex items-center justify-between mb-3">
