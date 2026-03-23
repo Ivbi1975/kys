@@ -158,8 +158,9 @@ export default function KesimAlaniPage() {
   const [bulkGroupEditValue, setBulkGroupEditValue] = useState("");
   const [jumpToAnimal, setJumpToAnimal] = useState("");
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
-  const [bulkEditField, setBulkEditField] = useState<"donationType" | "shareCount" | "notes">("donationType");
+  const [bulkEditField, setBulkEditField] = useState<"donationType" | "shareCount" | "notes" | "vekalet">("donationType");
   const [bulkEditValue, setBulkEditValue] = useState("");
+  const [rangeLockInput, setRangeLockInput] = useState("");
   const [dragItem, setDragItem] = useState<{
     groupIdx: number;
     donationIdx: number;
@@ -603,11 +604,31 @@ export default function KesimAlaniPage() {
     setGroupingProgress(null);
     try {
       await new Promise(resolve => setTimeout(resolve, 0));
-      const groups = await autoGroupDonationsAsync(kesim.donations, (progress) => {
+      const lockedGroups = kesim.animalGroups.filter(g => g.locked);
+      const lockedDonationIds = new Set<string>();
+      for (const lg of lockedGroups) {
+        for (const d of lg.donations) {
+          if (d.name.trim() || d.description.trim()) {
+            lockedDonationIds.add(d.id);
+          }
+        }
+      }
+      const donationsToGroup = kesim.donations.filter(d => !lockedDonationIds.has(d.id));
+      const newGroups = await autoGroupDonationsAsync(donationsToGroup, (progress) => {
         setGroupingProgress({ ...progress });
       });
-      save({ ...kesim, animalGroups: groups }, `Otomatik gruplama yapıldı: ${groups.length} hayvan`);
-      const found = checkGroupConflicts(groups);
+      let animalNo = 1;
+      const finalGroups: AnimalGroup[] = [];
+      for (const lg of lockedGroups) {
+        finalGroups.push({ ...lg, animalNo });
+        animalNo++;
+      }
+      for (const ng of newGroups) {
+        finalGroups.push({ ...ng, animalNo });
+        animalNo++;
+      }
+      save({ ...kesim, animalGroups: finalGroups }, `Otomatik gruplama yapıldı: ${finalGroups.length} hayvan (${lockedGroups.length} kilitli korundu)`);
+      const found = checkGroupConflicts(finalGroups);
       setConflicts(found);
       if (found.length > 0) setShowConflicts(true);
     } finally {
@@ -921,6 +942,51 @@ export default function KesimAlaniPage() {
     );
     const target = groups[groupIdx];
     save({ ...kesim, animalGroups: groups }, `Grup ${target.locked ? "kilidi açıldı" : "kilitlendi"}: Hayvan ${target.animalNo}`);
+  }
+
+  function parseRangeLockInput(input: string): number[] {
+    const results = new Set<number>();
+    const parts = input.split(",").map(p => p.trim()).filter(Boolean);
+    for (const part of parts) {
+      const rangeMatch = part.match(/^(\d+)\s*-\s*(\d+)$/);
+      if (rangeMatch) {
+        const start = parseInt(rangeMatch[1]);
+        const end = parseInt(rangeMatch[2]);
+        for (let i = Math.min(start, end); i <= Math.max(start, end); i++) {
+          results.add(i);
+        }
+      } else if (/^\d+$/.test(part)) {
+        results.add(parseInt(part));
+      }
+    }
+    return Array.from(results).sort((a, b) => a - b);
+  }
+
+  function applyRangeLock(lock: boolean) {
+    if (!kesim) return;
+    const targetNos = parseRangeLockInput(rangeLockInput);
+    if (targetNos.length === 0) return;
+    const existingNos = new Set(kesim.animalGroups.map(g => g.animalNo));
+    const validNos = targetNos.filter(n => existingNos.has(n));
+    if (validNos.length === 0) return;
+    const targetSet = new Set(validNos);
+    const groups = kesim.animalGroups.map(g =>
+      targetSet.has(g.animalNo) ? { ...g, locked: lock } : g
+    );
+    save({ ...kesim, animalGroups: groups }, `${validNos.length} grup ${lock ? "kilitlendi" : "kilidi açıldı"}: ${rangeLockInput}`);
+    setRangeLockInput("");
+  }
+
+  function lockAllGroups() {
+    if (!kesim) return;
+    const groups = kesim.animalGroups.map(g => ({ ...g, locked: true }));
+    save({ ...kesim, animalGroups: groups }, `Tüm gruplar kilitlendi`);
+  }
+
+  function unlockAllGroups() {
+    if (!kesim) return;
+    const groups = kesim.animalGroups.map(g => ({ ...g, locked: false }));
+    save({ ...kesim, animalGroups: groups }, `Tüm grupların kilidi açıldı`);
   }
 
   function splitGroup(groupIdx: number) {
@@ -2395,13 +2461,14 @@ export default function KesimAlaniPage() {
                       <DialogTitle>{selectedIds.size} Bağışçıyı Toplu Düzenle</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4 pt-4">
-                      <Select value={bulkEditField} onValueChange={(v: any) => setBulkEditField(v)}>
+                      <Select value={bulkEditField} onValueChange={(v: "donationType" | "shareCount" | "notes" | "vekalet") => setBulkEditField(v)}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="donationType">Cinsi</SelectItem>
                           <SelectItem value="shareCount">Hisse Sayısı</SelectItem>
+                          <SelectItem value="vekalet">Vekalet No</SelectItem>
                           <SelectItem value="notes">Notlar</SelectItem>
                         </SelectContent>
                       </Select>
@@ -2955,6 +3022,60 @@ export default function KesimAlaniPage() {
                     <Search className="w-4 h-4 mr-1" />
                     Çakışma Kontrol
                   </Button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" title="Toplu Kilitleme">
+                        <Lock className="w-4 h-4 mr-1" />
+                        Kilit
+                        {kesim.animalGroups.filter(g => g.locked).length > 0 && (
+                          <span className="ml-1 bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-semibold">
+                            {kesim.animalGroups.filter(g => g.locked).length}
+                          </span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 p-3" align="end">
+                      <p className="text-xs font-semibold mb-2">Toplu Kilitleme</p>
+                      <div className="space-y-3">
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" className="flex-1" onClick={lockAllGroups}>
+                            <Lock className="w-3 h-3 mr-1" />
+                            Tümünü Kilitle
+                          </Button>
+                          <Button variant="outline" size="sm" className="flex-1" onClick={unlockAllGroups}>
+                            <Unlock className="w-3 h-3 mr-1" />
+                            Tümünü Aç
+                          </Button>
+                        </div>
+                        <div className="border-t pt-2">
+                          <p className="text-xs text-muted-foreground mb-2">
+                            Hayvan numarası aralığı veya çoklu seçim girin (örn: 1-5 veya 3, 7, 12)
+                          </p>
+                          <div className="flex gap-2">
+                            <Input
+                              className="h-8 text-sm flex-1"
+                              placeholder="1-5 veya 3, 7, 12"
+                              value={rangeLockInput}
+                              onChange={(e) => setRangeLockInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") applyRangeLock(true);
+                              }}
+                            />
+                          </div>
+                          <div className="flex gap-2 mt-2">
+                            <Button variant="default" size="sm" className="flex-1" onClick={() => applyRangeLock(true)} disabled={!rangeLockInput.trim()}>
+                              <Lock className="w-3 h-3 mr-1" />
+                              Kilitle
+                            </Button>
+                            <Button variant="outline" size="sm" className="flex-1" onClick={() => applyRangeLock(false)} disabled={!rangeLockInput.trim()}>
+                              <Unlock className="w-3 h-3 mr-1" />
+                              Kilidi Aç
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               )}
             </div>
@@ -3321,7 +3442,7 @@ export default function KesimAlaniPage() {
                       onDragLeave={(e) => handleDragLeave(e, groupIdx)}
                     >
                       <div
-                        className={`flex items-center justify-between ${compact ? "p-2" : "p-3"} bg-primary/10 cursor-pointer`}
+                        className={`flex items-center justify-between ${compact ? "p-2" : "p-3"} ${group.locked ? "bg-amber-500/10" : "bg-primary/10"} cursor-pointer`}
                         onClick={() => toggleGroupCollapse(group.id)}
                       >
                         <div className="flex items-center gap-2">
@@ -3343,6 +3464,12 @@ export default function KesimAlaniPage() {
                           <h3 className={`font-semibold ${compact ? "text-xs" : "text-sm"}`}>
                             {kesim.name} - HAYVAN NO: {group.animalNo}
                           </h3>
+                          {group.locked && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 text-[10px] font-semibold border border-amber-500/30">
+                              <Lock className="w-2.5 h-2.5" />
+                              Kilitli
+                            </span>
+                          )}
                           <div className="flex items-center gap-0.5 ml-1" onClick={(e) => e.stopPropagation()}>
                             {(["green", "orange", "red", ""] as ColorTag[]).map((c) => (
                               <button
