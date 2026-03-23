@@ -3966,18 +3966,22 @@ export default function KesimAlaniPage() {
               </div>
             )}
 
-            {swapSelection && (
-              <div className="flex items-center gap-3 p-2 mb-3 bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg">
-                <ArrowLeftRight className="w-4 h-4 text-purple-600" />
-                <span className="text-sm text-purple-800 dark:text-purple-200">
-                  <strong>Takas modu:</strong> Hayvan {kesim.animalGroups[swapSelection.groupIdx]?.animalNo}, Sıra {swapSelection.donationIdx + 1} seçildi.
-                  Başka bir gruptaki bağışçıya tıklayın.
-                </span>
-                <Button variant="ghost" size="sm" onClick={cancelSwap}>
-                  İptal
-                </Button>
-              </div>
-            )}
+            {swapSelection && (() => {
+              const selDonor = kesim.animalGroups[swapSelection.groupIdx]?.donations[swapSelection.donationIdx];
+              return (
+                <div className="flex items-center gap-3 p-2 mb-3 bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg">
+                  <ArrowLeftRight className="w-4 h-4 text-purple-600" />
+                  <span className="text-sm text-purple-800 dark:text-purple-200">
+                    <strong>Takas modu:</strong> Hayvan {kesim.animalGroups[swapSelection.groupIdx]?.animalNo}, Sıra {swapSelection.donationIdx + 1}
+                    {selDonor ? ` — ${selDonor.description || selDonor.name} (${selDonor.shareCount} hisse)` : ""} seçildi.
+                    Başka bir gruptaki bağışçıya tıklayın.
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={cancelSwap}>
+                    İptal
+                  </Button>
+                </div>
+              );
+            })()}
 
             {showConflicts && (
               <Card className={`p-4 mb-4 ${conflicts.length > 0 ? "border-amber-300 bg-amber-50" : "border-green-300 bg-green-50"}`}>
@@ -4416,46 +4420,61 @@ export default function KesimAlaniPage() {
               Takas Önizleme
             </DialogTitle>
           </DialogHeader>
-          {swapSelection && swapTarget && kesim && (
-            <div className="space-y-4 pt-2">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 border rounded-lg bg-purple-50 dark:bg-purple-950">
-                  <p className="text-xs text-muted-foreground mb-1">
-                    Hayvan {kesim.animalGroups[swapSelection.groupIdx]?.animalNo}, Sıra {swapSelection.donationIdx + 1}
-                  </p>
-                  <p className="font-semibold text-sm">
-                    {kesim.animalGroups[swapSelection.groupIdx]?.donations[swapSelection.donationIdx]?.description || "—"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {kesim.animalGroups[swapSelection.groupIdx]?.donations[swapSelection.donationIdx]?.name || "—"}
-                  </p>
+          {swapSelection && swapTarget && kesim && (() => {
+            const srcDonor = kesim.animalGroups[swapSelection.groupIdx]?.donations[swapSelection.donationIdx];
+            const tgtDonor = kesim.animalGroups[swapTarget.groupIdx]?.donations[swapTarget.donationIdx];
+            const srcShare = srcDonor?.shareCount || 1;
+            const tgtShare = tgtDonor?.shareCount || 1;
+            const shareMismatch = srcShare !== tgtShare;
+            return (
+              <div className="space-y-4 pt-2">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 border rounded-lg bg-purple-50 dark:bg-purple-950">
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Hayvan {kesim.animalGroups[swapSelection.groupIdx]?.animalNo}, Sıra {swapSelection.donationIdx + 1}
+                    </p>
+                    <p className="font-semibold text-sm">
+                      {srcDonor?.description || "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {srcDonor?.name || "—"}
+                    </p>
+                    <p className="text-xs mt-1 font-medium">{srcShare} hisse</p>
+                  </div>
+                  <div className="p-3 border rounded-lg bg-purple-50 dark:bg-purple-950">
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Hayvan {kesim.animalGroups[swapTarget.groupIdx]?.animalNo}, Sıra {swapTarget.donationIdx + 1}
+                    </p>
+                    <p className="font-semibold text-sm">
+                      {tgtDonor?.description || "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {tgtDonor?.name || "—"}
+                    </p>
+                    <p className="text-xs mt-1 font-medium">{tgtShare} hisse</p>
+                  </div>
                 </div>
-                <div className="p-3 border rounded-lg bg-purple-50 dark:bg-purple-950">
-                  <p className="text-xs text-muted-foreground mb-1">
-                    Hayvan {kesim.animalGroups[swapTarget.groupIdx]?.animalNo}, Sıra {swapTarget.donationIdx + 1}
-                  </p>
-                  <p className="font-semibold text-sm">
-                    {kesim.animalGroups[swapTarget.groupIdx]?.donations[swapTarget.donationIdx]?.description || "—"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {kesim.animalGroups[swapTarget.groupIdx]?.donations[swapTarget.donationIdx]?.name || "—"}
-                  </p>
+                <div className="flex items-center justify-center">
+                  <ArrowLeftRight className="w-6 h-6 text-purple-400" />
+                </div>
+                {shareMismatch && (
+                  <div className="flex items-center gap-2 p-2 bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-700 rounded-lg text-sm text-amber-800 dark:text-amber-200">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                    <span>Hisse sayıları farklı ({srcShare} ↔ {tgtShare}). Takas sonrası grup toplamları değişecek.</span>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={cancelSwap} className="flex-1">
+                    İptal
+                  </Button>
+                  <Button onClick={executeSwap} className="flex-1">
+                    <ArrowLeftRight className="w-4 h-4 mr-1" />
+                    Takas Et
+                  </Button>
                 </div>
               </div>
-              <div className="flex items-center justify-center">
-                <ArrowLeftRight className="w-6 h-6 text-purple-400" />
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={cancelSwap} className="flex-1">
-                  İptal
-                </Button>
-                <Button onClick={executeSwap} className="flex-1">
-                  <ArrowLeftRight className="w-4 h-4 mr-1" />
-                  Takas Et
-                </Button>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
