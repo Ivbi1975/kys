@@ -6,11 +6,6 @@ import { ArrowLeft, Printer, Settings2, ChevronDown, ChevronUp } from "lucide-re
 import type { KesimAlani, AnimalGroup } from "@/lib/types";
 import { getKesimAlani, loadLogo } from "@/lib/storage";
 
-function getSurname(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  return parts.length > 0 ? parts[parts.length - 1] : "";
-}
-
 export default function PrintPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
@@ -18,7 +13,6 @@ export default function PrintPage() {
   const [logo, setLogo] = useState<string | null>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [hideVekaletTypes, setHideVekaletTypes] = useState<Set<string>>(new Set(["Vacip", "VACİB", "vacib", "Vacib"]));
-  const [sortBySurname, setSortBySurname] = useState(false);
 
   useEffect(() => {
     if (params.id) {
@@ -44,37 +38,8 @@ export default function PrintPage() {
 
   const processedGroups = useMemo((): AnimalGroup[] => {
     if (!kesim) return [];
-
-    return kesim.animalGroups.map((group) => {
-      let donations = [...group.donations];
-
-      if (sortBySurname) {
-        const filled = donations.filter((d) => d.name.trim() || d.description.trim());
-        const empty = donations.filter((d) => !d.name.trim() && !d.description.trim());
-
-        filled.sort((a, b) => {
-          const surnameA = getSurname(a.description || a.name);
-          const surnameB = getSurname(b.description || b.name);
-          return surnameA.localeCompare(surnameB, "tr");
-        });
-
-        donations = [...filled, ...empty].slice(0, 7);
-        while (donations.length < 7) {
-          donations.push(group.donations[donations.length] || {
-            id: Math.random().toString(36).substring(2, 12),
-            name: "",
-            description: "",
-            donationType: "",
-            shareCount: 1,
-            vekalet: "",
-            notes: "",
-          });
-        }
-      }
-
-      return { ...group, donations };
-    });
-  }, [kesim, sortBySurname]);
+    return kesim.animalGroups;
+  }, [kesim]);
 
   function toggleHideType(type: string) {
     setHideVekaletTypes((prev) => {
@@ -167,19 +132,6 @@ export default function PrintPage() {
               )}
             </Card>
 
-            <Card className="p-4">
-              <h3 className="text-sm font-semibold mb-3">Sıralama</h3>
-              <label className="inline-flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={sortBySurname}
-                  onChange={(e) => setSortBySurname(e.target.checked)}
-                  className="rounded w-4 h-4"
-                />
-                <span className="text-sm">Soyadına göre alfabetik sırala</span>
-                <span className="text-xs text-muted-foreground">(her gruptaki satırları vekaleti veren/adına kesilen soyadına göre sıralar)</span>
-              </label>
-            </Card>
           </div>
         </div>
       )}
@@ -187,11 +139,12 @@ export default function PrintPage() {
       <div className="print-pages">
         {processedGroups.map((group) => (
           <div key={group.id} className="print-page">
-            {logo && (
-              <div className="page-logo-header">
+            <div className="page-header-row">
+              {logo && (
                 <img src={logo} alt="Logo" className="page-logo-img" />
-              </div>
-            )}
+              )}
+              <div className="page-header-title">{kesim.name}</div>
+            </div>
 
             <div className="page-content">
               <table className="kesim-table">

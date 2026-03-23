@@ -4,6 +4,11 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 12);
 }
 
+function getSurname(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  return parts.length > 0 ? parts[parts.length - 1] : "";
+}
+
 export function computeEffectiveShares(donations: Donation[]): Map<string, number> {
   const activeDonations = donations.filter(d => !d.excluded);
   const descCount = new Map<string, number>();
@@ -49,8 +54,17 @@ function buildGroupDonations(segments: GroupedSegment[]): Donation[] {
     }
   }
 
-  while (groupDonations.length < 7) {
-    groupDonations.push({
+  const filled = groupDonations.filter(d => d.name.trim() || d.description.trim());
+  const empty = groupDonations.filter(d => !d.name.trim() && !d.description.trim());
+  filled.sort((a, b) => {
+    const surnameA = getSurname(a.description || a.name);
+    const surnameB = getSurname(b.description || b.name);
+    return surnameA.localeCompare(surnameB, "tr");
+  });
+  const sorted = [...filled, ...empty];
+
+  while (sorted.length < 7) {
+    sorted.push({
       id: generateId(),
       name: "",
       description: "",
@@ -61,7 +75,7 @@ function buildGroupDonations(segments: GroupedSegment[]): Donation[] {
     });
   }
 
-  return groupDonations.slice(0, 7);
+  return sorted.slice(0, 7);
 }
 
 function prepareDonorUnits(donations: Donation[]): DonorUnit[] {
