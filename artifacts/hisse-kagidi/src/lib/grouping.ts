@@ -22,7 +22,49 @@ export function computeEffectiveShares(donations: Donation[]): Map<string, numbe
   return result;
 }
 
-export function autoGroupDonations(donations: Donation[]): AnimalGroup[] {
+interface DonorUnit {
+  templateDonation: Donation;
+  donations: Donation[];
+  totalShares: number;
+}
+
+interface GroupedSegment {
+  templateDonation: Donation;
+  donations: Donation[];
+  shares: number;
+}
+
+function buildGroupDonations(segments: GroupedSegment[]): Donation[] {
+  const groupDonations: Donation[] = [];
+  for (const g of segments) {
+    for (const d of g.donations) {
+      groupDonations.push({ ...d });
+    }
+    const extraSlots = g.shares - g.donations.length;
+    for (let s = 0; s < extraSlots; s++) {
+      groupDonations.push({
+        ...g.templateDonation,
+        id: generateId(),
+      });
+    }
+  }
+
+  while (groupDonations.length < 7) {
+    groupDonations.push({
+      id: generateId(),
+      name: "",
+      description: "",
+      donationType: "",
+      shareCount: 1,
+      vekalet: "",
+      notes: "",
+    });
+  }
+
+  return groupDonations.slice(0, 7);
+}
+
+function prepareDonorUnits(donations: Donation[]): DonorUnit[] {
   const activeDonations = donations.filter(d => !d.excluded);
   if (activeDonations.length === 0) return [];
 
@@ -35,7 +77,7 @@ export function autoGroupDonations(donations: Donation[]): AnimalGroup[] {
     descGroups.get(key)!.push(d);
   }
 
-  const donorUnits: { donations: Donation[]; totalShares: number }[] = [];
+  const donorUnits: DonorUnit[] = [];
   const processedDescs = new Set<string>();
 
   for (const d of activeDonations) {
@@ -45,61 +87,131 @@ export function autoGroupDonations(donations: Donation[]): AnimalGroup[] {
 
     const group = descGroups.get(key) || [d];
     const shareCount = effectiveShares.get(d.id) || 1;
-    donorUnits.push({ donations: group, totalShares: shareCount });
+    donorUnits.push({
+      templateDonation: group[0],
+      donations: group,
+      totalShares: shareCount,
+    });
   }
 
   donorUnits.sort((a, b) => b.totalShares - a.totalShares);
+  return donorUnits;
+}
+
+function fillAnimalGroup(
+  remainingUnits: DonorUnit[]
+): GroupedSegment[] | null {
+  const segments: GroupedSegment[] = [];
+  let remaining = 7;
+
+  let i = 0;
+  while (i < remainingUnits.length && remaining > 0) {
+    const unit = remainingUnits[i];
+    if (unit.totalShares <= remaining) {
+      segments.push({
+        templateDonation: unit.templateDonation,
+        donations: unit.donations,
+        shares: unit.totalShares,
+      });
+      remaining -= unit.totalShares;
+      remainingUnits.splice(i, 1);
+    } else {
+      i++;
+    }
+  }
+
+  if (remaining > 0 && remainingUnits.length > 0) {
+    const unit = remainingUnits[0];
+    const splitShares = remaining;
+    const splitDonationCount = Math.min(unit.donations.length, splitShares);
+    const splitDonations = unit.donations.slice(0, splitDonationCount);
+
+    segments.push({
+      templateDonation: unit.templateDonation,
+      donations: splitDonations,
+      shares: splitShares,
+    });
+
+    unit.donations = unit.donations.slice(splitDonationCount);
+    unit.totalShares -= splitShares;
+
+    if (unit.totalShares <= 0) {
+      remainingUnits.splice(0, 1);
+    }
+  }
+
+  return segments.length > 0 ? segments : null;
+}
+
+export function autoGroupDonations(donations: Donation[]): AnimalGroup[] {
+  const units = prepareDonorUnits(donations);
+  if (units.length === 0) return [];
+
+  const remainingUnits: DonorUnit[] = units.map(u => ({
+    ...u,
+    donations: [...u.donations],
+  }));
 
   const groups: AnimalGroup[] = [];
-  const used = new Set<number>();
   let animalNo = 1;
 
-  while (used.size < donorUnits.length) {
-    const group: { donations: Donation[]; shares: number }[] = [];
-    let remaining = 7;
-
-    for (let i = 0; i < donorUnits.length; i++) {
-      if (used.has(i)) continue;
-      const unit = donorUnits[i];
-      if (unit.totalShares <= remaining) {
-        group.push({ donations: unit.donations, shares: unit.totalShares });
-        remaining -= unit.totalShares;
-        used.add(i);
-      }
-      if (remaining === 0) break;
-    }
-
-    const groupDonations: Donation[] = [];
-    for (const g of group) {
-      for (const d of g.donations) {
-        groupDonations.push({ ...d });
-      }
-      const extraSlots = g.shares - g.donations.length;
-      for (let s = 0; s < extraSlots; s++) {
-        groupDonations.push({
-          ...g.donations[0],
-          id: generateId(),
-        });
-      }
-    }
-
-    while (groupDonations.length < 7) {
-      groupDonations.push({
-        id: generateId(),
-        name: "",
-        description: "",
-        donationType: "",
-        shareCount: 1,
-        vekalet: "",
-        notes: "",
-      });
-    }
+  while (remainingUnits.length > 0) {
+    const segments = fillAnimalGroup(remainingUnits);
+    if (!segments) break;
 
     groups.push({
       id: generateId(),
       animalNo,
-      donations: groupDonations.slice(0, 7),
+      donations: buildGroupDonations(segments),
     });
+    animalNo++;
+  }
+
+  return groups;
+}
+
+export interface GroupingProgress {
+  current: number;
+  total: number;
+}
+
+export async function autoGroupDonationsAsync(
+  donations: Donation[],
+  onProgress?: (progress: GroupingProgress) => void
+): Promise<AnimalGroup[]> {
+  const units = prepareDonorUnits(donations);
+  if (units.length === 0) return [];
+
+  let totalSharesSum = 0;
+  for (const u of units) totalSharesSum += u.totalShares;
+  const estimatedTotal = Math.ceil(totalSharesSum / 7);
+
+  const remainingUnits: DonorUnit[] = units.map(u => ({
+    ...u,
+    donations: [...u.donations],
+  }));
+
+  const groups: AnimalGroup[] = [];
+  let animalNo = 1;
+
+  while (remainingUnits.length > 0) {
+    const segments = fillAnimalGroup(remainingUnits);
+    if (!segments) break;
+
+    groups.push({
+      id: generateId(),
+      animalNo,
+      donations: buildGroupDonations(segments),
+    });
+
+    if (onProgress) {
+      onProgress({ current: animalNo, total: estimatedTotal });
+    }
+
+    if (animalNo % 2 === 0) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+
     animalNo++;
   }
 

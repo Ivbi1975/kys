@@ -35,10 +35,12 @@ import {
   Settings2,
   EyeOff,
   Eye,
+  Loader2,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani } from "@/lib/types";
 import { getKesimAlani, updateKesimAlani } from "@/lib/storage";
-import { autoGroupDonations, getTotalShares, getRequiredAnimals } from "@/lib/grouping";
+import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals } from "@/lib/grouping";
+import type { GroupingProgress } from "@/lib/grouping";
 import * as XLSX from "xlsx";
 
 type SortField = "name" | "description" | "donationType" | "shareCount";
@@ -89,6 +91,8 @@ export default function KesimAlaniPage() {
   } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [groupingInProgress, setGroupingInProgress] = useState(false);
+  const [groupingProgress, setGroupingProgress] = useState<GroupingProgress | null>(null);
   const [dragItem, setDragItem] = useState<{
     groupIdx: number;
     donationIdx: number;
@@ -270,10 +274,20 @@ export default function KesimAlaniPage() {
     setHasHeaderRow(true);
   }
 
-  function handleAutoGroup() {
-    if (!kesim) return;
-    const groups = autoGroupDonations(kesim.donations);
-    save({ ...kesim, animalGroups: groups });
+  async function handleAutoGroup() {
+    if (!kesim || groupingInProgress) return;
+    setGroupingInProgress(true);
+    setGroupingProgress(null);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const groups = await autoGroupDonationsAsync(kesim.donations, (progress) => {
+        setGroupingProgress({ ...progress });
+      });
+      save({ ...kesim, animalGroups: groups });
+    } finally {
+      setGroupingInProgress(false);
+      setGroupingProgress(null);
+    }
   }
 
   function handleSort(field: SortField) {
@@ -1008,9 +1022,20 @@ export default function KesimAlaniPage() {
 
             {kesim.donations.length > 0 && (
               <div className="mt-4 flex gap-2">
-                <Button onClick={handleAutoGroup} className="flex-1">
-                  <Wand2 className="w-4 h-4 mr-2" />
-                  Otomatik Grupla ({requiredAnimals} Hayvan)
+                <Button onClick={handleAutoGroup} className="flex-1" disabled={groupingInProgress}>
+                  {groupingInProgress ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {groupingProgress
+                        ? `Gruplama: ${groupingProgress.current}/${groupingProgress.total} hayvan`
+                        : "Gruplama başlıyor..."}
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="w-4 h-4 mr-2" />
+                      Otomatik Grupla ({requiredAnimals} Hayvan)
+                    </>
+                  )}
                 </Button>
               </div>
             )}
