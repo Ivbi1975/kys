@@ -285,6 +285,18 @@ export default function KesimAlaniPage() {
       if (typeof aVal === "number" && typeof bVal === "number") {
         return newDir === "asc" ? aVal - bVal : bVal - aVal;
       }
+      if (field === "description") {
+        const aStr = String(aVal).trim();
+        const bStr = String(bVal).trim();
+        const aSurname = aStr.split(/\s+/).pop() || aStr;
+        const bSurname = bStr.split(/\s+/).pop() || bStr;
+        const surnameCmp = aSurname.localeCompare(bSurname, "tr");
+        if (surnameCmp !== 0) {
+          return newDir === "asc" ? surnameCmp : -surnameCmp;
+        }
+        const fullCmp = aStr.localeCompare(bStr, "tr");
+        return newDir === "asc" ? fullCmp : -fullCmp;
+      }
       return newDir === "asc"
         ? String(aVal).localeCompare(String(bVal), "tr")
         : String(bVal).localeCompare(String(aVal), "tr");
