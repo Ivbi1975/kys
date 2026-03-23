@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Printer, Settings2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff, FileSpreadsheet, FileText, LayoutTemplate } from "lucide-react";
+import { ArrowLeft, Printer, Settings2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff, FileSpreadsheet, FileText, LayoutTemplate, BarChart3 } from "lucide-react";
 import type { KesimAlani, AnimalGroup } from "@/lib/types";
 import { fetchKesimAlani, fetchLogo } from "@/lib/api";
 import * as XLSX from "xlsx";
@@ -307,10 +307,10 @@ export default function PrintPage() {
 
   function renderCompactTemplate() {
     if (!kesim) return null;
-    const groupsPerPage = 3;
+    const rowsPerPage = 20;
     const pages: AnimalGroup[][] = [];
-    for (let i = 0; i < processedGroups.length; i += groupsPerPage) {
-      pages.push(processedGroups.slice(i, i + groupsPerPage));
+    for (let i = 0; i < processedGroups.length; i += rowsPerPage) {
+      pages.push(processedGroups.slice(i, i + rowsPerPage));
     }
 
     return (
@@ -321,39 +321,35 @@ export default function PrintPage() {
               {logo && <img src={logo} alt="Logo" className="page-logo-img" style={{ maxHeight: "10mm" }} />}
               <div className="page-header-title" style={{ fontSize: "14px" }}>{kesim.name}</div>
             </div>
-            <div className="page-content compact-content">
-              {pageGroups.map((group) => (
-                <div key={group.id} className="compact-group">
-                  <table className="kesim-table compact-table dynamic-columns">
-                    <thead>
-                      <tr>
-                        {visibleColumns.map((col) => (
-                          <th key={col.key} className={`col-${col.key}`}>{col.label}</th>
-                        ))}
+            <div className="page-content">
+              <table className="compact-list-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: "45px" }}>Hayvan</th>
+                    <th style={{ width: "55px" }}>Dolu/Top</th>
+                    <th>Bağışçılar (Adına Kesilen)</th>
+                    <th style={{ width: "80px" }}>Cinsler</th>
+                    <th style={{ width: "120px" }}>Notlar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageGroups.map((group) => {
+                    const filledDonors = group.donations.filter(d => d.name.trim());
+                    const donorNames = filledDonors.map(d => d.name).join(", ");
+                    const cinsTypes = [...new Set(filledDonors.map(d => d.donationType).filter(Boolean))].join(", ");
+                    const groupNotes = [...new Set(filledDonors.map(d => d.notes).filter(Boolean))].join("; ");
+                    return (
+                      <tr key={group.id}>
+                        <td className="compact-list-animal">{group.animalNo}</td>
+                        <td className="compact-list-count">{filledDonors.length}/{group.donations.length}</td>
+                        <td className="compact-list-names">{donorNames || <span style={{ color: "#9ca3af", fontStyle: "italic" }}>Boş</span>}</td>
+                        <td className="compact-list-types">{cinsTypes}</td>
+                        <td className="compact-list-notes">{groupNotes}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {group.donations.map((d, idx) => (
-                        <tr key={d.id}>
-                          {!isColumnHidden("hayvan") && idx === 0 && (
-                            <td className="hayvan-cell" rowSpan={7}>
-                              <div className="hayvan-number">{group.animalNo}</div>
-                            </td>
-                          )}
-                          {visibleColumns.filter((col) => col.key !== "hayvan").map((col) => {
-                            if (col.key === "sira") {
-                              return <td key={col.key} className="sira-cell">{shouldHideContent("sira", d.donationType) ? "" : idx + 1}</td>;
-                            }
-                            const content = getCellContent(col.key, d);
-                            const hidden = shouldHideContent(col.key, d.donationType);
-                            return <td key={col.key} className={`${col.key}-cell`}>{hidden ? "" : content}</td>;
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ))}
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
             <div className="page-footer">
               <span>{kesim.name}</span>
@@ -436,6 +432,109 @@ export default function PrintPage() {
     );
   }
 
+  function renderSummaryTemplate() {
+    if (!kesim) return null;
+    const totalGroups = processedGroups.length;
+    const allDonors = processedGroups.flatMap(g => g.donations.filter(d => d.name.trim()));
+    const totalDonors = allDonors.length;
+    const totalShares = allDonors.reduce((sum, d) => sum + d.shareCount, 0);
+    const totalSlots = processedGroups.reduce((sum, g) => sum + g.donations.length, 0);
+    const filledSlots = allDonors.length;
+    const emptySlots = totalSlots - filledSlots;
+    const cinsBreakdown = new Map<string, number>();
+    for (const d of allDonors) {
+      const cins = d.donationType?.trim() || "Belirtilmemiş";
+      cinsBreakdown.set(cins, (cinsBreakdown.get(cins) || 0) + 1);
+    }
+
+    return (
+      <div className="print-pages template-summary">
+        <div className="print-page print-page-compact">
+          <div className="page-header-row">
+            {logo && <img src={logo} alt="Logo" className="page-logo-img" style={{ maxHeight: "12mm" }} />}
+            <div className="page-header-title" style={{ fontSize: "16px" }}>{kesim.name} - Özet Rapor</div>
+          </div>
+          <div className="page-content">
+            <div className="summary-stats-grid">
+              <div className="summary-stat-card">
+                <div className="summary-stat-value">{totalGroups}</div>
+                <div className="summary-stat-label">Toplam Hayvan</div>
+              </div>
+              <div className="summary-stat-card">
+                <div className="summary-stat-value">{totalDonors}</div>
+                <div className="summary-stat-label">Toplam Bağışçı</div>
+              </div>
+              <div className="summary-stat-card">
+                <div className="summary-stat-value">{totalShares}</div>
+                <div className="summary-stat-label">Toplam Hisse</div>
+              </div>
+              <div className="summary-stat-card">
+                <div className="summary-stat-value">{filledSlots}/{totalSlots}</div>
+                <div className="summary-stat-label">Dolu/Toplam Slot</div>
+              </div>
+              <div className="summary-stat-card">
+                <div className="summary-stat-value">{emptySlots}</div>
+                <div className="summary-stat-label">Boş Slot</div>
+              </div>
+              <div className="summary-stat-card">
+                <div className="summary-stat-value">{totalGroups > 0 ? Math.round((filledSlots / totalSlots) * 100) : 0}%</div>
+                <div className="summary-stat-label">Doluluk Oranı</div>
+              </div>
+            </div>
+
+            {cinsBreakdown.size > 0 && (
+              <div className="summary-section">
+                <h3 className="summary-section-title">Cins Dağılımı</h3>
+                <div className="summary-cins-grid">
+                  {[...cinsBreakdown.entries()].sort((a, b) => b[1] - a[1]).map(([cins, count]) => (
+                    <div key={cins} className="summary-cins-item">
+                      <span className="summary-cins-name">{cins}</span>
+                      <span className="summary-cins-count">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="summary-section">
+              <h3 className="summary-section-title">Grup Detayları</h3>
+              <table className="summary-groups-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: "50px" }}>Hayvan</th>
+                    <th style={{ width: "60px" }}>Dolu/Top</th>
+                    <th>Bağışçılar</th>
+                    <th style={{ width: "80px" }}>Cinsler</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {processedGroups.map((group) => {
+                    const filled = group.donations.filter(d => d.name.trim());
+                    const names = filled.map(d => d.name).join(", ");
+                    const types = [...new Set(filled.map(d => d.donationType).filter(Boolean))].join(", ");
+                    return (
+                      <tr key={group.id}>
+                        <td style={{ textAlign: "center", fontWeight: 700, color: "#1e3a5f" }}>{group.animalNo}</td>
+                        <td style={{ textAlign: "center" }}>{filled.length}/{group.donations.length}</td>
+                        <td>{names || "—"}</td>
+                        <td style={{ textAlign: "center", fontSize: "10px" }}>{types}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="page-footer">
+            <span>{kesim.name}</span>
+            <span>Özet Rapor</span>
+            <span>{new Date().toLocaleDateString("tr-TR")}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const pageStyle = useMemo(() => {
     if (prefs.template === "portrait" || prefs.template === "namelist") {
       return `@page { size: A4 portrait; margin: 0; }`;
@@ -513,8 +612,9 @@ export default function PrintPage() {
                       }`}>
                         {t.value === "standard" && <span className="rotate-90">A4</span>}
                         {t.value === "portrait" && "A4"}
-                        {t.value === "compact" && <span className="text-[6px]">3x</span>}
+                        {t.value === "compact" && <span className="text-[6px]">☰</span>}
                         {t.value === "namelist" && <span className="text-[6px]">☰</span>}
+                        {t.value === "summary" && <BarChart3 className="w-3 h-3" />}
                       </div>
                       <span className="text-xs font-semibold">{t.label}</span>
                     </div>
@@ -524,7 +624,7 @@ export default function PrintPage() {
               </div>
             </Card>
 
-            {prefs.template !== "namelist" && (
+            {prefs.template !== "namelist" && prefs.template !== "summary" && prefs.template !== "compact" && (
               <>
                 <Card className="p-4">
                   <div className="flex items-center justify-between mb-3">
@@ -637,6 +737,7 @@ export default function PrintPage() {
       {prefs.template === "portrait" && renderPortraitTemplate()}
       {prefs.template === "compact" && renderCompactTemplate()}
       {prefs.template === "namelist" && renderNameListTemplate()}
+      {prefs.template === "summary" && renderSummaryTemplate()}
     </div>
   );
 }

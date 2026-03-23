@@ -462,42 +462,188 @@
   padding: 3mm 6mm;
 }
 
-.compact-content {
+@media print {
+  .template-compact .print-page-compact {
+    box-shadow: none;
+    page-break-after: always;
+    page-break-inside: avoid;
+    margin: 0;
+    padding: 0 5mm;
+    width: 100%;
+    min-height: auto;
+    max-height: auto;
+  }
+}
+
+.compact-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.compact-list-table th {
+  background: #1e3a5f;
+  color: white;
+  padding: 4px 8px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid #1e3a5f;
+}
+
+.compact-list-table td {
+  padding: 3px 8px;
+  border: 1px solid #d1d5db;
+  font-size: 11px;
+  color: #1e293b;
+  vertical-align: top;
+}
+
+.compact-list-table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.compact-list-table tbody tr:nth-child(odd) {
+  background: white;
+}
+
+.compact-list-animal {
+  text-align: center;
+  font-weight: 800;
+  font-size: 14px;
+  color: #1e3a5f;
+  background: #dbeafe;
+}
+
+.compact-list-count {
+  text-align: center;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.compact-list-names {
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.compact-list-types {
+  text-align: center;
+  font-size: 10px;
+  color: #4b5563;
+}
+
+.compact-list-notes {
+  font-size: 10px;
+  color: #6b7280;
+}
+
+.summary-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3mm;
+  margin-bottom: 4mm;
+}
+
+.summary-stat-card {
+  border: 1.5px solid #1e3a5f;
+  border-radius: 4px;
+  padding: 3mm;
+  text-align: center;
+  background: #f0f5ff;
+}
+
+.summary-stat-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #1e3a5f;
+  line-height: 1.2;
+}
+
+.summary-stat-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: #4b5563;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 1mm;
+}
+
+.summary-section {
+  margin-bottom: 3mm;
+}
+
+.summary-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e3a5f;
+  margin-bottom: 2mm;
+  padding-bottom: 1mm;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.summary-cins-grid {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 2mm;
-  flex: 1;
 }
 
-.compact-group {
-  flex: 1;
+.summary-cins-item {
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+  padding: 1mm 3mm;
+  background: #f0f5ff;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  font-size: 10px;
 }
 
-.compact-table td {
-  height: auto !important;
-  padding: 1px 4px !important;
-  font-size: 10px !important;
+.summary-cins-name {
+  font-weight: 600;
+  color: #1e293b;
 }
 
-.compact-table th {
-  padding: 2px 4px !important;
-  font-size: 9px !important;
+.summary-cins-count {
+  font-weight: 800;
+  color: #1e3a5f;
+  background: #dbeafe;
+  padding: 0 2mm;
+  border-radius: 2px;
 }
 
-.compact-table .hayvan-cell {
-  font-size: 16px !important;
+.summary-groups-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
 }
 
-.compact-table .hayvan-number {
-  font-size: 18px !important;
+.summary-groups-table th {
+  background: #1e3a5f;
+  color: white;
+  padding: 3px 6px;
+  text-align: left;
+  font-size: 9px;
+  font-weight: 700;
+  border: 1px solid #1e3a5f;
 }
 
-.compact-table .sira-cell {
-  font-size: 10px !important;
+.summary-groups-table td {
+  padding: 2px 6px;
+  border: 1px solid #d1d5db;
+  font-size: 10px;
+  color: #1e293b;
+}
+
+.summary-groups-table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.summary-groups-table tbody tr:nth-child(odd) {
+  background: white;
 }
 
 @media print {
-  .template-compact .print-page-compact {
+  .template-summary .print-page-compact {
     box-shadow: none;
     page-break-after: always;
     page-break-inside: avoid;

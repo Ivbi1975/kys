@@ -1,6 +1,6 @@
 const PRINT_PREFS_KEY = "hisse-kagidi-print-prefs";
 
-export type PrintTemplate = "standard" | "portrait" | "compact" | "namelist";
+export type PrintTemplate = "standard" | "portrait" | "compact" | "namelist" | "summary";
 
 export interface PrintPreferences {
   hiddenColumns: string[];
@@ -19,8 +19,9 @@ export const DEFAULT_PRINT_PREFS: PrintPreferences = {
 export const PRINT_TEMPLATES: { value: PrintTemplate; label: string; description: string }[] = [
   { value: "standard", label: "Standart A4 Yatay", description: "Her hayvan grubu ayrı A4 yatay sayfada" },
   { value: "portrait", label: "A4 Dikey", description: "Her hayvan grubu ayrı A4 dikey sayfada" },
-  { value: "compact", label: "Kompakt Liste", description: "Birden fazla grup tek sayfada, küçük tablo" },
+  { value: "compact", label: "Kompakt Liste", description: "Her grup tek satırda, isimler virgülle ayrılmış" },
   { value: "namelist", label: "Sadece İsim Listesi", description: "Basit bağışçı adı ve hisse tablosu" },
+  { value: "summary", label: "Özet Rapor", description: "İstatistik kartları ve grupların özet tablosu" },
 ];
 
 export function savePrintPreferences(prefs: PrintPreferences): void {
@@ -28,7 +29,7 @@ export function savePrintPreferences(prefs: PrintPreferences): void {
 }
 
 const VALID_COLUMN_KEYS = ["hayvan", "sira", "vekalet", "vekaleti-veren", "adina-kesilen", "cinsi", "notlar"];
-const VALID_TEMPLATES: PrintTemplate[] = ["standard", "portrait", "compact", "namelist"];
+const VALID_TEMPLATES: PrintTemplate[] = ["standard", "portrait", "compact", "namelist", "summary"];
 
 export function loadPrintPreferences(): PrintPreferences {
   try {
