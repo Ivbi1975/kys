@@ -157,47 +157,71 @@ router.post("/backup/export", async (_req, res) => {
   }
 });
 
-router.post("/backup/import", async (req, res) => {
-  const parsed = backupImportSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz yedek dosyası", details: parsed.error.issues });
-    return;
-  }
+const importPayloadSchema = z.object({
+  mode: z.enum(["replace", "merge"]).optional().default("replace"),
+  data: backupImportSchema,
+});
 
-  const data = parsed.data;
+router.post("/backup/import", async (req, res) => {
+  let mode: "replace" | "merge" = "replace";
+  let data: z.infer<typeof backupImportSchema>;
+
+  const wrappedParse = importPayloadSchema.safeParse(req.body);
+  if (wrappedParse.success) {
+    mode = wrappedParse.data.mode;
+    data = wrappedParse.data.data;
+  } else {
+    const directParse = backupImportSchema.safeParse(req.body);
+    if (!directParse.success) {
+      res.status(400).json({ error: "Geçersiz yedek dosyası", details: directParse.error.issues });
+      return;
+    }
+    data = directParse.data;
+  }
 
   try {
     await db.transaction(async (tx) => {
-      await tx.delete(animalGroupDonationsTable);
-      await tx.delete(donationTagsTable);
-      await tx.delete(animalGroupsTable);
-      await tx.delete(donationsTable);
-      await tx.delete(kesimAlanlariTable);
-      await tx.delete(customTagsTable);
+      if (mode === "replace") {
+        await tx.delete(animalGroupDonationsTable);
+        await tx.delete(donationTagsTable);
+        await tx.delete(animalGroupsTable);
+        await tx.delete(donationsTable);
+        await tx.delete(kesimAlanlariTable);
+        await tx.delete(customTagsTable);
+      }
 
       if (data.globalTags && data.globalTags.length > 0) {
         for (const tag of data.globalTags) {
-          await tx.insert(customTagsTable).values({
-            id: tag.id,
-            name: tag.name,
-            color: tag.color || "#3b82f6",
-          });
+          if (mode === "merge") {
+            await tx.insert(customTagsTable).values({
+              id: tag.id, name: tag.name, color: tag.color || "#3b82f6",
+            }).onConflictDoNothing();
+          } else {
+            await tx.insert(customTagsTable).values({
+              id: tag.id, name: tag.name, color: tag.color || "#3b82f6",
+            });
+          }
         }
       }
 
       for (const ka of data.kesimAlanlari) {
         const kaId = ka.id || Math.random().toString(36).substring(2, 12);
-        await tx.insert(kesimAlanlariTable).values({
+        const kaValues = {
           id: kaId,
           name: ka.name || "İsimsiz",
           createdAt: ka.createdAt || new Date().toISOString(),
-        });
+        };
+        if (mode === "merge") {
+          await tx.insert(kesimAlanlariTable).values(kaValues).onConflictDoNothing();
+        } else {
+          await tx.insert(kesimAlanlariTable).values(kaValues);
+        }
 
         if (ka.donations && ka.donations.length > 0) {
           for (let i = 0; i < ka.donations.length; i++) {
             const d = ka.donations[i];
             const donationId = d.id || Math.random().toString(36).substring(2, 12);
-            await tx.insert(donationsTable).values({
+            const dValues = {
               id: donationId,
               kesimAlaniId: kaId,
               name: d.name || "",
@@ -208,7 +232,12 @@ router.post("/backup/import", async (req, res) => {
               notes: d.notes || "",
               excluded: d.excluded || false,
               sortOrder: i,
-            });
+            };
+            if (mode === "merge") {
+              await tx.insert(donationsTable).values(dValues).onConflictDoNothing();
+            } else {
+              await tx.insert(donationsTable).values(dValues);
+            }
             if (d.tags && d.tags.length > 0) {
               for (const tagId of d.tags) {
                 await tx.insert(donationTagsTable).values({ donationId, tagId })
@@ -222,7 +251,7 @@ router.post("/backup/import", async (req, res) => {
           for (let i = 0; i < ka.animalGroups.length; i++) {
             const g = ka.animalGroups[i];
             const groupId = g.id || Math.random().toString(36).substring(2, 12);
-            await tx.insert(animalGroupsTable).values({
+            const gValues = {
               id: groupId,
               kesimAlaniId: kaId,
               animalNo: g.animalNo || 0,
@@ -230,14 +259,19 @@ router.post("/backup/import", async (req, res) => {
               locked: g.locked || false,
               notes: g.notes || "",
               sortOrder: i,
-            });
+            };
+            if (mode === "merge") {
+              await tx.insert(animalGroupsTable).values(gValues).onConflictDoNothing();
+            } else {
+              await tx.insert(animalGroupsTable).values(gValues);
+            }
             if (g.donations && g.donations.length > 0) {
               for (let j = 0; j < g.donations.length; j++) {
                 await tx.insert(animalGroupDonationsTable).values({
                   groupId,
                   donationId: g.donations[j].id,
                   sortOrder: j,
-                });
+                }).onConflictDoNothing();
               }
             }
           }

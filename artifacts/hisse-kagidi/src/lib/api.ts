@@ -104,12 +104,12 @@ export async function exportBackupApi(): Promise<string> {
   return JSON.stringify(data, null, 2);
 }
 
-export async function importBackupApi(json: string): Promise<{ success: boolean; count: number; error?: string }> {
+export async function importBackupApi(json: string, mode: "replace" | "merge" = "replace"): Promise<{ success: boolean; count: number; error?: string }> {
   try {
     const parsed: unknown = JSON.parse(json);
     const data = await apiFetch<{ success: boolean; count: number }>("/backup/import", {
       method: "POST",
-      body: JSON.stringify(parsed),
+      body: JSON.stringify({ mode, data: parsed }),
     });
     return data;
   } catch (err) {

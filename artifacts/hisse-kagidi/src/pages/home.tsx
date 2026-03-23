@@ -208,36 +208,41 @@ export default function Home() {
     }
   }
 
+  const [importModeOpen, setImportModeOpen] = useState(false);
+  const [pendingImportJson, setPendingImportJson] = useState<string | null>(null);
+
   async function handleImportBackup(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (kesimAlanlari.length > 0) {
-      const confirmed = confirm(
-        `Mevcut ${kesimAlanlari.length} kesim alanınız var. Yedek yüklemek mevcut verilerin üzerine yazabilir.\n\nDevam etmeden önce mevcut verilerinizi yedeklemeniz önerilir. Devam etmek istiyor musunuz?`
-      );
-      if (!confirmed) {
-        if (backupInputRef.current) backupInputRef.current.value = "";
-        return;
-      }
-    }
     const reader = new FileReader();
     reader.onload = async (evt) => {
       const json = evt.target?.result as string;
-      const result = await importBackupApi(json);
-      if (result.success) {
-        const ka = await fetchKesimAlanlari();
-        setKesimAlanlari(ka);
-        const logo = await fetchLogo();
-        setLogoPreview(logo);
-        const tags = await fetchTags();
-        setGlobalTags(tags);
-        alert(`Yedek başarıyla yüklendi: ${result.count} kesim alanı`);
+      if (kesimAlanlari.length > 0) {
+        setPendingImportJson(json);
+        setImportModeOpen(true);
       } else {
-        alert(`Hata: ${result.error}`);
+        await executeImport(json, "replace");
       }
     };
     reader.readAsText(file);
     if (backupInputRef.current) backupInputRef.current.value = "";
+  }
+
+  async function executeImport(json: string, mode: "replace" | "merge") {
+    const result = await importBackupApi(json, mode);
+    if (result.success) {
+      const ka = await fetchKesimAlanlari();
+      setKesimAlanlari(ka);
+      const logo = await fetchLogo();
+      setLogoPreview(logo);
+      const tags = await fetchTags();
+      setGlobalTags(tags);
+      alert(`Yedek başarıyla yüklendi: ${result.count} kesim alanı (${mode === "merge" ? "birleştirildi" : "değiştirildi"})`);
+    } else {
+      alert(`Hata: ${result.error}`);
+    }
+    setPendingImportJson(null);
+    setImportModeOpen(false);
   }
 
   if (loading) {
@@ -474,6 +479,57 @@ export default function Home() {
             </DialogContent>
           </Dialog>
         </div>
+
+        <Dialog open={importModeOpen} onOpenChange={(open) => {
+          setImportModeOpen(open);
+          if (!open) setPendingImportJson(null);
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Yedek Yükleme Modu</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <p className="text-sm text-muted-foreground">
+                Mevcut {kesimAlanlari.length} kesim alanınız var. Yedek dosyasını nasıl yüklemek istersiniz?
+              </p>
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-left h-auto py-3"
+                  onClick={() => pendingImportJson && executeImport(pendingImportJson, "merge")}
+                >
+                  <div>
+                    <div className="font-semibold flex items-center gap-1.5">
+                      <Upload className="w-4 h-4" />
+                      Birleştir
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 font-normal">
+                      Yedekteki yeni kesim alanlarını mevcut verilere ekler. Aynı ID&apos;li veriler atlanır.
+                    </p>
+                  </div>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-left h-auto py-3 border-destructive/50"
+                  onClick={() => pendingImportJson && executeImport(pendingImportJson, "replace")}
+                >
+                  <div>
+                    <div className="font-semibold flex items-center gap-1.5 text-destructive">
+                      <Trash2 className="w-4 h-4" />
+                      Değiştir (Üzerine Yaz)
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 font-normal">
+                      Tüm mevcut verileri siler ve yedekteki verilerle değiştirir. Bu işlem geri alınamaz!
+                    </p>
+                  </div>
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground italic">
+                İpucu: Değiştirmeden önce Ayarlar &gt; Yedekle ile mevcut verilerinizi yedekleyin.
+              </p>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
