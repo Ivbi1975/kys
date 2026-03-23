@@ -4,6 +4,8 @@ export interface Donation {
   description: string;
   donationType: string;
   shareCount: number;
+  vekalet: string;
+  notes: string;
 }
 
 export interface AnimalGroup {

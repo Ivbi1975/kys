@@ -41,13 +41,15 @@ import * as XLSX from "xlsx";
 
 type SortField = "name" | "description" | "donationType" | "shareCount";
 type SortDir = "asc" | "desc";
-type ColumnMapping = "name" | "description" | "donationType" | "shareCount" | "skip";
+type ColumnMapping = "name" | "description" | "donationType" | "shareCount" | "vekalet" | "notes" | "skip";
 
 const COLUMN_OPTIONS: { value: ColumnMapping; label: string }[] = [
-  { value: "name", label: "İsim" },
-  { value: "description", label: "Açıklama" },
-  { value: "donationType", label: "Bağış Türü" },
+  { value: "name", label: "Adına Kesilen" },
+  { value: "description", label: "Vekaleti Veren" },
+  { value: "donationType", label: "Cinsi" },
   { value: "shareCount", label: "Hisse Sayısı" },
+  { value: "vekalet", label: "Vekalet No" },
+  { value: "notes", label: "Notlar" },
   { value: "skip", label: "Atla (kullanma)" },
 ];
 
@@ -76,6 +78,8 @@ export default function KesimAlaniPage() {
     description: "",
     donationType: "",
     shareCount: 1,
+    vekalet: "",
+    notes: "",
   });
   const [editingCell, setEditingCell] = useState<{
     donationId: string;
@@ -118,9 +122,11 @@ export default function KesimAlaniPage() {
       description: newDonation.description.trim(),
       donationType: newDonation.donationType.trim(),
       shareCount: Math.max(1, Math.min(7, newDonation.shareCount)),
+      vekalet: newDonation.vekalet.trim(),
+      notes: newDonation.notes.trim(),
     };
     save({ ...kesim, donations: [...kesim.donations, donation] });
-    setNewDonation({ name: "", description: "", donationType: "", shareCount: 1 });
+    setNewDonation({ name: "", description: "", donationType: "", shareCount: 1, vekalet: "", notes: "" });
     setAddDialogOpen(false);
   }
 
@@ -207,7 +213,7 @@ export default function KesimAlaniPage() {
     setPreviewData(rows);
     const colCount = Math.max(...rows.map((r) => r.length));
     const defaultMappings: ColumnMapping[] = [];
-    const defaults: ColumnMapping[] = ["name", "description", "donationType", "shareCount"];
+    const defaults: ColumnMapping[] = ["name", "vekalet", "description", "donationType", "notes", "shareCount"];
     for (let i = 0; i < colCount; i++) {
       defaultMappings.push(i < defaults.length ? defaults[i] : "skip");
     }
@@ -228,6 +234,8 @@ export default function KesimAlaniPage() {
         description: "",
         donationType: "",
         shareCount: 1,
+        vekalet: "",
+        notes: "",
       };
 
       for (let c = 0; c < columnMappings.length; c++) {
@@ -348,6 +356,8 @@ export default function KesimAlaniPage() {
       description: "",
       donationType: "",
       shareCount: 1,
+      vekalet: "",
+      notes: "",
     });
     save({ ...kesim, animalGroups: groups });
   }
@@ -613,14 +623,14 @@ export default function KesimAlaniPage() {
                     </DialogHeader>
                     <div className="space-y-3 pt-4">
                       <Input
-                        placeholder="İsim"
-                        value={newDonation.name}
+                        placeholder="Vekalet No"
+                        value={newDonation.vekalet}
                         onChange={(e) =>
-                          setNewDonation({ ...newDonation, name: e.target.value })
+                          setNewDonation({ ...newDonation, vekalet: e.target.value })
                         }
                       />
                       <Input
-                        placeholder="Açıklama"
+                        placeholder="Vekaleti Veren"
                         value={newDonation.description}
                         onChange={(e) =>
                           setNewDonation({
@@ -630,12 +640,29 @@ export default function KesimAlaniPage() {
                         }
                       />
                       <Input
-                        placeholder="Bağış Türü"
+                        placeholder="Adına Kesilen"
+                        value={newDonation.name}
+                        onChange={(e) =>
+                          setNewDonation({ ...newDonation, name: e.target.value })
+                        }
+                      />
+                      <Input
+                        placeholder="Cinsi (Vacip, Akika, Adak...)"
                         value={newDonation.donationType}
                         onChange={(e) =>
                           setNewDonation({
                             ...newDonation,
                             donationType: e.target.value,
+                          })
+                        }
+                      />
+                      <Input
+                        placeholder="Notlar"
+                        value={newDonation.notes}
+                        onChange={(e) =>
+                          setNewDonation({
+                            ...newDonation,
+                            notes: e.target.value,
                           })
                         }
                       />
@@ -700,24 +727,13 @@ export default function KesimAlaniPage() {
                         />
                       </th>
                       <th className="p-2 text-left w-8">#</th>
-                      <th
-                        className="p-2 text-left cursor-pointer hover:bg-muted"
-                        onClick={() => handleSort("name")}
-                      >
-                        <span className="flex items-center gap-1">
-                          İsim
-                          {sortField === "name" && (
-                            sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-                          )}
-                          {sortField !== "name" && <ArrowUpDown className="w-3 h-3 opacity-30" />}
-                        </span>
-                      </th>
+                      <th className="p-2 text-left w-20">Vekalet</th>
                       <th
                         className="p-2 text-left cursor-pointer hover:bg-muted"
                         onClick={() => handleSort("description")}
                       >
                         <span className="flex items-center gap-1">
-                          Açıklama
+                          Vekaleti Veren
                           {sortField === "description" && (
                             sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
                           )}
@@ -726,16 +742,29 @@ export default function KesimAlaniPage() {
                       </th>
                       <th
                         className="p-2 text-left cursor-pointer hover:bg-muted"
+                        onClick={() => handleSort("name")}
+                      >
+                        <span className="flex items-center gap-1">
+                          Adına Kesilen
+                          {sortField === "name" && (
+                            sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                          )}
+                          {sortField !== "name" && <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                        </span>
+                      </th>
+                      <th
+                        className="p-2 text-left cursor-pointer hover:bg-muted w-20"
                         onClick={() => handleSort("donationType")}
                       >
                         <span className="flex items-center gap-1">
-                          Bağış Türü
+                          Cinsi
                           {sortField === "donationType" && (
                             sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
                           )}
                           {sortField !== "donationType" && <ArrowUpDown className="w-3 h-3 opacity-30" />}
                         </span>
                       </th>
+                      <th className="p-2 text-left w-24">Notlar</th>
                       <th
                         className="p-2 text-center cursor-pointer hover:bg-muted w-16"
                         onClick={() => handleSort("shareCount")}
@@ -754,7 +783,7 @@ export default function KesimAlaniPage() {
                   <tbody>
                     {kesim.donations.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                        <td colSpan={9} className="p-8 text-center text-muted-foreground">
                           Henüz bağışçı eklenmedi. "Toplu Ekle" ile Excel yükleyin veya yapıştırın.
                         </td>
                       </tr>
@@ -778,12 +807,12 @@ export default function KesimAlaniPage() {
                           <td className="p-2 text-muted-foreground">{idx + 1}</td>
                           <td className="p-2">
                             {editingCell?.donationId === d.id &&
-                            editingCell?.field === "name" ? (
+                            editingCell?.field === "vekalet" ? (
                               <Input
                                 className="h-7 text-sm"
-                                value={d.name}
+                                value={d.vekalet || ""}
                                 onChange={(e) =>
-                                  updateDonationField(d.id, "name", e.target.value)
+                                  updateDonationField(d.id, "vekalet", e.target.value)
                                 }
                                 onBlur={() => setEditingCell(null)}
                                 autoFocus
@@ -792,10 +821,10 @@ export default function KesimAlaniPage() {
                               <span
                                 className="cursor-text"
                                 onClick={() =>
-                                  setEditingCell({ donationId: d.id, field: "name" })
+                                  setEditingCell({ donationId: d.id, field: "vekalet" })
                                 }
                               >
-                                {d.name || "—"}
+                                {d.vekalet || "—"}
                               </span>
                             )}
                           </td>
@@ -831,6 +860,29 @@ export default function KesimAlaniPage() {
                           </td>
                           <td className="p-2">
                             {editingCell?.donationId === d.id &&
+                            editingCell?.field === "name" ? (
+                              <Input
+                                className="h-7 text-sm"
+                                value={d.name}
+                                onChange={(e) =>
+                                  updateDonationField(d.id, "name", e.target.value)
+                                }
+                                onBlur={() => setEditingCell(null)}
+                                autoFocus
+                              />
+                            ) : (
+                              <span
+                                className="cursor-text"
+                                onClick={() =>
+                                  setEditingCell({ donationId: d.id, field: "name" })
+                                }
+                              >
+                                {d.name || "—"}
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-2">
+                            {editingCell?.donationId === d.id &&
                             editingCell?.field === "donationType" ? (
                               <Input
                                 className="h-7 text-sm"
@@ -856,6 +908,29 @@ export default function KesimAlaniPage() {
                                 }
                               >
                                 {d.donationType || "—"}
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-2">
+                            {editingCell?.donationId === d.id &&
+                            editingCell?.field === "notes" ? (
+                              <Input
+                                className="h-7 text-sm"
+                                value={d.notes || ""}
+                                onChange={(e) =>
+                                  updateDonationField(d.id, "notes", e.target.value)
+                                }
+                                onBlur={() => setEditingCell(null)}
+                                autoFocus
+                              />
+                            ) : (
+                              <span
+                                className="cursor-text"
+                                onClick={() =>
+                                  setEditingCell({ donationId: d.id, field: "notes" })
+                                }
+                              >
+                                {d.notes || "—"}
                               </span>
                             )}
                           </td>
@@ -969,9 +1044,11 @@ export default function KesimAlaniPage() {
                             <tr className="border-b bg-muted/30">
                               <th className="p-1.5 w-6"></th>
                               <th className="p-1.5 text-left w-6">#</th>
-                              <th className="p-1.5 text-left">İsim</th>
-                              <th className="p-1.5 text-left">Açıklama</th>
-                              <th className="p-1.5 text-left">Bağış Türü</th>
+                              <th className="p-1.5 text-left w-16">Vekalet</th>
+                              <th className="p-1.5 text-left">Vekaleti Veren</th>
+                              <th className="p-1.5 text-left">Adına Kesilen</th>
+                              <th className="p-1.5 text-left w-16">Cinsi</th>
+                              <th className="p-1.5 text-left w-20">Notlar</th>
                               <th className="p-1.5 w-8"></th>
                             </tr>
                           </thead>
@@ -1007,12 +1084,12 @@ export default function KesimAlaniPage() {
                                 <td className="p-1.5">
                                   <Input
                                     className="h-6 text-xs border-0 bg-transparent p-0"
-                                    value={d.name}
+                                    value={d.vekalet || ""}
                                     onChange={(e) =>
                                       updateGroupDonation(
                                         groupIdx,
                                         dIdx,
-                                        "name",
+                                        "vekalet",
                                         e.target.value
                                       )
                                     }
@@ -1037,12 +1114,42 @@ export default function KesimAlaniPage() {
                                 <td className="p-1.5">
                                   <Input
                                     className="h-6 text-xs border-0 bg-transparent p-0"
+                                    value={d.name}
+                                    onChange={(e) =>
+                                      updateGroupDonation(
+                                        groupIdx,
+                                        dIdx,
+                                        "name",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="—"
+                                  />
+                                </td>
+                                <td className="p-1.5">
+                                  <Input
+                                    className="h-6 text-xs border-0 bg-transparent p-0"
                                     value={d.donationType}
                                     onChange={(e) =>
                                       updateGroupDonation(
                                         groupIdx,
                                         dIdx,
                                         "donationType",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="—"
+                                  />
+                                </td>
+                                <td className="p-1.5">
+                                  <Input
+                                    className="h-6 text-xs border-0 bg-transparent p-0"
+                                    value={d.notes || ""}
+                                    onChange={(e) =>
+                                      updateGroupDonation(
+                                        groupIdx,
+                                        dIdx,
+                                        "notes",
                                         e.target.value
                                       )
                                     }

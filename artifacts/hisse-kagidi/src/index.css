@@ -209,93 +209,120 @@
   }
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 8mm;
-  padding-bottom: 4mm;
-  border-bottom: 2px solid #2563eb;
-}
-
-.page-header-left {
+.page-content {
   flex: 1;
-}
-
-.page-main-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #1e293b;
-  margin: 0;
-  line-height: 1.2;
-}
-
-.page-header-right {
   display: flex;
-  align-items: center;
+  flex-direction: column;
 }
 
-.page-logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.animal-title {
-  text-align: center;
-  font-size: 18px;
-  font-weight: 700;
-  color: #1e3a5f;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 6px;
-  padding: 6px 16px;
-  margin-bottom: 6mm;
-}
-
-.hisse-table {
+.kesim-table {
   width: 100%;
   border-collapse: collapse;
   flex: 1;
+  table-layout: fixed;
 }
 
-.hisse-table th {
+.kesim-table th {
   background: #1e3a5f;
   color: white;
-  padding: 8px 12px;
-  text-align: left;
-  font-size: 13px;
-  font-weight: 600;
-  border: 1px solid #1e3a5f;
+  padding: 6px 8px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  border: 2px solid #1e3a5f;
+  letter-spacing: 0.02em;
 }
 
-.hisse-table td {
-  padding: 8px 12px;
-  border: 1px solid #d1d5db;
+.kesim-table .col-hayvan { width: 60px; }
+.kesim-table .col-sira { width: 40px; }
+.kesim-table .col-vekalet { width: 70px; }
+.kesim-table .col-vekaleti-veren { }
+.kesim-table .col-adina-kesilen { }
+.kesim-table .col-cinsi { width: 80px; }
+.kesim-table .col-notlar { width: 140px; }
+
+.kesim-table td {
+  padding: 0 8px;
+  border: 1.5px solid #9ca3af;
   font-size: 13px;
   color: #1e293b;
   vertical-align: middle;
+  height: 22mm;
 }
 
-.hisse-table tbody tr:nth-child(even) {
+.kesim-table .hayvan-cell {
+  text-align: center;
+  vertical-align: middle;
+  background: #dbeafe;
+  border: 2px solid #1e3a5f;
+  font-weight: 800;
+  font-size: 28px;
+  color: #1e3a5f;
+  padding: 0;
+}
+
+.kesim-table .hayvan-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 32px;
+  font-weight: 800;
+  color: #1e3a5f;
+}
+
+.kesim-table .sira-cell {
+  text-align: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: #374151;
+}
+
+.kesim-table .vekalet-cell {
+  text-align: center;
+  font-size: 11px;
+  color: #4b5563;
+}
+
+.kesim-table .vekaleti-veren-cell {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.kesim-table .adina-kesilen-cell {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.kesim-table .cinsi-cell {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.kesim-table .notlar-cell {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.kesim-table tbody tr:nth-child(even) {
   background: #f8fafc;
 }
 
-.hisse-table tbody tr:nth-child(odd) {
+.kesim-table tbody tr:nth-child(odd) {
   background: white;
-}
-
-.hisse-table .text-center {
-  text-align: center;
 }
 
 .page-footer {
   display: flex;
   justify-content: space-between;
-  margin-top: 4mm;
-  padding-top: 3mm;
+  margin-top: 3mm;
+  padding-top: 2mm;
   border-top: 1px solid #e2e8f0;
-  font-size: 10px;
+  font-size: 9px;
   color: #94a3b8;
 }
 

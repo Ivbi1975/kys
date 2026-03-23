@@ -88,6 +88,8 @@ export function autoGroupDonations(donations: Donation[]): AnimalGroup[] {
         description: "",
         donationType: "",
         shareCount: 1,
+        vekalet: "",
+        notes: "",
       });
     }
 

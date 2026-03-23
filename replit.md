@@ -42,20 +42,25 @@ artifacts-monorepo/
 
 Frontend-only React + Vite app for managing Kurban Bayramı share certificates. Features:
 - Create cutting areas (kesim alanları)
-- Add donors via manual entry or Excel paste (tab-separated: name, description, donation type, share count)
-- Smart auto-grouping: distributes donors into groups of 7 (one animal per group)
+- Add donors via manual entry, Excel upload (.xlsx/.xls/.csv), or copy-paste with column mapping
+- Multi-select checkboxes for bulk deletion of donors
+- Same-name auto-count: if a name appears N times, effectiveShare=N is used
+- Smart auto-grouping: distributes donors into groups of 7 (one animal per group) using bin-packing
 - Drag-and-drop between animal groups
-- Sort by any column (name, description, donation type, share count)
-- Print A4 landscape pages with logo, titles, and 7-row tables
-- Data persisted in localStorage
+- Sort by any column
+- Print A4 landscape pages matching Excel "Kesim Kağıdı" format with columns: HAYVAN (merged vertically), SIRA, VEKALET, VEKALETİ VEREN, ADINA KESİLEN, CİNSİ, NOTLAR
+- Data persisted in localStorage with backward-compatible migration
+
+Data model (Donation):
+- `id`, `name` (adına kesilen), `description` (vekaleti veren), `donationType` (cinsi), `shareCount`, `vekalet` (vekalet no), `notes` (notlar)
 
 Key files:
 - `src/lib/types.ts` - TypeScript types (Donation, AnimalGroup, KesimAlani)
-- `src/lib/storage.ts` - localStorage persistence
-- `src/lib/grouping.ts` - Auto-grouping algorithm (bin-packing for 7-share animals)
+- `src/lib/storage.ts` - localStorage persistence with data migration
+- `src/lib/grouping.ts` - Auto-grouping algorithm (bin-packing, name-based effective shares)
 - `src/pages/home.tsx` - Home page with kesim alanı list
 - `src/pages/kesim-alani.tsx` - Main editing page with donor table and animal groups
-- `src/pages/print.tsx` - Print-optimized A4 landscape view
+- `src/pages/print.tsx` - Print-optimized A4 landscape view matching Excel design
 
 ## TypeScript & Composite Projects
 

@@ -47,47 +47,41 @@ export default function PrintPage() {
       <div className="print-pages">
         {kesim.animalGroups.map((group) => (
           <div key={group.id} className="print-page">
-            <div className="page-header">
-              <div className="page-header-left">
-                <h1 className="page-main-title">{kesim.name}</h1>
-              </div>
-              <div className="page-header-right">
-                <div className="page-logo">
-                  <svg viewBox="0 0 80 80" width="60" height="60">
-                    <circle cx="40" cy="40" r="38" fill="none" stroke="#2563eb" strokeWidth="2" />
-                    <text x="40" y="35" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#2563eb">KURBAN</text>
-                    <text x="40" y="50" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#2563eb">HİSSE</text>
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div className="animal-title">
-              {kesim.name} - HAYVAN NO: {group.animalNo}
-            </div>
-
-            <table className="hisse-table">
-              <thead>
-                <tr>
-                  <th style={{ width: "40px" }}>Sıra</th>
-                  <th>Bağışçı Adı Soyadı</th>
-                  <th>Açıklama</th>
-                  <th>Bağış Türü</th>
-                </tr>
-              </thead>
-              <tbody>
-                {group.donations.map((d, idx) => (
-                  <tr key={d.id}>
-                    <td className="text-center font-bold">{idx + 1}</td>
-                    <td>{d.name}</td>
-                    <td>{d.description}</td>
-                    <td>{d.donationType}</td>
+            <div className="page-content">
+              <table className="kesim-table">
+                <thead>
+                  <tr>
+                    <th className="col-hayvan">HAYVAN</th>
+                    <th className="col-sira">SIRA</th>
+                    <th className="col-vekalet">VEKALET</th>
+                    <th className="col-vekaleti-veren">VEKALETİ VEREN</th>
+                    <th className="col-adina-kesilen">ADINA KESİLEN</th>
+                    <th className="col-cinsi">CİNSİ</th>
+                    <th className="col-notlar">NOTLAR</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {group.donations.map((d, idx) => (
+                    <tr key={d.id}>
+                      {idx === 0 && (
+                        <td className="hayvan-cell" rowSpan={7}>
+                          <div className="hayvan-number">{group.animalNo}</div>
+                        </td>
+                      )}
+                      <td className="sira-cell">{idx + 1}</td>
+                      <td className="vekalet-cell">{d.vekalet || ""}</td>
+                      <td className="vekaleti-veren-cell">{d.description || ""}</td>
+                      <td className="adina-kesilen-cell">{d.name || ""}</td>
+                      <td className="cinsi-cell">{d.donationType || ""}</td>
+                      <td className="notlar-cell">{d.notes || ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             <div className="page-footer">
+              <span>{kesim.name}</span>
               <span>Sayfa {group.animalNo} / {kesim.animalGroups.length}</span>
               <span>{new Date().toLocaleDateString("tr-TR")}</span>
             </div>
