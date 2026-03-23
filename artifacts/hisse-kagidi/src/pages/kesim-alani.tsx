@@ -30,13 +30,26 @@ import {
   ArrowDown,
   ChevronUp,
   ChevronDown,
+  FileSpreadsheet,
+  ClipboardPaste,
+  Settings2,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani } from "@/lib/types";
 import { getKesimAlani, updateKesimAlani } from "@/lib/storage";
 import { autoGroupDonations, getTotalShares, getRequiredAnimals } from "@/lib/grouping";
+import * as XLSX from "xlsx";
 
 type SortField = "name" | "description" | "donationType" | "shareCount";
 type SortDir = "asc" | "desc";
+type ColumnMapping = "name" | "description" | "donationType" | "shareCount" | "skip";
+
+const COLUMN_OPTIONS: { value: ColumnMapping; label: string }[] = [
+  { value: "name", label: "İsim" },
+  { value: "description", label: "Açıklama" },
+  { value: "donationType", label: "Bağış Türü" },
+  { value: "shareCount", label: "Hisse Sayısı" },
+  { value: "skip", label: "Atla (kullanma)" },
+];
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 12);
@@ -48,8 +61,15 @@ export default function KesimAlaniPage() {
   const [kesim, setKesim] = useState<KesimAlani | null>(null);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
-  const [pasteDialogOpen, setPasteDialogOpen] = useState(false);
+
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkMode, setBulkMode] = useState<"upload" | "paste">("upload");
   const [pasteText, setPasteText] = useState("");
+  const [previewData, setPreviewData] = useState<string[][]>([]);
+  const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([]);
+  const [hasHeaderRow, setHasHeaderRow] = useState(true);
+  const [bulkStep, setBulkStep] = useState<"input" | "mapping">("input");
+
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newDonation, setNewDonation] = useState({
     name: "",
@@ -70,6 +90,8 @@ export default function KesimAlaniPage() {
     groupIdx: number;
     donationIdx: number;
   } | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (params.id) {
@@ -119,30 +141,90 @@ export default function KesimAlaniPage() {
     });
   }
 
-  function handlePaste() {
-    if (!kesim || !pasteText.trim()) return;
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = evt.target?.result;
+        const workbook = XLSX.read(data, { type: "binary" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+        if (rows.length > 0) {
+          processRawData(rows);
+        }
+      } catch {
+        alert("Excel dosyası okunamadı. Lütfen geçerli bir dosya seçin.");
+      }
+    };
+    reader.readAsBinaryString(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function handlePasteData() {
+    if (!pasteText.trim()) return;
     const lines = pasteText.trim().split("\n");
+    const rows = lines.map((line) => line.split("\t").map((c) => c.trim()));
+    processRawData(rows);
+  }
+
+  function processRawData(rows: string[][]) {
+    setPreviewData(rows);
+    const colCount = Math.max(...rows.map((r) => r.length));
+    const defaultMappings: ColumnMapping[] = [];
+    const defaults: ColumnMapping[] = ["name", "description", "donationType", "shareCount"];
+    for (let i = 0; i < colCount; i++) {
+      defaultMappings.push(i < defaults.length ? defaults[i] : "skip");
+    }
+    setColumnMappings(defaultMappings);
+    setBulkStep("mapping");
+  }
+
+  function applyBulkImport() {
+    if (!kesim || previewData.length === 0) return;
+    const startRow = hasHeaderRow ? 1 : 0;
     const newDonations: Donation[] = [];
-    for (const line of lines) {
-      const parts = line.split("\t");
-      if (parts.length === 0) continue;
-      const name = (parts[0] || "").trim();
-      const description = (parts[1] || "").trim();
-      const donationType = (parts[2] || "").trim();
-      const shareCount = Math.max(1, Math.min(7, parseInt(parts[3] || "1", 10) || 1));
-      if (name) {
-        newDonations.push({
-          id: generateId(),
-          name,
-          description,
-          donationType,
-          shareCount,
-        });
+
+    for (let r = startRow; r < previewData.length; r++) {
+      const row = previewData[r];
+      const donation: Partial<Donation> = {
+        id: generateId(),
+        name: "",
+        description: "",
+        donationType: "",
+        shareCount: 1,
+      };
+
+      for (let c = 0; c < columnMappings.length; c++) {
+        const mapping = columnMappings[c];
+        const cellValue = (row[c] || "").trim();
+        if (mapping === "skip" || !cellValue) continue;
+        if (mapping === "shareCount") {
+          donation.shareCount = Math.max(1, Math.min(7, parseInt(cellValue, 10) || 1));
+        } else {
+          (donation as any)[mapping] = cellValue;
+        }
+      }
+
+      if (donation.name) {
+        newDonations.push(donation as Donation);
       }
     }
+
     save({ ...kesim, donations: [...kesim.donations, ...newDonations] });
+    resetBulkDialog();
+  }
+
+  function resetBulkDialog() {
+    setBulkDialogOpen(false);
+    setBulkStep("input");
+    setBulkMode("upload");
     setPasteText("");
-    setPasteDialogOpen(false);
+    setPreviewData([]);
+    setColumnMappings([]);
+    setHasHeaderRow(true);
   }
 
   function handleAutoGroup() {
@@ -246,7 +328,7 @@ export default function KesimAlaniPage() {
     if (!kesim) return;
     const groups = kesim.animalGroups.map((g) => ({
       ...g,
-      donations: g.donations.map((d, i) => ({ ...d })),
+      donations: g.donations.map((d) => ({ ...d })),
     }));
     (groups[groupIdx].donations[donationIdx] as any)[field] = value;
     save({ ...kesim, animalGroups: groups });
@@ -265,6 +347,9 @@ export default function KesimAlaniPage() {
 
   const totalShares = getTotalShares(kesim.donations);
   const requiredAnimals = getRequiredAnimals(kesim.donations);
+
+  const displayPreviewRows = hasHeaderRow ? previewData.slice(1) : previewData;
+  const headerRow = hasHeaderRow && previewData.length > 0 ? previewData[0] : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -298,39 +383,187 @@ export default function KesimAlaniPage() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Bağışçı Listesi</h2>
               <div className="flex gap-2">
-                <Dialog open={pasteDialogOpen} onOpenChange={setPasteDialogOpen}>
+                <Dialog open={bulkDialogOpen} onOpenChange={(open) => { if (!open) resetBulkDialog(); else setBulkDialogOpen(true); }}>
                   <DialogTrigger asChild>
                     <Button variant="outline" size="sm">
                       <Upload className="w-4 h-4 mr-1" />
-                      Excel'den Yapıştır
+                      Toplu Ekle
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
+                  <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle>Excel'den Veri Yapıştır</DialogTitle>
+                      <DialogTitle>
+                        {bulkStep === "input" ? "Toplu Bağışçı Ekle" : "Sütun Eşleştirme"}
+                      </DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                      <p className="text-sm text-muted-foreground">
-                        Excel'den kopyaladığınız verileri aşağıya yapıştırın.
-                        Sütun sırası: <strong>İsim, Açıklama, Bağış Türü, Hisse Sayısı</strong>
-                      </p>
-                      <textarea
-                        className="w-full h-48 p-3 border rounded-md bg-background text-foreground font-mono text-sm resize-none"
-                        placeholder="Ali Yılmaz&#9;Ankara&#9;Adak&#9;1&#10;Mehmet Kaya&#9;İstanbul&#9;Kurban&#9;3"
-                        value={pasteText}
-                        onChange={(e) => setPasteText(e.target.value)}
-                      />
-                      <Button onClick={handlePaste} className="w-full">
-                        Ekle
-                      </Button>
-                    </div>
+
+                    {bulkStep === "input" && (
+                      <div className="space-y-4 pt-4">
+                        <div className="flex gap-2">
+                          <Button
+                            variant={bulkMode === "upload" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setBulkMode("upload")}
+                            className="flex-1"
+                          >
+                            <FileSpreadsheet className="w-4 h-4 mr-1" />
+                            Excel Yükle
+                          </Button>
+                          <Button
+                            variant={bulkMode === "paste" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setBulkMode("paste")}
+                            className="flex-1"
+                          >
+                            <ClipboardPaste className="w-4 h-4 mr-1" />
+                            Kopyala Yapıştır
+                          </Button>
+                        </div>
+
+                        {bulkMode === "upload" && (
+                          <div className="space-y-3">
+                            <p className="text-sm text-muted-foreground">
+                              Excel dosyanızı (.xlsx, .xls) seçin. İlk sayfa okunacaktır.
+                            </p>
+                            <div
+                              className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                              onClick={() => fileInputRef.current?.click()}
+                            >
+                              <FileSpreadsheet className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                              <p className="text-sm font-medium">Excel dosyası seçmek için tıklayın</p>
+                              <p className="text-xs text-muted-foreground mt-1">.xlsx, .xls, .csv desteklenir</p>
+                            </div>
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept=".xlsx,.xls,.csv"
+                              className="hidden"
+                              onChange={handleFileUpload}
+                            />
+                          </div>
+                        )}
+
+                        {bulkMode === "paste" && (
+                          <div className="space-y-3">
+                            <p className="text-sm text-muted-foreground">
+                              Excel'den kopyaladığınız verileri aşağıya yapıştırın. Bir sonraki adımda hangi sütunun ne olduğunu belirleyeceksiniz.
+                            </p>
+                            <textarea
+                              className="w-full h-48 p-3 border rounded-md bg-background text-foreground font-mono text-sm resize-none"
+                              placeholder={"Ali Yılmaz\tAnkara\tAdak\t1\nMehmet Kaya\tİstanbul\tKurban\t3\nAyşe Demir\tBursa\tAkika\t2"}
+                              value={pasteText}
+                              onChange={(e) => setPasteText(e.target.value)}
+                            />
+                            <Button onClick={handlePasteData} className="w-full" disabled={!pasteText.trim()}>
+                              Devam Et
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {bulkStep === "mapping" && (
+                      <div className="space-y-4 pt-4">
+                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                          <Settings2 className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                          <p className="text-sm text-muted-foreground">
+                            Her sütunun hangi bilgiye karşılık geldiğini aşağıdan seçin. Kullanmak istemediğiniz sütunları "Atla" olarak ayarlayın.
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="hasHeader"
+                            checked={hasHeaderRow}
+                            onChange={(e) => setHasHeaderRow(e.target.checked)}
+                            className="rounded"
+                          />
+                          <label htmlFor="hasHeader" className="text-sm font-medium">
+                            İlk satır başlık satırıdır (veri olarak eklenmez)
+                          </label>
+                        </div>
+
+                        <div className="border rounded-lg overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="bg-primary/10 border-b">
+                                  {columnMappings.map((mapping, colIdx) => (
+                                    <th key={colIdx} className="p-2 min-w-[140px]">
+                                      <Select
+                                        value={mapping}
+                                        onValueChange={(v) => {
+                                          const newMappings = [...columnMappings];
+                                          newMappings[colIdx] = v as ColumnMapping;
+                                          setColumnMappings(newMappings);
+                                        }}
+                                      >
+                                        <SelectTrigger className="h-8 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {COLUMN_OPTIONS.map((opt) => (
+                                            <SelectItem key={opt.value} value={opt.value}>
+                                              {opt.label}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </th>
+                                  ))}
+                                </tr>
+                                {headerRow && (
+                                  <tr className="bg-muted/30 border-b">
+                                    {headerRow.map((cell, idx) => (
+                                      <td key={idx} className="p-2 text-xs text-muted-foreground font-medium">
+                                        {cell || "—"}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                )}
+                              </thead>
+                              <tbody>
+                                {displayPreviewRows.slice(0, 5).map((row, rIdx) => (
+                                  <tr key={rIdx} className="border-b">
+                                    {columnMappings.map((mapping, cIdx) => (
+                                      <td
+                                        key={cIdx}
+                                        className={`p-2 text-xs ${mapping === "skip" ? "text-muted-foreground/40 line-through" : ""}`}
+                                      >
+                                        {row[cIdx] || "—"}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          {displayPreviewRows.length > 5 && (
+                            <div className="p-2 text-xs text-muted-foreground text-center bg-muted/20">
+                              ... ve {displayPreviewRows.length - 5} satır daha (toplam {displayPreviewRows.length} satır)
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button variant="outline" onClick={() => setBulkStep("input")} className="flex-1">
+                            Geri
+                          </Button>
+                          <Button onClick={applyBulkImport} className="flex-1">
+                            {displayPreviewRows.length} Bağışçı Ekle
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </DialogContent>
                 </Dialog>
+
                 <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
                   <DialogTrigger asChild>
                     <Button size="sm">
                       <Plus className="w-4 h-4 mr-1" />
-                      Ekle
+                      Tekli Ekle
                     </Button>
                   </DialogTrigger>
                   <DialogContent>
@@ -458,7 +691,7 @@ export default function KesimAlaniPage() {
                     {kesim.donations.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="p-8 text-center text-muted-foreground">
-                          Henüz bağışçı eklenmedi. Yukarıdan ekleyin veya Excel'den yapıştırın.
+                          Henüz bağışçı eklenmedi. "Toplu Ekle" ile Excel yükleyin veya yapıştırın.
                         </td>
                       </tr>
                     ) : (
