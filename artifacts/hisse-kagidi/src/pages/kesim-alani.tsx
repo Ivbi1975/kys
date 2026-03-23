@@ -39,11 +39,20 @@ import {
   AlertTriangle,
   Search,
   UserCog,
+  Undo2,
+  Redo2,
+  History,
+  Lock,
+  Unlock,
+  Sun,
+  Moon,
+  Download,
 } from "lucide-react";
-import type { Donation, AnimalGroup, KesimAlani } from "@/lib/types";
+import type { Donation, AnimalGroup, KesimAlani, ColorTag } from "@/lib/types";
 import { getKesimAlani, updateKesimAlani } from "@/lib/storage";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
+import { useHistory } from "@/lib/useHistory";
 import * as XLSX from "xlsx";
 
 type SortField = "name" | "description" | "donationType" | "shareCount";
@@ -70,6 +79,9 @@ export default function KesimAlaniPage() {
   const [kesim, setKesim] = useState<KesimAlani | null>(null);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
+  const [colorTagFilter, setColorTagFilter] = useState<ColorTag | "all">("all");
+  const history = useHistory();
 
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [bulkMode, setBulkMode] = useState<"upload" | "paste">("upload");
@@ -102,6 +114,9 @@ export default function KesimAlaniPage() {
   const [personSearchQuery, setPersonSearchQuery] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [jumpToAnimal, setJumpToAnimal] = useState("");
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [bulkEditField, setBulkEditField] = useState<"donationType" | "shareCount" | "notes">("donationType");
+  const [bulkEditValue, setBulkEditValue] = useState("");
   const [dragItem, setDragItem] = useState<{
     groupIdx: number;
     donationIdx: number;
@@ -116,18 +131,64 @@ export default function KesimAlaniPage() {
   useEffect(() => {
     if (params.id) {
       const data = getKesimAlani(params.id);
-      if (data) setKesim(data);
-      else setLocation("/");
+      if (data) {
+        setKesim(data);
+        history.initialize(data);
+      } else {
+        setLocation("/");
+      }
     }
   }, [params.id, setLocation]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const save = useCallback(
-    (updated: KesimAlani) => {
+    (updated: KesimAlani, desc?: string) => {
       setKesim(updated);
       updateKesimAlani(updated);
+      if (desc) {
+        history.push(updated, desc);
+      }
     },
     []
   );
+
+  const handleUndo = useCallback(() => {
+    const prev = history.undo();
+    if (prev) {
+      setKesim(prev);
+      updateKesimAlani(prev);
+    }
+  }, [history]);
+
+  const handleRedo = useCallback(() => {
+    const next = history.redo();
+    if (next) {
+      setKesim(next);
+      updateKesimAlani(next);
+    }
+  }, [history]);
+
+  const handleGoToStep = useCallback((index: number) => {
+    const target = history.goToStep(index);
+    if (target) {
+      setKesim(target);
+      updateKesimAlani(target);
+    }
+  }, [history]);
 
   function addDonation() {
     if (!kesim || !newDonation.name.trim()) return;
@@ -140,17 +201,18 @@ export default function KesimAlaniPage() {
       vekalet: newDonation.vekalet.trim(),
       notes: newDonation.notes.trim(),
     };
-    save({ ...kesim, donations: [...kesim.donations, donation] });
+    save({ ...kesim, donations: [...kesim.donations, donation] }, `Bağışçı eklendi: ${donation.description || donation.name}`);
     setNewDonation({ name: "", description: "", donationType: "", shareCount: 1, vekalet: "", notes: "" });
     setAddDialogOpen(false);
   }
 
   function deleteDonation(id: string) {
     if (!kesim) return;
+    const target = kesim.donations.find(d => d.id === id);
     save({
       ...kesim,
       donations: kesim.donations.filter((d) => d.id !== id),
-    });
+    }, `Bağışçı silindi: ${target?.description || target?.name || ""}`);
     setSelectedIds((prev) => {
       const next = new Set(prev);
       next.delete(id);
@@ -163,7 +225,7 @@ export default function KesimAlaniPage() {
     save({
       ...kesim,
       donations: kesim.donations.filter((d) => !selectedIds.has(d.id)),
-    });
+    }, `${selectedIds.size} bağışçı silindi`);
     setSelectedIds(new Set());
   }
 
@@ -196,7 +258,7 @@ export default function KesimAlaniPage() {
           donations: kesim.donations.map((d) =>
             d.description.trim().toLowerCase() === key ? { ...d, excluded: true } : d
           ),
-        });
+        }, `Hariç tutuldu: ${target.description}`);
         return;
       }
     }
@@ -209,7 +271,7 @@ export default function KesimAlaniPage() {
           donations: kesim.donations.map((d) =>
             d.description.trim().toLowerCase() === key ? { ...d, excluded: false } : d
           ),
-        });
+        }, `Dahil edildi: ${target.description}`);
         return;
       }
     }
@@ -218,7 +280,7 @@ export default function KesimAlaniPage() {
       donations: kesim.donations.map((d) =>
         d.id === id ? { ...d, [field]: value } : d
       ),
-    });
+    }, `Bağışçı güncellendi`);
   }
 
   function bulkExcludeByDesc(description: string, excluded: boolean) {
@@ -229,7 +291,7 @@ export default function KesimAlaniPage() {
       donations: kesim.donations.map((d) =>
         d.description.trim().toLowerCase() === key ? { ...d, excluded } : d
       ),
-    });
+    }, excluded ? `Toplu hariç tutuldu: ${description}` : `Toplu dahil edildi: ${description}`);
   }
 
   function bulkDeleteByDesc(description: string) {
@@ -240,7 +302,7 @@ export default function KesimAlaniPage() {
       donations: kesim.donations.filter((d) =>
         d.description.trim().toLowerCase() !== key
       ),
-    });
+    }, `Toplu silindi: ${description}`);
     setPersonEditDesc(null);
   }
 
@@ -318,7 +380,7 @@ export default function KesimAlaniPage() {
       }
     }
 
-    save({ ...kesim, donations: [...kesim.donations, ...newDonations] });
+    save({ ...kesim, donations: [...kesim.donations, ...newDonations] }, `${newDonations.length} bağışçı toplu eklendi`);
     resetBulkDialog();
   }
 
@@ -341,7 +403,7 @@ export default function KesimAlaniPage() {
       const groups = await autoGroupDonationsAsync(kesim.donations, (progress) => {
         setGroupingProgress({ ...progress });
       });
-      save({ ...kesim, animalGroups: groups });
+      save({ ...kesim, animalGroups: groups }, `Otomatik gruplama yapıldı: ${groups.length} hayvan`);
       const found = checkGroupConflicts(groups);
       setConflicts(found);
       if (found.length > 0) setShowConflicts(true);
@@ -378,7 +440,11 @@ export default function KesimAlaniPage() {
         ? String(aVal).localeCompare(String(bVal), "tr")
         : String(bVal).localeCompare(String(aVal), "tr");
     });
-    save({ ...kesim, donations: sorted });
+    save({ ...kesim, donations: sorted }, `Sıralama değiştirildi`);
+  }
+
+  function isGroupLocked(groupIdx: number): boolean {
+    return !!kesim?.animalGroups[groupIdx]?.locked;
   }
 
   function moveGroupDonation(
@@ -388,6 +454,7 @@ export default function KesimAlaniPage() {
     toIdx: number
   ) {
     if (!kesim) return;
+    if (isGroupLocked(groupIdx) || isGroupLocked(toGroupIdx)) return;
     const groups = kesim.animalGroups.map((g) => ({
       ...g,
       donations: [...g.donations],
@@ -403,7 +470,7 @@ export default function KesimAlaniPage() {
       groups[groupIdx].donations.push(...overflow);
     }
 
-    save({ ...kesim, animalGroups: groups });
+    save({ ...kesim, animalGroups: groups }, `Grup içi taşıma yapıldı`);
   }
 
   function handleDragStart(groupIdx: number, donationIdx: number) {
@@ -434,6 +501,7 @@ export default function KesimAlaniPage() {
 
   function removeFromGroup(groupIdx: number, donationIdx: number) {
     if (!kesim) return;
+    if (isGroupLocked(groupIdx)) return;
     const groups = kesim.animalGroups.map((g) => ({
       ...g,
       donations: [...g.donations],
@@ -448,7 +516,7 @@ export default function KesimAlaniPage() {
       vekalet: "",
       notes: "",
     });
-    save({ ...kesim, animalGroups: groups });
+    save({ ...kesim, animalGroups: groups }, `Gruptan çıkarıldı`);
   }
 
   function updateGroupDonation(
@@ -458,12 +526,97 @@ export default function KesimAlaniPage() {
     value: string | number
   ) {
     if (!kesim) return;
+    if (isGroupLocked(groupIdx)) return;
     const groups = kesim.animalGroups.map((g) => ({
       ...g,
       donations: g.donations.map((d) => ({ ...d })),
     }));
     (groups[groupIdx].donations[donationIdx] as any)[field] = value;
-    save({ ...kesim, animalGroups: groups });
+    save({ ...kesim, animalGroups: groups }, `Grup bağışçısı güncellendi`);
+  }
+
+  function setGroupColorTag(groupIdx: number, tag: ColorTag) {
+    if (!kesim) return;
+    const groups = kesim.animalGroups.map((g, i) =>
+      i === groupIdx ? { ...g, colorTag: tag } : g
+    );
+    save({ ...kesim, animalGroups: groups }, `Grup rengi değiştirildi: Hayvan ${groups[groupIdx].animalNo}`);
+  }
+
+  function applyBulkEdit() {
+    if (!kesim || selectedIds.size === 0) return;
+    const updated = {
+      ...kesim,
+      donations: kesim.donations.map((d) => {
+        if (!selectedIds.has(d.id)) return d;
+        if (bulkEditField === "shareCount") {
+          const val = Math.max(1, Math.min(7, parseInt(bulkEditValue) || 1));
+          return { ...d, shareCount: val };
+        }
+        return { ...d, [bulkEditField]: bulkEditValue };
+      }),
+    };
+    save(updated, `${selectedIds.size} bağışçı toplu düzenlendi`);
+    setBulkEditOpen(false);
+    setBulkEditValue("");
+  }
+
+  function updateGroupNotes(groupIdx: number, notes: string) {
+    if (!kesim) return;
+    const groups = kesim.animalGroups.map((g, i) =>
+      i === groupIdx ? { ...g, notes } : g
+    );
+    save({ ...kesim, animalGroups: groups }, `Grup notu güncellendi: Hayvan ${groups[groupIdx].animalNo}`);
+  }
+
+  function toggleGroupLock(groupIdx: number) {
+    if (!kesim) return;
+    const groups = kesim.animalGroups.map((g, i) =>
+      i === groupIdx ? { ...g, locked: !g.locked } : g
+    );
+    const target = groups[groupIdx];
+    save({ ...kesim, animalGroups: groups }, `Grup ${target.locked ? "kilidi açıldı" : "kilitlendi"}: Hayvan ${target.animalNo}`);
+  }
+
+  function exportDonorsExcel() {
+    if (!kesim) return;
+    const data = kesim.donations.map((d, i) => ({
+      "Sıra": i + 1,
+      "Adına Kesilen": d.name,
+      "Vekaleti Veren": d.description,
+      "Cinsi": d.donationType,
+      "Hisse": d.shareCount,
+      "Vekalet": d.vekalet,
+      "Notlar": d.notes,
+      "Durum": d.excluded ? "Hariç" : "Dahil",
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Bağışçılar");
+    XLSX.writeFile(wb, `${kesim.name}_bagiscilar.xlsx`);
+  }
+
+  function exportGroupsExcel() {
+    if (!kesim || kesim.animalGroups.length === 0) return;
+    const data: Record<string, string | number>[] = [];
+    for (const group of kesim.animalGroups) {
+      for (let i = 0; i < group.donations.length; i++) {
+        const d = group.donations[i];
+        data.push({
+          "Hayvan No": group.animalNo,
+          "Sıra": i + 1,
+          "Vekalet": d.vekalet,
+          "Vekaleti Veren": d.description,
+          "Adına Kesilen": d.name,
+          "Cinsi": d.donationType,
+          "Notlar": d.notes,
+        });
+      }
+    }
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Kesim Kağıdı");
+    XLSX.writeFile(wb, `${kesim.name}_kesim_kagidi.xlsx`);
   }
 
   function toggleGroupCollapse(groupId: string) {
@@ -517,18 +670,105 @@ export default function KesimAlaniPage() {
               {requiredAnimals} hayvan gerekli
             </p>
           </div>
-          <div className="flex gap-2">
-            {kesim.animalGroups.length > 0 && (
+          <div className="flex gap-2 items-center">
+            <div className="flex items-center gap-1 border rounded-md px-1">
               <Button
-                variant="outline"
-                onClick={() => setLocation(`/print/${kesim.id}`)}
+                variant="ghost"
+                size="sm"
+                onClick={handleUndo}
+                disabled={!history.canUndo}
+                title="Geri Al (Ctrl+Z)"
               >
-                <Printer className="w-4 h-4 mr-2" />
-                Yazdır
+                <Undo2 className="w-4 h-4" />
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRedo}
+                disabled={!history.canRedo}
+                title="İleri Al (Ctrl+Y)"
+              >
+                <Redo2 className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setHistoryPanelOpen(!historyPanelOpen)}
+                title="Geçmiş"
+              >
+                <History className="w-4 h-4" />
+              </Button>
+            </div>
+            <Button variant="outline" size="sm" onClick={exportDonorsExcel} title="Bağışçı Listesi Excel">
+              <FileSpreadsheet className="w-4 h-4" />
+            </Button>
+            {kesim.animalGroups.length > 0 && (
+              <>
+                <Button variant="outline" size="sm" onClick={exportGroupsExcel} title="Kesim Kağıdı Excel">
+                  <FileSpreadsheet className="w-4 h-4 mr-1" />
+                  Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setLocation(`/print/${kesim.id}`)}
+                >
+                  <Printer className="w-4 h-4 mr-2" />
+                  Yazdır
+                </Button>
+              </>
             )}
           </div>
         </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <Card className="p-3 text-center">
+            <div className="text-2xl font-bold text-primary">{kesim.donations.filter(d => !d.excluded).length}</div>
+            <div className="text-xs text-muted-foreground">Aktif Bağışçı</div>
+          </Card>
+          <Card className="p-3 text-center">
+            <div className="text-2xl font-bold text-primary">{totalShares}</div>
+            <div className="text-xs text-muted-foreground">Toplam Hisse</div>
+          </Card>
+          <Card className="p-3 text-center">
+            <div className="text-2xl font-bold text-primary">{requiredAnimals}</div>
+            <div className="text-xs text-muted-foreground">Gereken Hayvan</div>
+          </Card>
+          <Card className="p-3 text-center">
+            <div className="text-2xl font-bold text-primary">
+              {kesim.animalGroups.length > 0
+                ? kesim.animalGroups.reduce((sum, g) => sum + g.donations.filter(d => d.name.trim() === "").length, 0)
+                : 0}
+            </div>
+            <div className="text-xs text-muted-foreground">Boş Slot</div>
+          </Card>
+        </div>
+
+        {historyPanelOpen && (
+          <Card className="mb-4 p-3 max-h-64 overflow-y-auto">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold">İşlem Geçmişi</h3>
+              <Button variant="ghost" size="sm" onClick={() => setHistoryPanelOpen(false)}>✕</Button>
+            </div>
+            <div className="space-y-1">
+              {history.historyList.map((item, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleGoToStep(i)}
+                  className={`w-full text-left text-xs px-2 py-1.5 rounded transition-colors ${
+                    item.isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted"
+                  }`}
+                >
+                  <span className="font-medium">{item.description}</span>
+                  <span className="ml-2 opacity-60">
+                    {new Date(item.timestamp).toLocaleTimeString("tr-TR")}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
@@ -809,14 +1049,48 @@ export default function KesimAlaniPage() {
             </div>
 
             {selectedIds.size > 0 && (
-              <div className="mb-3 flex items-center gap-3 p-2 bg-primary/10 rounded-lg">
+              <div className="mb-3 flex items-center gap-3 p-2 bg-primary/10 rounded-lg flex-wrap">
                 <span className="text-sm font-medium">
                   {selectedIds.size} satır seçildi
                 </span>
                 <Button variant="destructive" size="sm" onClick={deleteSelected}>
                   <Trash2 className="w-3 h-3 mr-1" />
-                  Seçilenleri Sil
+                  Sil
                 </Button>
+                <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Settings2 className="w-3 h-3 mr-1" />
+                      Toplu Düzenle
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>{selectedIds.size} Bağışçıyı Toplu Düzenle</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-4">
+                      <Select value={bulkEditField} onValueChange={(v: any) => setBulkEditField(v)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="donationType">Cinsi</SelectItem>
+                          <SelectItem value="shareCount">Hisse Sayısı</SelectItem>
+                          <SelectItem value="notes">Notlar</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        placeholder={bulkEditField === "shareCount" ? "1-7" : "Yeni değer"}
+                        value={bulkEditValue}
+                        onChange={(e) => setBulkEditValue(e.target.value)}
+                        type={bulkEditField === "shareCount" ? "number" : "text"}
+                      />
+                      <Button onClick={applyBulkEdit} className="w-full">
+                        Uygula
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
                 <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
                   Seçimi Kaldır
                 </Button>
@@ -1137,14 +1411,50 @@ export default function KesimAlaniPage() {
 
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">
-                Hayvan Grupları
+              <div>
+                <h2 className="text-lg font-semibold">
+                  Hayvan Grupları
+                  {kesim.animalGroups.length > 0 && (
+                    <span className="text-sm font-normal text-muted-foreground ml-2">
+                      ({colorTagFilter === "all"
+                        ? kesim.animalGroups.length
+                        : kesim.animalGroups.filter(g => (g.colorTag || "") === colorTagFilter).length
+                      }/{kesim.animalGroups.length} hayvan)
+                    </span>
+                  )}
+                </h2>
                 {kesim.animalGroups.length > 0 && (
-                  <span className="text-sm font-normal text-muted-foreground ml-2">
-                    ({kesim.animalGroups.length} hayvan)
-                  </span>
+                  <div className="flex items-center gap-1 mt-1">
+                    <button
+                      onClick={() => setColorTagFilter("all")}
+                      className={`text-xs px-2 py-0.5 rounded border ${colorTagFilter === "all" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                    >Tümü</button>
+                    <button
+                      onClick={() => setColorTagFilter("green")}
+                      className={`w-5 h-5 rounded-full border-2 ${colorTagFilter === "green" ? "ring-2 ring-offset-1 ring-green-500" : ""}`}
+                      style={{ backgroundColor: "#22c55e" }}
+                      title="Yeşil"
+                    />
+                    <button
+                      onClick={() => setColorTagFilter("orange")}
+                      className={`w-5 h-5 rounded-full border-2 ${colorTagFilter === "orange" ? "ring-2 ring-offset-1 ring-orange-500" : ""}`}
+                      style={{ backgroundColor: "#f97316" }}
+                      title="Turuncu"
+                    />
+                    <button
+                      onClick={() => setColorTagFilter("red")}
+                      className={`w-5 h-5 rounded-full border-2 ${colorTagFilter === "red" ? "ring-2 ring-offset-1 ring-red-500" : ""}`}
+                      style={{ backgroundColor: "#ef4444" }}
+                      title="Kırmızı"
+                    />
+                    <button
+                      onClick={() => setColorTagFilter("")}
+                      className={`w-5 h-5 rounded-full border-2 border-dashed ${colorTagFilter === "" ? "ring-2 ring-offset-1 ring-gray-400" : ""}`}
+                      title="Renksiz"
+                    />
+                  </div>
                 )}
-              </h2>
+              </div>
               {kesim.animalGroups.length > 0 && (
                 <div className="flex gap-2 items-center">
                   <div className="flex items-center gap-1">
@@ -1249,13 +1559,23 @@ export default function KesimAlaniPage() {
               </Card>
             ) : (
               <div className="space-y-4">
-                {kesim.animalGroups.map((group, groupIdx) => {
+                {kesim.animalGroups
+                  .map((group, groupIdx) => ({ group, groupIdx }))
+                  .filter(({ group }) =>
+                    colorTagFilter === "all" ? true : (group.colorTag || "") === colorTagFilter
+                  )
+                  .map(({ group, groupIdx }) => {
                   const isCollapsed = collapsedGroups.has(group.id);
                   const filledCount = group.donations.filter(
                     (d) => d.name.trim() !== ""
                   ).length;
+                  const colorMap: Record<string, string> = {
+                    green: "#22c55e",
+                    orange: "#f97316",
+                    red: "#ef4444",
+                  };
                   return (
-                    <Card key={group.id} id={`animal-group-${group.animalNo}`} className="overflow-hidden">
+                    <Card key={group.id} id={`animal-group-${group.animalNo}`} className="overflow-hidden" style={group.colorTag ? { borderLeft: `4px solid ${colorMap[group.colorTag]}` } : {}}>
                       <div
                         className="flex items-center justify-between p-3 bg-primary/10 cursor-pointer"
                         onClick={() => toggleGroupCollapse(group.id)}
@@ -1269,12 +1589,35 @@ export default function KesimAlaniPage() {
                           <h3 className="font-semibold text-sm">
                             {kesim.name} - HAYVAN NO: {group.animalNo}
                           </h3>
+                          <div className="flex items-center gap-0.5 ml-1" onClick={(e) => e.stopPropagation()}>
+                            {(["green", "orange", "red", ""] as ColorTag[]).map((c) => (
+                              <button
+                                key={c || "none"}
+                                onClick={() => setGroupColorTag(groupIdx, c)}
+                                className={`w-3.5 h-3.5 rounded-full border transition-transform ${
+                                  (group.colorTag || "") === c ? "scale-125 ring-1 ring-offset-1" : "opacity-50 hover:opacity-100"
+                                } ${c === "" ? "border-dashed" : ""}`}
+                                style={c ? { backgroundColor: colorMap[c] } : {}}
+                                title={c === "green" ? "Yeşil" : c === "orange" ? "Turuncu" : c === "red" ? "Kırmızı" : "Renksiz"}
+                              />
+                            ))}
+                          </div>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {filledCount}/7 dolu
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            {filledCount}/7 dolu
+                          </span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleGroupLock(groupIdx); }}
+                            className={`p-0.5 rounded transition-colors ${group.locked ? "text-amber-500" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
+                            title={group.locked ? "Kilidi Aç" : "Kilitle"}
+                          >
+                            {group.locked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
                       </div>
                       {!isCollapsed && (
+                        <>
                         <table className="w-full text-xs">
                           <thead>
                             <tr className="border-b bg-muted/30">
@@ -1410,6 +1753,16 @@ export default function KesimAlaniPage() {
                             ))}
                           </tbody>
                         </table>
+                        <div className="p-2 border-t">
+                          <input
+                            type="text"
+                            placeholder="Grup notu..."
+                            value={group.notes || ""}
+                            onChange={(e) => updateGroupNotes(groupIdx, e.target.value)}
+                            className="w-full text-xs bg-transparent border-0 outline-none placeholder:text-muted-foreground/50 text-muted-foreground"
+                          />
+                        </div>
+                        </>
                       )}
                     </Card>
                   );

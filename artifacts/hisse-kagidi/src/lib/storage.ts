@@ -11,6 +11,8 @@ function migrateDonation(d: Partial<Donation>): Donation {
     shareCount: d.shareCount || 1,
     vekalet: d.vekalet || "",
     notes: d.notes || "",
+    excluded: d.excluded ?? false,
+    tags: d.tags ?? [],
   };
 }
 
@@ -67,4 +69,46 @@ export function loadLogo(): string | null {
 
 export function deleteLogo(): void {
   localStorage.removeItem(LOGO_KEY);
+}
+
+export function exportBackup(): string {
+  const data = {
+    version: 1,
+    timestamp: new Date().toISOString(),
+    kesimAlanlari: loadKesimAlanlari(),
+    logo: loadLogo(),
+  };
+  return JSON.stringify(data, null, 2);
+}
+
+export function importBackup(json: string): { success: boolean; count: number; error?: string } {
+  try {
+    const data = JSON.parse(json);
+    if (!data.kesimAlanlari || !Array.isArray(data.kesimAlanlari)) {
+      return { success: false, count: 0, error: "Geçersiz yedek dosyası" };
+    }
+    const validated = data.kesimAlanlari.map((k: any) => ({
+      id: k.id || Math.random().toString(36).substring(2, 12),
+      name: k.name || "İsimsiz",
+      donations: Array.isArray(k.donations) ? k.donations.map(migrateDonation) : [],
+      animalGroups: Array.isArray(k.animalGroups) ? k.animalGroups.map((g: any) => ({
+        id: g.id || Math.random().toString(36).substring(2, 12),
+        animalNo: g.animalNo || 0,
+        donations: Array.isArray(g.donations) ? g.donations.map(migrateDonation) : [],
+        colorTag: g.colorTag || "",
+        locked: g.locked || false,
+        notes: g.notes || "",
+      })) : [],
+      createdAt: k.createdAt || new Date().toISOString(),
+    }));
+    saveKesimAlanlari(validated);
+    if (data.logo) {
+      saveLogo(data.logo);
+    } else {
+      deleteLogo();
+    }
+    return { success: true, count: validated.length };
+  } catch {
+    return { success: false, count: 0, error: "Dosya okunamadı" };
+  }
 }

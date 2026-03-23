@@ -1,3 +1,5 @@
+export type ColorTag = "green" | "orange" | "red" | "";
+
 export interface Donation {
   id: string;
   name: string;
@@ -7,12 +9,16 @@ export interface Donation {
   vekalet: string;
   notes: string;
   excluded?: boolean;
+  tags?: string[];
 }
 
 export interface AnimalGroup {
   id: string;
   animalNo: number;
   donations: Donation[];
+  colorTag?: ColorTag;
+  locked?: boolean;
+  notes?: string;
 }
 
 export interface KesimAlani {

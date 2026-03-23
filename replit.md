@@ -43,23 +43,36 @@ artifacts-monorepo/
 Frontend-only React + Vite app for managing Kurban Bayramı share certificates. Features:
 - Create cutting areas (kesim alanları)
 - Add donors via manual entry, Excel upload (.xlsx/.xls/.csv), or copy-paste with column mapping
-- Multi-select checkboxes for bulk deletion of donors
+- Multi-select checkboxes for bulk deletion and bulk editing of donors
 - Same-name auto-count: if a name appears N times, effectiveShare=N is used
 - Smart auto-grouping: distributes donors into groups of 7 (one animal per group) using bin-packing
 - Drag-and-drop between animal groups
 - Sort by any column
+- Undo/Redo system with history panel (Ctrl+Z/Ctrl+Y, up to 80 steps with Turkish descriptions)
+- Animal group color tags (green/orange/red) with filtering
+- Animal group locking (prevents accidental changes)
+- Animal group notes
+- Dark theme support (toggle in header)
+- Excel export for donor lists and kesim kağıdı format
+- Statistics dashboard (active donors, total shares, required animals, empty slots)
+- JSON backup/restore for all data
 - Print A4 landscape pages matching Excel "Kesim Kağıdı" format with columns: HAYVAN (merged vertically), SIRA, VEKALET, VEKALETİ VEREN, ADINA KESİLEN, CİNSİ, NOTLAR
 - Data persisted in localStorage with backward-compatible migration
 
 Data model (Donation):
-- `id`, `name` (adına kesilen), `description` (vekaleti veren), `donationType` (cinsi), `shareCount`, `vekalet` (vekalet no), `notes` (notlar)
+- `id`, `name` (adına kesilen), `description` (vekaleti veren), `donationType` (cinsi), `shareCount`, `vekalet` (vekalet no), `notes` (notlar), `excluded?`, `tags?`
+
+Data model (AnimalGroup):
+- `id`, `animalNo`, `donations[]`, `colorTag?` (green/orange/red), `locked?`, `notes?`
 
 Key files:
-- `src/lib/types.ts` - TypeScript types (Donation, AnimalGroup, KesimAlani)
-- `src/lib/storage.ts` - localStorage persistence with data migration
+- `src/lib/types.ts` - TypeScript types (Donation, AnimalGroup, KesimAlani, ColorTag)
+- `src/lib/storage.ts` - localStorage persistence with data migration, backup/restore
 - `src/lib/grouping.ts` - Auto-grouping algorithm (bin-packing, name-based effective shares)
-- `src/pages/home.tsx` - Home page with kesim alanı list
-- `src/pages/kesim-alani.tsx` - Main editing page with donor table and animal groups
+- `src/lib/useHistory.ts` - Snapshot-based undo/redo hook (80 steps, structuredClone)
+- `src/lib/useTheme.ts` - Dark theme toggle hook
+- `src/pages/home.tsx` - Home page with kesim alanı list, settings (logo, backup)
+- `src/pages/kesim-alani.tsx` - Main editing page with donor table, animal groups, stats, export
 - `src/pages/print.tsx` - Print-optimized A4 landscape view matching Excel design
 
 ## TypeScript & Composite Projects

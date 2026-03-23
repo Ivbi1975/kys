@@ -6,6 +6,7 @@ import Home from "@/pages/home";
 import KesimAlaniPage from "@/pages/kesim-alani";
 import PrintPage from "@/pages/print";
 import NotFound from "@/pages/not-found";
+import { useTheme } from "@/lib/useTheme";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +22,7 @@ function Router() {
 }
 
 function App() {
+  useTheme();
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

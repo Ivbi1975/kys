@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, ChevronRight, Scissors, Settings, ImagePlus, X } from "lucide-react";
+import { Plus, Trash2, ChevronRight, Scissors, Settings, ImagePlus, X, Sun, Moon, Download, Upload } from "lucide-react";
 import type { KesimAlani } from "@/lib/types";
 import {
   loadKesimAlanlari,
@@ -19,7 +19,10 @@ import {
   saveLogo,
   loadLogo,
   deleteLogo,
+  exportBackup,
+  importBackup,
 } from "@/lib/storage";
+import { useTheme } from "@/lib/useTheme";
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -29,6 +32,8 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const backupInputRef = useRef<HTMLInputElement>(null);
+  const { isDark, toggle: toggleTheme } = useTheme();
 
   useEffect(() => {
     setKesimAlanlari(loadKesimAlanlari());
@@ -78,6 +83,36 @@ export default function Home() {
     setLogoPreview(null);
   }
 
+  function handleExportBackup() {
+    const json = exportBackup();
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `kurban_yedek_${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleImportBackup(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const json = evt.target?.result as string;
+      const result = importBackup(json);
+      if (result.success) {
+        setKesimAlanlari(loadKesimAlanlari());
+        setLogoPreview(loadLogo());
+        alert(`Yedek başarıyla yüklendi: ${result.count} kesim alanı`);
+      } else {
+        alert(`Hata: ${result.error}`);
+      }
+    };
+    reader.readAsText(file);
+    if (backupInputRef.current) backupInputRef.current.value = "";
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto p-6">
@@ -92,6 +127,9 @@ export default function Home() {
               yazdırın
             </p>
           </div>
+          <Button variant="ghost" size="sm" onClick={toggleTheme} title={isDark ? "Açık Tema" : "Koyu Tema"}>
+            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </Button>
           <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
@@ -158,6 +196,32 @@ export default function Home() {
                     accept="image/*"
                     className="hidden"
                     onChange={handleLogoUpload}
+                  />
+                </div>
+
+                <div className="border-t pt-4">
+                  <label className="text-sm font-medium mb-2 block">
+                    Veri Yedekleme
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Tüm kesim alanları ve logo dahil JSON olarak yedekleyin veya geri yükleyin.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="flex-1" onClick={handleExportBackup}>
+                      <Download className="w-4 h-4 mr-1" />
+                      Yedekle
+                    </Button>
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => backupInputRef.current?.click()}>
+                      <Upload className="w-4 h-4 mr-1" />
+                      Geri Yükle
+                    </Button>
+                  </div>
+                  <input
+                    ref={backupInputRef}
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={handleImportBackup}
                   />
                 </div>
               </div>
