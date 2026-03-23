@@ -209,6 +209,20 @@
   }
 }
 
+.page-logo-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 4mm;
+  padding-bottom: 3mm;
+}
+
+.page-logo-img {
+  max-height: 20mm;
+  max-width: 100%;
+  object-fit: contain;
+}
+
 .page-content {
   flex: 1;
   display: flex;

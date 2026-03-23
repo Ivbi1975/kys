@@ -3,12 +3,13 @@ import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Printer } from "lucide-react";
 import type { KesimAlani } from "@/lib/types";
-import { getKesimAlani } from "@/lib/storage";
+import { getKesimAlani, loadLogo } from "@/lib/storage";
 
 export default function PrintPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const [kesim, setKesim] = useState<KesimAlani | null>(null);
+  const [logo, setLogo] = useState<string | null>(null);
 
   useEffect(() => {
     if (params.id) {
@@ -16,6 +17,7 @@ export default function PrintPage() {
       if (data) setKesim(data);
       else setLocation("/");
     }
+    setLogo(loadLogo());
   }, [params.id, setLocation]);
 
   function handlePrint() {
@@ -47,6 +49,12 @@ export default function PrintPage() {
       <div className="print-pages">
         {kesim.animalGroups.map((group) => (
           <div key={group.id} className="print-page">
+            {logo && (
+              <div className="page-logo-header">
+                <img src={logo} alt="Logo" className="page-logo-img" />
+              </div>
+            )}
+
             <div className="page-content">
               <table className="kesim-table">
                 <thead>

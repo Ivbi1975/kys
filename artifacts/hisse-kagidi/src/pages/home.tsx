@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,12 +10,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, ChevronRight, Scissors } from "lucide-react";
+import { Plus, Trash2, ChevronRight, Scissors, Settings, ImagePlus, X } from "lucide-react";
 import type { KesimAlani } from "@/lib/types";
 import {
   loadKesimAlanlari,
   updateKesimAlani,
   deleteKesimAlani,
+  saveLogo,
+  loadLogo,
+  deleteLogo,
 } from "@/lib/storage";
 
 export default function Home() {
@@ -23,9 +26,13 @@ export default function Home() {
   const [kesimAlanlari, setKesimAlanlari] = useState<KesimAlani[]>([]);
   const [newName, setNewName] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setKesimAlanlari(loadKesimAlanlari());
+    setLogoPreview(loadLogo());
   }, []);
 
   function handleCreate() {
@@ -49,12 +56,34 @@ export default function Home() {
     setKesimAlanlari(loadKesimAlanlari());
   }
 
+  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Lütfen bir resim dosyası seçin.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const base64 = evt.target?.result as string;
+      saveLogo(base64);
+      setLogoPreview(base64);
+    };
+    reader.readAsDataURL(file);
+    if (logoInputRef.current) logoInputRef.current.value = "";
+  }
+
+  function handleDeleteLogo() {
+    deleteLogo();
+    setLogoPreview(null);
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto p-6">
         <div className="flex items-center gap-3 mb-8">
           <Scissors className="w-8 h-8 text-primary" />
-          <div>
+          <div className="flex-1">
             <h1 className="text-3xl font-bold text-foreground">
               Kurban Hisse Kağıdı
             </h1>
@@ -63,6 +92,77 @@ export default function Home() {
               yazdırın
             </p>
           </div>
+          <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Settings className="w-4 h-4 mr-1" />
+                Ayarlar
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Ayarlar</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Kesim Kağıdı Logosu
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Yazdırma sayfasında tablonun üst kısmında görünecek logo.
+                  </p>
+
+                  {logoPreview ? (
+                    <div className="space-y-3">
+                      <div className="border rounded-lg p-4 bg-muted/30 flex items-center justify-center">
+                        <img
+                          src={logoPreview}
+                          alt="Logo"
+                          className="max-h-24 max-w-full object-contain"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => logoInputRef.current?.click()}
+                        >
+                          <ImagePlus className="w-4 h-4 mr-1" />
+                          Değiştir
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={handleDeleteLogo}
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          Kaldır
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => logoInputRef.current?.click()}
+                    >
+                      <ImagePlus className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-sm font-medium">Logo yüklemek için tıklayın</p>
+                      <p className="text-xs text-muted-foreground mt-1">PNG, JPG, SVG desteklenir</p>
+                    </div>
+                  )}
+
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleLogoUpload}
+                  />
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

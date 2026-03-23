@@ -213,7 +213,7 @@ export default function KesimAlaniPage() {
     setPreviewData(rows);
     const colCount = Math.max(...rows.map((r) => r.length));
     const defaultMappings: ColumnMapping[] = [];
-    const defaults: ColumnMapping[] = ["name", "vekalet", "description", "donationType", "notes", "shareCount"];
+    const defaults: ColumnMapping[] = ["skip", "skip", "vekalet", "description", "name", "donationType", "notes"];
     for (let i = 0; i < colCount; i++) {
       defaultMappings.push(i < defaults.length ? defaults[i] : "skip");
     }

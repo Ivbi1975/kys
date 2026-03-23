@@ -54,3 +54,17 @@ export function updateKesimAlani(updated: KesimAlani): void {
 export function deleteKesimAlani(id: string): void {
   saveKesimAlanlari(loadKesimAlanlari().filter((k) => k.id !== id));
 }
+
+const LOGO_KEY = "hisse-kagidi-logo";
+
+export function saveLogo(base64: string): void {
+  localStorage.setItem(LOGO_KEY, base64);
+}
+
+export function loadLogo(): string | null {
+  return localStorage.getItem(LOGO_KEY);
+}
+
+export function deleteLogo(): void {
+  localStorage.removeItem(LOGO_KEY);
+}
