@@ -6,6 +6,7 @@ import {
   animalGroupsTable,
   animalGroupDonationsTable,
   donationTagsTable,
+  projectsTable,
 } from "@workspace/db/schema";
 import { eq, inArray, isNull, isNotNull, and } from "drizzle-orm";
 import { z } from "zod";
@@ -168,6 +169,7 @@ async function getFullKesimAlani(id: string) {
     name: ka.name,
     createdAt: ka.createdAt,
     deletedAt: ka.deletedAt || null,
+    projectId: ka.projectId || null,
     donations: mappedDonations,
     animalGroups: mappedGroups,
   };
@@ -235,6 +237,7 @@ router.post("/kesim-alanlari", async (req, res) => {
   }
 
   const { id, name, createdAt, donations, animalGroups } = parsed.data;
+  const projectId = req.body.projectId || null;
 
   try {
     await db.transaction(async (tx) => {
@@ -242,6 +245,7 @@ router.post("/kesim-alanlari", async (req, res) => {
         id,
         name,
         createdAt: createdAt || new Date().toISOString(),
+        projectId,
       });
 
       if (donations.length > 0) {
@@ -258,6 +262,32 @@ router.post("/kesim-alanlari", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error("POST /kesim-alanlari error:", message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.put("/kesim-alanlari/:id/move", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { projectId } = req.body;
+    const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
+    if (!existing) {
+      res.status(404).json({ error: "Kesim alanı bulunamadı" });
+      return;
+    }
+    if (projectId) {
+      const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+      if (!proj) {
+        res.status(404).json({ error: "Hedef proje bulunamadı" });
+        return;
+      }
+    }
+    await db.update(kesimAlanlariTable).set({ projectId: projectId || null }).where(eq(kesimAlanlariTable.id, id));
+    const result = await getFullKesimAlani(id);
+    res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`PUT /kesim-alanlari/${req.params.id}/move error:`, message);
     res.status(500).json({ error: message });
   }
 });

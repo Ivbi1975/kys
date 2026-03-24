@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import projectsRouter from "./projects";
 import kesimAlanlariRouter from "./kesim-alanlari";
 import tagsRouter from "./tags";
 import settingsRouter from "./settings";
@@ -9,6 +10,7 @@ import aiNotesRouter from "./ai-notes";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(projectsRouter);
 router.use(kesimAlanlariRouter);
 router.use(tagsRouter);
 router.use(settingsRouter);

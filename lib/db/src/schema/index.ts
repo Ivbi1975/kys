@@ -2,11 +2,23 @@ import { pgTable, text, serial, integer, boolean, timestamp, index, unique } fro
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
+export const projectsTable = pgTable("projects", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  createdAt: text("created_at").notNull(),
+  deletedAt: text("deleted_at"),
+});
+
+export const insertProjectSchema = createInsertSchema(projectsTable);
+export type InsertProject = z.infer<typeof insertProjectSchema>;
+export type ProjectRow = typeof projectsTable.$inferSelect;
+
 export const kesimAlanlariTable = pgTable("kesim_alanlari", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   createdAt: text("created_at").notNull(),
   deletedAt: text("deleted_at"),
+  projectId: text("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
 });
 
 export const insertKesimAlaniSchema = createInsertSchema(kesimAlanlariTable);

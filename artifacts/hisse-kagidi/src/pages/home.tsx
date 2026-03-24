@@ -20,8 +20,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Trash2, ChevronRight, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, PieChart, RotateCcw, Clock, Calendar } from "lucide-react";
-import type { KesimAlani, CustomTag } from "@/lib/types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Plus, Trash2, ChevronRight, ChevronDown, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, PieChart, RotateCcw, Clock, Calendar, FolderOpen, FolderPlus, MoveRight } from "lucide-react";
+import type { KesimAlani, CustomTag, Project } from "@/lib/types";
 import {
   fetchKesimAlanlari,
   createKesimAlani,
@@ -39,6 +46,13 @@ import {
   exportBackupApi,
   importBackupApi,
   migrateLocalStorageToApi,
+  fetchProjects,
+  createProject,
+  updateProject,
+  deleteProject,
+  restoreProject,
+  fetchDeletedProjects,
+  moveKesimAlani,
 } from "@/lib/api";
 import { useTheme } from "@/lib/useTheme";
 import type { ThemeMode } from "@/lib/useTheme";
@@ -49,8 +63,11 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const [kesimAlanlari, setKesimAlanlari] = useState<KesimAlani[]>([]);
   const [deletedKesimAlanlari, setDeletedKesimAlanlari] = useState<KesimAlani[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [deletedProjects, setDeletedProjects] = useState<Project[]>([]);
   const [newName, setNewName] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [createProjectId, setCreateProjectId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -66,6 +83,15 @@ export default function Home() {
   const [migrationDone, setMigrationDone] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string; hasDonations: boolean } | null>(null);
   const [permanentDeleteConfirm, setPermanentDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [projectDialogOpen, setProjectDialogOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [editProjectDialogOpen, setEditProjectDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<{ id: string; name: string } | null>(null);
+  const [deleteProjectConfirm, setDeleteProjectConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [moveDialogOpen, setMoveDialogOpen] = useState(false);
+  const [movingKesim, setMovingKesim] = useState<{ id: string; name: string; currentProjectId: string | null } | null>(null);
+  const [moveTargetProjectId, setMoveTargetProjectId] = useState<string>("__none__");
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const TAG_COLORS = [
@@ -78,17 +104,23 @@ export default function Home() {
       try {
         const migrated = await migrateLocalStorageToApi();
         if (migrated) setMigrationDone(true);
-        const [ka, tags, logo] = await Promise.all([
+        const [ka, tags, logo, projs] = await Promise.all([
           fetchKesimAlanlari(),
           fetchTags(),
           fetchLogo(),
+          fetchProjects(),
         ]);
         setKesimAlanlari(ka);
         setGlobalTags(tags);
         setLogoPreview(logo);
+        setProjects(projs);
         try {
-          const deleted = await fetchDeletedKesimAlanlari();
+          const [deleted, deletedProjs] = await Promise.all([
+            fetchDeletedKesimAlanlari(),
+            fetchDeletedProjects(),
+          ]);
           setDeletedKesimAlanlari(deleted);
+          setDeletedProjects(deletedProjs);
         } catch (delErr) {
           console.warn("Silinen öğeler yüklenemedi:", delErr instanceof Error ? delErr.message : delErr);
         }
@@ -172,22 +204,117 @@ export default function Home() {
 
   async function handleCreate() {
     if (!newName.trim()) return;
-    const newKesim: KesimAlani = {
+    const newKesim: KesimAlani & { projectId?: string | null } = {
       id: crypto.randomUUID(),
       name: newName.trim(),
       donations: [],
       animalGroups: [],
       createdAt: new Date().toISOString(),
+      projectId: createProjectId,
     };
     try {
       await createKesimAlani(newKesim);
       setNewName("");
       setDialogOpen(false);
+      setCreateProjectId(null);
       toast({ title: "Kesim alanı oluşturuldu", description: newKesim.name });
       setLocation(`/kesim/${newKesim.id}`);
     } catch (err) {
       toast({
         title: "Oluşturma hatası",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleCreateProject() {
+    if (!newProjectName.trim()) return;
+    try {
+      const proj = await createProject(newProjectName.trim());
+      setProjects(prev => [...prev, proj]);
+      setNewProjectName("");
+      setProjectDialogOpen(false);
+      toast({ title: "Proje oluşturuldu", description: proj.name });
+    } catch (err) {
+      toast({
+        title: "Proje oluşturulamadı",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleUpdateProject() {
+    if (!editingProject || !editingProject.name.trim()) return;
+    try {
+      const updated = await updateProject(editingProject.id, editingProject.name.trim());
+      setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
+      setEditProjectDialogOpen(false);
+      setEditingProject(null);
+      toast({ title: "Proje güncellendi" });
+    } catch (err) {
+      toast({
+        title: "Proje güncellenemedi",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleDeleteProject() {
+    if (!deleteProjectConfirm) return;
+    try {
+      await deleteProject(deleteProjectConfirm.id);
+      const deletedProj = projects.find(p => p.id === deleteProjectConfirm.id);
+      setProjects(prev => prev.filter(p => p.id !== deleteProjectConfirm.id));
+      if (deletedProj) {
+        setDeletedProjects(prev => [...prev, { ...deletedProj, deletedAt: new Date().toISOString() }]);
+      }
+      setKesimAlanlari(prev => prev.map(k =>
+        k.projectId === deleteProjectConfirm.id ? { ...k, projectId: null } : k
+      ));
+      toast({ title: "Proje silindi", description: `"${deleteProjectConfirm.name}" çöp kutusuna taşındı.` });
+    } catch (err) {
+      toast({
+        title: "Proje silinemedi",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    }
+    setDeleteProjectConfirm(null);
+  }
+
+  async function handleRestoreProject(id: string) {
+    try {
+      const restored = await restoreProject(id);
+      setDeletedProjects(prev => prev.filter(p => p.id !== id));
+      setProjects(prev => [...prev, restored]);
+      toast({ title: "Proje geri yüklendi", description: restored.name });
+    } catch (err) {
+      toast({
+        title: "Geri yükleme hatası",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleMoveKesimAlani() {
+    if (!movingKesim) return;
+    const targetId = moveTargetProjectId === "__none__" ? null : moveTargetProjectId;
+    try {
+      const updated = await moveKesimAlani(movingKesim.id, targetId);
+      setKesimAlanlari(prev => prev.map(k => k.id === updated.id ? updated : k));
+      const targetName = targetId ? projects.find(p => p.id === targetId)?.name : "Projesiz";
+      toast({ title: "Taşındı", description: `"${movingKesim.name}" → ${targetName}` });
+      setMoveDialogOpen(false);
+      setMovingKesim(null);
+      const projs = await fetchProjects();
+      setProjects(projs);
+    } catch (err) {
+      toast({
+        title: "Taşıma hatası",
         description: err instanceof Error ? err.message : "Bilinmeyen hata",
         variant: "destructive",
       });
@@ -417,6 +544,104 @@ export default function Home() {
     }
   }
 
+  function toggleProjectCollapse(projectId: string) {
+    setCollapsedProjects(prev => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  }
+
+  function openMoveDialog(k: KesimAlani) {
+    setMovingKesim({ id: k.id, name: k.name, currentProjectId: k.projectId || null });
+    setMoveTargetProjectId(k.projectId || "__none__");
+    setMoveDialogOpen(true);
+  }
+
+  function renderKesimCard(k: KesimAlani) {
+    const shares = getTotalShares(k.donations);
+    const animals = getRequiredAnimals(k.donations);
+    const activeDonors = k.donations.filter(d => !d.excluded).length;
+    const totalSlots = k.animalGroups.length * 7;
+    const filledSlots = k.animalGroups.reduce(
+      (s, g) => s + g.donations.filter(d => d.name.trim() !== "").length, 0
+    );
+    const occupancy = totalSlots > 0 ? Math.round((filledSlots / totalSlots) * 100) : 0;
+    return (
+      <Card
+        key={k.id}
+        className="p-4 hover:bg-accent/50 transition-colors cursor-pointer"
+        onClick={() => setLocation(`/kesim/${k.id}`)}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-foreground">{k.name}</h3>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                {formatDate(k.createdAt)}
+              </span>
+              <span className="text-[10px] text-muted-foreground/60">
+                ({timeSince(k.createdAt)})
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              title="Taşı"
+              onClick={(e) => {
+                e.stopPropagation();
+                openMoveDialog(k);
+              }}
+            >
+              <MoveRight className="w-4 h-4 text-muted-foreground" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                requestDelete(k.id);
+              }}
+            >
+              <Trash2 className="w-4 h-4 text-destructive" />
+            </Button>
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-center">
+          <div>
+            <div className="text-sm font-bold text-primary">{activeDonors}</div>
+            <div className="text-[10px] text-muted-foreground">Bağışçı</div>
+          </div>
+          <div>
+            <div className="text-sm font-bold text-primary">{shares}</div>
+            <div className="text-[10px] text-muted-foreground">Hisse</div>
+          </div>
+          <div>
+            <div className="text-sm font-bold text-primary">{animals}</div>
+            <div className="text-[10px] text-muted-foreground">Hayvan</div>
+          </div>
+          <div>
+            <div className="text-sm font-bold text-primary">{k.animalGroups.length}</div>
+            <div className="text-[10px] text-muted-foreground">Grup</div>
+          </div>
+          <div>
+            <div className="text-sm font-bold text-primary">%{occupancy}</div>
+            <div className="text-[10px] text-muted-foreground">Doluluk</div>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  const unassignedKesimAlanlari = kesimAlanlari.filter(k => !k.projectId);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -443,8 +668,7 @@ export default function Home() {
               Kurban Hisse Kağıdı
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Kesim alanı oluşturun, bağışçıları ekleyin ve hisse kağıtlarını
-              yazdırın
+              Projeler ve kesim alanlarını yönetin, bağışçıları ekleyin ve hisse kağıtlarını yazdırın
             </p>
           </div>
           <Button variant="ghost" size="sm" onClick={toggleTheme} title={themeMode === "light" ? "Açık" : themeMode === "dark" ? "Koyu" : "Sistem"}>
@@ -614,8 +838,8 @@ export default function Home() {
                               <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => startEditTag(tag)}>
                                 <Pencil className="w-3 h-3" />
                               </Button>
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleDeleteTag(tag.id)}>
-                                <Trash2 className="w-3 h-3 text-destructive" />
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => handleDeleteTag(tag.id)}>
+                                <X className="w-3 h-3" />
                               </Button>
                             </>
                           )}
@@ -704,45 +928,90 @@ export default function Home() {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="lg" className="mb-6">
-              <Plus className="w-5 h-5 mr-2" />
-              Yeni Kesim Alanı Oluştur
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Yeni Kesim Alanı</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <Input
-                placeholder="Kesim alanı adı (örn: Ankara Merkez)"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-                autoFocus
-              />
-              <Button onClick={handleCreate} className="w-full" disabled={!newName.trim()}>
-                Oluştur
+        <div className="flex gap-2 mb-6 flex-wrap">
+          <Dialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="default">
+                <FolderPlus className="w-4 h-4 mr-2" />
+                Yeni Proje
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Yeni Proje Oluştur</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <Input
+                  placeholder="Proje adı (örn: 2025 Kurban)"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreateProject()}
+                  autoFocus
+                />
+                <Button onClick={handleCreateProject} className="w-full" disabled={!newProjectName.trim()}>
+                  Oluştur
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
 
-        {kesimAlanlari.length === 0 ? (
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setCreateProjectId(null); }}>
+            <DialogTrigger asChild>
+              <Button size="default">
+                <Plus className="w-4 h-4 mr-2" />
+                Yeni Kesim Alanı
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Yeni Kesim Alanı</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <Input
+                  placeholder="Kesim alanı adı (örn: Ankara Merkez)"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                  autoFocus
+                />
+                {projects.length > 0 && (
+                  <div>
+                    <label className="text-sm text-muted-foreground mb-1 block">Proje (isteğe bağlı)</label>
+                    <Select value={createProjectId || "__none__"} onValueChange={(v) => setCreateProjectId(v === "__none__" ? null : v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Projesiz" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Projesiz</SelectItem>
+                        {projects.map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <Button onClick={handleCreate} className="w-full" disabled={!newName.trim()}>
+                  Oluştur
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {kesimAlanlari.length === 0 && projects.length === 0 ? (
           <Card className="p-12 text-center">
             <Scissors className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">
-              Henüz kesim alanı yok
+              Henüz proje veya kesim alanı yok
             </h3>
             <p className="text-muted-foreground mb-4">
-              Yukarıdaki butona tıklayarak ilk kesim alanınızı oluşturun
+              Bir proje veya kesim alanı oluşturarak başlayın
             </p>
             <div className="text-sm text-muted-foreground space-y-2 max-w-md mx-auto text-left">
               <p className="font-medium text-foreground">Nasıl çalışır?</p>
               <ol className="list-decimal list-inside space-y-1">
-                <li>Bir kesim alanı oluşturun (örn: "Ankara 2025")</li>
+                <li>Bir proje oluşturun (örn: "2025 Kurban")</li>
+                <li>Projenin içine kesim alanları ekleyin</li>
                 <li>Bağışçıları tek tek veya Excel'den toplu ekleyin</li>
                 <li>Otomatik gruplama ile hayvan gruplarını oluşturun</li>
                 <li>Kesim kağıtlarını yazdırın veya Excel'e aktarın</li>
@@ -801,85 +1070,147 @@ export default function Home() {
                 </Card>
               );
             })()}
-            <div className="space-y-3">
-              {kesimAlanlari.map((k) => {
+
+            {projects.map(project => {
+              const projectKesimAlanlari = kesimAlanlari.filter(k => k.projectId === project.id);
+              const isCollapsed = collapsedProjects.has(project.id);
+              const projTotals = projectKesimAlanlari.reduce((acc, k) => {
                 const shares = getTotalShares(k.donations);
-                const animals = getRequiredAnimals(k.donations);
                 const activeDonors = k.donations.filter(d => !d.excluded).length;
-                const totalSlots = k.animalGroups.length * 7;
-                const filledSlots = k.animalGroups.reduce(
-                  (s, g) => s + g.donations.filter(d => d.name.trim() !== "").length, 0
-                );
-                const occupancy = totalSlots > 0 ? Math.round((filledSlots / totalSlots) * 100) : 0;
-                return (
-                  <Card
-                    key={k.id}
-                    className="p-4 hover:bg-accent/50 transition-colors cursor-pointer"
-                    onClick={() => setLocation(`/kesim/${k.id}`)}
-                  >
-                    <div className="flex items-center justify-between mb-2">
+                return {
+                  donors: acc.donors + activeDonors,
+                  shares: acc.shares + shares,
+                  areas: acc.areas + 1,
+                  groups: acc.groups + k.animalGroups.length,
+                };
+              }, { donors: 0, shares: 0, areas: 0, groups: 0 });
+
+              return (
+                <div key={project.id} className="mb-6">
+                  <Card className="p-3 bg-muted/30 border-primary/10">
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="p-0.5 hover:bg-accent rounded"
+                        onClick={() => toggleProjectCollapse(project.id)}
+                      >
+                        {isCollapsed ? (
+                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </button>
+                      <FolderOpen className="w-5 h-5 text-primary" />
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-foreground">{k.name}</h3>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {formatDate(k.createdAt)}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground/60">
-                            ({timeSince(k.createdAt)})
-                          </span>
+                        <h2 className="font-semibold text-foreground text-lg">{project.name}</h2>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                          <span>{projTotals.areas} kesim alanı</span>
+                          <span>{projTotals.donors} bağışçı</span>
+                          <span>{projTotals.shares} hisse</span>
+                          <span>{projTotals.groups} grup</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            requestDelete(k.id);
+                          className="h-7 w-7 p-0"
+                          title="Yeni Kesim Alanı Ekle"
+                          onClick={() => {
+                            setCreateProjectId(project.id);
+                            setDialogOpen(true);
                           }}
                         >
-                          <Trash2 className="w-4 h-4 text-destructive" />
+                          <Plus className="w-4 h-4 text-primary" />
                         </Button>
-                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-center">
-                      <div>
-                        <div className="text-sm font-bold text-primary">{activeDonors}</div>
-                        <div className="text-[10px] text-muted-foreground">Bağışçı</div>
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-primary">{shares}</div>
-                        <div className="text-[10px] text-muted-foreground">Hisse</div>
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-primary">{animals}</div>
-                        <div className="text-[10px] text-muted-foreground">Hayvan</div>
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-primary">{k.animalGroups.length}</div>
-                        <div className="text-[10px] text-muted-foreground">Grup</div>
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-primary">%{occupancy}</div>
-                        <div className="text-[10px] text-muted-foreground">Doluluk</div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          title="Düzenle"
+                          onClick={() => {
+                            setEditingProject({ id: project.id, name: project.name });
+                            setEditProjectDialogOpen(true);
+                          }}
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => setDeleteProjectConfirm({ id: project.id, name: project.name })}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                        </Button>
                       </div>
                     </div>
                   </Card>
-                );
-              })}
-            </div>
+                  {!isCollapsed && (
+                    <div className="space-y-2 mt-2 ml-4 border-l-2 border-primary/10 pl-4">
+                      {projectKesimAlanlari.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-2 italic">
+                          Bu projede henüz kesim alanı yok.
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="px-1 h-auto text-primary"
+                            onClick={() => {
+                              setCreateProjectId(project.id);
+                              setDialogOpen(true);
+                            }}
+                          >
+                            Ekle
+                          </Button>
+                        </p>
+                      ) : (
+                        projectKesimAlanlari.map(k => renderKesimCard(k))
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {unassignedKesimAlanlari.length > 0 && (
+              <div className="mb-6">
+                {projects.length > 0 && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <Scissors className="w-4 h-4 text-muted-foreground" />
+                    <h3 className="text-sm font-semibold text-muted-foreground">Projesiz Kesim Alanları</h3>
+                  </div>
+                )}
+                <div className="space-y-3">
+                  {unassignedKesimAlanlari.map(k => renderKesimCard(k))}
+                </div>
+              </div>
+            )}
           </>
         )}
 
-        {deletedKesimAlanlari.length > 0 && (
+        {(deletedKesimAlanlari.length > 0 || deletedProjects.length > 0) && (
           <div className="mt-6">
             <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2 mb-3">
               <Trash2 className="w-4 h-4" />
-              Çöp Kutusu ({deletedKesimAlanlari.length})
+              Çöp Kutusu ({deletedKesimAlanlari.length + deletedProjects.length})
             </h3>
             <div className="space-y-2">
+              {deletedProjects.map(p => (
+                <Card key={`proj-${p.id}`} className="p-3">
+                  <div className="flex items-center gap-3">
+                    <FolderOpen className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{p.name} <span className="text-xs text-muted-foreground">(Proje)</span></p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Silinme: {p.deletedAt ? formatDateTime(p.deletedAt) : "—"}
+                      </p>
+                    </div>
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleRestoreProject(p.id)}>
+                      <RotateCcw className="w-3 h-3 mr-1" />
+                      Geri Al
+                    </Button>
+                  </div>
+                </Card>
+              ))}
               {deletedKesimAlanlari.map(k => (
                 <Card key={k.id} className="p-3">
                   <div className="flex items-center gap-3">
@@ -903,6 +1234,58 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      <Dialog open={editProjectDialogOpen} onOpenChange={(open) => { setEditProjectDialogOpen(open); if (!open) setEditingProject(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Projeyi Düzenle</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <Input
+              value={editingProject?.name || ""}
+              onChange={(e) => setEditingProject(prev => prev ? { ...prev, name: e.target.value } : null)}
+              onKeyDown={(e) => e.key === "Enter" && handleUpdateProject()}
+              autoFocus
+            />
+            <Button onClick={handleUpdateProject} className="w-full" disabled={!editingProject?.name.trim()}>
+              Kaydet
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={moveDialogOpen} onOpenChange={(open) => { setMoveDialogOpen(open); if (!open) setMovingKesim(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Kesim Alanını Taşı</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <p className="text-sm text-muted-foreground">
+              <strong>"{movingKesim?.name}"</strong> kesim alanını hangi projeye taşımak istiyorsunuz?
+            </p>
+            <Select value={moveTargetProjectId} onValueChange={setMoveTargetProjectId}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Projesiz</SelectItem>
+                {projects
+                  .filter(p => p.id !== movingKesim?.currentProjectId)
+                  .map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={handleMoveKesimAlani}
+              className="w-full"
+              disabled={moveTargetProjectId === (movingKesim?.currentProjectId || "__none__")}
+            >
+              Taşı
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={deleteConfirm !== null} onOpenChange={(open) => { if (!open) setDeleteConfirm(null); }}>
         <AlertDialogContent>
@@ -946,6 +1329,24 @@ export default function Home() {
             <AlertDialogCancel>İptal</AlertDialogCancel>
             <AlertDialogAction onClick={executePermanentDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Kalıcı Olarak Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteProjectConfirm !== null} onOpenChange={(open) => { if (!open) setDeleteProjectConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Projeyi Sil</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>"{deleteProjectConfirm?.name}"</strong> projesi silinecek.
+              Projedeki kesim alanları silinmez, "Projesiz" olarak kalır.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteProject} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Sil
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

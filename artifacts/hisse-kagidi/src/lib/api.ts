@@ -1,4 +1,4 @@
-import type { KesimAlani, CustomTag } from "./types";
+import type { KesimAlani, CustomTag, Project } from "./types";
 
 const API_BASE = import.meta.env.BASE_URL
   ? `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/").replace(/\/$/, "")
@@ -24,6 +24,43 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export async function fetchProjects(): Promise<Project[]> {
+  return apiFetch<Project[]>("/projects");
+}
+
+export async function createProject(name: string): Promise<Project> {
+  return apiFetch<Project>("/projects", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function updateProject(id: string, name: string): Promise<Project> {
+  return apiFetch<Project>(`/projects/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function deleteProject(id: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/projects/${id}`, { method: "DELETE" });
+}
+
+export async function restoreProject(id: string): Promise<Project> {
+  return apiFetch<Project>(`/projects/${id}/restore`, { method: "POST" });
+}
+
+export async function fetchDeletedProjects(): Promise<Project[]> {
+  return apiFetch<Project[]>("/projects/deleted");
+}
+
+export async function moveKesimAlani(kesimAlaniId: string, projectId: string | null): Promise<KesimAlani> {
+  return apiFetch<KesimAlani>(`/kesim-alanlari/${kesimAlaniId}/move`, {
+    method: "PUT",
+    body: JSON.stringify({ projectId }),
+  });
+}
+
 export async function fetchKesimAlanlari(): Promise<KesimAlani[]> {
   return apiFetch<KesimAlani[]>("/kesim-alanlari");
 }
@@ -41,7 +78,7 @@ export async function fetchKesimAlani(id: string): Promise<KesimAlani | null> {
   }
 }
 
-export async function createKesimAlani(data: KesimAlani): Promise<KesimAlani> {
+export async function createKesimAlani(data: KesimAlani & { projectId?: string | null }): Promise<KesimAlani> {
   return apiFetch<KesimAlani>("/kesim-alanlari", {
     method: "POST",
     body: JSON.stringify(data),
@@ -84,19 +121,6 @@ export async function apiUpdateSingleGroup(
   });
 }
 
-export async function apiUpdateDonationsOnly(data: KesimAlani): Promise<KesimAlani> {
-  return apiFetch<KesimAlani>(`/kesim-alanlari/${data.id}`, {
-    method: "PUT",
-    body: JSON.stringify({ donations: data.donations }),
-  });
-}
-
-export async function apiUpdateGroupsOnly(data: KesimAlani): Promise<KesimAlani> {
-  return apiFetch<KesimAlani>(`/kesim-alanlari/${data.id}`, {
-    method: "PUT",
-    body: JSON.stringify({ animalGroups: data.animalGroups }),
-  });
-}
 
 export async function apiDeleteKesimAlani(id: string): Promise<{ success: boolean }> {
   return apiFetch<{ success: boolean }>(`/kesim-alanlari/${id}`, { method: "DELETE" });

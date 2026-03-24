@@ -34,5 +34,20 @@ export interface KesimAlani {
   animalGroups: AnimalGroup[];
   createdAt: string;
   deletedAt?: string | null;
+  projectId?: string | null;
   customTags?: CustomTag[];
+}
+
+export interface ProjectStats {
+  donorCount: number;
+  shareCount: number;
+  groupCount: number;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  createdAt: string;
+  deletedAt?: string | null;
+  stats: ProjectStats;
 }

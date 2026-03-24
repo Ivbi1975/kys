@@ -3051,7 +3051,7 @@ export default function KesimAlaniPage() {
                       Toplu Ekle
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+                  <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
                     <DialogHeader>
                       <DialogTitle>
                         {bulkStep === "input" ? "Toplu Bağışçı Ekle" : "Sütun Eşleştirme"}
@@ -3124,15 +3124,15 @@ export default function KesimAlaniPage() {
                     )}
 
                     {bulkStep === "mapping" && (
-                      <div className="space-y-4 pt-4">
-                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                      <div className="flex flex-col min-h-0 flex-1 pt-4">
+                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg mb-4 flex-shrink-0">
                           <Settings2 className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                           <p className="text-sm text-muted-foreground">
                             Her sütunun hangi bilgiye karşılık geldiğini aşağıdan seçin. Kullanmak istemediğiniz sütunları "Atla" olarak ayarlayın.
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 mb-4 flex-shrink-0">
                           <input
                             type="checkbox"
                             id="hasHeader"
@@ -3145,10 +3145,10 @@ export default function KesimAlaniPage() {
                           </label>
                         </div>
 
-                        <div className="border rounded-lg overflow-hidden">
-                          <div className="overflow-x-auto">
+                        <div className="border rounded-lg overflow-hidden min-h-0 flex-1">
+                          <div className="overflow-auto max-h-full">
                             <table className="w-full text-sm">
-                              <thead>
+                              <thead className="sticky top-0 z-10">
                                 <tr className="bg-primary/10 border-b">
                                   {columnMappings.map((mapping, colIdx) => (
                                     <th key={colIdx} className="p-2 min-w-[140px]">
@@ -3207,7 +3207,7 @@ export default function KesimAlaniPage() {
                           )}
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 pt-4 flex-shrink-0">
                           <Button variant="outline" onClick={() => setBulkStep("input")} className="flex-1">
                             Geri
                           </Button>

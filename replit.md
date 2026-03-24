@@ -93,14 +93,14 @@ Data model (AnimalGroup):
 - `id`, `animalNo`, `donations[]`, `colorTag?` (green/orange/red), `locked?`, `notes?`
 
 Key files:
-- `src/lib/types.ts` - TypeScript types (Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag)
-- `src/lib/api.ts` - API client functions for all CRUD operations (PostgreSQL backend)
+- `src/lib/types.ts` - TypeScript types (Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag, Project, ProjectStats)
+- `src/lib/api.ts` - API client functions for all CRUD operations (PostgreSQL backend), including project CRUD (fetchProjects, createProject, updateProject, deleteProject, restoreProject, fetchDeletedProjects) and moveKesimAlani
 - `src/lib/storage.ts` - Print preferences (localStorage, UI-only settings)
-- `src/lib/grouping.ts` - Auto-grouping algorithm (bin-packing, name-based effective shares)
+- `src/lib/grouping.ts` - Mod 7 smart grouping algorithm (pre-splits into full 7-share animals, then pairs/triples remainders)
 - `src/lib/useHistory.ts` - Snapshot-based undo/redo hook (80 steps, structuredClone)
 - `src/lib/useTheme.ts` - Theme hook supporting light/dark/system modes with system preference detection
 - `src/lib/useWorkspacePreferences.ts` - Workspace layout preferences hook (columnCount, hiddenColumns, compactMode, columnOrder, splitRatio) with localStorage persistence
-- `src/pages/home.tsx` - Home page with kesim alanı list, settings (logo, backup, theme selector, tag management)
+- `src/pages/home.tsx` - Home page with project cards (collapsible), kesim alanı list grouped by project, project CRUD, move kesim alanı between projects, settings (logo, backup, theme selector, tag management)
 - `src/pages/kesim-alani.tsx` - Main editing page with donor table, animal groups, stats, export
 - `src/pages/print.tsx` - Print-optimized A4 landscape view matching Excel design
 
@@ -125,7 +125,7 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
 
 - Entry: `src/index.ts` — reads `PORT`, starts Express
 - App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` (`GET /api/healthz`); `src/routes/kesim-alanlari.ts` (full CRUD for kesim alanları with nested donation/animal-group endpoints and bulk updates, zod-validated); `src/routes/tags.ts` (custom tag CRUD, zod-validated); `src/routes/settings.ts` (logo management, zod-validated); `src/routes/backup.ts` (export/import with transactions, zod-validated)
+- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` (`GET /api/healthz`); `src/routes/projects.ts` (project CRUD with aggregated stats, soft delete/restore); `src/routes/kesim-alanlari.ts` (full CRUD for kesim alanları with nested donation/animal-group endpoints, bulk updates, move between projects, zod-validated); `src/routes/tags.ts` (custom tag CRUD, zod-validated); `src/routes/settings.ts` (logo management, zod-validated); `src/routes/backup.ts` (export/import with transactions, zod-validated); `src/routes/ai-notes.ts` (AI classification with OpenAI integration)
 - Depends on: `@workspace/db`, `@workspace/api-zod`
 - `pnpm --filter @workspace/api-server run dev` — run the dev server
 - `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
@@ -136,7 +136,7 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
 Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
 
 - `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — table definitions with Drizzle-Zod insert schemas: `kesimAlanlariTable`, `donationsTable`, `animalGroupsTable`, `animalGroupDonationsTable`, `customTagsTable`, `donationTagsTable`, `appSettingsTable`
+- `src/schema/index.ts` — table definitions with Drizzle-Zod insert schemas: `projectsTable`, `kesimAlanlariTable` (with `projectId` FK to projects), `donationsTable` (with `deletedAt` for soft-delete), `animalGroupsTable`, `animalGroupDonationsTable`, `customTagsTable`, `donationTagsTable`, `appSettingsTable`
 - `drizzle/` — generated migration files
 - `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
 - Exports: `.` (pool, db, schema), `./schema` (schema only)
