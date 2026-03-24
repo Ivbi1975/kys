@@ -13,6 +13,7 @@ Notları analiz ederken:
 1. Belirtilen kategorilere göre tespit et
 2. Bağışçının cinsi (donationType) ile notları karşılaştır ve tutarsızlıkları bildir
 3. Önemli istekler veya uyarılar varsa belirt
+4. Büyük/küçük harf farkını görmezden gel. "vacip", "vacib", "VACİP", "VACİB" gibi yazımlar aynı anlama gelir, uyarı verme. Benzer şekilde "adak", "Adak", "ADAK" aynıdır
 
 Kategoriler:
 {{CATEGORIES}}

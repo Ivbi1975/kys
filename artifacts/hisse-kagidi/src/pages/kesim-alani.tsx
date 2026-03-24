@@ -91,10 +91,12 @@ import {
   SearchX,
   RotateCcw,
   Send,
+  Home,
+  ChevronRight,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
 import { Tag } from "lucide-react";
-import { fetchKesimAlani, fetchKesimAlanlari, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani } from "@/lib/api";
+import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani } from "@/lib/api";
 import type { DeletedDonation } from "@/lib/api";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
@@ -284,6 +286,7 @@ export default function KesimAlaniPage() {
   const [siblingKesimAlanlari, setSiblingKesimAlanlari] = useState<{ id: string; name: string }[]>([]);
   const [crossKATransferring, setCrossKATransferring] = useState(false);
   const [basketOpen, setBasketOpen] = useState(true);
+  const [projectName, setProjectName] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [, startFilterTransition] = useTransition();
   const [removedFromGroupIds, setRemovedFromGroupIds] = useState<Set<string>>(new Set());
@@ -324,11 +327,16 @@ export default function KesimAlaniPage() {
           setBasketItems(stored);
           if (data.projectId) {
             try {
-              const allKA = await fetchKesimAlanlari();
+              const [allKA, projects] = await Promise.all([
+                fetchKesimAlanlari(),
+                fetchProjects(),
+              ]);
               const siblings = allKA
                 .filter(ka => ka.projectId === data.projectId && ka.id !== data.id && !ka.deletedAt)
                 .map(ka => ({ id: ka.id, name: ka.name }));
               setSiblingKesimAlanlari(siblings);
+              const proj = projects.find(p => p.id === data.projectId);
+              if (proj) setProjectName(proj.name);
             } catch {}
           }
         } else {
@@ -1493,6 +1501,62 @@ export default function KesimAlaniPage() {
       }
     }
     return Array.from(results).sort((a, b) => a - b);
+  }
+
+  function deleteAnimalGroup(groupIdx: number) {
+    if (!kesim) return;
+    const group = kesim.animalGroups[groupIdx];
+    if (!group || group.locked) return;
+    const newGroups = kesim.animalGroups.filter((_, i) => i !== groupIdx);
+    const renumbered = newGroups.map((g, i) => ({ ...g, animalNo: i + 1 }));
+    save({ ...kesim, animalGroups: renumbered }, `Grup silindi: Hayvan ${group.animalNo} (${group.donations.filter(d => d.name.trim()).length} bağışçı grupsuz kaldı)`, true, 'groups');
+    const found = checkGroupConflicts(renumbered);
+    setConflicts(found);
+  }
+
+  async function handleAutoGroupSelected() {
+    if (!kesim || groupingInProgress || selectedIds.size === 0) return;
+    setGroupingInProgress(true);
+    setGroupingProgress(null);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const selectedDonations = kesim.donations.filter(d => selectedIds.has(d.id));
+      const newGroups = await autoGroupDonationsAsync(selectedDonations, (progress) => {
+        setGroupingProgress({ ...progress });
+      });
+      const cleanedExistingGroups = kesim.animalGroups.map(g => ({
+        ...g,
+        donations: g.donations.map(d =>
+          selectedIds.has(d.id) ? { ...d, name: "", description: "", donationType: "", shareCount: 1, notes: "", vekalet: "", excluded: false } : d
+        ),
+      }));
+      const allGroups = [...cleanedExistingGroups, ...newGroups];
+      allGroups.forEach((g, i) => { g.animalNo = i + 1; });
+      const existingDonationIds = new Set(kesim.donations.map(d => d.id));
+      const newDonations: Donation[] = [];
+      for (const g of newGroups) {
+        for (const d of g.donations) {
+          if (!existingDonationIds.has(d.id)) {
+            existingDonationIds.add(d.id);
+            newDonations.push(d);
+          }
+        }
+      }
+      const mergedDonations = [...kesim.donations, ...newDonations];
+      const updated = { ...kesim, donations: mergedDonations, animalGroups: allGroups };
+      if (newDonations.length > 0) {
+        save(updated, `Seçilen ${selectedDonations.length} bağışçı gruplandı: ${newGroups.length} yeni hayvan`, true);
+      } else {
+        save(updated, `Seçilen ${selectedDonations.length} bağışçı gruplandı: ${newGroups.length} yeni hayvan`, true, 'groups');
+      }
+      const found = checkGroupConflicts(allGroups);
+      setConflicts(found);
+      if (found.length > 0) setShowConflicts(true);
+      setSelectedIds(new Set());
+    } finally {
+      setGroupingInProgress(false);
+      setGroupingProgress(null);
+    }
   }
 
   function applyRangeLock(lock: boolean) {
@@ -2974,10 +3038,23 @@ export default function KesimAlaniPage() {
       <div className={`mx-auto p-4 ${fullscreenMode ? "max-w-full" : "max-w-7xl"} ${basketItems.length > 0 ? "pb-24" : ""}`}>
         {!fullscreenMode && (
         <div className="mb-4">
+          <nav className="flex items-center gap-1 text-xs text-muted-foreground mb-2 flex-wrap">
+            <button onClick={() => setLocation("/")} className="flex items-center gap-1 hover:text-foreground transition-colors">
+              <Home className="w-3 h-3" />
+              <span>Ana Sayfa</span>
+            </button>
+            {kesim.projectId && projectName && (
+              <>
+                <ChevronRight className="w-3 h-3" />
+                <button onClick={() => setLocation(`/proje/${kesim.projectId}`)} className="hover:text-foreground transition-colors truncate max-w-[120px]">
+                  {projectName}
+                </button>
+              </>
+            )}
+            <ChevronRight className="w-3 h-3" />
+            <span className="text-foreground font-medium truncate max-w-[200px]">{kesim.name}</span>
+          </nav>
           <div className="flex items-center gap-2 mb-2">
-            <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setLocation("/")}>
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
             <div className="flex-1 min-w-0">
               <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">{kesim.name}</h1>
               <p className="text-xs md:text-sm text-muted-foreground truncate">
@@ -3953,6 +4030,10 @@ export default function KesimAlaniPage() {
                 <Button variant="outline" size="sm" onClick={addSelectedToBasket}>
                   <ShoppingBag className="w-3 h-3 mr-1" />
                   Sepete Ekle
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleAutoGroupSelected} disabled={groupingInProgress}>
+                  <Wand2 className="w-3 h-3 mr-1" />
+                  Seçilenleri Grupla
                 </Button>
                 <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
                   <DialogTrigger asChild>
@@ -5196,6 +5277,19 @@ export default function KesimAlaniPage() {
                           >
                             {group.locked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
                           </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (group.locked) return;
+                              if (!confirm(`Hayvan ${group.animalNo} grubunu silmek istediğinize emin misiniz? İçindeki bağışçılar grupsuz kalacaktır.`)) return;
+                              deleteAnimalGroup(groupIdx);
+                            }}
+                            className={`p-0.5 rounded transition-colors ${group.locked ? "opacity-30 cursor-not-allowed" : "text-red-400/60 hover:text-red-500"}`}
+                            title={group.locked ? "Kilitli grup silinemez" : "Grubu Sil"}
+                            disabled={group.locked}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
                       {!isCollapsed && (
@@ -5832,18 +5926,33 @@ export default function KesimAlaniPage() {
             </button>
             {basketOpen && (
               <div className="px-4 pb-3 space-y-2">
-                {localBasketItems.length > 0 && (
+                {localBasketItems.length > 0 && (() => {
+                  const grouped: { key: string; label: string; items: typeof localBasketItems }[] = [];
+                  const seen = new Map<string, number>();
+                  for (const b of localBasketItems) {
+                    const label = (b.description || b.name).trim();
+                    const existing = seen.get(label);
+                    if (existing !== undefined) {
+                      grouped[existing].items.push(b);
+                    } else {
+                      seen.set(label, grouped.length);
+                      grouped.push({ key: label, label, items: [b] });
+                    }
+                  }
+                  return (
                   <div className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300 flex-wrap">
                     <span className="text-[10px] font-semibold mr-1">Bu KA:</span>
-                    {localBasketItems.slice(0, 6).map(b => (
-                      <span key={b.donationId} className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900 rounded text-[10px]">
-                        {b.description || b.name}
-                        <button className="ml-1 hover:text-destructive" onClick={() => removeFromBasket(b.donationId)}>×</button>
+                    {grouped.slice(0, 6).map(g => (
+                      <span key={g.key} className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900 rounded text-[10px] inline-flex items-center gap-0.5">
+                        {g.label}
+                        {g.items.length > 1 && <span className="bg-emerald-200 dark:bg-emerald-800 px-1 rounded-full text-[9px] font-bold">×{g.items.length}</span>}
+                        <button className="ml-0.5 hover:text-destructive" onClick={() => g.items.forEach(b => removeFromBasket(b.donationId))}>×</button>
                       </span>
                     ))}
-                    {localBasketItems.length > 6 && <span className="text-[10px]">+{localBasketItems.length - 6}</span>}
+                    {grouped.length > 6 && <span className="text-[10px]">+{grouped.length - 6}</span>}
                   </div>
-                )}
+                  );
+                })()}
                 {foreignBasketItems.length > 0 && (
                   <div className="flex items-center gap-1 text-xs text-blue-700 dark:text-blue-300 flex-wrap">
                     <span className="text-[10px] font-semibold mr-1">Diğer KA:</span>

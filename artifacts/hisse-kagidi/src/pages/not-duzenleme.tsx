@@ -18,7 +18,6 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import {
-  ArrowLeft,
   Search,
   Replace,
   Trash2,
@@ -35,11 +34,14 @@ import {
   FileBarChart,
   ChevronDown,
   ChevronUp,
+  Home,
+  ChevronRight,
 } from "lucide-react";
 import type { KesimAlani } from "@/lib/types";
 import type { AiClassificationResult } from "@/lib/api";
 import {
   fetchKesimAlani,
+  fetchProjects,
   bulkUpdateNotes,
   classifyNotes,
   saveAiClassifications,
@@ -89,6 +91,7 @@ export default function NotDuzenlemePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [projectName, setProjectName] = useState<string | null>(null);
 
   const historyRef = useRef<LocalDonation[][]>([]);
   const historyIndexRef = useRef(-1);
@@ -168,13 +171,20 @@ export default function NotDuzenlemePage() {
 
   useEffect(() => {
     if (!params.id) return;
-    fetchKesimAlani(params.id).then((data) => {
+    fetchKesimAlani(params.id).then(async (data) => {
       if (!data) {
         toast({ title: "Hata", description: "Kesim alanı bulunamadı", variant: "destructive" });
         setLocation("/");
         return;
       }
       setKesim(data);
+      if (data.projectId) {
+        try {
+          const projects = await fetchProjects();
+          const proj = projects.find(p => p.id === data.projectId);
+          if (proj) setProjectName(proj.name);
+        } catch {}
+      }
       const allDonations: LocalDonation[] = [];
       for (const d of data.donations) {
         if (!allDonations.find(x => x.id === d.id)) {
@@ -470,11 +480,28 @@ export default function NotDuzenlemePage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
-        <div className="flex items-center gap-3 p-3">
-          <Button variant="ghost" size="sm" onClick={() => setLocation(`/kesim/${params.id}`)}>
-            <ArrowLeft className="w-4 h-4 mr-1" />
-            Geri
-          </Button>
+        <div className="flex flex-col gap-1 p-3">
+          <nav className="flex items-center gap-1 text-xs text-muted-foreground flex-wrap">
+            <button onClick={() => setLocation("/")} className="flex items-center gap-1 hover:text-foreground transition-colors">
+              <Home className="w-3 h-3" />
+              <span>Ana Sayfa</span>
+            </button>
+            {kesim?.projectId && projectName && (
+              <>
+                <ChevronRight className="w-3 h-3" />
+                <button onClick={() => setLocation(`/proje/${kesim.projectId}`)} className="hover:text-foreground transition-colors truncate max-w-[120px]">
+                  {projectName}
+                </button>
+              </>
+            )}
+            <ChevronRight className="w-3 h-3" />
+            <button onClick={() => setLocation(`/kesim/${params.id}`)} className="hover:text-foreground transition-colors truncate max-w-[120px]">
+              {kesim?.name || "Kesim Alanı"}
+            </button>
+            <ChevronRight className="w-3 h-3" />
+            <span className="text-foreground font-medium">Notlar</span>
+          </nav>
+          <div className="flex items-center gap-3">
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-semibold truncate">Not Düzenleme</h1>
             <p className="text-xs text-muted-foreground truncate">{kesim?.name} — {donations.length} bağışçı, {notesWithContent.length} notu olan</p>
@@ -514,6 +541,7 @@ export default function NotDuzenlemePage() {
                 Kaydet
               </Button>
             )}
+          </div>
           </div>
         </div>
       </div>
