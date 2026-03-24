@@ -1,15 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "wouter";
-import { fetchTrackingData, toggleKesildi, fetchTrackingNotes, createTrackingNote } from "@/lib/api";
-import type { TrackingData, TrackingGroup, TrackingNote } from "@/lib/api";
+import { fetchTrackingData, toggleKesildi, fetchTrackingNotes, createTrackingNote, fetchGroupPhotos, getGroupPhotoUrl, uploadGroupPhoto, deleteGroupPhoto } from "@/lib/api";
+import type { TrackingData, TrackingGroup, TrackingNote, GroupPhoto } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import PhotoGallery from "@/components/PhotoGallery";
 import {
   CheckCircle2, Circle, Loader2, AlertTriangle, Beef, Clock, X,
   ChevronLeft, ChevronRight, MessageSquarePlus, Mic, MicOff, Send,
-  StickyNote, Edit3, ChevronDown, ChevronUp
+  StickyNote, Edit3, ChevronDown, ChevronUp, Camera
 } from "lucide-react";
 
 const colorMap: Record<string, string> = {
@@ -389,6 +390,10 @@ function KesimKagidiOverlay({
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [showNotes, setShowNotes] = useState(false);
   const [editDonorIdx, setEditDonorIdx] = useState<number | null>(null);
+  const [showPhotos, setShowPhotos] = useState(false);
+  const [photos, setPhotos] = useState<GroupPhoto[]>([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
+  const photosLoadedFor = useRef<string | null>(null);
 
   const group = groups[currentIndex];
   if (!group) return null;
@@ -396,10 +401,14 @@ function KesimKagidiOverlay({
   const goNext = () => {
     if (currentIndex < groups.length - 1) setCurrentIndex(currentIndex + 1);
     setEditDonorIdx(null);
+    setShowPhotos(false);
+    photosLoadedFor.current = null;
   };
   const goPrev = () => {
     if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
     setEditDonorIdx(null);
+    setShowPhotos(false);
+    photosLoadedFor.current = null;
   };
 
   const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
@@ -624,6 +633,50 @@ function KesimKagidiOverlay({
                 <div className="space-y-2">
                   <NoteInput groupId={group.id} token={token} onNoteAdded={onNoteAdded} />
                   <NotesList notes={notes} groupId={group.id} />
+                </div>
+              )}
+            </div>
+
+            <div className="mt-3">
+              <button
+                className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground mb-2"
+                onClick={() => {
+                  setShowPhotos(!showPhotos);
+                  if (!showPhotos && photosLoadedFor.current !== group.id) {
+                    setPhotosLoading(true);
+                    fetchGroupPhotos(token, group.id)
+                      .then(p => { setPhotos(p); photosLoadedFor.current = group.id; })
+                      .catch(() => setPhotos([]))
+                      .finally(() => setPhotosLoading(false));
+                  }
+                }}
+              >
+                <Camera className="w-3.5 h-3.5" />
+                Fotoğraflar {photos.length > 0 && photosLoadedFor.current === group.id && `(${photos.length})`}
+                {showPhotos ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+              {showPhotos && (
+                <div className="mt-1">
+                  {photosLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Yükleniyor...
+                    </div>
+                  ) : (
+                    <PhotoGallery
+                      photos={photos}
+                      getPhotoUrl={(photoId) => getGroupPhotoUrl(token, group.id, photoId)}
+                      onUpload={async (data, mimeType) => {
+                        const photo = await uploadGroupPhoto(token, group.id, data, mimeType);
+                        setPhotos(prev => [...prev, photo]);
+                        return photo;
+                      }}
+                      onDelete={async (photoId) => {
+                        await deleteGroupPhoto(token, group.id, photoId);
+                        setPhotos(prev => prev.filter(p => p.id !== photoId));
+                      }}
+                    />
+                  )}
                 </div>
               )}
             </div>

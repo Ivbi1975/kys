@@ -8,6 +8,7 @@ import {
   donationTagsTable,
   projectsTable,
   trackingNotesTable,
+  animalGroupPhotosTable,
 } from "@workspace/db/schema";
 import { desc } from "drizzle-orm";
 import { eq, inArray, isNull, isNotNull, and } from "drizzle-orm";
@@ -1628,6 +1629,191 @@ router.put("/kesim-alanlari/:id/tracking-notes/:noteId/status", async (req, res)
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`PUT /kesim-alanlari/${req.params.id}/tracking-notes/${req.params.noteId}/status error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+const MAX_PHOTOS_PER_GROUP = 5;
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+
+router.get("/tracking/:token/group/:groupId/photos", async (req, res) => {
+  try {
+    const { token, groupId } = req.params;
+    const [ka] = await db.select().from(kesimAlanlariTable)
+      .where(eq(kesimAlanlariTable.trackingToken, token));
+    if (!ka) { res.status(404).json({ error: "Bulunamadı" }); return; }
+
+    const [group] = await db.select().from(animalGroupsTable)
+      .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
+    if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+
+    const photos = await db.select({
+      id: animalGroupPhotosTable.id,
+      mimeType: animalGroupPhotosTable.mimeType,
+      createdAt: animalGroupPhotosTable.createdAt,
+    }).from(animalGroupPhotosTable)
+      .where(eq(animalGroupPhotosTable.animalGroupId, groupId))
+      .orderBy(animalGroupPhotosTable.createdAt);
+
+    res.json(photos);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/tracking/:token/group/:groupId/photos/:photoId", async (req, res) => {
+  try {
+    const { token, groupId, photoId } = req.params;
+    const [ka] = await db.select().from(kesimAlanlariTable)
+      .where(eq(kesimAlanlariTable.trackingToken, token));
+    if (!ka) { res.status(404).json({ error: "Bulunamadı" }); return; }
+
+    const [photo] = await db.select().from(animalGroupPhotosTable)
+      .where(and(eq(animalGroupPhotosTable.id, photoId), eq(animalGroupPhotosTable.animalGroupId, groupId)));
+    if (!photo) { res.status(404).json({ error: "Fotoğraf bulunamadı" }); return; }
+
+    const base64Data = photo.data.replace(/^data:[^;]+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
+    res.setHeader("Content-Type", photo.mimeType);
+    res.setHeader("Content-Length", buffer.length);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(buffer);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/tracking/:token/group/:groupId/photos", async (req, res) => {
+  try {
+    const { token, groupId } = req.params;
+    const { data, mimeType } = req.body;
+
+    if (!data || typeof data !== "string") {
+      res.status(400).json({ error: "Fotoğraf verisi gerekli" }); return;
+    }
+
+    const validMimes = ["image/jpeg", "image/png", "image/webp"];
+    const mime = validMimes.includes(mimeType) ? mimeType : "image/jpeg";
+
+    const base64Part = data.replace(/^data:[^;]+;base64,/, "");
+    const sizeBytes = Math.ceil(base64Part.length * 3 / 4);
+    if (sizeBytes > MAX_PHOTO_SIZE) {
+      res.status(400).json({ error: "Fotoğraf çok büyük (max 5MB)" }); return;
+    }
+
+    const [ka] = await db.select().from(kesimAlanlariTable)
+      .where(eq(kesimAlanlariTable.trackingToken, token));
+    if (!ka) { res.status(404).json({ error: "Bulunamadı" }); return; }
+
+    const [group] = await db.select().from(animalGroupsTable)
+      .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
+    if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+
+    const existingPhotos = await db.select({ id: animalGroupPhotosTable.id })
+      .from(animalGroupPhotosTable)
+      .where(eq(animalGroupPhotosTable.animalGroupId, groupId));
+    if (existingPhotos.length >= MAX_PHOTOS_PER_GROUP) {
+      res.status(400).json({ error: `Grup başına en fazla ${MAX_PHOTOS_PER_GROUP} fotoğraf yüklenebilir` }); return;
+    }
+
+    const photoId = crypto.randomUUID();
+    await db.insert(animalGroupPhotosTable).values({
+      id: photoId,
+      animalGroupId: groupId,
+      data: data.startsWith("data:") ? data : `data:${mime};base64,${data}`,
+      mimeType: mime,
+      createdAt: new Date().toISOString(),
+    });
+
+    res.status(201).json({ id: photoId, mimeType: mime, createdAt: new Date().toISOString() });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.delete("/tracking/:token/group/:groupId/photos/:photoId", async (req, res) => {
+  try {
+    const { token, groupId, photoId } = req.params;
+    const [ka] = await db.select().from(kesimAlanlariTable)
+      .where(eq(kesimAlanlariTable.trackingToken, token));
+    if (!ka) { res.status(404).json({ error: "Bulunamadı" }); return; }
+
+    await db.delete(animalGroupPhotosTable)
+      .where(and(eq(animalGroupPhotosTable.id, photoId), eq(animalGroupPhotosTable.animalGroupId, groupId)));
+
+    res.json({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/kesim-alanlari/:id/group/:groupId/photos", async (req, res) => {
+  try {
+    const { id, groupId } = req.params;
+    const [ka] = await db.select().from(kesimAlanlariTable)
+      .where(eq(kesimAlanlariTable.id, id));
+    if (!ka) { res.status(404).json({ error: "Bulunamadı" }); return; }
+
+    const photos = await db.select({
+      id: animalGroupPhotosTable.id,
+      mimeType: animalGroupPhotosTable.mimeType,
+      createdAt: animalGroupPhotosTable.createdAt,
+    }).from(animalGroupPhotosTable)
+      .where(eq(animalGroupPhotosTable.animalGroupId, groupId))
+      .orderBy(animalGroupPhotosTable.createdAt);
+
+    res.json(photos);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/kesim-alanlari/:id/group/:groupId/photos/:photoId", async (req, res) => {
+  try {
+    const { groupId, photoId } = req.params;
+    const [photo] = await db.select().from(animalGroupPhotosTable)
+      .where(and(eq(animalGroupPhotosTable.id, photoId), eq(animalGroupPhotosTable.animalGroupId, groupId)));
+    if (!photo) { res.status(404).json({ error: "Fotoğraf bulunamadı" }); return; }
+
+    const base64Data = photo.data.replace(/^data:[^;]+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
+    res.setHeader("Content-Type", photo.mimeType);
+    res.setHeader("Content-Length", buffer.length);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(buffer);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/kesim-alanlari/:id/photos/counts", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const groups = await db.select({ id: animalGroupsTable.id })
+      .from(animalGroupsTable)
+      .where(eq(animalGroupsTable.kesimAlaniId, id));
+    const groupIds = groups.map(g => g.id);
+    if (groupIds.length === 0) { res.json({}); return; }
+
+    const photos = await db.select({
+      animalGroupId: animalGroupPhotosTable.animalGroupId,
+      id: animalGroupPhotosTable.id,
+    }).from(animalGroupPhotosTable)
+      .where(inArray(animalGroupPhotosTable.animalGroupId, groupIds));
+
+    const counts: Record<string, number> = {};
+    for (const p of photos) {
+      counts[p.animalGroupId] = (counts[p.animalGroupId] || 0) + 1;
+    }
+    res.json(counts);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     res.status(500).json({ error: message });
   }
 });

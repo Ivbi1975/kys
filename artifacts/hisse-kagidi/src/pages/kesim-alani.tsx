@@ -100,11 +100,13 @@ import {
   Edit3,
   Check,
   QrCode,
+  Tag,
+  Camera,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
-import { Tag } from "lucide-react";
-import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani, generateTrackingToken, fetchKesimAlaniTrackingNotes, updateTrackingNoteStatus } from "@/lib/api";
-import type { DeletedDonation, TrackingNote } from "@/lib/api";
+import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani, generateTrackingToken, fetchKesimAlaniTrackingNotes, updateTrackingNoteStatus, fetchGroupPhotosAdmin, getGroupPhotoUrlAdmin, fetchPhotoCountsAdmin } from "@/lib/api";
+import type { DeletedDonation, TrackingNote, GroupPhoto } from "@/lib/api";
+import PhotoGallery from "@/components/PhotoGallery";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
 import { useHistory } from "@/lib/useHistory";
@@ -310,6 +312,11 @@ export default function KesimAlaniPage() {
   const [trackingNotes, setTrackingNotes] = useState<TrackingNote[]>([]);
   const [trackingNotesLoading, setTrackingNotesLoading] = useState(false);
 
+  const [photoCounts, setPhotoCounts] = useState<Record<string, number>>({});
+  const [photoViewGroup, setPhotoViewGroup] = useState<{ id: string; animalNo: number } | null>(null);
+  const [photoViewPhotos, setPhotoViewPhotos] = useState<GroupPhoto[]>([]);
+  const [photoViewLoading, setPhotoViewLoading] = useState(false);
+
   const [findDeleteOpen, setFindDeleteOpen] = useState(false);
   const [findDeleteColumn, setFindDeleteColumn] = useState<"name" | "description" | "donationType" | "vekalet" | "notes">("description");
   const [findDeleteValue, setFindDeleteValue] = useState("");
@@ -339,6 +346,7 @@ export default function KesimAlaniPage() {
           history.initialize(data);
           const stored = loadBasketFromStorage(data.projectId);
           setBasketItems(stored);
+          fetchPhotoCountsAdmin(data.id).then(setPhotoCounts).catch(() => {});
           if (data.projectId) {
             try {
               const [allKA, projects] = await Promise.all([
@@ -3297,6 +3305,16 @@ export default function KesimAlaniPage() {
               </Card>
             );
           })()}
+          {Object.values(photoCounts).reduce((a, b) => a + b, 0) > 0 && (
+            <Card className="p-3 text-center">
+              <div className="text-2xl font-bold text-blue-600">
+                {Object.values(photoCounts).reduce((a, b) => a + b, 0)}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Fotoğraf ({Object.keys(photoCounts).length} grup)
+              </div>
+            </Card>
+          )}
           {ungroupedDonors.length > 0 && (
             <Card
               className={`p-3 text-center cursor-pointer transition-colors ${filterUngrouped ? "ring-2 ring-orange-500 bg-orange-50 dark:bg-orange-950" : "hover:bg-muted"}`}
@@ -5392,6 +5410,26 @@ export default function KesimAlaniPage() {
                           >
                             <ShoppingBag className="w-3.5 h-3.5" />
                           </button>
+                          {(photoCounts[group.id] ?? 0) > 0 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPhotoViewGroup({ id: group.id, animalNo: group.animalNo });
+                                setPhotoViewLoading(true);
+                                fetchGroupPhotosAdmin(kesim.id, group.id)
+                                  .then(setPhotoViewPhotos)
+                                  .catch(() => setPhotoViewPhotos([]))
+                                  .finally(() => setPhotoViewLoading(false));
+                              }}
+                              className="p-0.5 rounded transition-colors text-blue-500 hover:text-blue-600 relative"
+                              title={`${photoCounts[group.id]} fotoğraf`}
+                            >
+                              <Camera className="w-3.5 h-3.5" />
+                              <span className="absolute -top-1.5 -right-1.5 bg-blue-500 text-white text-[8px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none font-bold">
+                                {photoCounts[group.id]}
+                              </span>
+                            </button>
+                          )}
                           <button
                             onClick={(e) => { e.stopPropagation(); toggleGroupLock(groupIdx); }}
                             className={`p-0.5 rounded transition-colors ${group.locked ? "text-amber-500" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
@@ -6449,6 +6487,32 @@ export default function KesimAlaniPage() {
         url={qrUrl}
         title={kesim?.name}
       />
+
+      <Dialog open={!!photoViewGroup} onOpenChange={(open) => { if (!open) setPhotoViewGroup(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Camera className="w-5 h-5" />
+              Hayvan {photoViewGroup?.animalNo} — Fotoğraflar
+            </DialogTitle>
+          </DialogHeader>
+          {photoViewLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+          ) : photoViewPhotos.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              Bu hayvan grubunda fotoğraf yok.
+            </div>
+          ) : (
+            <PhotoGallery
+              photos={photoViewPhotos}
+              getPhotoUrl={(photoId) => kesim ? getGroupPhotoUrlAdmin(kesim.id, photoViewGroup!.id, photoId) : ""}
+              readOnly
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

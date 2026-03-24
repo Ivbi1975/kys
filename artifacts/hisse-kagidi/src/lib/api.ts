@@ -508,3 +508,42 @@ export async function updateTrackingNoteStatus(kesimAlaniId: string, noteId: str
     body: JSON.stringify({ status }),
   });
 }
+
+export interface GroupPhoto {
+  id: string;
+  mimeType: string;
+  createdAt: string;
+}
+
+export async function fetchGroupPhotos(token: string, groupId: string): Promise<GroupPhoto[]> {
+  return apiFetch<GroupPhoto[]>(`/tracking/${token}/group/${groupId}/photos`);
+}
+
+export function getGroupPhotoUrl(token: string, groupId: string, photoId: string): string {
+  return `${API_BASE}/tracking/${token}/group/${groupId}/photos/${photoId}`;
+}
+
+export async function uploadGroupPhoto(token: string, groupId: string, data: string, mimeType: string): Promise<GroupPhoto> {
+  return apiFetch<GroupPhoto>(`/tracking/${token}/group/${groupId}/photos`, {
+    method: "POST",
+    body: JSON.stringify({ data, mimeType }),
+  });
+}
+
+export async function deleteGroupPhoto(token: string, groupId: string, photoId: string): Promise<void> {
+  await apiFetch(`/tracking/${token}/group/${groupId}/photos/${photoId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function fetchGroupPhotosAdmin(kesimAlaniId: string, groupId: string): Promise<GroupPhoto[]> {
+  return apiFetch<GroupPhoto[]>(`/kesim-alanlari/${kesimAlaniId}/group/${groupId}/photos`);
+}
+
+export function getGroupPhotoUrlAdmin(kesimAlaniId: string, groupId: string, photoId: string): string {
+  return `${API_BASE}/kesim-alanlari/${kesimAlaniId}/group/${groupId}/photos/${photoId}`;
+}
+
+export async function fetchPhotoCountsAdmin(kesimAlaniId: string): Promise<Record<string, number>> {
+  return apiFetch<Record<string, number>>(`/kesim-alanlari/${kesimAlaniId}/photos/counts`);
+}

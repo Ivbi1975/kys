@@ -117,6 +117,20 @@ export const insertTrackingNoteSchema = createInsertSchema(trackingNotesTable);
 export type InsertTrackingNote = z.infer<typeof insertTrackingNoteSchema>;
 export type TrackingNoteRow = typeof trackingNotesTable.$inferSelect;
 
+export const animalGroupPhotosTable = pgTable("animal_group_photos", {
+  id: text("id").primaryKey(),
+  animalGroupId: text("animal_group_id").notNull().references(() => animalGroupsTable.id, { onDelete: "cascade" }),
+  data: text("data").notNull(),
+  mimeType: text("mime_type").notNull().default("image/jpeg"),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  index("idx_photos_animal_group_id").on(table.animalGroupId),
+]);
+
+export const insertAnimalGroupPhotoSchema = createInsertSchema(animalGroupPhotosTable);
+export type InsertAnimalGroupPhoto = z.infer<typeof insertAnimalGroupPhotoSchema>;
+export type AnimalGroupPhotoRow = typeof animalGroupPhotosTable.$inferSelect;
+
 export const appSettingsTable = pgTable("app_settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
