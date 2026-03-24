@@ -268,6 +268,67 @@ export async function classifyNotes(donations: AiDonationInput[]): Promise<{ res
   });
 }
 
+export interface ConflictEntry {
+  donationId: string;
+  donationName: string;
+  donationDescription: string;
+  donationNotes: string;
+  kesimAlaniId: string;
+  kesimAlaniName: string;
+  animalGroupId: string | null;
+  animalGroupNo: number | null;
+  hasNoteWarning: boolean;
+  siblingsInGroup: Array<{
+    donationId: string;
+    donationName: string;
+    donationDescription: string;
+    donationNotes: string;
+    donationType: string;
+    shareCount: number;
+    vekalet: string;
+  }>;
+}
+
+export interface Conflict {
+  key: string;
+  matchField: "name" | "description";
+  displayName: string;
+  entries: ConflictEntry[];
+  kesimAlanCount: number;
+  totalEntries: number;
+  hasNoteWarnings: boolean;
+}
+
+export interface ConflictCheckResult {
+  conflicts: Conflict[];
+  totalConflicts: number;
+}
+
+export async function fetchCatismaTespiti(): Promise<ConflictCheckResult> {
+  return apiFetch<ConflictCheckResult>("/catisma-tespiti");
+}
+
+export interface TransferPayload {
+  donationId: string;
+  sourceKesimAlaniId: string;
+  targetKesimAlaniId: string;
+  transferAnimal?: boolean;
+  animalGroupId?: string;
+}
+
+export interface TransferResult {
+  success: boolean;
+  source: KesimAlani;
+  target: KesimAlani;
+}
+
+export async function transferDonation(payload: TransferPayload): Promise<TransferResult> {
+  return apiFetch<TransferResult>("/catisma-tespiti/transfer", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function bulkUpdateNotes(kesimAlaniId: string, updates: { donationId: string; notes: string }[]): Promise<{ success: boolean; count: number }> {
   return apiFetch<{ success: boolean; count: number }>("/ai-notes/bulk-update", {
     method: "PUT",

@@ -792,6 +792,344 @@ router.delete("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => 
   }
 });
 
+router.get("/catisma-tespiti", async (_req, res) => {
+  try {
+    const allKA = await db.select().from(kesimAlanlariTable).where(isNull(kesimAlanlariTable.deletedAt));
+    const allDonations = allKA.length > 0
+      ? await db.select().from(donationsTable)
+          .where(and(
+            inArray(donationsTable.kesimAlaniId, allKA.map(k => k.id)),
+            isNull(donationsTable.deletedAt)
+          ))
+      : [];
+    const allGroups = allKA.length > 0
+      ? await db.select().from(animalGroupsTable)
+          .where(inArray(animalGroupsTable.kesimAlaniId, allKA.map(k => k.id)))
+      : [];
+    const allDonationIds = allDonations.map(d => d.id);
+    const allGroupIds = allGroups.map(g => g.id);
+    const [donationTags, groupDonationLinks] = await Promise.all([
+      allDonationIds.length > 0
+        ? db.select().from(donationTagsTable).where(inArray(donationTagsTable.donationId, allDonationIds))
+        : Promise.resolve([]),
+      allGroupIds.length > 0
+        ? db.select().from(animalGroupDonationsTable).where(inArray(animalGroupDonationsTable.groupId, allGroupIds))
+        : Promise.resolve([]),
+    ]);
+
+    const tagsByDonation: Record<string, string[]> = {};
+    for (const dt of donationTags) {
+      if (!tagsByDonation[dt.donationId]) tagsByDonation[dt.donationId] = [];
+      tagsByDonation[dt.donationId].push(dt.tagId);
+    }
+
+    const donationsByGroupId: Record<string, string[]> = {};
+    for (const link of groupDonationLinks) {
+      if (!donationsByGroupId[link.groupId]) donationsByGroupId[link.groupId] = [];
+      donationsByGroupId[link.groupId].push(link.donationId);
+    }
+
+    const groupsByDonationId: Record<string, string[]> = {};
+    for (const link of groupDonationLinks) {
+      if (!groupsByDonationId[link.donationId]) groupsByDonationId[link.donationId] = [];
+      groupsByDonationId[link.donationId].push(link.groupId);
+    }
+
+    const kaById = Object.fromEntries(allKA.map(k => [k.id, k]));
+    const donationById = Object.fromEntries(allDonations.map(d => [d.id, d]));
+    const groupById = Object.fromEntries(allGroups.map(g => [g.id, g]));
+
+    const normalizeStr = (s: string) => (s || "").trim().toLowerCase();
+
+    type ConflictEntry = {
+      donationId: string;
+      donationName: string;
+      donationDescription: string;
+      donationNotes: string;
+      kesimAlaniId: string;
+      kesimAlaniName: string;
+      animalGroupId: string | null;
+      animalGroupNo: number | null;
+      hasNoteWarning: boolean;
+      siblingsInGroup: Array<{
+        donationId: string;
+        donationName: string;
+        donationDescription: string;
+        donationNotes: string;
+        donationType: string;
+        shareCount: number;
+        vekalet: string;
+      }>;
+    };
+
+    type Conflict = {
+      key: string;
+      matchField: "name" | "description";
+      displayName: string;
+      entries: ConflictEntry[];
+      kesimAlanCount: number;
+      totalEntries: number;
+      hasNoteWarnings: boolean;
+    };
+
+    const NOTE_WARNING_KEYWORDS = ["iade", "iptal", "hata", "yanlış", "sorun", "problem", "dikkat", "uyarı", "eksik", "hatalı", "değiştirilecek"];
+    const hasNoteWarning = (notes: string) => {
+      if (!notes) return false;
+      const lower = notes.toLowerCase();
+      return NOTE_WARNING_KEYWORDS.some(kw => lower.includes(kw));
+    };
+
+    const groupedByName: Record<string, { displayName: string; donations: typeof allDonations }> = {};
+    const groupedByDescription: Record<string, { displayDescription: string; donations: typeof allDonations }> = {};
+
+    for (const d of allDonations) {
+      const nameKey = normalizeStr(d.name);
+      if (nameKey) {
+        if (!groupedByName[nameKey]) groupedByName[nameKey] = { displayName: d.name, donations: [] };
+        groupedByName[nameKey].donations.push(d);
+      }
+      const descKey = normalizeStr(d.description);
+      if (descKey) {
+        if (!groupedByDescription[descKey]) groupedByDescription[descKey] = { displayDescription: d.description, donations: [] };
+        groupedByDescription[descKey].donations.push(d);
+      }
+    }
+
+    function buildConflictEntries(donations: typeof allDonations): ConflictEntry[] {
+      const entries: ConflictEntry[] = [];
+      for (const d of donations) {
+        const groupIds = groupsByDonationId[d.id] || [];
+        if (groupIds.length === 0) {
+          const siblings = allDonations
+            .filter(od => od.kesimAlaniId === d.kesimAlaniId && od.id !== d.id)
+            .slice(0, 5)
+            .map(od => ({
+              donationId: od.id,
+              donationName: od.name,
+              donationDescription: od.description,
+              donationNotes: od.notes,
+              donationType: od.donationType,
+              shareCount: od.shareCount,
+              vekalet: od.vekalet,
+            }));
+          entries.push({
+            donationId: d.id,
+            donationName: d.name,
+            donationDescription: d.description,
+            donationNotes: d.notes,
+            kesimAlaniId: d.kesimAlaniId,
+            kesimAlaniName: kaById[d.kesimAlaniId]?.name || d.kesimAlaniId,
+            animalGroupId: null,
+            animalGroupNo: null,
+            hasNoteWarning: hasNoteWarning(d.notes),
+            siblingsInGroup: siblings,
+          });
+        } else {
+          for (const groupId of groupIds) {
+            const group = groupById[groupId];
+            const siblingDonationIds = donationsByGroupId[groupId] || [];
+            const siblings = siblingDonationIds
+              .filter(sid => sid !== d.id)
+              .map(sid => donationById[sid])
+              .filter(Boolean)
+              .map(od => ({
+                donationId: od.id,
+                donationName: od.name,
+                donationDescription: od.description,
+                donationNotes: od.notes,
+                donationType: od.donationType,
+                shareCount: od.shareCount,
+                vekalet: od.vekalet,
+              }));
+            entries.push({
+              donationId: d.id,
+              donationName: d.name,
+              donationDescription: d.description,
+              donationNotes: d.notes,
+              kesimAlaniId: d.kesimAlaniId,
+              kesimAlaniName: kaById[d.kesimAlaniId]?.name || d.kesimAlaniId,
+              animalGroupId: groupId,
+              animalGroupNo: group?.animalNo ?? null,
+              hasNoteWarning: hasNoteWarning(d.notes),
+              siblingsInGroup: siblings,
+            });
+          }
+        }
+      }
+      return entries;
+    }
+
+    const seenConflictKeys = new Set<string>();
+    const conflicts: Conflict[] = [];
+
+    for (const [key, { displayName, donations }] of Object.entries(groupedByName)) {
+      if (donations.length <= 1) continue;
+      const entries = buildConflictEntries(donations);
+      const uniqueKesimAlaniIds = new Set(entries.map(e => e.kesimAlaniId));
+      if (uniqueKesimAlaniIds.size <= 1 && donations.length <= 1) continue;
+      seenConflictKeys.add(key);
+      conflicts.push({
+        key,
+        matchField: "name",
+        displayName,
+        entries,
+        kesimAlanCount: uniqueKesimAlaniIds.size,
+        totalEntries: entries.length,
+        hasNoteWarnings: entries.some(e => e.hasNoteWarning),
+      });
+    }
+
+    for (const [key, { displayDescription, donations }] of Object.entries(groupedByDescription)) {
+      if (donations.length <= 1) continue;
+      if (seenConflictKeys.has(key)) continue;
+      const entries = buildConflictEntries(donations);
+      const uniqueKesimAlaniIds = new Set(entries.map(e => e.kesimAlaniId));
+      if (uniqueKesimAlaniIds.size <= 1 && donations.length <= 1) continue;
+      conflicts.push({
+        key: `desc:${key}`,
+        matchField: "description",
+        displayName: displayDescription,
+        entries,
+        kesimAlanCount: uniqueKesimAlaniIds.size,
+        totalEntries: entries.length,
+        hasNoteWarnings: entries.some(e => e.hasNoteWarning),
+      });
+    }
+
+    conflicts.sort((a, b) => {
+      if (b.kesimAlanCount !== a.kesimAlanCount) return b.kesimAlanCount - a.kesimAlanCount;
+      if (b.hasNoteWarnings !== a.hasNoteWarnings) return b.hasNoteWarnings ? 1 : -1;
+      return b.totalEntries - a.totalEntries;
+    });
+
+    res.json({ conflicts, totalConflicts: conflicts.length });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error("GET /catisma-tespiti error:", message);
+    res.status(500).json({ error: message });
+  }
+});
+
+const transferSchema = z.object({
+  donationId: z.string().min(1),
+  sourceKesimAlaniId: z.string().min(1),
+  targetKesimAlaniId: z.string().min(1),
+  transferAnimal: z.boolean().optional().default(false),
+  animalGroupId: z.string().optional(),
+});
+
+router.post("/catisma-tespiti/transfer", async (req, res) => {
+  const parsed = transferSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
+  const { donationId, sourceKesimAlaniId, targetKesimAlaniId, transferAnimal, animalGroupId } = parsed.data;
+
+  if (sourceKesimAlaniId === targetKesimAlaniId) {
+    res.status(400).json({ error: "Kaynak ve hedef kesim alanı aynı olamaz" });
+    return;
+  }
+
+  try {
+    const [sourceKA, targetKA] = await Promise.all([
+      db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, sourceKesimAlaniId)),
+      db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, targetKesimAlaniId)),
+    ]);
+
+    if (!sourceKA[0] || sourceKA[0].deletedAt) {
+      res.status(404).json({ error: "Kaynak kesim alanı bulunamadı veya silinmiş" });
+      return;
+    }
+    if (!targetKA[0] || targetKA[0].deletedAt) {
+      res.status(404).json({ error: "Hedef kesim alanı bulunamadı veya silinmiş" });
+      return;
+    }
+
+    const [donation] = await db.select().from(donationsTable).where(eq(donationsTable.id, donationId));
+    if (!donation || donation.kesimAlaniId !== sourceKesimAlaniId) {
+      res.status(404).json({ error: "Bağışçı bulunamadı veya kaynak kesim alanına ait değil" });
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      if (transferAnimal && animalGroupId) {
+        const [group] = await tx.select().from(animalGroupsTable).where(eq(animalGroupsTable.id, animalGroupId));
+        if (!group || group.kesimAlaniId !== sourceKesimAlaniId) {
+          throw new Error("Hayvan grubu bulunamadı veya kaynak kesim alanına ait değil");
+        }
+
+        const links = await tx.select().from(animalGroupDonationsTable)
+          .where(eq(animalGroupDonationsTable.groupId, animalGroupId));
+        const donationIdsInGroup = links.map(l => l.donationId);
+
+        const donationsInGroup = donationIdsInGroup.length > 0
+          ? await tx.select().from(donationsTable)
+              .where(inArray(donationsTable.id, donationIdsInGroup))
+          : [];
+
+        const existingTargetDonations = await tx.select().from(donationsTable)
+          .where(and(eq(donationsTable.kesimAlaniId, targetKesimAlaniId), isNull(donationsTable.deletedAt)));
+        const existingTargetGroups = await tx.select().from(animalGroupsTable)
+          .where(eq(animalGroupsTable.kesimAlaniId, targetKesimAlaniId));
+
+        const donationSortBase = existingTargetDonations.length;
+        const groupSortBase = existingTargetGroups.length;
+
+        await tx.delete(animalGroupDonationsTable).where(eq(animalGroupDonationsTable.groupId, animalGroupId));
+
+        for (let i = 0; i < donationsInGroup.length; i++) {
+          const d = donationsInGroup[i];
+          const tagRows = await tx.select().from(donationTagsTable).where(eq(donationTagsTable.donationId, d.id));
+          await tx.delete(donationTagsTable).where(eq(donationTagsTable.donationId, d.id));
+          await tx.update(donationsTable)
+            .set({ kesimAlaniId: targetKesimAlaniId, sortOrder: donationSortBase + i })
+            .where(eq(donationsTable.id, d.id));
+          if (tagRows.length > 0) {
+            await tx.insert(donationTagsTable)
+              .values(tagRows.map(t => ({ donationId: d.id, tagId: t.tagId })))
+              .onConflictDoNothing();
+          }
+        }
+
+        await tx.update(animalGroupsTable)
+          .set({ kesimAlaniId: targetKesimAlaniId, sortOrder: groupSortBase })
+          .where(eq(animalGroupsTable.id, animalGroupId));
+
+        for (let i = 0; i < donationIdsInGroup.length; i++) {
+          await tx.insert(animalGroupDonationsTable)
+            .values({ groupId: animalGroupId, donationId: donationIdsInGroup[i], sortOrder: i })
+            .onConflictDoNothing();
+        }
+
+      } else {
+        const existingTargetDonations = await tx.select().from(donationsTable)
+          .where(and(eq(donationsTable.kesimAlaniId, targetKesimAlaniId), isNull(donationsTable.deletedAt)));
+        const newSortOrder = existingTargetDonations.length;
+
+        await tx.delete(animalGroupDonationsTable)
+          .where(eq(animalGroupDonationsTable.donationId, donationId));
+
+        await tx.update(donationsTable)
+          .set({ kesimAlaniId: targetKesimAlaniId, sortOrder: newSortOrder })
+          .where(eq(donationsTable.id, donationId));
+      }
+    });
+
+    const [updatedSource, updatedTarget] = await Promise.all([
+      getFullKesimAlani(sourceKesimAlaniId),
+      getFullKesimAlani(targetKesimAlaniId),
+    ]);
+
+    res.json({ success: true, source: updatedSource, target: updatedTarget });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error("POST /catisma-tespiti/transfer error:", message);
+    res.status(500).json({ error: message });
+  }
+});
+
 const BATCH_SIZE = 500;
 
 async function saveDonations(tx: Tx, kesimAlaniId: string, donations: DonationPayload[]) {

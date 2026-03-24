@@ -8,6 +8,7 @@ import PrintPage from "@/pages/print";
 import NotFound from "@/pages/not-found";
 import NotDuzenlemePage from "@/pages/not-duzenleme";
 import AiPromptAyarlariPage from "@/pages/ai-prompt-ayarlari";
+import CatismaTespitiPage from "@/pages/catisma-tespiti";
 import { useTheme } from "@/lib/useTheme";
 
 const queryClient = new QueryClient();
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/print/:id" component={PrintPage} />
       <Route path="/not-duzenleme/:id" component={NotDuzenlemePage} />
       <Route path="/ai-prompt-ayarlari" component={AiPromptAyarlariPage} />
+      <Route path="/catisma-tespiti" component={CatismaTespitiPage} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ChevronRight, ChevronDown, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, PieChart, RotateCcw, Clock, Calendar, FolderOpen, FolderPlus, MoveRight } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronDown, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, PieChart, RotateCcw, Clock, Calendar, FolderOpen, FolderPlus, MoveRight, AlertTriangle } from "lucide-react";
 import type { KesimAlani, CustomTag, Project } from "@/lib/types";
 import {
   fetchKesimAlanlari,
@@ -53,6 +53,7 @@ import {
   restoreProject,
   fetchDeletedProjects,
   moveKesimAlani,
+  fetchCatismaTespiti,
 } from "@/lib/api";
 import { useTheme } from "@/lib/useTheme";
 import type { ThemeMode } from "@/lib/useTheme";
@@ -81,6 +82,7 @@ export default function Home() {
   const [editTagColor, setEditTagColor] = useState("");
   const [loading, setLoading] = useState(true);
   const [migrationDone, setMigrationDone] = useState(false);
+  const [conflictCount, setConflictCount] = useState(0);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string; hasDonations: boolean } | null>(null);
   const [permanentDeleteConfirm, setPermanentDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
@@ -114,6 +116,10 @@ export default function Home() {
         setGlobalTags(tags);
         setLogoPreview(logo);
         setProjects(projs);
+        try {
+          const catisma = await fetchCatismaTespiti();
+          setConflictCount(catisma.totalConflicts);
+        } catch {}
         try {
           const [deleted, deletedProjs] = await Promise.all([
             fetchDeletedKesimAlanlari(),
@@ -668,7 +674,8 @@ export default function Home() {
               Kurban Hisse Kağıdı
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Projeler ve kesim alanlarını yönetin, bağışçıları ekleyin ve hisse kağıtlarını yazdırın
+              Kesim alanı oluşturun, bağışçıları ekleyin ve hisse kağıtlarını
+              yazdırın
             </p>
           </div>
           <Button variant="ghost" size="sm" onClick={toggleTheme} title={themeMode === "light" ? "Açık" : themeMode === "dark" ? "Koyu" : "Sistem"}>
@@ -838,8 +845,8 @@ export default function Home() {
                               <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => startEditTag(tag)}>
                                 <Pencil className="w-3 h-3" />
                               </Button>
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => handleDeleteTag(tag.id)}>
-                                <X className="w-3 h-3" />
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleDeleteTag(tag.id)}>
+                                <Trash2 className="w-3 h-3 text-destructive" />
                               </Button>
                             </>
                           )}
@@ -996,6 +1003,21 @@ export default function Home() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <Button
+            variant="outline"
+            size="default"
+            className="relative"
+            onClick={() => setLocation("/catisma-tespiti")}
+          >
+            <AlertTriangle className="w-4 h-4 mr-2 text-amber-500" />
+            Çatışma Tespiti
+            {conflictCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1">
+                {conflictCount}
+              </span>
+            )}
+          </Button>
         </div>
 
         {kesimAlanlari.length === 0 && projects.length === 0 ? (
