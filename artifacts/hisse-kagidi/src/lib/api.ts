@@ -76,6 +76,28 @@ export async function apiUpdateGroupsOnly(data: KesimAlani): Promise<KesimAlani>
   });
 }
 
+export async function apiUpdateSingleDonation(
+  kesimAlaniId: string,
+  donationId: string,
+  updates: Record<string, string | number | boolean | string[]>
+): Promise<void> {
+  await apiFetch(`/kesim-alanlari/${kesimAlaniId}/donations/${donationId}`, {
+    method: "PUT",
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function apiUpdateSingleGroup(
+  kesimAlaniId: string,
+  groupId: string,
+  updates: Record<string, unknown>
+): Promise<void> {
+  await apiFetch(`/kesim-alanlari/${kesimAlaniId}/animal-groups/${groupId}`, {
+    method: "PUT",
+    body: JSON.stringify(updates),
+  });
+}
+
 export async function apiDeleteKesimAlani(id: string): Promise<{ success: boolean }> {
   return apiFetch<{ success: boolean }>(`/kesim-alanlari/${id}`, { method: "DELETE" });
 }

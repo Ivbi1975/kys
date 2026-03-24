@@ -91,7 +91,7 @@ import {
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
 import { Tag } from "lucide-react";
-import { fetchKesimAlani, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, fetchTags } from "@/lib/api";
+import { fetchKesimAlani, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags } from "@/lib/api";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
 import { useHistory } from "@/lib/useHistory";
@@ -532,6 +532,28 @@ export default function KesimAlaniPage() {
     }
   }, [history, saveToApi]);
 
+  const saveSingleDonationField = useCallback((
+    donationId: string,
+    updates: Record<string, string | number | boolean | string[]>
+  ) => {
+    if (!kesim) return;
+    apiUpdateSingleDonation(kesim.id, donationId, updates).catch(err => {
+      const errMsg = err instanceof Error ? err.message : "Bağışçı kaydedilemedi";
+      toast({ title: "Kaydetme hatası", description: errMsg, variant: "destructive" });
+    });
+  }, [kesim?.id, toast]);
+
+  const saveSingleGroupField = useCallback((
+    groupId: string,
+    updates: Record<string, unknown>
+  ) => {
+    if (!kesim) return;
+    apiUpdateSingleGroup(kesim.id, groupId, updates).catch(err => {
+      const errMsg = err instanceof Error ? err.message : "Grup kaydedilemedi";
+      toast({ title: "Kaydetme hatası", description: errMsg, variant: "destructive" });
+    });
+  }, [kesim?.id, toast]);
+
   function addDonation() {
     if (!kesim || !newDonation.name.trim()) return;
     const donation: Donation = {
@@ -617,12 +639,13 @@ export default function KesimAlaniPage() {
         return;
       }
     }
-    save({
+    setKesim({
       ...kesim,
       donations: kesim.donations.map((d) =>
         d.id === id ? { ...d, [field]: value } : d
       ),
-    }, `Bağışçı güncellendi`);
+    });
+    saveSingleDonationField(id, { [field]: value });
   }
 
   function toggleDonationTag(donationId: string, tagId: string) {
@@ -1127,10 +1150,12 @@ export default function KesimAlaniPage() {
 
   function setGroupColorTag(groupIdx: number, tag: ColorTag) {
     if (!kesim) return;
+    const group = kesim.animalGroups[groupIdx];
     const groups = kesim.animalGroups.map((g, i) =>
       i === groupIdx ? { ...g, colorTag: tag } : g
     );
-    save({ ...kesim, animalGroups: groups }, `Grup rengi değiştirildi: Hayvan ${groups[groupIdx].animalNo}`, false, 'groups');
+    setKesim({ ...kesim, animalGroups: groups });
+    saveSingleGroupField(group.id, { colorTag: tag });
   }
 
   function applyBulkEdit() {
@@ -1153,19 +1178,23 @@ export default function KesimAlaniPage() {
 
   function updateGroupNotes(groupIdx: number, notes: string) {
     if (!kesim) return;
+    const group = kesim.animalGroups[groupIdx];
     const groups = kesim.animalGroups.map((g, i) =>
       i === groupIdx ? { ...g, notes } : g
     );
-    save({ ...kesim, animalGroups: groups }, `Grup notu güncellendi: Hayvan ${groups[groupIdx].animalNo}`, false, 'groups');
+    setKesim({ ...kesim, animalGroups: groups });
+    saveSingleGroupField(group.id, { notes });
   }
 
   function toggleGroupLock(groupIdx: number) {
     if (!kesim) return;
+    const group = kesim.animalGroups[groupIdx];
+    const newLocked = !group.locked;
     const groups = kesim.animalGroups.map((g, i) =>
-      i === groupIdx ? { ...g, locked: !g.locked } : g
+      i === groupIdx ? { ...g, locked: newLocked } : g
     );
-    const target = groups[groupIdx];
-    save({ ...kesim, animalGroups: groups }, `Grup ${target.locked ? "kilidi açıldı" : "kilitlendi"}: Hayvan ${target.animalNo}`, false, 'groups');
+    setKesim({ ...kesim, animalGroups: groups });
+    saveSingleGroupField(group.id, { locked: newLocked });
   }
 
   function parseRangeLockInput(input: string): number[] {
