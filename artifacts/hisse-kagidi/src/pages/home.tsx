@@ -49,7 +49,6 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const [kesimAlanlari, setKesimAlanlari] = useState<KesimAlani[]>([]);
   const [deletedKesimAlanlari, setDeletedKesimAlanlari] = useState<KesimAlani[]>([]);
-  const [showDeleted, setShowDeleted] = useState(false);
   const [newName, setNewName] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -87,6 +86,10 @@ export default function Home() {
         setKesimAlanlari(ka);
         setGlobalTags(tags);
         setLogoPreview(logo);
+        try {
+          const deleted = await fetchDeletedKesimAlanlari();
+          setDeletedKesimAlanlari(deleted);
+        } catch {}
       } catch (err) {
         toast({
           title: "Veri yüklenemedi",
@@ -104,7 +107,6 @@ export default function Home() {
     try {
       const deleted = await fetchDeletedKesimAlanlari();
       setDeletedKesimAlanlari(deleted);
-      setShowDeleted(true);
     } catch (err) {
       toast({
         title: "Silinen öğeler yüklenemedi",
@@ -653,46 +655,6 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="border-t pt-4">
-                  <label className="text-sm font-medium mb-2 block">
-                    <Trash2 className="w-4 h-4 inline mr-1" />
-                    Silinen Kesim Alanları
-                  </label>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Silinen kesim alanlarını görüntüleyin ve geri yükleyin.
-                  </p>
-                  <Button variant="outline" size="sm" className="w-full" onClick={loadDeletedItems}>
-                    <RotateCcw className="w-4 h-4 mr-1" />
-                    Silinenleri Göster ({deletedKesimAlanlari.length})
-                  </Button>
-
-                  {showDeleted && deletedKesimAlanlari.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      {deletedKesimAlanlari.map(k => (
-                        <div key={k.id} className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{k.name}</p>
-                            <p className="text-[10px] text-muted-foreground">
-                              Silinme: {k.deletedAt ? formatDateTime(k.deletedAt) : "—"}
-                            </p>
-                          </div>
-                          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleRestore(k.id)}>
-                            <RotateCcw className="w-3 h-3 mr-1" />
-                            Geri Al
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => requestPermanentDelete(k.id)}>
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {showDeleted && deletedKesimAlanlari.length === 0 && (
-                    <p className="mt-3 text-xs text-muted-foreground text-center py-2">
-                      Silinen kesim alanı bulunmuyor.
-                    </p>
-                  )}
-                </div>
               </div>
             </DialogContent>
           </Dialog>
@@ -916,6 +878,36 @@ export default function Home() {
               })}
             </div>
           </>
+        )}
+
+        {deletedKesimAlanlari.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2 mb-3">
+              <Trash2 className="w-4 h-4" />
+              Çöp Kutusu ({deletedKesimAlanlari.length})
+            </h3>
+            <div className="space-y-2">
+              {deletedKesimAlanlari.map(k => (
+                <Card key={k.id} className="p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{k.name}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Silinme: {k.deletedAt ? formatDateTime(k.deletedAt) : "—"}
+                      </p>
+                    </div>
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleRestore(k.id)}>
+                      <RotateCcw className="w-3 h-3 mr-1" />
+                      Geri Al
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => requestPermanentDelete(k.id)}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 

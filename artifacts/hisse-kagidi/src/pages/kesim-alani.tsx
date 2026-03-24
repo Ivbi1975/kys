@@ -2565,7 +2565,25 @@ export default function KesimAlaniPage() {
         </div>
         )}
 
-        
+        {!fullscreenMode && kesim.donations.length > 0 && (
+          <div className="mb-4 flex gap-2">
+            <Button onClick={handleAutoGroup} className="flex-1" disabled={groupingInProgress}>
+              {groupingInProgress ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {groupingProgress
+                    ? `Gruplama: ${groupingProgress.current}/${groupingProgress.total} hayvan`
+                    : "Gruplama başlıyor..."}
+                </>
+              ) : (
+                <>
+                  <Wand2 className="w-4 h-4 mr-2" />
+                  Otomatik Grupla ({requiredAnimals} Hayvan)
+                </>
+              )}
+            </Button>
+          </div>
+        )}
 
         {historyPanelOpen && !fullscreenMode && (
           <Card className="mb-4 p-3 max-h-64 overflow-y-auto">
@@ -3417,25 +3435,6 @@ export default function KesimAlaniPage() {
               </div>
             </Card>
 
-            {kesim.donations.length > 0 && (
-              <div className="mt-4 flex gap-2">
-                <Button onClick={handleAutoGroup} className="flex-1" disabled={groupingInProgress}>
-                  {groupingInProgress ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      {groupingProgress
-                        ? `Gruplama: ${groupingProgress.current}/${groupingProgress.total} hayvan`
-                        : "Gruplama başlıyor..."}
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="w-4 h-4 mr-2" />
-                      Otomatik Grupla ({requiredAnimals} Hayvan)
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
           </div>}
 
           {donorListVisible && !fullscreenMode && (
