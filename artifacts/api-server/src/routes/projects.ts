@@ -6,7 +6,7 @@ import {
   donationsTable,
   animalGroupsTable,
 } from "@workspace/db/schema";
-import { eq, isNull, isNotNull, and, sql } from "drizzle-orm";
+import { eq, isNull, isNotNull, and, sql, inArray } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -60,7 +60,7 @@ router.get("/projects", async (_req, res) => {
             .from(donationsTable)
             .where(
               and(
-                sql`${donationsTable.kesimAlaniId} = ANY(${kesimIds})`,
+                inArray(donationsTable.kesimAlaniId, kesimIds),
                 isNull(donationsTable.deletedAt),
                 eq(donationsTable.excluded, false)
               )
@@ -68,7 +68,7 @@ router.get("/projects", async (_req, res) => {
           db
             .select({ count: sql<number>`count(*)::int` })
             .from(animalGroupsTable)
-            .where(sql`${animalGroupsTable.kesimAlaniId} = ANY(${kesimIds})`),
+            .where(inArray(animalGroupsTable.kesimAlaniId, kesimIds)),
         ]);
 
         statsMap[pid] = {
