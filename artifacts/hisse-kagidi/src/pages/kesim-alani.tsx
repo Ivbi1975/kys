@@ -259,6 +259,11 @@ export default function KesimAlaniPage() {
   const [findDeleteValue, setFindDeleteValue] = useState("");
   const [findDeleteConfirm, setFindDeleteConfirm] = useState(false);
 
+  const [groupFindDeleteOpen, setGroupFindDeleteOpen] = useState(false);
+  const [groupFindDeleteColumn, setGroupFindDeleteColumn] = useState<"name" | "description" | "donationType" | "vekalet" | "notes">("description");
+  const [groupFindDeleteValue, setGroupFindDeleteValue] = useState("");
+  const [groupFindDeleteConfirm, setGroupFindDeleteConfirm] = useState(false);
+
   const [trashOpen, setTrashOpen] = useState(false);
   const [trashItems, setTrashItems] = useState<DeletedDonation[]>([]);
   const [trashLoading, setTrashLoading] = useState(false);
@@ -802,6 +807,48 @@ export default function KesimAlaniPage() {
     }
   }
 
+  function getGroupFindDeleteMatches() {
+    if (!kesim || !groupFindDeleteValue.trim()) return [];
+    const q = groupFindDeleteValue.trim().toLowerCase();
+    const matchIds = new Set<string>();
+    for (const group of kesim.animalGroups) {
+      for (const d of group.donations) {
+        if (!d.id) continue;
+        const val = (d[groupFindDeleteColumn] || "").toString().toLowerCase();
+        if (val.includes(q)) {
+          matchIds.add(d.id);
+        }
+      }
+    }
+    return kesim.donations.filter(d => matchIds.has(d.id));
+  }
+
+  async function executeGroupFindDelete() {
+    if (!kesim) return;
+    const matches = getGroupFindDeleteMatches();
+    if (matches.length === 0) return;
+    const matchIds = new Set(matches.map((d) => d.id));
+    try {
+      await Promise.all(matches.map(d => apiSoftDeleteDonation(kesim.id, d.id)));
+      const updated = {
+        ...kesim,
+        donations: kesim.donations.filter((d) => !matchIds.has(d.id)),
+        animalGroups: kesim.animalGroups.map(g => ({
+          ...g,
+          donations: g.donations.filter(d => !matchIds.has(d.id)),
+        })),
+      };
+      setKesim(updated);
+      history.push(updated, `Gruplardan toplu silindi: ${matches.length} bağışçı (${findDeleteColumnLabel[groupFindDeleteColumn]}: "${groupFindDeleteValue}")`);
+      setGroupFindDeleteOpen(false);
+      setGroupFindDeleteValue("");
+      setGroupFindDeleteConfirm(false);
+      toast({ title: "Çöp kutusuna taşındı", description: `${matches.length} bağışçı gruplardan silinip çöp kutusuna taşındı.` });
+    } catch (err) {
+      toast({ title: "Silme hatası", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+    }
+  }
+
   async function openTrash() {
     if (!kesim) return;
     setTrashOpen(true);
@@ -892,11 +939,7 @@ export default function KesimAlaniPage() {
       if (shareCountColIdx >= 0) {
         const rawVal = parseInt(String(row[shareCountColIdx] ?? "0").trim(), 10) || 0;
         if (rawVal > 50) {
-          const nameColIdx = columnMappings.indexOf("name");
-          const hasName = nameColIdx >= 0 && String(row[nameColIdx] ?? "").trim();
-          if (hasName) {
-            highShareRows.push({ idx: r, row, rawShareCount: rawVal, selected: true });
-          }
+          highShareRows.push({ idx: r, row, rawShareCount: rawVal, selected: true });
         }
       }
     }
@@ -4231,6 +4274,110 @@ export default function KesimAlaniPage() {
                     <Search className="w-4 h-4 mr-1" />
                     Çakışma Kontrol
                   </Button>
+                  <Dialog open={groupFindDeleteOpen} onOpenChange={(open) => { setGroupFindDeleteOpen(open); if (!open) { setGroupFindDeleteValue(""); setGroupFindDeleteConfirm(false); } }}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" title="Gruplarda Bul ve Sil">
+                        <SearchX className="w-4 h-4 mr-1" />
+                        Bul ve Sil
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-lg">
+                      <DialogHeader>
+                        <DialogTitle>Gruplarda Bul ve Sil</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 pt-2">
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground">Sütun Seç</label>
+                          <Select value={groupFindDeleteColumn} onValueChange={(v: "name" | "description" | "donationType" | "vekalet" | "notes") => { setGroupFindDeleteColumn(v); setGroupFindDeleteValue(""); setGroupFindDeleteConfirm(false); }}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="description">Vekaleti Veren</SelectItem>
+                              <SelectItem value="name">Adına Kesilen</SelectItem>
+                              <SelectItem value="donationType">Cinsi</SelectItem>
+                              <SelectItem value="vekalet">Vekalet No</SelectItem>
+                              <SelectItem value="notes">Notlar</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground">Aranacak Değer</label>
+                          <Input
+                            placeholder={`${findDeleteColumnLabel[groupFindDeleteColumn]} içinde ara...`}
+                            value={groupFindDeleteValue}
+                            onChange={(e) => { setGroupFindDeleteValue(e.target.value); setGroupFindDeleteConfirm(false); }}
+                          />
+                        </div>
+                        {groupFindDeleteValue.trim() && (() => {
+                          const matches = getGroupFindDeleteMatches();
+                          return (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium">
+                                  {matches.length > 0
+                                    ? `${matches.length} kayıt bulundu (gruplarda)`
+                                    : "Gruplarda eşleşen kayıt bulunamadı"}
+                                </span>
+                              </div>
+                              {matches.length > 0 && (
+                                <div className="border rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                                  <table className="w-full text-xs">
+                                    <thead>
+                                      <tr className="bg-muted/50 border-b">
+                                        <th className="p-2 text-left font-medium">Vekaleti Veren</th>
+                                        <th className="p-2 text-left font-medium">Adına Kesilen</th>
+                                        <th className="p-2 text-left font-medium">Cinsi</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {matches.slice(0, 50).map((d) => (
+                                        <tr key={d.id} className="border-b last:border-0">
+                                          <td className="p-2">{d.description || "—"}</td>
+                                          <td className="p-2">{d.name || "—"}</td>
+                                          <td className="p-2">{d.donationType || "—"}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                  {matches.length > 50 && (
+                                    <div className="p-2 text-xs text-muted-foreground text-center bg-muted/20">
+                                      ... ve {matches.length - 50} kayıt daha
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {matches.length > 0 && !groupFindDeleteConfirm && (
+                                <Button
+                                  variant="destructive"
+                                  className="w-full"
+                                  onClick={() => setGroupFindDeleteConfirm(true)}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-1" />
+                                  {matches.length} Kaydı Sil
+                                </Button>
+                              )}
+                              {matches.length > 0 && groupFindDeleteConfirm && (
+                                <div className="space-y-2 border border-destructive/50 rounded-lg p-3 bg-destructive/5">
+                                  <p className="text-sm font-medium text-destructive">
+                                    {matches.length} bağışçı gruplardan ve listeden kalıcı olarak silinecek. Emin misiniz?
+                                  </p>
+                                  <div className="flex gap-2">
+                                    <Button variant="outline" size="sm" className="flex-1" onClick={() => setGroupFindDeleteConfirm(false)}>
+                                      İptal
+                                    </Button>
+                                    <Button variant="destructive" size="sm" className="flex-1" onClick={executeGroupFindDelete}>
+                                      Evet, Sil
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm" title="Toplu Kilitleme">
