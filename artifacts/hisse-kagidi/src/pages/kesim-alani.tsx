@@ -150,7 +150,10 @@ export default function KesimAlaniPage() {
   const [previewData, setPreviewData] = useState<string[][]>([]);
   const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([]);
   const [hasHeaderRow, setHasHeaderRow] = useState(true);
-  const [bulkStep, setBulkStep] = useState<"input" | "mapping">("input");
+  const [bulkStep, setBulkStep] = useState<"input" | "mapping" | "review">("input");
+  const [bulkReviewRows, setBulkReviewRows] = useState<{ idx: number; row: string[]; rawShareCount: number; selected: boolean }[]>([]);
+  const [jumpDialogOpen, setJumpDialogOpen] = useState(false);
+  const [jumpDialogValue, setJumpDialogValue] = useState("");
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newDonation, setNewDonation] = useState({
@@ -341,8 +344,10 @@ export default function KesimAlaniPage() {
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "g") {
         e.preventDefault();
-        jumpInputRef.current?.focus();
-        jumpInputRef.current?.select();
+        if (!jumpDialogOpen) {
+          setJumpDialogOpen(true);
+          setJumpDialogValue("");
+        }
       }
       if (e.key === "F11") {
         e.preventDefault();
@@ -366,7 +371,7 @@ export default function KesimAlaniPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [kesim, editingCell, shortcutHelpOpen, minimapOpen, fullscreenMode]);
+  }, [kesim, editingCell, shortcutHelpOpen, minimapOpen, fullscreenMode, jumpDialogOpen]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -879,9 +884,34 @@ export default function KesimAlaniPage() {
   function applyBulkImport() {
     if (!kesim || previewData.length === 0) return;
     const startRow = hasHeaderRow ? 1 : 0;
-    const newDonations: Donation[] = [];
+    const shareCountColIdx = columnMappings.indexOf("shareCount");
 
+    const highShareRows: typeof bulkReviewRows = [];
     for (let r = startRow; r < previewData.length; r++) {
+      const row = previewData[r];
+      if (shareCountColIdx >= 0) {
+        const rawVal = parseInt(String(row[shareCountColIdx] ?? "0").trim(), 10) || 0;
+        if (rawVal > 50) {
+          const nameColIdx = columnMappings.indexOf("name");
+          const hasName = nameColIdx >= 0 && String(row[nameColIdx] ?? "").trim();
+          if (hasName) {
+            highShareRows.push({ idx: r, row, rawShareCount: rawVal, selected: true });
+          }
+        }
+      }
+    }
+
+    if (highShareRows.length > 0 && bulkStep !== "review") {
+      setBulkReviewRows(highShareRows);
+      setBulkStep("review");
+      return;
+    }
+
+    const excludedIdxs = new Set(bulkReviewRows.filter(r => r.selected).map(r => r.idx));
+
+    const newDonations: Donation[] = [];
+    for (let r = startRow; r < previewData.length; r++) {
+      if (excludedIdxs.has(r)) continue;
       const row = previewData[r];
       const donation: Partial<Donation> = {
         id: generateId(),
@@ -921,6 +951,7 @@ export default function KesimAlaniPage() {
     setPreviewData([]);
     setColumnMappings([]);
     setHasHeaderRow(true);
+    setBulkReviewRows([]);
   }
 
   async function handleAutoGroup() {
@@ -3054,7 +3085,7 @@ export default function KesimAlaniPage() {
                   <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
                     <DialogHeader>
                       <DialogTitle>
-                        {bulkStep === "input" ? "Toplu Bağışçı Ekle" : "Sütun Eşleştirme"}
+                        {bulkStep === "input" ? "Toplu Bağışçı Ekle" : bulkStep === "review" ? "Yüksek Hisse Sayılı Satırlar" : "Sütun Eşleştirme"}
                       </DialogTitle>
                     </DialogHeader>
 
@@ -3120,6 +3151,86 @@ export default function KesimAlaniPage() {
                             </Button>
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {bulkStep === "review" && (
+                      <div className="flex flex-col min-h-0 flex-1 pt-4">
+                        <div className="flex items-center gap-3 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg mb-4 flex-shrink-0">
+                          <AlertTriangle className="w-5 h-5 text-orange-500 flex-shrink-0" />
+                          <p className="text-sm">
+                            Aşağıdaki satırların hisse sayısı 50'den fazla. Bunlar muhtemelen hatalı verilerdir. Silmek istediklerinizi işaretli bırakın.
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 mb-3 flex-shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBulkReviewRows(prev => prev.map(r => ({ ...r, selected: true })))}
+                          >
+                            Tümünü Seç
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBulkReviewRows(prev => prev.map(r => ({ ...r, selected: false })))}
+                          >
+                            Tümünü Kaldır
+                          </Button>
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            {bulkReviewRows.filter(r => r.selected).length} / {bulkReviewRows.length} satır silinecek
+                          </span>
+                        </div>
+
+                        <div className="border rounded-lg overflow-hidden min-h-0 flex-1">
+                          <div className="overflow-auto max-h-full">
+                            <table className="w-full text-sm">
+                              <thead className="sticky top-0 z-10">
+                                <tr className="bg-primary/10 border-b">
+                                  <th className="p-2 w-10 text-center">Sil</th>
+                                  <th className="p-2 text-left">Satır</th>
+                                  <th className="p-2 text-left">Ad</th>
+                                  <th className="p-2 text-right">Hisse (Ham)</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {bulkReviewRows.map((item, i) => {
+                                  const nameColIdx = columnMappings.indexOf("name");
+                                  const name = nameColIdx >= 0 ? String(item.row[nameColIdx] ?? "").trim() : "";
+                                  return (
+                                    <tr key={i} className={`border-b ${item.selected ? "bg-red-500/5" : ""}`}>
+                                      <td className="p-2 text-center">
+                                        <input
+                                          type="checkbox"
+                                          checked={item.selected}
+                                          onChange={() => {
+                                            setBulkReviewRows(prev => prev.map((r, ri) => ri === i ? { ...r, selected: !r.selected } : r));
+                                          }}
+                                          className="rounded"
+                                        />
+                                      </td>
+                                      <td className="p-2 text-xs text-muted-foreground">{item.idx + 1}</td>
+                                      <td className="p-2 text-sm font-medium">{name || "—"}</td>
+                                      <td className="p-2 text-sm text-right font-mono text-red-600 font-bold">{item.rawShareCount}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 pt-4 flex-shrink-0">
+                          <Button variant="outline" onClick={() => setBulkStep("mapping")} className="flex-1">
+                            Geri
+                          </Button>
+                          <Button onClick={applyBulkImport} className="flex-1">
+                            {bulkReviewRows.filter(r => r.selected).length > 0
+                              ? `${bulkReviewRows.filter(r => r.selected).length} Satırı Sil ve Devam Et`
+                              : "Hiçbirini Silme, Devam Et"}
+                          </Button>
+                        </div>
                       </div>
                     )}
 
@@ -4088,25 +4199,16 @@ export default function KesimAlaniPage() {
                   <div className="flex items-center gap-1">
                     <Input
                       ref={jumpInputRef}
-                      className="h-8 w-20 text-sm text-center"
+                      className="h-8 w-20 text-sm text-center cursor-pointer"
                       placeholder="No (Ctrl+G)"
-                      value={jumpToAnimal}
-                      onChange={(e) => setJumpToAnimal(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          const el = document.getElementById(`animal-group-${jumpToAnimal}`);
-                          if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-                        }
-                      }}
+                      readOnly
+                      onClick={() => { setJumpDialogOpen(true); setJumpDialogValue(""); }}
                     />
                     <Button
                       variant="outline"
                       size="sm"
                       className="h-8"
-                      onClick={() => {
-                        const el = document.getElementById(`animal-group-${jumpToAnimal}`);
-                        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-                      }}
+                      onClick={() => { setJumpDialogOpen(true); setJumpDialogValue(""); }}
                     >
                       Git
                     </Button>
@@ -5307,6 +5409,62 @@ export default function KesimAlaniPage() {
           </div>
         );
       })()}
+
+      {jumpDialogOpen && (
+        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[20vh]" onClick={() => setJumpDialogOpen(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative bg-background rounded-2xl shadow-2xl border p-6 w-[340px] flex flex-col items-center gap-4 animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-sm font-medium text-muted-foreground">Hayvan Numarasına Git</div>
+            <input
+              autoFocus
+              type="number"
+              min={1}
+              className="w-full text-center text-4xl font-bold border-2 border-primary/30 focus:border-primary rounded-xl px-4 py-3 bg-background outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              placeholder="No"
+              value={jumpDialogValue}
+              onChange={(e) => setJumpDialogValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && jumpDialogValue.trim()) {
+                  const el = document.getElementById(`animal-group-${jumpDialogValue.trim()}`);
+                  if (el) {
+                    el.scrollIntoView({ behavior: "smooth", block: "center" });
+                    setJumpDialogOpen(false);
+                  } else {
+                    toast({ title: `Hayvan No ${jumpDialogValue} bulunamadı`, variant: "destructive" });
+                  }
+                }
+                if (e.key === "Escape") {
+                  setJumpDialogOpen(false);
+                }
+              }}
+            />
+            <div className="flex gap-2 w-full">
+              <Button variant="outline" onClick={() => setJumpDialogOpen(false)} className="flex-1">
+                İptal
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!jumpDialogValue.trim()) return;
+                  const el = document.getElementById(`animal-group-${jumpDialogValue.trim()}`);
+                  if (el) {
+                    el.scrollIntoView({ behavior: "smooth", block: "center" });
+                    setJumpDialogOpen(false);
+                  } else {
+                    toast({ title: `Hayvan No ${jumpDialogValue} bulunamadı`, variant: "destructive" });
+                  }
+                }}
+                className="flex-1"
+              >
+                Git
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Ctrl+G ile açılır</p>
+          </div>
+        </div>
+      )}
 
       {/* Scroll to top button */}
       {showScrollTop && (
