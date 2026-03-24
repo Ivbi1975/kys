@@ -91,7 +91,7 @@ import {
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
 import { Tag } from "lucide-react";
-import { fetchKesimAlani, apiUpdateKesimAlani, fetchTags } from "@/lib/api";
+import { fetchKesimAlani, apiUpdateKesimAlani, apiUpdateDonationsOnly, apiUpdateGroupsOnly, fetchTags } from "@/lib/api";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
 import { useHistory } from "@/lib/useHistory";
@@ -432,10 +432,15 @@ export default function KesimAlaniPage() {
     return errMsg;
   }, []);
 
-  const saveToApi = useCallback((data: KesimAlani) => {
+  const saveToApi = useCallback((data: KesimAlani, saveType: 'full' | 'donations' | 'groups' = 'full') => {
     setSaveStatus("saving");
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    apiUpdateKesimAlani(data)
+    const apiCall = saveType === 'donations'
+      ? apiUpdateDonationsOnly(data)
+      : saveType === 'groups'
+        ? apiUpdateGroupsOnly(data)
+        : apiUpdateKesimAlani(data);
+    apiCall
       .then(() => {
         setSaveStatus("saved");
         setLastSavedTime(new Date());
@@ -453,12 +458,15 @@ export default function KesimAlaniPage() {
       });
   }, [toast, buildErrorDescription]);
 
-  const debouncedSaveToApi = useCallback((data: KesimAlani) => {
+  const pendingSaveTypeRef = useRef<'full' | 'donations' | 'groups'>('full');
+
+  const debouncedSaveToApi = useCallback((data: KesimAlani, saveType: 'full' | 'donations' | 'groups' = 'full') => {
     pendingSaveRef.current = data;
+    pendingSaveTypeRef.current = saveType;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
       if (pendingSaveRef.current) {
-        saveToApi(pendingSaveRef.current);
+        saveToApi(pendingSaveRef.current, pendingSaveTypeRef.current);
         pendingSaveRef.current = null;
       }
     }, 600);
@@ -468,7 +476,7 @@ export default function KesimAlaniPage() {
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       if (pendingSaveRef.current) {
-        saveToApi(pendingSaveRef.current);
+        saveToApi(pendingSaveRef.current, pendingSaveTypeRef.current);
       }
     };
   }, [saveToApi]);
@@ -482,13 +490,13 @@ export default function KesimAlaniPage() {
   }, []);
 
   const save = useCallback(
-    (updated: KesimAlani, desc?: string, immediate?: boolean) => {
+    (updated: KesimAlani, desc?: string, immediate?: boolean, saveType: 'full' | 'donations' | 'groups' = 'full') => {
       setKesim(updated);
       if (immediate) {
         discardPendingSave();
-        saveToApi(updated);
+        saveToApi(updated, saveType);
       } else {
-        debouncedSaveToApi(updated);
+        debouncedSaveToApi(updated, saveType);
       }
       if (desc) {
         history.push(updated, desc);
@@ -534,7 +542,7 @@ export default function KesimAlaniPage() {
       vekalet: newDonation.vekalet.trim(),
       notes: newDonation.notes.trim(),
     };
-    save({ ...kesim, donations: [...kesim.donations, donation] }, `Bağışçı eklendi: ${donation.description || donation.name}`);
+    save({ ...kesim, donations: [...kesim.donations, donation] }, `Bağışçı eklendi: ${donation.description || donation.name}`, false, 'donations');
     setNewDonation({ name: "", description: "", donationType: "", shareCount: 1, vekalet: "", notes: "" });
     setAddDialogOpen(false);
   }
@@ -545,7 +553,7 @@ export default function KesimAlaniPage() {
     save({
       ...kesim,
       donations: kesim.donations.filter((d) => d.id !== id),
-    }, `Bağışçı silindi: ${target?.description || target?.name || ""}`);
+    }, `Bağışçı silindi: ${target?.description || target?.name || ""}`, false, 'donations');
     setSelectedIds((prev) => {
       const next = new Set(prev);
       next.delete(id);
@@ -558,7 +566,7 @@ export default function KesimAlaniPage() {
     save({
       ...kesim,
       donations: kesim.donations.filter((d) => !selectedIds.has(d.id)),
-    }, `${selectedIds.size} bağışçı silindi`);
+    }, `${selectedIds.size} bağışçı silindi`, false, 'donations');
     setSelectedIds(new Set());
   }
 
@@ -591,7 +599,7 @@ export default function KesimAlaniPage() {
           donations: kesim.donations.map((d) =>
             d.description.trim().toLowerCase() === key ? { ...d, excluded: true } : d
           ),
-        }, `Hariç tutuldu: ${target.description}`);
+        }, `Hariç tutuldu: ${target.description}`, false, 'donations');
         return;
       }
     }
@@ -604,7 +612,7 @@ export default function KesimAlaniPage() {
           donations: kesim.donations.map((d) =>
             d.description.trim().toLowerCase() === key ? { ...d, excluded: false } : d
           ),
-        }, `Dahil edildi: ${target.description}`);
+        }, `Dahil edildi: ${target.description}`, false, 'donations');
         return;
       }
     }
@@ -613,7 +621,7 @@ export default function KesimAlaniPage() {
       donations: kesim.donations.map((d) =>
         d.id === id ? { ...d, [field]: value } : d
       ),
-    }, `Bağışçı güncellendi`);
+    }, `Bağışçı güncellendi`, false, 'donations');
   }
 
   function toggleDonationTag(donationId: string, tagId: string) {
@@ -642,7 +650,7 @@ export default function KesimAlaniPage() {
       donations: kesim.donations.map((d) =>
         d.description.trim().toLowerCase() === key ? { ...d, excluded } : d
       ),
-    }, excluded ? `Toplu hariç tutuldu: ${description}` : `Toplu dahil edildi: ${description}`);
+    }, excluded ? `Toplu hariç tutuldu: ${description}` : `Toplu dahil edildi: ${description}`, false, 'donations');
   }
 
   function bulkDeleteByDesc(description: string) {
@@ -653,7 +661,7 @@ export default function KesimAlaniPage() {
       donations: kesim.donations.filter((d) =>
         d.description.trim().toLowerCase() !== key
       ),
-    }, `Toplu silindi: ${description}`);
+    }, `Toplu silindi: ${description}`, false, 'donations');
     setPersonEditDesc(null);
   }
 
@@ -682,7 +690,7 @@ export default function KesimAlaniPage() {
     save({
       ...kesim,
       donations: kesim.donations.filter((d) => !matchIds.has(d.id)),
-    }, `Toplu silindi: ${matches.length} bağışçı (${findDeleteColumnLabel[findDeleteColumn]}: "${findDeleteValue}")`);
+    }, `Toplu silindi: ${matches.length} bağışçı (${findDeleteColumnLabel[findDeleteColumn]}: "${findDeleteValue}")`, false, 'donations');
     setFindDeleteOpen(false);
     setFindDeleteValue("");
     setFindDeleteConfirm(false);
@@ -762,7 +770,7 @@ export default function KesimAlaniPage() {
       }
     }
 
-    save({ ...kesim, donations: [...kesim.donations, ...newDonations] }, `${newDonations.length} bağışçı toplu eklendi`, true);
+    save({ ...kesim, donations: [...kesim.donations, ...newDonations] }, `${newDonations.length} bağışçı toplu eklendi`, true, 'donations');
     resetBulkDialog();
   }
 
@@ -847,7 +855,7 @@ export default function KesimAlaniPage() {
         ? String(aVal).localeCompare(String(bVal), "tr")
         : String(bVal).localeCompare(String(aVal), "tr");
     });
-    save({ ...kesim, donations: sorted }, `Sıralama değiştirildi`, true);
+    save({ ...kesim, donations: sorted }, `Sıralama değiştirildi`, true, 'donations');
   }
 
   function isGroupLocked(groupIdx: number): boolean {
@@ -877,7 +885,7 @@ export default function KesimAlaniPage() {
       groups[groupIdx].donations.push(...overflow);
     }
 
-    save({ ...kesim, animalGroups: groups }, `Grup içi taşıma yapıldı`);
+    save({ ...kesim, animalGroups: groups }, `Grup içi taşıma yapıldı`, false, 'groups');
   }
 
   const [dragOverGroup, setDragOverGroup] = useState<number | null>(null);
@@ -1092,7 +1100,7 @@ export default function KesimAlaniPage() {
       vekalet: "",
       notes: "",
     });
-    save({ ...kesim, animalGroups: groups }, `Gruptan çıkarıldı`);
+    save({ ...kesim, animalGroups: groups }, `Gruptan çıkarıldı`, false, 'groups');
   }
 
   function updateGroupDonation(
@@ -1108,7 +1116,7 @@ export default function KesimAlaniPage() {
       donations: g.donations.map((d) => ({ ...d })),
     }));
     (groups[groupIdx].donations[donationIdx] as any)[field] = value;
-    save({ ...kesim, animalGroups: groups }, `Grup bağışçısı güncellendi`);
+    save({ ...kesim, animalGroups: groups }, `Grup bağışçısı güncellendi`, false, 'groups');
   }
 
   function setGroupColorTag(groupIdx: number, tag: ColorTag) {
@@ -1116,7 +1124,7 @@ export default function KesimAlaniPage() {
     const groups = kesim.animalGroups.map((g, i) =>
       i === groupIdx ? { ...g, colorTag: tag } : g
     );
-    save({ ...kesim, animalGroups: groups }, `Grup rengi değiştirildi: Hayvan ${groups[groupIdx].animalNo}`);
+    save({ ...kesim, animalGroups: groups }, `Grup rengi değiştirildi: Hayvan ${groups[groupIdx].animalNo}`, false, 'groups');
   }
 
   function applyBulkEdit() {
@@ -1132,7 +1140,7 @@ export default function KesimAlaniPage() {
         return { ...d, [bulkEditField]: bulkEditValue };
       }),
     };
-    save(updated, `${selectedIds.size} bağışçı toplu düzenlendi`);
+    save(updated, `${selectedIds.size} bağışçı toplu düzenlendi`, false, 'donations');
     setBulkEditOpen(false);
     setBulkEditValue("");
   }
@@ -1142,7 +1150,7 @@ export default function KesimAlaniPage() {
     const groups = kesim.animalGroups.map((g, i) =>
       i === groupIdx ? { ...g, notes } : g
     );
-    save({ ...kesim, animalGroups: groups }, `Grup notu güncellendi: Hayvan ${groups[groupIdx].animalNo}`);
+    save({ ...kesim, animalGroups: groups }, `Grup notu güncellendi: Hayvan ${groups[groupIdx].animalNo}`, false, 'groups');
   }
 
   function toggleGroupLock(groupIdx: number) {
@@ -1151,7 +1159,7 @@ export default function KesimAlaniPage() {
       i === groupIdx ? { ...g, locked: !g.locked } : g
     );
     const target = groups[groupIdx];
-    save({ ...kesim, animalGroups: groups }, `Grup ${target.locked ? "kilidi açıldı" : "kilitlendi"}: Hayvan ${target.animalNo}`);
+    save({ ...kesim, animalGroups: groups }, `Grup ${target.locked ? "kilidi açıldı" : "kilitlendi"}: Hayvan ${target.animalNo}`, false, 'groups');
   }
 
   function parseRangeLockInput(input: string): number[] {
@@ -1183,20 +1191,20 @@ export default function KesimAlaniPage() {
     const groups = kesim.animalGroups.map(g =>
       targetSet.has(g.animalNo) ? { ...g, locked: lock } : g
     );
-    save({ ...kesim, animalGroups: groups }, `${validNos.length} grup ${lock ? "kilitlendi" : "kilidi açıldı"}: ${rangeLockInput}`);
+    save({ ...kesim, animalGroups: groups }, `${validNos.length} grup ${lock ? "kilitlendi" : "kilidi açıldı"}: ${rangeLockInput}`, false, 'groups');
     setRangeLockInput("");
   }
 
   function lockAllGroups() {
     if (!kesim) return;
     const groups = kesim.animalGroups.map(g => ({ ...g, locked: true }));
-    save({ ...kesim, animalGroups: groups }, `Tüm gruplar kilitlendi`);
+    save({ ...kesim, animalGroups: groups }, `Tüm gruplar kilitlendi`, false, 'groups');
   }
 
   function unlockAllGroups() {
     if (!kesim) return;
     const groups = kesim.animalGroups.map(g => ({ ...g, locked: false }));
-    save({ ...kesim, animalGroups: groups }, `Tüm grupların kilidi açıldı`);
+    save({ ...kesim, animalGroups: groups }, `Tüm grupların kilidi açıldı`, false, 'groups');
   }
 
   function openSplitGroupDialog(groupIdx: number) {
@@ -1248,7 +1256,7 @@ export default function KesimAlaniPage() {
     newGroups.splice(groupIdx + 1, 0, newGroup);
 
     const renumbered = newGroups.map((g, i) => ({ ...g, animalNo: i + 1 }));
-    save({ ...kesim, animalGroups: renumbered }, `Grup bölündü: Hayvan ${group.animalNo} → ${splitAt}/${filled.length - splitAt}`);
+    save({ ...kesim, animalGroups: renumbered }, `Grup bölündü: Hayvan ${group.animalNo} → ${splitAt}/${filled.length - splitAt}`, false, 'groups');
     setSplitGroupDialog(null);
   }
 
@@ -1308,7 +1316,7 @@ export default function KesimAlaniPage() {
     finalGroups.splice(firstMergedIdx, 0, ...newGroups);
     const renumbered = finalGroups.map((g, i) => ({ ...g, animalNo: i + 1 }));
 
-    save({ ...kesim, animalGroups: renumbered }, `${groupsToMerge.length} grup birleştirildi`);
+    save({ ...kesim, animalGroups: renumbered }, `${groupsToMerge.length} grup birleştirildi`, false, 'groups');
     setSelectedGroupIds(new Set());
   }
 
@@ -1357,7 +1365,7 @@ export default function KesimAlaniPage() {
     };
     groups[swapTarget.groupIdx].donations[swapTarget.donationIdx] = temp;
 
-    save({ ...kesim, animalGroups: groups }, `Takas yapıldı: Hayvan ${groups[swapSelection.groupIdx].animalNo} ↔ Hayvan ${groups[swapTarget.groupIdx].animalNo}`);
+    save({ ...kesim, animalGroups: groups }, `Takas yapıldı: Hayvan ${groups[swapSelection.groupIdx].animalNo} ↔ Hayvan ${groups[swapTarget.groupIdx].animalNo}`, false, 'groups');
     setSwapSelection(null);
     setSwapTarget(null);
     setSwapPreviewOpen(false);
@@ -1512,7 +1520,7 @@ export default function KesimAlaniPage() {
       return;
     }
 
-    save({ ...kesim, animalGroups: groups }, `Otomatik çakışma çözümü: ${appliedCount} takas uygulandı (${resolveResults.length} kişi)`);
+    save({ ...kesim, animalGroups: groups }, `Otomatik çakışma çözümü: ${appliedCount} takas uygulandı (${resolveResults.length} kişi)`, false, 'groups');
     setAutoResolveOpen(false);
     setResolveResults([]);
 
@@ -1690,7 +1698,7 @@ export default function KesimAlaniPage() {
       removedIds.forEach(id => next.add(id));
       return next;
     });
-    save({ ...kesim, animalGroups: groups }, `${selectedGroupDonations.size} bağışçı gruplardan çıkarıldı`);
+    save({ ...kesim, animalGroups: groups }, `${selectedGroupDonations.size} bağışçı gruplardan çıkarıldı`, false, 'groups');
     setSelectedGroupDonations(new Set());
     toast({
       title: "Gruptan Çıkarıldı",
@@ -1747,7 +1755,7 @@ export default function KesimAlaniPage() {
         groups[targetGroupIdx].donations[emptyIdx] = item;
       }
     }
-    save({ ...kesim, animalGroups: groups }, `${itemsToMove.length} bağışçı Hayvan ${groups[targetGroupIdx].animalNo}'e taşındı`);
+    save({ ...kesim, animalGroups: groups }, `${itemsToMove.length} bağışçı Hayvan ${groups[targetGroupIdx].animalNo}'e taşındı`, false, 'groups');
     setSelectedGroupDonations(new Set());
     setBulkMoveTargetGroup(-1);
     if (moveCount < candidateIds.length) {
@@ -1767,7 +1775,7 @@ export default function KesimAlaniPage() {
         return { ...d };
       }),
     }));
-    save({ ...kesim, animalGroups: groups }, `${selectedGroupDonations.size} bağışçı toplu düzenlendi`);
+    save({ ...kesim, animalGroups: groups }, `${selectedGroupDonations.size} bağışçı toplu düzenlendi`, false, 'groups');
     setSelectedGroupDonations(new Set());
     setBulkGroupEditOpen(false);
     setBulkGroupEditValue("");
@@ -1873,7 +1881,7 @@ export default function KesimAlaniPage() {
       return;
     }
     const movedDonorCount = groupedBasketIds.size + ungroupedBasketDonors.length;
-    save({ ...kesim, animalGroups: groups }, `Sepetten ${movedDonorCount} bağışçı (${transferredIds.size} slot) Hayvan ${groups[targetGroupIdx].animalNo}'e aktarıldı`);
+    save({ ...kesim, animalGroups: groups }, `Sepetten ${movedDonorCount} bağışçı (${transferredIds.size} slot) Hayvan ${groups[targetGroupIdx].animalNo}'e aktarıldı`, false, 'groups');
     setBasketItems(prev => prev.filter(id => !transferredIds.has(id) && !groupedBasketIds.has(id)));
     setBasketTransferTarget(-1);
     const skipped = lockedBasketIds.size;
@@ -1998,7 +2006,7 @@ export default function KesimAlaniPage() {
     }
 
     const renumbered = groups.map((g, i) => ({ ...g, animalNo: i + 1 }));
-    save({ ...kesim, animalGroups: renumbered }, `Sepet otomatik dağıtıldı: ${placed} bağışçı`);
+    save({ ...kesim, animalGroups: renumbered }, `Sepet otomatik dağıtıldı: ${placed} bağışçı`, false, 'groups');
     const remaining = basketItems.filter(id => lockedGroupDonorIds.has(id));
     setBasketItems(remaining);
     const desc = skippedCount > 0
@@ -2039,7 +2047,7 @@ export default function KesimAlaniPage() {
       animalNo: kesim.animalGroups.length + 1,
       donations: Array.from({ length: 7 }, emptyDonation),
     };
-    save({ ...kesim, animalGroups: [...kesim.animalGroups, newGroup] }, `Boş hayvan grubu eklendi: #${newGroup.animalNo}`);
+    save({ ...kesim, animalGroups: [...kesim.animalGroups, newGroup] }, `Boş hayvan grubu eklendi: #${newGroup.animalNo}`, false, 'groups');
   }
 
   function cleanEmptyGroups() {
@@ -2048,7 +2056,7 @@ export default function KesimAlaniPage() {
     if (nonEmpty.length === kesim.animalGroups.length) return;
     const removed = kesim.animalGroups.length - nonEmpty.length;
     const renumbered = nonEmpty.map((g, i) => ({ ...g, animalNo: i + 1 }));
-    save({ ...kesim, animalGroups: renumbered }, `${removed} boş grup temizlendi`);
+    save({ ...kesim, animalGroups: renumbered }, `${removed} boş grup temizlendi`, false, 'groups');
   }
 
   function moveGroupUp(groupIdx: number) {
@@ -2056,7 +2064,7 @@ export default function KesimAlaniPage() {
     const groups = [...kesim.animalGroups];
     [groups[groupIdx - 1], groups[groupIdx]] = [groups[groupIdx], groups[groupIdx - 1]];
     const renumbered = groups.map((g, i) => ({ ...g, animalNo: i + 1 }));
-    save({ ...kesim, animalGroups: renumbered }, `Hayvan ${kesim.animalGroups[groupIdx].animalNo} yukarı taşındı`);
+    save({ ...kesim, animalGroups: renumbered }, `Hayvan ${kesim.animalGroups[groupIdx].animalNo} yukarı taşındı`, false, 'groups');
   }
 
   function moveGroupDown(groupIdx: number) {
@@ -2064,7 +2072,7 @@ export default function KesimAlaniPage() {
     const groups = [...kesim.animalGroups];
     [groups[groupIdx], groups[groupIdx + 1]] = [groups[groupIdx + 1], groups[groupIdx]];
     const renumbered = groups.map((g, i) => ({ ...g, animalNo: i + 1 }));
-    save({ ...kesim, animalGroups: renumbered }, `Hayvan ${kesim.animalGroups[groupIdx].animalNo} aşağı taşındı`);
+    save({ ...kesim, animalGroups: renumbered }, `Hayvan ${kesim.animalGroups[groupIdx].animalNo} aşağı taşındı`, false, 'groups');
   }
 
   function getAvailableGroupsForDonor(donorId: string): { groupIdx: number; animalNo: number; emptySlots: number }[] {
@@ -2141,7 +2149,7 @@ export default function KesimAlaniPage() {
         placed++;
       }
     }
-    save({ ...kesim, animalGroups: groups }, `${donor.description || donor.name}: Hayvan ${groups[groupIdx].animalNo}'e takas ile yerleştirildi`);
+    save({ ...kesim, animalGroups: groups }, `${donor.description || donor.name}: Hayvan ${groups[groupIdx].animalNo}'e takas ile yerleştirildi`, false, 'groups');
     setSmartPlacePopover(null);
   }
 
@@ -2164,7 +2172,7 @@ export default function KesimAlaniPage() {
       }
     }
     if (placed === 0) return;
-    save({ ...kesim, animalGroups: groups }, `${donor.description || donor.name} (${placed} hisse) Hayvan ${groups[targetGroupIdx].animalNo}'e yerleştirildi`);
+    save({ ...kesim, animalGroups: groups }, `${donor.description || donor.name} (${placed} hisse) Hayvan ${groups[targetGroupIdx].animalNo}'e yerleştirildi`, false, 'groups');
     setSmartPlacePopover(null);
   }
 
@@ -2196,7 +2204,7 @@ export default function KesimAlaniPage() {
       description: `${baseName} (2/${splitA + splitB})`,
     };
     updatedDonations.push(newDonor);
-    save({ ...kesim, donations: updatedDonations }, `${baseName}: ${splitA + splitB} hisse → ${splitA}+${splitB} olarak bölündü`);
+    save({ ...kesim, donations: updatedDonations }, `${baseName}: ${splitA + splitB} hisse → ${splitA}+${splitB} olarak bölündü`, false, 'donations');
     setSplitShareDialog(null);
   }
 
