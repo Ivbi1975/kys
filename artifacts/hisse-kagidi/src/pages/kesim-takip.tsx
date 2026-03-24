@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "wouter";
 import { fetchTrackingData, toggleKesildi } from "@/lib/api";
 import type { TrackingData, TrackingGroup } from "@/lib/api";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, Circle, Loader2, AlertTriangle, Beef, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CheckCircle2, Circle, Loader2, AlertTriangle, Beef, Clock, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 const colorMap: Record<string, string> = {
   green: "#22c55e",
@@ -21,12 +22,242 @@ function formatKesildiTime(isoString: string | null): string {
   }
 }
 
+function KesimKagidiOverlay({
+  groups,
+  initialIndex,
+  toggling,
+  onToggle,
+  onClose,
+}: {
+  groups: TrackingGroup[];
+  initialIndex: number;
+  toggling: Set<string>;
+  onToggle: (group: TrackingGroup) => void;
+  onClose: () => void;
+}) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const touchDeltaX = useRef(0);
+  const touchDeltaY = useRef(0);
+  const isDragging = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+
+  const group = groups[currentIndex];
+  if (!group) return null;
+
+  const goNext = () => {
+    if (currentIndex < groups.length - 1) setCurrentIndex(currentIndex + 1);
+  };
+  const goPrev = () => {
+    if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    touchStartX.current = clientX;
+    touchStartY.current = clientY;
+    touchDeltaX.current = 0;
+    touchDeltaY.current = 0;
+    isDragging.current = true;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
+    if (!isDragging.current) return;
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    touchDeltaX.current = clientX - touchStartX.current;
+    touchDeltaY.current = clientY - touchStartY.current;
+    if (Math.abs(touchDeltaX.current) > Math.abs(touchDeltaY.current)) {
+      setSwipeOffset(touchDeltaX.current);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    const threshold = 60;
+
+    if (touchDeltaY.current > 100 && Math.abs(touchDeltaY.current) > Math.abs(touchDeltaX.current)) {
+      onClose();
+      return;
+    }
+
+    if (touchDeltaX.current < -threshold) {
+      goNext();
+    } else if (touchDeltaX.current > threshold) {
+      goPrev();
+    }
+    setSwipeOffset(0);
+  };
+
+  const rows = [];
+  for (let i = 0; i < 7; i++) {
+    const donor = group.donors[i];
+    rows.push({
+      sira: i + 1,
+      vekalet: donor?.donationType || "",
+      vekaletVeren: donor?.name || "",
+      adinaKesilen: donor?.description || "",
+      empty: !donor,
+    });
+  }
+
+  const isToggling = toggling.has(group.id);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        ref={containerRef}
+        className="relative w-full max-w-2xl mx-2 max-h-[95vh] flex flex-col"
+        style={{ transform: `translateX(${swipeOffset}px)`, transition: isDragging.current ? "none" : "transform 0.2s ease-out" }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onMouseDown={handleTouchStart}
+        onMouseMove={handleTouchMove}
+        onMouseUp={handleTouchEnd}
+        onMouseLeave={() => { if (isDragging.current) handleTouchEnd(); }}
+      >
+        <div className="flex items-center justify-between px-1 mb-2">
+          <Button variant="ghost" size="sm" onClick={goPrev} disabled={currentIndex === 0} className="text-white hover:bg-white/20 h-8 w-8 p-0">
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <span className="text-white text-sm font-semibold">
+            Hayvan {currentIndex + 1} / {groups.length}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={goNext} disabled={currentIndex === groups.length - 1} className="text-white hover:bg-white/20 h-8 w-8 p-0">
+              <ChevronRight className="w-5 h-5" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onClose} className="text-white hover:bg-white/20 h-8 w-8 p-0">
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+        </div>
+
+        <Card
+          className="flex-1 overflow-auto rounded-xl"
+          style={group.colorTag && colorMap[group.colorTag] ? { borderTop: `4px solid ${colorMap[group.colorTag]}` } : {}}
+        >
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-bold text-primary">#{group.animalNo}</span>
+                <span className="text-sm text-muted-foreground">({group.filledCount}/7 dolu)</span>
+              </div>
+              {group.kesildi && group.kesildiAt && (
+                <span className="text-xs bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 px-2 py-1 rounded-full font-semibold flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {formatKesildiTime(group.kesildiAt)}
+                </span>
+              )}
+            </div>
+
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-muted/50">
+                    <th className="text-left p-2 font-semibold border-b w-10">SIRA</th>
+                    <th className="text-left p-2 font-semibold border-b">VEKALET</th>
+                    <th className="text-left p-2 font-semibold border-b">VEKALETİ VEREN</th>
+                    <th className="text-left p-2 font-semibold border-b">ADINA KESİLEN</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, idx) => (
+                    <tr key={idx} className={`${row.empty ? "text-muted-foreground/30" : ""} ${idx % 2 === 0 ? "bg-background" : "bg-muted/20"}`}>
+                      <td className="p-2 border-b text-center font-medium">{row.sira}</td>
+                      <td className="p-2 border-b text-xs">{row.vekalet || "—"}</td>
+                      <td className="p-2 border-b">{row.vekaletVeren || "—"}</td>
+                      <td className="p-2 border-b">{row.adinaKesilen || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="sm:hidden space-y-2">
+              {rows.map((row, idx) => (
+                <div
+                  key={idx}
+                  className={`rounded-lg p-2.5 ${row.empty ? "bg-muted/20 opacity-40" : "bg-muted/40"}`}
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-bold text-muted-foreground bg-background rounded-full w-5 h-5 flex items-center justify-center shrink-0">{row.sira}</span>
+                    <div className="flex-1 min-w-0">
+                      {row.empty ? (
+                        <p className="text-xs text-muted-foreground">Boş</p>
+                      ) : (
+                        <>
+                          <p className="font-medium text-sm truncate">{row.vekaletVeren}</p>
+                          {row.adinaKesilen && row.adinaKesilen !== row.vekaletVeren && (
+                            <p className="text-xs text-muted-foreground truncate">→ {row.adinaKesilen}</p>
+                          )}
+                          {row.vekalet && (
+                            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded mt-0.5 inline-block">{row.vekalet}</span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="sticky bottom-0 p-4 bg-background border-t">
+            <Button
+              className={`w-full h-12 text-base font-semibold ${
+                group.kesildi
+                  ? "bg-orange-500 hover:bg-orange-600 text-white"
+                  : "bg-emerald-600 hover:bg-emerald-700 text-white"
+              }`}
+              onClick={() => onToggle(group)}
+              disabled={isToggling}
+            >
+              {isToggling ? (
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+              ) : group.kesildi ? (
+                <Circle className="w-5 h-5 mr-2" />
+              ) : (
+                <CheckCircle2 className="w-5 h-5 mr-2" />
+              )}
+              {group.kesildi ? "İşareti Kaldır" : "Kesildi Olarak İşaretle"}
+            </Button>
+          </div>
+        </Card>
+
+        <div className="flex justify-center gap-1 mt-2 px-4 flex-wrap">
+          {groups.map((_, idx) => (
+            <button
+              key={idx}
+              className={`w-2 h-2 rounded-full transition-all ${
+                idx === currentIndex ? "bg-white scale-125" : "bg-white/40"
+              }`}
+              onClick={() => setCurrentIndex(idx)}
+            />
+          ))}
+        </div>
+
+        <p className="text-white/60 text-[10px] text-center mt-1">Sola/sağa kaydırarak gezinin • Aşağı kaydırarak kapatın</p>
+      </div>
+    </div>
+  );
+}
+
 export default function KesimTakipPage() {
   const params = useParams<{ token: string }>();
   const [data, setData] = useState<TrackingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toggling, setToggling] = useState<Set<string>>(new Set());
+  const [overlayIndex, setOverlayIndex] = useState<number | null>(null);
 
   const loadData = useCallback(async () => {
     if (!params.token) return;
@@ -125,7 +356,7 @@ export default function KesimTakipPage() {
         </Card>
 
         <div className="space-y-2">
-          {filledGroups.map(group => {
+          {filledGroups.map((group, idx) => {
             const isToggling = toggling.has(group.id);
             return (
               <Card
@@ -136,10 +367,10 @@ export default function KesimTakipPage() {
                     : "hover:bg-muted/50"
                 }`}
                 style={group.colorTag && colorMap[group.colorTag] ? { borderLeft: `4px solid ${colorMap[group.colorTag]}` } : {}}
-                onClick={() => handleToggle(group)}
+                onClick={() => setOverlayIndex(idx)}
               >
                 <div className="flex items-center gap-3">
-                  <div className="shrink-0">
+                  <div className="shrink-0" onClick={(e) => { e.stopPropagation(); handleToggle(group); }}>
                     {isToggling ? (
                       <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                     ) : group.kesildi ? (
@@ -182,9 +413,19 @@ export default function KesimTakipPage() {
         )}
 
         <p className="text-[10px] text-muted-foreground text-center mt-6">
-          Hayvanın üzerine tıklayarak kesildi olarak işaretleyebilirsiniz • Sayfa her 30 saniyede otomatik güncellenir
+          Bir hayvan grubuna tıklayarak kesim kağıdı detayını görüntüleyin • Sayfa her 30 saniyede otomatik güncellenir
         </p>
       </div>
+
+      {overlayIndex !== null && (
+        <KesimKagidiOverlay
+          groups={filledGroups}
+          initialIndex={overlayIndex}
+          toggling={toggling}
+          onToggle={handleToggle}
+          onClose={() => setOverlayIndex(null)}
+        />
+      )}
     </div>
   );
 }
