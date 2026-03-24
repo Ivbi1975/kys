@@ -105,19 +105,6 @@ export default function Home() {
     init();
   }, []);
 
-  async function loadDeletedItems() {
-    try {
-      const deleted = await fetchDeletedKesimAlanlari();
-      setDeletedKesimAlanlari(deleted);
-    } catch (err) {
-      toast({
-        title: "Silinen öğeler yüklenemedi",
-        description: err instanceof Error ? err.message : "Bilinmeyen hata",
-        variant: "destructive",
-      });
-    }
-  }
-
   async function handleAddTag() {
     if (!newTagName.trim()) return;
     const tag: CustomTag = {
