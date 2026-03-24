@@ -89,7 +89,9 @@ export default function Home() {
         try {
           const deleted = await fetchDeletedKesimAlanlari();
           setDeletedKesimAlanlari(deleted);
-        } catch {}
+        } catch (delErr) {
+          console.warn("Silinen öğeler yüklenemedi:", delErr instanceof Error ? delErr.message : delErr);
+        }
       } catch (err) {
         toast({
           title: "Veri yüklenemedi",
@@ -219,10 +221,14 @@ export default function Home() {
     if (!deleteConfirm) return;
     try {
       await apiDeleteKesimAlani(deleteConfirm.id);
+      const deletedItem = kesimAlanlari.find(k => k.id === deleteConfirm.id);
       setKesimAlanlari(kesimAlanlari.filter(k => k.id !== deleteConfirm.id));
+      if (deletedItem) {
+        setDeletedKesimAlanlari(prev => [...prev, { ...deletedItem, deletedAt: new Date().toISOString() }]);
+      }
       toast({
         title: "Kesim alanı silindi",
-        description: `"${deleteConfirm.name}" çöp kutusuna taşındı. Ayarlar'dan geri yükleyebilirsiniz.`,
+        description: `"${deleteConfirm.name}" çöp kutusuna taşındı.`,
       });
     } catch (err) {
       toast({
@@ -919,14 +925,14 @@ export default function Home() {
               {deleteConfirm?.hasDonations ? (
                 <>
                   <strong>"{deleteConfirm.name}"</strong> kesim alanında bağışçılar bulunuyor.
-                  Bu alan çöp kutusuna taşınacak ve daha sonra Ayarlar'dan geri yükleyebilirsiniz.
+                  Bu alan çöp kutusuna taşınacak ve daha sonra ana sayfadaki çöp kutusundan geri yükleyebilirsiniz.
                   <br /><br />
                   Silmeden önce Ayarlar &gt; Yedekle ile yedek almanız önerilir.
                 </>
               ) : (
                 <>
                   <strong>"{deleteConfirm?.name}"</strong> kesim alanı çöp kutusuna taşınacak.
-                  Daha sonra Ayarlar'dan geri yükleyebilirsiniz.
+                  Daha sonra ana sayfadaki çöp kutusundan geri yükleyebilirsiniz.
                 </>
               )}
             </AlertDialogDescription>
