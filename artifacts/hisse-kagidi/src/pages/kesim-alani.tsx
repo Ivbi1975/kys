@@ -151,7 +151,7 @@ export default function KesimAlaniPage() {
   const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([]);
   const [hasHeaderRow, setHasHeaderRow] = useState(true);
   const [bulkStep, setBulkStep] = useState<"input" | "mapping" | "review">("input");
-  const [bulkReviewRows, setBulkReviewRows] = useState<{ idx: number; row: string[]; rawShareCount: number; selected: boolean }[]>([]);
+  const [bulkReviewRows, setBulkReviewRows] = useState<{ idx: number; row: string[]; rawShareCount: number; selected: boolean; groupKey: string; groupTotal: number }[]>([]);
   const [jumpDialogOpen, setJumpDialogOpen] = useState(false);
   const [jumpDialogValue, setJumpDialogValue] = useState("");
 
@@ -932,22 +932,50 @@ export default function KesimAlaniPage() {
     if (!kesim || previewData.length === 0) return;
     const startRow = hasHeaderRow ? 1 : 0;
     const shareCountColIdx = columnMappings.indexOf("shareCount");
+    const descColIdx = columnMappings.indexOf("description");
 
-    const highShareRows: typeof bulkReviewRows = [];
-    for (let r = startRow; r < previewData.length; r++) {
-      const row = previewData[r];
-      if (shareCountColIdx >= 0) {
-        const rawVal = parseInt(String(row[shareCountColIdx] ?? "0").trim(), 10) || 0;
-        if (rawVal > 50) {
-          highShareRows.push({ idx: r, row, rawShareCount: rawVal, selected: true });
+    if (bulkStep !== "review") {
+      const groupTotals = new Map<string, { total: number; rows: { idx: number; row: string[]; shareCount: number }[] }>();
+
+      for (let r = startRow; r < previewData.length; r++) {
+        const row = previewData[r];
+        const desc = descColIdx >= 0 ? String(row[descColIdx] ?? "").trim().toLowerCase() : "";
+        const shareCount = shareCountColIdx >= 0
+          ? (parseInt(String(row[shareCountColIdx] ?? "1").trim(), 10) || 1)
+          : 1;
+
+        if (!desc) continue;
+
+        if (!groupTotals.has(desc)) {
+          groupTotals.set(desc, { total: 0, rows: [] });
+        }
+        const group = groupTotals.get(desc)!;
+        group.total += shareCount;
+        group.rows.push({ idx: r, row, shareCount });
+      }
+
+      const highShareRows: typeof bulkReviewRows = [];
+      for (const [groupKey, group] of groupTotals) {
+        if (group.total > 50) {
+          for (const item of group.rows) {
+            highShareRows.push({
+              idx: item.idx,
+              row: item.row,
+              rawShareCount: item.shareCount,
+              selected: true,
+              groupKey,
+              groupTotal: group.total,
+            });
+          }
         }
       }
-    }
 
-    if (highShareRows.length > 0 && bulkStep !== "review") {
-      setBulkReviewRows(highShareRows);
-      setBulkStep("review");
-      return;
+      if (highShareRows.length > 0) {
+        highShareRows.sort((a, b) => a.groupKey.localeCompare(b.groupKey) || a.idx - b.idx);
+        setBulkReviewRows(highShareRows);
+        setBulkStep("review");
+        return;
+      }
     }
 
     const excludedIdxs = new Set(bulkReviewRows.filter(r => r.selected).map(r => r.idx));
@@ -3197,12 +3225,14 @@ export default function KesimAlaniPage() {
                       </div>
                     )}
 
-                    {bulkStep === "review" && (
+                    {bulkStep === "review" && (() => {
+                      const groupKeys = [...new Set(bulkReviewRows.map(r => r.groupKey))];
+                      return (
                       <div className="flex flex-col min-h-0 flex-1 pt-4">
                         <div className="flex items-center gap-3 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg mb-4 flex-shrink-0">
                           <AlertTriangle className="w-5 h-5 text-orange-500 flex-shrink-0" />
                           <p className="text-sm">
-                            Aşağıdaki satırların hisse sayısı 50'den fazla. Bunlar muhtemelen hatalı verilerdir. Silmek istediklerinizi işaretli bırakın.
+                            Aşağıdaki vekaleti verenlerin toplam hisse sayısı 50'den fazla. Bunlar muhtemelen hatalı verilerdir. Dahil etmek istemediklerinizi işaretli bırakın.
                           </p>
                         </div>
 
@@ -3222,45 +3252,64 @@ export default function KesimAlaniPage() {
                             Tümünü Kaldır
                           </Button>
                           <span className="text-xs text-muted-foreground ml-auto">
-                            {bulkReviewRows.filter(r => r.selected).length} / {bulkReviewRows.length} satır silinecek
+                            {bulkReviewRows.filter(r => r.selected).length} / {bulkReviewRows.length} satır dahil edilmeyecek
                           </span>
                         </div>
 
                         <div className="border rounded-lg overflow-hidden min-h-0 flex-1">
                           <div className="overflow-auto max-h-full">
-                            <table className="w-full text-sm">
-                              <thead className="sticky top-0 z-10">
-                                <tr className="bg-primary/10 border-b">
-                                  <th className="p-2 w-10 text-center">Sil</th>
-                                  <th className="p-2 text-left">Satır</th>
-                                  <th className="p-2 text-left">Ad</th>
-                                  <th className="p-2 text-right">Hisse (Ham)</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {bulkReviewRows.map((item, i) => {
-                                  const nameColIdx = columnMappings.indexOf("name");
-                                  const name = nameColIdx >= 0 ? String(item.row[nameColIdx] ?? "").trim() : "";
-                                  return (
-                                    <tr key={i} className={`border-b ${item.selected ? "bg-red-500/5" : ""}`}>
-                                      <td className="p-2 text-center">
-                                        <input
-                                          type="checkbox"
-                                          checked={item.selected}
-                                          onChange={() => {
-                                            setBulkReviewRows(prev => prev.map((r, ri) => ri === i ? { ...r, selected: !r.selected } : r));
-                                          }}
-                                          className="rounded"
-                                        />
-                                      </td>
-                                      <td className="p-2 text-xs text-muted-foreground">{item.idx + 1}</td>
-                                      <td className="p-2 text-sm font-medium">{name || "—"}</td>
-                                      <td className="p-2 text-sm text-right font-mono text-red-600 font-bold">{item.rawShareCount}</td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
+                            {groupKeys.map((gk) => {
+                              const groupRows = bulkReviewRows.filter(r => r.groupKey === gk);
+                              const groupTotal = groupRows[0]?.groupTotal ?? 0;
+                              const descColIdx = columnMappings.indexOf("description");
+                              const displayName = descColIdx >= 0 ? String(groupRows[0]?.row[descColIdx] ?? "").trim() : gk;
+                              const allSelected = groupRows.every(r => r.selected);
+                              return (
+                                <div key={gk} className="border-b last:border-0">
+                                  <div className="flex items-center gap-2 px-3 py-2 bg-orange-500/5">
+                                    <input
+                                      type="checkbox"
+                                      checked={allSelected}
+                                      onChange={() => {
+                                        const newVal = !allSelected;
+                                        setBulkReviewRows(prev => prev.map(r => r.groupKey === gk ? { ...r, selected: newVal } : r));
+                                      }}
+                                      className="rounded"
+                                    />
+                                    <span className="text-sm font-semibold flex-1">{displayName}</span>
+                                    <span className="text-xs font-mono text-red-600 font-bold">
+                                      Toplam: {groupTotal} hisse ({groupRows.length} satır)
+                                    </span>
+                                  </div>
+                                  <table className="w-full text-sm">
+                                    <tbody>
+                                      {groupRows.map((item) => {
+                                        const globalIdx = bulkReviewRows.indexOf(item);
+                                        const nameColIdx = columnMappings.indexOf("name");
+                                        const name = nameColIdx >= 0 ? String(item.row[nameColIdx] ?? "").trim() : "";
+                                        return (
+                                          <tr key={item.idx} className={`border-b last:border-0 ${item.selected ? "bg-red-500/5" : ""}`}>
+                                            <td className="p-2 pl-8 w-10 text-center">
+                                              <input
+                                                type="checkbox"
+                                                checked={item.selected}
+                                                onChange={() => {
+                                                  setBulkReviewRows(prev => prev.map((r, ri) => ri === globalIdx ? { ...r, selected: !r.selected } : r));
+                                                }}
+                                                className="rounded"
+                                              />
+                                            </td>
+                                            <td className="p-2 text-xs text-muted-foreground w-12">{item.idx + 1}</td>
+                                            <td className="p-2 text-sm font-medium">{name || "—"}</td>
+                                            <td className="p-2 text-sm text-right font-mono">{item.rawShareCount} hisse</td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -3270,12 +3319,13 @@ export default function KesimAlaniPage() {
                           </Button>
                           <Button onClick={applyBulkImport} className="flex-1">
                             {bulkReviewRows.filter(r => r.selected).length > 0
-                              ? `${bulkReviewRows.filter(r => r.selected).length} Satırı Sil ve Devam Et`
-                              : "Hiçbirini Silme, Devam Et"}
+                              ? `${bulkReviewRows.filter(r => r.selected).length} Satırı Çıkar ve Devam Et`
+                              : "Tümünü Dahil Et ve Devam Et"}
                           </Button>
                         </div>
                       </div>
-                    )}
+                      );
+                    })()}
 
                     {bulkStep === "mapping" && (
                       <div className="flex flex-col min-h-0 flex-1 pt-4">
