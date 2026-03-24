@@ -1111,17 +1111,10 @@ export default function Home() {
               return (
                 <div key={project.id} className="mb-6">
                   <Card className="p-3 bg-muted/30 border-primary/10">
-                    <div className="flex items-center gap-2">
-                      <button
-                        className="p-0.5 hover:bg-accent rounded"
-                        onClick={() => toggleProjectCollapse(project.id)}
-                      >
-                        {isCollapsed ? (
-                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </button>
+                    <div
+                      className="flex items-center gap-2 cursor-pointer"
+                      onClick={() => setLocation(`/proje/${project.id}`)}
+                    >
                       <FolderOpen className="w-5 h-5 text-primary" />
                       <div className="flex-1 min-w-0">
                         <h2 className="font-semibold text-foreground text-lg">{project.name}</h2>
@@ -1132,64 +1125,9 @@ export default function Home() {
                           <span>{projTotals.groups} grup</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          title="Yeni Kesim Alanı Ekle"
-                          onClick={() => {
-                            setCreateProjectId(project.id);
-                            setDialogOpen(true);
-                          }}
-                        >
-                          <Plus className="w-4 h-4 text-primary" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          title="Düzenle"
-                          onClick={() => {
-                            setEditingProject({ id: project.id, name: project.name });
-                            setEditProjectDialogOpen(true);
-                          }}
-                        >
-                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          onClick={() => setDeleteProjectConfirm({ id: project.id, name: project.name })}
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                        </Button>
-                      </div>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
                     </div>
                   </Card>
-                  {!isCollapsed && (
-                    <div className="space-y-2 mt-2 ml-4 border-l-2 border-primary/10 pl-4">
-                      {projectKesimAlanlari.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-2 italic">
-                          Bu projede henüz kesim alanı yok.
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="px-1 h-auto text-primary"
-                            onClick={() => {
-                              setCreateProjectId(project.id);
-                              setDialogOpen(true);
-                            }}
-                          >
-                            Ekle
-                          </Button>
-                        </p>
-                      ) : (
-                        projectKesimAlanlari.map(k => renderKesimCard(k))
-                      )}
-                    </div>
-                  )}
                 </div>
               );
             })}

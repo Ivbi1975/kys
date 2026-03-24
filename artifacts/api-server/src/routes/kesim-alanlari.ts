@@ -792,9 +792,14 @@ router.delete("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => 
   }
 });
 
-router.get("/catisma-tespiti", async (_req, res) => {
+router.get("/catisma-tespiti", async (req, res) => {
   try {
-    const allKA = await db.select().from(kesimAlanlariTable).where(isNull(kesimAlanlariTable.deletedAt));
+    const projectIdFilter = req.query.projectId as string | undefined;
+    const conditions = [isNull(kesimAlanlariTable.deletedAt)];
+    if (projectIdFilter) {
+      conditions.push(eq(kesimAlanlariTable.projectId, projectIdFilter));
+    }
+    const allKA = await db.select().from(kesimAlanlariTable).where(and(...conditions));
     const allDonations = allKA.length > 0
       ? await db.select().from(donationsTable)
           .where(and(

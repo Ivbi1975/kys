@@ -304,8 +304,9 @@ export interface ConflictCheckResult {
   totalConflicts: number;
 }
 
-export async function fetchCatismaTespiti(): Promise<ConflictCheckResult> {
-  return apiFetch<ConflictCheckResult>("/catisma-tespiti");
+export async function fetchCatismaTespiti(projectId?: string): Promise<ConflictCheckResult> {
+  const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
+  return apiFetch<ConflictCheckResult>(`/catisma-tespiti${query}`);
 }
 
 export interface TransferPayload {
