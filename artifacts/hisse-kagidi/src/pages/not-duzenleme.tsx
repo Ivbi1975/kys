@@ -32,6 +32,9 @@ import {
   X,
   Undo2,
   Redo2,
+  FileBarChart,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import type { KesimAlani } from "@/lib/types";
 import type { AiClassificationResult } from "@/lib/api";
@@ -115,6 +118,9 @@ export default function NotDuzenlemePage() {
   const [rangeStart, setRangeStart] = useState(1);
   const [rangeEnd, setRangeEnd] = useState(50);
   const [showAiPanel, setShowAiPanel] = useState(false);
+  const [aiErrorBatches, setAiErrorBatches] = useState(0);
+  const [showAiReport, setShowAiReport] = useState(false);
+  const [aiReportCollapsed, setAiReportCollapsed] = useState(false);
 
   const pushHistory = useCallback((newDonations: LocalDonation[]) => {
     const trimmed = historyRef.current.slice(0, historyIndexRef.current + 1);
@@ -291,6 +297,9 @@ export default function NotDuzenlemePage() {
     setAiStopped(false);
     setAiResults(new Map());
     setAiSaveStatus("idle");
+    setAiErrorBatches(0);
+    setShowAiReport(false);
+    setAiReportCollapsed(false);
 
     let toProcess: LocalDonation[];
     if (rangeMode === "all") {
@@ -360,6 +369,7 @@ export default function NotDuzenlemePage() {
         }
       } catch (err) {
         errorCount++;
+        setAiErrorBatches(errorCount);
         const msg = err instanceof Error ? err.message : "Sınıflandırma hatası";
         toast({
           title: "AI Batch Hatası",
@@ -384,12 +394,67 @@ export default function NotDuzenlemePage() {
     }
 
     setAiRunning(false);
+    setShowAiReport(true);
+    setAiReportCollapsed(false);
   };
 
   const stopAiClassification = () => {
     aiStopRef.current = true;
     setAiStopped(true);
   };
+
+  const scrollToDonation = (donationId: string) => {
+    let row = document.querySelector(`[data-donation-id="${donationId}"]`);
+    if (!row && searchQuery) {
+      setSearchQuery("");
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          row = document.querySelector(`[data-donation-id="${donationId}"]`);
+          if (row) {
+            row.scrollIntoView({ behavior: "smooth", block: "center" });
+            row.classList.add("ring-2", "ring-primary", "ring-offset-2");
+            setTimeout(() => {
+              row!.classList.remove("ring-2", "ring-primary", "ring-offset-2");
+            }, 2000);
+          }
+        }, 100);
+      });
+      return;
+    }
+    if (row) {
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+      row.classList.add("ring-2", "ring-primary", "ring-offset-2");
+      setTimeout(() => {
+        row!.classList.remove("ring-2", "ring-primary", "ring-offset-2");
+      }, 2000);
+    }
+  };
+
+  const aiReportStats = (() => {
+    const results = Array.from(aiResults.values());
+    const totalProcessed = results.length;
+    const withWarnings = results.filter(r => r.warnings && r.warnings.trim() !== "");
+    const withRequests = results.filter(r => r.requests && r.requests.trim() !== "");
+    const categoryMap = new Map<string, number>();
+    for (const r of results) {
+      if (r.categories) {
+        for (const cat of r.categories) {
+          categoryMap.set(cat, (categoryMap.get(cat) || 0) + 1);
+        }
+      }
+    }
+    const categoryDistribution = Array.from(categoryMap.entries())
+      .sort((a, b) => b[1] - a[1]);
+
+    return {
+      totalProcessed,
+      warningDonors: withWarnings,
+      warningCount: withWarnings.length,
+      requestCount: withRequests.length,
+      categoryDistribution,
+      errorBatches: aiErrorBatches,
+    };
+  })();
 
   if (loading) {
     return (
@@ -619,6 +684,124 @@ export default function NotDuzenlemePage() {
           )}
         </Card>
 
+        {showAiReport && (
+          <Card className="p-0 overflow-hidden border-primary/20">
+            <div
+              className="flex items-center justify-between p-3 bg-primary/5 cursor-pointer"
+              onClick={() => setAiReportCollapsed(!aiReportCollapsed)}
+            >
+              <h2 className="text-sm font-semibold flex items-center gap-2">
+                <FileBarChart className="w-4 h-4 text-primary" />
+                AI Tamamlanma Raporu
+                {aiStopped && <Badge variant="outline" className="text-xs">Durduruldu</Badge>}
+              </h2>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={(e) => { e.stopPropagation(); setAiReportCollapsed(!aiReportCollapsed); }}
+                >
+                  {aiReportCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={(e) => { e.stopPropagation(); setShowAiReport(false); }}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            {!aiReportCollapsed && (
+              <div className="p-4 space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-muted/50 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-primary">{aiReportStats.totalProcessed}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {aiProgress.total > aiReportStats.totalProcessed
+                        ? `Başarılı / ${aiProgress.total} toplam`
+                        : "İşlenen Not"}
+                    </div>
+                  </div>
+                  <div className={`rounded-lg p-3 text-center ${aiReportStats.warningCount > 0 ? "bg-destructive/10" : "bg-muted/50"}`}>
+                    <div className={`text-2xl font-bold ${aiReportStats.warningCount > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                      {aiReportStats.warningCount}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">Uyarı</div>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-blue-600">{aiReportStats.requestCount}</div>
+                    <div className="text-xs text-muted-foreground mt-1">Özel İstek</div>
+                  </div>
+                  <div className={`rounded-lg p-3 text-center ${aiReportStats.errorBatches > 0 ? "bg-destructive/10" : "bg-muted/50"}`}>
+                    <div className={`text-2xl font-bold ${aiReportStats.errorBatches > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                      {aiReportStats.errorBatches}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">Hatalı Batch</div>
+                  </div>
+                </div>
+
+                {aiReportStats.categoryDistribution.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-muted-foreground mb-2">Kategori Dağılımı</h3>
+                    <div className="flex flex-wrap gap-1.5">
+                      {aiReportStats.categoryDistribution.map(([cat, count]) => (
+                        <Badge key={cat} variant="secondary" className="text-xs">
+                          {cat.replace(/_/g, " ")} <span className="ml-1 font-bold">{count}</span>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {aiReportStats.warningCount > 0 && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-destructive mb-2 flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Uyarılı Bağışçılar ({aiReportStats.warningCount})
+                    </h3>
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      {aiReportStats.warningDonors.map(r => {
+                        const donor = donations.find(d => d.id === r.donationId);
+                        return (
+                          <button
+                            key={r.donationId}
+                            className="w-full flex items-start gap-2 text-left p-2 rounded-md hover:bg-destructive/5 transition-colors border border-transparent hover:border-destructive/20"
+                            onClick={() => scrollToDonation(r.donationId)}
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5 text-destructive shrink-0 mt-0.5" />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-medium truncate">
+                                {donor?.description || donor?.name || r.donationId}
+                              </div>
+                              <div className="text-[11px] text-destructive/80 line-clamp-2">{r.warnings}</div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {!showAiReport && !aiRunning && aiResults.size > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setShowAiReport(true); setAiReportCollapsed(false); }}
+            className="flex items-center gap-1"
+          >
+            <FileBarChart className="w-4 h-4" />
+            Raporu Göster
+          </Button>
+        )}
+
         <div className="text-xs text-muted-foreground">
           {filteredDonations.length} bağışçı gösteriliyor
           {searchQuery && ` ("${searchQuery}" araması)`}
@@ -645,7 +828,8 @@ export default function NotDuzenlemePage() {
                 return (
                   <TableRow
                     key={d.id}
-                    className={hasWarning ? "bg-destructive/5" : ""}
+                    data-donation-id={d.id}
+                    className={`transition-all ${hasWarning ? "bg-destructive/5" : ""}`}
                   >
                     <TableCell className="text-xs text-muted-foreground">{globalIdx + 1}</TableCell>
                     <TableCell>
