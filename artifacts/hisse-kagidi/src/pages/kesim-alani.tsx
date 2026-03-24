@@ -2693,6 +2693,10 @@ export default function KesimAlaniPage() {
                     <FileSpreadsheet className="w-3.5 h-3.5 mr-1" />
                     <span className="hidden sm:inline">Excel</span>
                   </Button>
+                  <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setLocation(`/not-duzenleme/${kesim.id}`)}>
+                    <Search className="w-3.5 h-3.5 mr-1" />
+                    <span className="hidden sm:inline">Notlar</span>
+                  </Button>
                   <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setLocation(`/print/${kesim.id}`)}>
                     <Printer className="w-3.5 h-3.5 mr-1" />
                     <span className="hidden sm:inline">Yazdır</span>
