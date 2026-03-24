@@ -461,6 +461,9 @@ export default function KesimAlaniPage() {
   const pendingSaveTypeRef = useRef<'full' | 'donations' | 'groups'>('full');
 
   const debouncedSaveToApi = useCallback((data: KesimAlani, saveType: 'full' | 'donations' | 'groups' = 'full') => {
+    if (pendingSaveRef.current && pendingSaveTypeRef.current !== saveType) {
+      saveType = 'full';
+    }
     pendingSaveRef.current = data;
     pendingSaveTypeRef.current = saveType;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
