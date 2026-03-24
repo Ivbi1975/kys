@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, createElement, useMemo, forwardRef } from "react";
+import { useState, useEffect, useCallback, useRef, createElement, useMemo, forwardRef, useTransition } from "react";
 import { TableVirtuoso } from "react-virtuoso";
 import { useParams, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -248,6 +248,7 @@ export default function KesimAlaniPage() {
   const [basketTransferTarget, setBasketTransferTarget] = useState<number>(-1);
   const [basketOpen, setBasketOpen] = useState(true);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [, startFilterTransition] = useTransition();
   const [removedFromGroupIds, setRemovedFromGroupIds] = useState<Set<string>>(new Set());
   const [showRemovedFilter, setShowRemovedFilter] = useState(false);
   const [smartPlacePopover, setSmartPlacePopover] = useState<string | null>(null);
@@ -298,7 +299,7 @@ export default function KesimAlaniPage() {
     const handleScroll = () => {
       const container = scrollContainerRef.current;
       const scrollY = container ? container.scrollTop : window.scrollY;
-      setShowScrollTop(scrollY > 300);
+      setShowScrollTop(scrollY > 150);
     };
     const container = scrollContainerRef.current;
     if (container) {
@@ -1520,14 +1521,14 @@ export default function KesimAlaniPage() {
     setSplitGroupDialog(null);
   }
 
-  function toggleGroupSelect(groupId: string) {
+  const toggleGroupSelect = useCallback((groupId: string) => {
     setSelectedGroupIds(prev => {
       const next = new Set(prev);
       if (next.has(groupId)) next.delete(groupId);
       else next.add(groupId);
       return next;
     });
-  }
+  }, []);
 
   function mergeSelectedGroups() {
     if (!kesim || selectedGroupIds.size < 2) return;
@@ -1861,14 +1862,14 @@ export default function KesimAlaniPage() {
     XLSX.writeFile(wb, `${kesim.name}_kesim_kagidi.xlsx`);
   }
 
-  function toggleGroupCollapse(groupId: string) {
+  const toggleGroupCollapse = useCallback((groupId: string) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(groupId)) next.delete(groupId);
       else next.add(groupId);
       return next;
     });
-  }
+  }, []);
 
   const groupSearchMatches = useCallback(() => {
     if (!kesim || !groupSearchQuery.trim()) return [];
@@ -1890,7 +1891,7 @@ export default function KesimAlaniPage() {
     return matches;
   }, [kesim, groupSearchQuery]);
 
-  const currentGroupMatches = groupSearchMatches();
+  const currentGroupMatches = useMemo(() => groupSearchMatches(), [groupSearchMatches]);
 
   useEffect(() => {
     if (currentGroupMatches.length > 0 && groupSearchMatchIdx >= 0) {
@@ -1923,14 +1924,14 @@ export default function KesimAlaniPage() {
     );
   }
 
-  function toggleGroupDonationSelect(donationId: string) {
+  const toggleGroupDonationSelect = useCallback((donationId: string) => {
     setSelectedGroupDonations(prev => {
       const next = new Set(prev);
       if (next.has(donationId)) next.delete(donationId);
       else next.add(donationId);
       return next;
     });
-  }
+  }, []);
 
   function bulkRemoveFromGroups() {
     if (!kesim || selectedGroupDonations.size === 0) return;
@@ -3076,13 +3077,13 @@ export default function KesimAlaniPage() {
           <div className="flex md:hidden border-b mb-4">
             <button
               className={`flex-1 py-2 text-sm font-medium text-center border-b-2 transition-colors ${mobileTab === "donors" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-              onClick={() => setMobileTab("donors")}
+              onClick={() => startFilterTransition(() => setMobileTab("donors"))}
             >
               Bağışçı Listesi ({kesim.donations.filter(d => !d.excluded).length})
             </button>
             <button
               className={`flex-1 py-2 text-sm font-medium text-center border-b-2 transition-colors ${mobileTab === "groups" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-              onClick={() => setMobileTab("groups")}
+              onClick={() => startFilterTransition(() => setMobileTab("groups"))}
             >
               Hayvan Grupları ({kesim.animalGroups.length})
             </button>
@@ -4178,7 +4179,7 @@ export default function KesimAlaniPage() {
                     variant="ghost"
                     size="sm"
                     className="h-8 w-8 p-0"
-                    onClick={() => setDonorListVisible(!donorListVisible)}
+                    onClick={() => startFilterTransition(() => setDonorListVisible(!donorListVisible))}
                     title={donorListVisible ? "Bağışçı Listesini Gizle" : "Bağışçı Listesini Göster"}
                   >
                     {donorListVisible ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
@@ -4563,29 +4564,29 @@ export default function KesimAlaniPage() {
 
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => setColorTagFilter("all")}
+                    onClick={() => startFilterTransition(() => setColorTagFilter("all"))}
                     className={`text-xs px-2 py-0.5 rounded border ${colorTagFilter === "all" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
                   >Tümü</button>
                   <button
-                    onClick={() => setColorTagFilter("green")}
+                    onClick={() => startFilterTransition(() => setColorTagFilter("green"))}
                     className={`w-5 h-5 rounded-full border-2 ${colorTagFilter === "green" ? "ring-2 ring-offset-1 ring-green-500" : ""}`}
                     style={{ backgroundColor: "#22c55e" }}
                     title="Yeşil"
                   />
                   <button
-                    onClick={() => setColorTagFilter("orange")}
+                    onClick={() => startFilterTransition(() => setColorTagFilter("orange"))}
                     className={`w-5 h-5 rounded-full border-2 ${colorTagFilter === "orange" ? "ring-2 ring-offset-1 ring-orange-500" : ""}`}
                     style={{ backgroundColor: "#f97316" }}
                     title="Turuncu"
                   />
                   <button
-                    onClick={() => setColorTagFilter("red")}
+                    onClick={() => startFilterTransition(() => setColorTagFilter("red"))}
                     className={`w-5 h-5 rounded-full border-2 ${colorTagFilter === "red" ? "ring-2 ring-offset-1 ring-red-500" : ""}`}
                     style={{ backgroundColor: "#ef4444" }}
                     title="Kırmızı"
                   />
                   <button
-                    onClick={() => setColorTagFilter("")}
+                    onClick={() => startFilterTransition(() => setColorTagFilter(""))}
                     className={`w-5 h-5 rounded-full border-2 border-dashed ${colorTagFilter === "" ? "ring-2 ring-offset-1 ring-gray-400" : ""}`}
                     title="Renksiz"
                   />
@@ -4596,7 +4597,7 @@ export default function KesimAlaniPage() {
                     variant={showOnlyIncomplete ? "default" : "outline"}
                     size="sm"
                     className="h-7 text-xs"
-                    onClick={() => setShowOnlyIncomplete(!showOnlyIncomplete)}
+                    onClick={() => startFilterTransition(() => setShowOnlyIncomplete(!showOnlyIncomplete))}
                     title="Sadece eksik grupları göster"
                   >
                     <Filter className="w-3 h-3 mr-1" />
@@ -4606,7 +4607,7 @@ export default function KesimAlaniPage() {
                     variant={highlightIncomplete ? "default" : "outline"}
                     size="sm"
                     className="h-7 text-xs"
-                    onClick={() => setHighlightIncomplete(!highlightIncomplete)}
+                    onClick={() => startFilterTransition(() => setHighlightIncomplete(!highlightIncomplete))}
                     title="Eksik grupları vurgula"
                   >
                     <AlertTriangle className="w-3 h-3 mr-1" />
@@ -5140,7 +5141,7 @@ export default function KesimAlaniPage() {
                           <th className="p-2 text-left">Cinsi</th>
                           <th className="p-2 text-left">Notlar</th>
                           <th className="p-2 text-center">Durum</th>
-                          <th className="p-2 w-10"></th>
+                          <th className="p-2 w-20"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -5167,9 +5168,21 @@ export default function KesimAlaniPage() {
                               </Button>
                             </td>
                             <td className="p-2">
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => deleteDonation(d.id)}>
-                                <Trash2 className="w-3 h-3 text-destructive" />
-                              </Button>
+                              <div className="flex gap-0.5">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className={`h-7 w-7 p-0 ${basketItems.includes(d.id) ? "bg-emerald-100 dark:bg-emerald-900" : ""}`}
+                                  title={basketItems.includes(d.id) ? "Sepetten Çıkar" : "Keseye Ekle"}
+                                  onClick={() => basketItems.includes(d.id) ? removeFromBasket(d.id) : addDonorToBasket(d.id)}
+                                  disabled={d.excluded}
+                                >
+                                  <ShoppingBag className={`w-3 h-3 ${basketItems.includes(d.id) ? "text-emerald-600" : "text-muted-foreground"}`} />
+                                </Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => deleteDonation(d.id)}>
+                                  <Trash2 className="w-3 h-3 text-destructive" />
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -5191,6 +5204,7 @@ export default function KesimAlaniPage() {
                           <th className="p-2 text-left">Adına Kesilen</th>
                           <th className="p-2 text-left">Cinsi</th>
                           <th className="p-2 text-left">Notlar</th>
+                          <th className="p-2 w-10"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -5212,6 +5226,17 @@ export default function KesimAlaniPage() {
                             </td>
                             <td className="p-2">
                               <Input className="h-7 text-sm" value={entry.donation.notes || ""} onChange={(e) => updateGroupDonation(entry.groupIdx, entry.dIdx, "notes", e.target.value)} />
+                            </td>
+                            <td className="p-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={`h-7 w-7 p-0 ${basketItems.includes(entry.donation.id) ? "bg-emerald-100 dark:bg-emerald-900" : ""}`}
+                                title={basketItems.includes(entry.donation.id) ? "Sepetten Çıkar" : "Keseye Ekle"}
+                                onClick={() => basketItems.includes(entry.donation.id) ? removeFromBasket(entry.donation.id) : addToBasket(entry.groupIdx, entry.dIdx)}
+                              >
+                                <ShoppingBag className={`w-3 h-3 ${basketItems.includes(entry.donation.id) ? "text-emerald-600" : "text-muted-foreground"}`} />
+                              </Button>
                             </td>
                           </tr>
                         ))}
@@ -5697,10 +5722,9 @@ export default function KesimAlaniPage() {
         </div>
       )}
 
-      {/* Scroll to top button */}
       {showScrollTop && (
         <button
-          className="fixed bottom-16 right-4 z-50 w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          className={`fixed right-4 z-50 w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all ${basketItems.length > 0 ? (basketOpen ? "bottom-36" : "bottom-16") : "bottom-6"}`}
           onClick={() => {
             const container = scrollContainerRef.current;
             if (container && fullscreenMode) {
@@ -5709,9 +5733,9 @@ export default function KesimAlaniPage() {
               window.scrollTo({ top: 0, behavior: "smooth" });
             }
           }}
-          title="Yukarı çık"
+          title="En yukarı kaydır"
         >
-          <ChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+          <ArrowUp className="w-5 h-5 text-gray-600 dark:text-gray-300" />
         </button>
       )}
 
