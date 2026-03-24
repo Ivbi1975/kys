@@ -18,7 +18,9 @@ const colorMap: Record<string, string> = {
   red: "#ef4444",
 };
 
-const FIELD_LABELS: Record<string, string> = {
+type DonorFieldKey = "name" | "description" | "donationType" | "vekalet" | "notes";
+
+const FIELD_LABELS: Record<DonorFieldKey, string> = {
   name: "Adına Kesilen",
   description: "Vekaleti Veren",
   donationType: "Cinsi",
@@ -51,23 +53,57 @@ function formatNoteTime(isoString: string): string {
   }
 }
 
+interface SpeechRecognitionResult {
+  readonly [index: number]: { transcript: string };
+  readonly isFinal: boolean;
+  readonly length: number;
+}
+
+interface SpeechRecognitionResultList {
+  readonly [index: number]: SpeechRecognitionResult;
+  readonly length: number;
+}
+
+interface SpeechRecognitionEvent {
+  readonly results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionInstance {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
+
+function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | null {
+  if (typeof window === "undefined") return null;
+  const w = window as Window & { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor };
+  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
+}
+
 function useSpeechRecognition() {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   const isSupported = typeof window !== "undefined" &&
     ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
 
   const startListening = useCallback(() => {
-    if (!isSupported) return;
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
+    const Ctor = getSpeechRecognitionConstructor();
+    if (!Ctor) return;
+    const recognition = new Ctor();
     recognition.lang = "tr-TR";
     recognition.continuous = true;
     recognition.interimResults = true;
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       let finalTranscript = "";
       for (let i = 0; i < event.results.length; i++) {
         finalTranscript += event.results[i][0].transcript;
@@ -205,11 +241,11 @@ function EditRequestForm({
   onNoteAdded: (note: TrackingNote) => void;
   onClose: () => void;
 }) {
-  const [field, setField] = useState<string>("name");
+  const [field, setField] = useState<DonorFieldKey>("name");
   const [newValue, setNewValue] = useState("");
   const [sending, setSending] = useState(false);
 
-  const currentValue = (donor as any)[field] || "";
+  const currentValue = donor[field] || "";
 
   const handleSubmit = async () => {
     if (!newValue.trim() || sending) return;
@@ -242,7 +278,7 @@ function EditRequestForm({
         </Button>
       </div>
       <div className="flex gap-1 flex-wrap">
-        {Object.entries(FIELD_LABELS).map(([key, label]) => (
+        {(Object.entries(FIELD_LABELS) as [DonorFieldKey, string][]).map(([key, label]) => (
           <button
             key={key}
             className={`text-[10px] px-2 py-0.5 rounded-full border ${
@@ -297,7 +333,7 @@ function NotesList({ notes, groupId }: { notes: TrackingNote[]; groupId?: string
               {note.type === "edit_request" ? (
                 <>
                   <span className="font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-0.5 mb-0.5">
-                    <Edit3 className="w-2.5 h-2.5" /> {FIELD_LABELS[note.fieldName || ""] || note.fieldName}
+                    <Edit3 className="w-2.5 h-2.5" /> {FIELD_LABELS[note.fieldName as DonorFieldKey] || note.fieldName}
                   </span>
                   <div className="flex items-center gap-1 flex-wrap">
                     <span className="line-through text-red-400">{note.oldValue || "—"}</span>
