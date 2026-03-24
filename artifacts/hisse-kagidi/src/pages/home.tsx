@@ -66,6 +66,7 @@ export default function Home() {
   const [deletedKesimAlanlari, setDeletedKesimAlanlari] = useState<KesimAlani[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [deletedProjects, setDeletedProjects] = useState<Project[]>([]);
+  const [trashOpen, setTrashOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [createProjectId, setCreateProjectId] = useState<string | null>(null);
@@ -1211,48 +1212,55 @@ export default function Home() {
 
         {(deletedKesimAlanlari.length > 0 || deletedProjects.length > 0) && (
           <div className="mt-6">
-            <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2 mb-3">
+            <button
+              type="button"
+              className="text-sm font-semibold text-muted-foreground flex items-center gap-2 mb-3 hover:text-foreground transition-colors"
+              onClick={() => setTrashOpen(!trashOpen)}
+            >
+              {trashOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               <Trash2 className="w-4 h-4" />
               Çöp Kutusu ({deletedKesimAlanlari.length + deletedProjects.length})
-            </h3>
-            <div className="space-y-2">
-              {deletedProjects.map(p => (
-                <Card key={`proj-${p.id}`} className="p-3">
-                  <div className="flex items-center gap-3">
-                    <FolderOpen className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{p.name} <span className="text-xs text-muted-foreground">(Proje)</span></p>
-                      <p className="text-[10px] text-muted-foreground">
-                        Silinme: {p.deletedAt ? formatDateTime(p.deletedAt) : "—"}
-                      </p>
+            </button>
+            {trashOpen && (
+              <div className="space-y-2">
+                {deletedProjects.map(p => (
+                  <Card key={`proj-${p.id}`} className="p-3">
+                    <div className="flex items-center gap-3">
+                      <FolderOpen className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{p.name} <span className="text-xs text-muted-foreground">(Proje)</span></p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Silinme: {p.deletedAt ? formatDateTime(p.deletedAt) : "—"}
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleRestoreProject(p.id)}>
+                        <RotateCcw className="w-3 h-3 mr-1" />
+                        Geri Al
+                      </Button>
                     </div>
-                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleRestoreProject(p.id)}>
-                      <RotateCcw className="w-3 h-3 mr-1" />
-                      Geri Al
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-              {deletedKesimAlanlari.map(k => (
-                <Card key={k.id} className="p-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{k.name}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        Silinme: {k.deletedAt ? formatDateTime(k.deletedAt) : "—"}
-                      </p>
+                  </Card>
+                ))}
+                {deletedKesimAlanlari.map(k => (
+                  <Card key={k.id} className="p-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{k.name}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Silinme: {k.deletedAt ? formatDateTime(k.deletedAt) : "—"}
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleRestore(k.id)}>
+                        <RotateCcw className="w-3 h-3 mr-1" />
+                        Geri Al
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => requestPermanentDelete(k.id)}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
                     </div>
-                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleRestore(k.id)}>
-                      <RotateCcw className="w-3 h-3 mr-1" />
-                      Geri Al
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => requestPermanentDelete(k.id)}>
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
