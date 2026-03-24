@@ -1468,4 +1468,39 @@ router.put("/tracking/:token/group/:groupId/kesildi", async (req, res) => {
   }
 });
 
+router.get("/kesim-alanlari/:id/dashboard", async (req, res) => {
+  const { id: kesimAlaniId } = req.params;
+
+  try {
+    const kaCheck = await requireActiveKesimAlani(kesimAlaniId);
+    if (kaCheck.error) {
+      res.status(kaCheck.status).json({ error: kaCheck.error });
+      return;
+    }
+
+    const groups = await db.select({
+      id: animalGroupsTable.id,
+      kesildi: animalGroupsTable.kesildi,
+      kesildiAt: animalGroupsTable.kesildiAt,
+    }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId));
+
+    const totalAnimals = groups.length;
+    const kesildiCount = groups.filter(g => g.kesildi).length;
+    const kesildiTimes = groups.filter(g => g.kesildiAt).map(g => g.kesildiAt!).sort();
+    const lastKesildiAt = kesildiTimes.length > 0 ? kesildiTimes[kesildiTimes.length - 1] : null;
+
+    res.json({
+      totalAnimals,
+      kesildiCount,
+      remainingCount: totalAnimals - kesildiCount,
+      kesildiPercent: totalAnimals > 0 ? Math.round((kesildiCount / totalAnimals) * 100) : 0,
+      lastKesildiAt,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`GET /kesim-alanlari/${kesimAlaniId}/dashboard error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
 export default router;
