@@ -170,7 +170,7 @@ function applyMod7PreSplit(units: DonorUnit[]): Mod7Result {
   return { fullAnimals, remainders };
 }
 
-function tryMatchPairs(remainders: DonorUnit[]): { animals: GroupedSegment[][]; leftover: DonorUnit[] } {
+function tryFlexibleMatch(remainders: DonorUnit[]): { animals: GroupedSegment[][]; leftover: DonorUnit[] } {
   const pools: DonorUnit[][] = [[], [], [], [], [], []];
   for (const u of remainders) {
     if (u.totalShares >= 1 && u.totalShares <= 6) {
@@ -180,102 +180,39 @@ function tryMatchPairs(remainders: DonorUnit[]): { animals: GroupedSegment[][]; 
 
   const animals: GroupedSegment[][] = [];
 
-  const makePair = (sA: number, sB: number) => {
-    while (pools[sA - 1].length > 0 && pools[sB - 1].length > 0) {
-      const uA = pools[sA - 1].shift()!;
-      const uB = pools[sB - 1].shift()!;
-      animals.push([
-        { templateDonation: uA.templateDonation, donations: uA.donations, shares: sA },
-        { templateDonation: uB.templateDonation, donations: uB.donations, shares: sB },
-      ]);
+  function tryFillRemainder(needed: number, segments: GroupedSegment[]): boolean {
+    if (needed === 0) return true;
+
+    for (let s = Math.min(needed, 6); s >= 1; s--) {
+      if (pools[s - 1].length > 0) {
+        const unit = pools[s - 1].shift()!;
+        segments.push({ templateDonation: unit.templateDonation, donations: unit.donations, shares: s });
+        if (tryFillRemainder(needed - s, segments)) {
+          return true;
+        }
+        segments.pop();
+        pools[s - 1].unshift(unit);
+      }
     }
-  };
 
-  makePair(6, 1);
-  makePair(5, 2);
-  makePair(4, 3);
-
-  const leftover: DonorUnit[] = [];
-  for (let s = 1; s <= 6; s++) {
-    leftover.push(...pools[s - 1]);
+    return false;
   }
 
-  return { animals, leftover };
-}
+  for (let anchorSize = 6; anchorSize >= 1; anchorSize--) {
+    while (pools[anchorSize - 1].length > 0) {
+      const anchor = pools[anchorSize - 1].shift()!;
+      const segments: GroupedSegment[] = [
+        { templateDonation: anchor.templateDonation, donations: anchor.donations, shares: anchorSize },
+      ];
+      const needed = 7 - anchorSize;
 
-function tryMatchTriples(remainders: DonorUnit[]): { animals: GroupedSegment[][]; leftover: DonorUnit[] } {
-  const pools: DonorUnit[][] = [[], [], [], [], [], []];
-  for (const u of remainders) {
-    if (u.totalShares >= 1 && u.totalShares <= 6) {
-      pools[u.totalShares - 1].push({ ...u, donations: [...u.donations] });
-    }
-  }
-
-  const animals: GroupedSegment[][] = [];
-
-  type Triple = [number, number, number];
-  const allTriples: Triple[] = [
-    [5, 1, 1],
-    [4, 2, 1],
-    [3, 3, 1],
-    [3, 2, 2],
-    [2, 2, 2],
-  ];
-
-  const tryTriple = (a: number, b: number, c: number) => {
-    const poolA = pools[a - 1];
-    const poolB = pools[b - 1];
-    const poolC = pools[c - 1];
-
-    if (a === b && b === c) {
-      while (poolA.length >= 3) {
-        const u1 = poolA.shift()!;
-        const u2 = poolA.shift()!;
-        const u3 = poolA.shift()!;
-        animals.push([
-          { templateDonation: u1.templateDonation, donations: u1.donations, shares: a },
-          { templateDonation: u2.templateDonation, donations: u2.donations, shares: b },
-          { templateDonation: u3.templateDonation, donations: u3.donations, shares: c },
-        ]);
-      }
-    } else if (a === b) {
-      while (poolA.length >= 2 && poolC.length >= 1) {
-        const u1 = poolA.shift()!;
-        const u2 = poolA.shift()!;
-        const u3 = poolC.shift()!;
-        animals.push([
-          { templateDonation: u1.templateDonation, donations: u1.donations, shares: a },
-          { templateDonation: u2.templateDonation, donations: u2.donations, shares: b },
-          { templateDonation: u3.templateDonation, donations: u3.donations, shares: c },
-        ]);
-      }
-    } else if (b === c) {
-      while (poolA.length >= 1 && poolB.length >= 2) {
-        const u1 = poolA.shift()!;
-        const u2 = poolB.shift()!;
-        const u3 = poolB.shift()!;
-        animals.push([
-          { templateDonation: u1.templateDonation, donations: u1.donations, shares: a },
-          { templateDonation: u2.templateDonation, donations: u2.donations, shares: b },
-          { templateDonation: u3.templateDonation, donations: u3.donations, shares: c },
-        ]);
-      }
-    } else {
-      while (poolA.length >= 1 && poolB.length >= 1 && poolC.length >= 1) {
-        const u1 = poolA.shift()!;
-        const u2 = poolB.shift()!;
-        const u3 = poolC.shift()!;
-        animals.push([
-          { templateDonation: u1.templateDonation, donations: u1.donations, shares: a },
-          { templateDonation: u2.templateDonation, donations: u2.donations, shares: b },
-          { templateDonation: u3.templateDonation, donations: u3.donations, shares: c },
-        ]);
+      if (needed === 0 || tryFillRemainder(needed, segments)) {
+        animals.push(segments);
+      } else {
+        pools[anchorSize - 1].unshift(anchor);
+        break;
       }
     }
-  };
-
-  for (const [a, b, c] of allTriples) {
-    tryTriple(a, b, c);
   }
 
   const leftover: DonorUnit[] = [];
@@ -350,13 +287,11 @@ function mod7GroupDonations(donations: Donation[]): GroupedSegment[][] {
 
   const { fullAnimals, remainders } = applyMod7PreSplit(unitsDeep);
 
-  const { animals: pairedAnimals, leftover: afterPairs } = tryMatchPairs(remainders);
+  const { animals: matchedAnimals, leftover: afterMatch } = tryFlexibleMatch(remainders);
 
-  const { animals: tripledAnimals, leftover: afterTriples } = tryMatchTriples(afterPairs);
+  const leftoverAnimals = packLeftovers(afterMatch);
 
-  const leftoverAnimals = packLeftovers(afterTriples);
-
-  return [...fullAnimals, ...pairedAnimals, ...tripledAnimals, ...leftoverAnimals];
+  return [...fullAnimals, ...matchedAnimals, ...leftoverAnimals];
 }
 
 export function autoGroupDonations(donations: Donation[]): AnimalGroup[] {

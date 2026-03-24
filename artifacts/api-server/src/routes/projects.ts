@@ -51,6 +51,7 @@ router.get("/projects", async (_req, res) => {
           continue;
         }
 
+        const kesimIdList = sql`ARRAY[${sql.join(kesimIds.map(id => sql`${id}`), sql`, `)}]`;
         const [donorStats, groupStats] = await Promise.all([
           db
             .select({
@@ -60,7 +61,7 @@ router.get("/projects", async (_req, res) => {
             .from(donationsTable)
             .where(
               and(
-                inArray(donationsTable.kesimAlaniId, kesimIds),
+                sql`${donationsTable.kesimAlaniId} = ANY(${kesimIdList})`,
                 isNull(donationsTable.deletedAt),
                 eq(donationsTable.excluded, false)
               )
@@ -68,7 +69,7 @@ router.get("/projects", async (_req, res) => {
           db
             .select({ count: sql<number>`count(*)::int` })
             .from(animalGroupsTable)
-            .where(inArray(animalGroupsTable.kesimAlaniId, kesimIds)),
+            .where(sql`${animalGroupsTable.kesimAlaniId} = ANY(${kesimIdList})`),
         ]);
 
         statsMap[pid] = {
