@@ -62,7 +62,6 @@ export async function apiUpdateBulkAnimalGroups(kesimAlaniId: string, animalGrou
   });
 }
 
-
 export async function apiUpdateSingleDonation(
   kesimAlaniId: string,
   donationId: string,
@@ -82,6 +81,20 @@ export async function apiUpdateSingleGroup(
   await apiFetch(`/kesim-alanlari/${kesimAlaniId}/animal-groups/${groupId}`, {
     method: "PUT",
     body: JSON.stringify(updates),
+  });
+}
+
+export async function apiUpdateDonationsOnly(data: KesimAlani): Promise<KesimAlani> {
+  return apiFetch<KesimAlani>(`/kesim-alanlari/${data.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ donations: data.donations }),
+  });
+}
+
+export async function apiUpdateGroupsOnly(data: KesimAlani): Promise<KesimAlani> {
+  return apiFetch<KesimAlani>(`/kesim-alanlari/${data.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ animalGroups: data.animalGroups }),
   });
 }
 

@@ -202,6 +202,7 @@ export default function KesimAlaniPage() {
   const [fullscreenMode, setFullscreenMode] = useState(false);
   const workspace = useWorkspacePreferences();
   const splitContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const [columnDragItem, setColumnDragItem] = useState<ColumnKey | null>(null);
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
@@ -239,6 +240,8 @@ export default function KesimAlaniPage() {
   const [tagPopoverDonorId, setTagPopoverDonorId] = useState<string | null>(null);
   const [basketItems, setBasketItems] = useState<string[]>([]);
   const [basketTransferTarget, setBasketTransferTarget] = useState<number>(-1);
+  const [basketOpen, setBasketOpen] = useState(true);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const [removedFromGroupIds, setRemovedFromGroupIds] = useState<Set<string>>(new Set());
   const [showRemovedFilter, setShowRemovedFilter] = useState(false);
   const [smartPlacePopover, setSmartPlacePopover] = useState<string | null>(null);
@@ -274,6 +277,21 @@ export default function KesimAlaniPage() {
     }
     loadData();
   }, [params.id, setLocation]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const container = scrollContainerRef.current;
+      const scrollY = container ? container.scrollTop : window.scrollY;
+      setShowScrollTop(scrollY > 300);
+    };
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.addEventListener("scroll", handleScroll, { passive: true });
+      return () => container.removeEventListener("scroll", handleScroll);
+    }
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [fullscreenMode]);
 
   useEffect(() => {
     setSwapSelection(null);
@@ -2609,8 +2627,8 @@ export default function KesimAlaniPage() {
   };
 
   return (
-    <div className={`min-h-screen bg-background ${fullscreenMode ? "fixed inset-0 z-50 overflow-auto" : ""}`}>
-      <div className={`mx-auto p-4 ${fullscreenMode ? "max-w-full" : "max-w-7xl"}`}>
+    <div ref={scrollContainerRef} className={`min-h-screen bg-background ${fullscreenMode ? "fixed inset-0 z-50 overflow-auto" : ""}`}>
+      <div className={`mx-auto p-4 ${fullscreenMode ? "max-w-full" : "max-w-7xl"} ${basketItems.length > 0 ? "pb-24" : ""}`}>
         {!fullscreenMode && (
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
@@ -4207,77 +4225,6 @@ export default function KesimAlaniPage() {
               </Card>
             )}
 
-            {basketItems.length > 0 && (() => {
-              const sharesMap = computeEffectiveShares(kesim.donations);
-              let basketTotalShares = 0;
-              for (const id of basketItems) {
-                const grouped = kesim.animalGroups.flatMap(g => g.donations).find(d => d.id === id);
-                if (grouped) {
-                  basketTotalShares += 1;
-                } else {
-                  basketTotalShares += sharesMap.get(id) || 1;
-                }
-              }
-              const basketAnimals = Math.ceil(basketTotalShares / 7);
-              return (
-                <div className="p-2 mb-3 bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-lg space-y-2">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <ShoppingBag className="w-4 h-4 text-emerald-600" />
-                    <span className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
-                      Sepet: {basketItems.length} bağışçı
-                    </span>
-                    <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 rounded-full font-semibold">
-                      {basketTotalShares} hisse
-                    </span>
-                    <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 rounded-full font-semibold">
-                      ~{basketAnimals} hayvan
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300 flex-wrap">
-                    {basketItems.slice(0, 5).map(id => {
-                      const d = kesim.animalGroups.flatMap(g => g.donations).find(dd => dd.id === id)
-                        || kesim.donations.find(dd => dd.id === id);
-                      return d ? (
-                        <span key={id} className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900 rounded text-[10px]">
-                          {d.description || d.name}
-                          <button className="ml-1 hover:text-destructive" onClick={() => removeFromBasket(id)}>×</button>
-                        </span>
-                      ) : null;
-                    })}
-                    {basketItems.length > 5 && <span className="text-[10px]">+{basketItems.length - 5}</span>}
-                  </div>
-                  <div className="flex items-center gap-1 flex-wrap">
-                    <Select value={String(basketTransferTarget)} onValueChange={(v) => setBasketTransferTarget(parseInt(v))}>
-                      <SelectTrigger className="h-7 w-32 text-xs">
-                        <SelectValue placeholder="Hedef grup..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {kesim.animalGroups.map((g, i) => {
-                          const empty = g.donations.filter(d => !d.name.trim()).length;
-                          return (
-                            <SelectItem key={g.id} value={String(i)} disabled={g.locked || empty === 0}>
-                              Hayvan {g.animalNo} ({empty} boş)
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                    <Button variant="default" size="sm" className="h-7 text-xs" onClick={() => transferBasketToGroup(basketTransferTarget)} disabled={basketTransferTarget < 0}>
-                      <Package className="w-3 h-3 mr-1" />
-                      Yerleştir
-                    </Button>
-                    <Button variant="secondary" size="sm" className="h-7 text-xs" onClick={autoDistributeBasket}>
-                      <Wand2 className="w-3 h-3 mr-1" />
-                      Otomatik Dağıt
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={clearBasket}>
-                      Temizle
-                    </Button>
-                  </div>
-                </div>
-              );
-            })()}
-
             {selectedGroupIds.size > 0 && (
               <div className="flex items-center gap-3 p-2 mb-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg flex-wrap">
                 <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
@@ -5180,6 +5127,104 @@ export default function KesimAlaniPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Sticky bottom basket panel */}
+      {basketItems.length > 0 && (() => {
+        const sharesMap = computeEffectiveShares(kesim.donations);
+        let basketTotalShares = 0;
+        for (const id of basketItems) {
+          const grouped = kesim.animalGroups.flatMap(g => g.donations).find(d => d.id === id);
+          if (grouped) {
+            basketTotalShares += 1;
+          } else {
+            basketTotalShares += sharesMap.get(id) || 1;
+          }
+        }
+        const basketAnimals = Math.ceil(basketTotalShares / 7);
+        return (
+          <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 shadow-lg">
+            <button
+              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors"
+              onClick={() => setBasketOpen(prev => !prev)}
+            >
+              <ShoppingBag className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                Sepet: {basketItems.length} bağışçı
+              </span>
+              <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 rounded-full font-semibold">
+                {basketTotalShares} hisse
+              </span>
+              <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 rounded-full font-semibold">
+                ~{basketAnimals} hayvan
+              </span>
+              <ChevronUp className={`w-4 h-4 text-emerald-600 ml-auto transition-transform ${basketOpen ? "" : "rotate-180"}`} />
+            </button>
+            {basketOpen && (
+              <div className="px-4 pb-3 space-y-2">
+                <div className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300 flex-wrap">
+                  {basketItems.slice(0, 6).map(id => {
+                    const d = kesim.animalGroups.flatMap(g => g.donations).find(dd => dd.id === id)
+                      || kesim.donations.find(dd => dd.id === id);
+                    return d ? (
+                      <span key={id} className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900 rounded text-[10px]">
+                        {d.description || d.name}
+                        <button className="ml-1 hover:text-destructive" onClick={() => removeFromBasket(id)}>×</button>
+                      </span>
+                    ) : null;
+                  })}
+                  {basketItems.length > 6 && <span className="text-[10px]">+{basketItems.length - 6}</span>}
+                </div>
+                <div className="flex items-center gap-1 flex-wrap">
+                  <Select value={String(basketTransferTarget)} onValueChange={(v) => setBasketTransferTarget(parseInt(v))}>
+                    <SelectTrigger className="h-7 w-36 text-xs">
+                      <SelectValue placeholder="Hedef grup..." />
+                    </SelectTrigger>
+                    <SelectContent side="top">
+                      {kesim.animalGroups.map((g, i) => {
+                        const empty = g.donations.filter(d => !d.name.trim()).length;
+                        return (
+                          <SelectItem key={g.id} value={String(i)} disabled={g.locked || empty === 0}>
+                            Hayvan {g.animalNo} ({empty} boş)
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <Button variant="default" size="sm" className="h-7 text-xs" onClick={() => transferBasketToGroup(basketTransferTarget)} disabled={basketTransferTarget < 0}>
+                    <Package className="w-3 h-3 mr-1" />
+                    Yerleştir
+                  </Button>
+                  <Button variant="secondary" size="sm" className="h-7 text-xs" onClick={autoDistributeBasket}>
+                    <Wand2 className="w-3 h-3 mr-1" />
+                    Otomatik Dağıt
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={clearBasket}>
+                    Temizle
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Scroll to top button */}
+      {showScrollTop && (
+        <button
+          className="fixed bottom-16 right-4 z-50 w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          onClick={() => {
+            const container = scrollContainerRef.current;
+            if (container && fullscreenMode) {
+              container.scrollTo({ top: 0, behavior: "smooth" });
+            } else {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          }}
+          title="Yukarı çık"
+        >
+          <ChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+        </button>
+      )}
     </div>
   );
 }
