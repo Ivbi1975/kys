@@ -64,7 +64,8 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - JSON backup/restore for all data
 - Print A4 landscape pages matching Excel "Kesim Kağıdı" format with columns: HAYVAN (merged vertically), SIRA, VEKALET, VEKALETİ VEREN, ADINA KESİLEN, CİNSİ, NOTLAR
 - Flexible workspace layout: multi-column grid (1/2/3 columns), column hide/show popover, compact mode, fullscreen mode (ESC to exit), collapse all/expand all, column drag-and-drop reorder, resizable split pane between donor list and animal groups — all preferences saved to localStorage via `useWorkspacePreferences` hook
-- Donor list hide/show toggle (panel collapses, groups reflow to full width)
+- Mobile responsive: tab-based navigation (Bağışçı Listesi / Hayvan Grupları) on mobile instead of split pane, compact header with save button, responsive stat cards (2-col grid on mobile), toolbar buttons adapt to screen size
+- Donor list hide/show toggle (panel collapses, groups reflow to full width) — desktop only
 - Group split (scissors icon, divides filled donors into two renumbered groups)
 - Group merge (checkbox selection + toolbar, handles 7-share overflow into new groups)
 - Manual swap mode (ArrowLeftRight icon, preview dialog before executing)
@@ -76,6 +77,7 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - Soft delete for kesim alanları (trash/restore functionality with permanent delete option)
 - Toast notifications for all user actions (success/error feedback)
 - AlertDialog for destructive operations (modern UI instead of browser confirm())
+- Save button in header with last save timestamp (HH:MM:SS), auto-save on changes + manual save button
 - Save status indicator in workspace header (saving/saved/error states)
 - Creation date display on kesim alanı cards with relative time
 - crypto.randomUUID() for all ID generation (collision-safe)

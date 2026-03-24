@@ -436,10 +436,10 @@ export default function Home() {
             Mevcut verileriniz veritabanına başarıyla aktarıldı. Artık verileriniz kalıcı olarak saklanmaktadır.
           </div>
         )}
-        <div className="flex items-center gap-3 mb-8">
-          <Scissors className="w-8 h-8 text-primary" />
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold text-foreground">
+        <div className="flex items-center gap-3 mb-6 sm:mb-8">
+          <Scissors className="w-6 h-6 sm:w-8 sm:h-8 text-primary shrink-0" />
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
               Kurban Hisse Kağıdı
             </h1>
             <p className="text-muted-foreground text-sm mt-1">

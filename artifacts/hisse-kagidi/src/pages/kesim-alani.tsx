@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -151,6 +152,7 @@ export default function KesimAlaniPage() {
     field: string;
   } | null>(null);
   const [editDraft, setEditDraft] = useState<string>("");
+  const isMobile = useIsMobile();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [groupingInProgress, setGroupingInProgress] = useState(false);
@@ -360,6 +362,8 @@ export default function KesimAlaniPage() {
   }, []);
 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
+  const [mobileTab, setMobileTab] = useState<"donors" | "groups">("donors");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const saveToApi = useCallback((data: KesimAlani) => {
@@ -368,6 +372,7 @@ export default function KesimAlaniPage() {
     apiUpdateKesimAlani(data)
       .then(() => {
         setSaveStatus("saved");
+        setLastSavedTime(new Date());
         saveTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
       })
       .catch(err => {
@@ -2370,106 +2375,100 @@ export default function KesimAlaniPage() {
     <div className={`min-h-screen bg-background ${fullscreenMode ? "fixed inset-0 z-50 overflow-auto" : ""}`}>
       <div className={`mx-auto p-4 ${fullscreenMode ? "max-w-full" : "max-w-7xl"}`}>
         {!fullscreenMode && (
-        <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" size="sm" onClick={() => setLocation("/")}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-foreground">{kesim.name}</h1>
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setLocation("/")}>
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">{kesim.name}</h1>
+              <p className="text-xs md:text-sm text-muted-foreground truncate">
+                {kesim.donations.length} bağışçı • {totalShares} hisse • {requiredAnimals} hayvan
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="shrink-0"
+              onClick={() => saveToApi(kesim)}
+              disabled={saveStatus === "saving"}
+            >
+              {saveStatus === "saving" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline ml-1">Kaydet</span>
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
               {saveStatus === "saving" && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1 animate-pulse">
+                <span className="flex items-center gap-1 animate-pulse">
                   <Loader2 className="w-3 h-3 animate-spin" />
                   Kaydediliyor...
                 </span>
               )}
               {saveStatus === "saved" && (
-                <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
                   <Save className="w-3 h-3" />
                   Kaydedildi
                 </span>
               )}
               {saveStatus === "error" && (
-                <span className="text-xs text-destructive flex items-center gap-1">
+                <span className="flex items-center gap-1 text-destructive">
                   <AlertTriangle className="w-3 h-3" />
                   Kaydetme hatası
                 </span>
               )}
+              {saveStatus === "idle" && lastSavedTime && (
+                <span className="flex items-center gap-1">
+                  <Save className="w-3 h-3" />
+                  Son kayıt: {lastSavedTime.toLocaleTimeString("tr-TR")}
+                </span>
+              )}
             </div>
-            <p className="text-sm text-muted-foreground">
-              {kesim.donations.length} bağışçı • {totalShares} hisse •{" "}
-              {requiredAnimals} hayvan gerekli
-            </p>
-          </div>
-          <div className="flex gap-2 items-center">
-            <div className="flex items-center gap-1 border rounded-md px-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleUndo}
-                disabled={!history.canUndo}
-                title="Geri Al (Ctrl+Z)"
-              >
-                <Undo2 className="w-4 h-4" />
+
+            <div className="flex items-center gap-1 flex-wrap justify-end">
+              <div className="flex items-center gap-0.5 border rounded-md px-0.5">
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleUndo} disabled={!history.canUndo} title="Geri Al (Ctrl+Z)">
+                  <Undo2 className="w-3.5 h-3.5" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleRedo} disabled={!history.canRedo} title="İleri Al (Ctrl+Y)">
+                  <Redo2 className="w-3.5 h-3.5" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setHistoryPanelOpen(!historyPanelOpen)} title="Geçmiş">
+                  <History className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hidden sm:flex" onClick={() => setShortcutHelpOpen(true)} title="Klavye Kısayolları (?)">
+                <Keyboard className="w-3.5 h-3.5" />
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRedo}
-                disabled={!history.canRedo}
-                title="İleri Al (Ctrl+Y)"
-              >
-                <Redo2 className="w-4 h-4" />
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hidden sm:flex" onClick={toggleFullscreen} title="Tam Ekran (F11)">
+                {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setHistoryPanelOpen(!historyPanelOpen)}
-                title="Geçmiş"
-              >
-                <History className="w-4 h-4" />
+              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={exportDonorsExcel} title="Bağışçı Listesi Excel">
+                <FileSpreadsheet className="w-3.5 h-3.5" />
               </Button>
+              {kesim.animalGroups.length > 0 && (
+                <>
+                  <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={exportGroupsExcel} title="Kesim Kağıdı Excel">
+                    <FileSpreadsheet className="w-3.5 h-3.5 mr-1" />
+                    <span className="hidden sm:inline">Excel</span>
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setLocation(`/print/${kesim.id}`)}>
+                    <Printer className="w-3.5 h-3.5 mr-1" />
+                    <span className="hidden sm:inline">Yazdır</span>
+                  </Button>
+                </>
+              )}
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShortcutHelpOpen(true)}
-              title="Klavye Kısayolları (?)"
-            >
-              <Keyboard className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleFullscreen}
-              title="Tam Ekran (F11)"
-            >
-              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-            </Button>
-            <Button variant="outline" size="sm" onClick={exportDonorsExcel} title="Bağışçı Listesi Excel">
-              <FileSpreadsheet className="w-4 h-4" />
-            </Button>
-            {kesim.animalGroups.length > 0 && (
-              <>
-                <Button variant="outline" size="sm" onClick={exportGroupsExcel} title="Kesim Kağıdı Excel">
-                  <FileSpreadsheet className="w-4 h-4 mr-1" />
-                  Excel
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setLocation(`/print/${kesim.id}`)}
-                >
-                  <Printer className="w-4 h-4 mr-2" />
-                  Yazdır
-                </Button>
-              </>
-            )}
           </div>
         </div>
         )}
 
         {!fullscreenMode && (
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3 mb-4">
           <Card className="p-3 text-center">
             <div className="text-2xl font-bold text-primary">{kesim.donations.filter(d => !d.excluded).length}</div>
             <div className="text-xs text-muted-foreground">Aktif Bağışçı</div>
@@ -2612,15 +2611,32 @@ export default function KesimAlaniPage() {
           </Card>
         )}
 
+        {!fullscreenMode && (
+          <div className="flex md:hidden border-b mb-4">
+            <button
+              className={`flex-1 py-2 text-sm font-medium text-center border-b-2 transition-colors ${mobileTab === "donors" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              onClick={() => setMobileTab("donors")}
+            >
+              Bağışçı Listesi ({kesim.donations.filter(d => !d.excluded).length})
+            </button>
+            <button
+              className={`flex-1 py-2 text-sm font-medium text-center border-b-2 transition-colors ${mobileTab === "groups" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              onClick={() => setMobileTab("groups")}
+            >
+              Hayvan Grupları ({kesim.animalGroups.length})
+            </button>
+          </div>
+        )}
+
         <div
           ref={splitContainerRef}
-          className={`flex gap-0 ${donorListVisible ? "" : ""}`}
+          className="flex gap-0"
           style={{ position: "relative" }}
         >
-          {donorListVisible && !fullscreenMode && <div style={{ width: donorListVisible ? `${workspace.prefs.splitRatio}%` : "0%", minWidth: 0, flexShrink: 0, paddingRight: "12px" }}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold">Bağışçı Listesi</h2>
+          {(isMobile || donorListVisible) && !fullscreenMode && <div className={`${isMobile && mobileTab !== "donors" ? "hidden" : ""}`} style={isMobile ? { width: "100%", minWidth: 0 } : { width: `${workspace.prefs.splitRatio}%`, minWidth: 0, flexShrink: 0, paddingRight: "12px" }}>
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-semibold whitespace-nowrap">Bağışçı Listesi</h2>
                 {filterUngrouped && (
                   <button
                     onClick={() => setFilterUngrouped(false)}
@@ -2647,12 +2663,12 @@ export default function KesimAlaniPage() {
                   </button>
                 )}
               </div>
-              <div className="flex gap-2 items-center">
+              <div className="flex gap-2 items-center flex-wrap">
                 <div className="relative">
                   <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     ref={searchInputRef}
-                    className="h-8 text-sm pl-8 w-48"
+                    className="h-8 text-sm pl-8 w-32 sm:w-48"
                     placeholder="Ara... (Ctrl+F)"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -3437,7 +3453,7 @@ export default function KesimAlaniPage() {
 
           </div>}
 
-          {donorListVisible && !fullscreenMode && (
+          {donorListVisible && !fullscreenMode && !isMobile && (
             <div
               className="w-2 cursor-col-resize flex-shrink-0 group relative"
               onMouseDown={(e) => {
@@ -3449,10 +3465,10 @@ export default function KesimAlaniPage() {
             </div>
           )}
 
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div className={`${isMobile && mobileTab !== "groups" ? "hidden" : ""}`} style={{ flex: 1, minWidth: 0 }}>
             <div ref={groupsHeaderRef} className="flex items-center justify-between mb-4 flex-wrap gap-2 sticky top-0 z-20 bg-background py-2 -mt-2 border-b border-transparent" style={{ backdropFilter: "blur(8px)" }}>
               <div className="flex items-center gap-2 flex-wrap">
-                {!fullscreenMode && (
+                {!fullscreenMode && !isMobile && (
                   <Button
                     variant="ghost"
                     size="sm"
