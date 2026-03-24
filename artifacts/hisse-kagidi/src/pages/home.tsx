@@ -1077,15 +1077,18 @@ export default function Home() {
                 const shares = getTotalShares(k.donations);
                 const activeDonors = k.donations.filter(d => !d.excluded).length;
                 const kesildi = k.animalGroups.filter(g => g.kesildi).length;
+                const kesildiTimes = k.animalGroups.filter(g => g.kesildiAt).map(g => g.kesildiAt!);
                 return {
                   donors: acc.donors + activeDonors,
                   shares: acc.shares + shares,
                   areas: acc.areas + 1,
                   groups: acc.groups + k.animalGroups.length,
                   kesildi: acc.kesildi + kesildi,
+                  kesildiTimes: [...acc.kesildiTimes, ...kesildiTimes],
                 };
-              }, { donors: 0, shares: 0, areas: 0, groups: 0, kesildi: 0 });
+              }, { donors: 0, shares: 0, areas: 0, groups: 0, kesildi: 0, kesildiTimes: [] as string[] });
               const projKesildiPercent = projTotals.groups > 0 ? Math.round((projTotals.kesildi / projTotals.groups) * 100) : 0;
+              const projLastKesildiAt = projTotals.kesildiTimes.sort().pop();
 
               return (
                 <div key={project.id} className="mb-6">
@@ -1110,7 +1113,14 @@ export default function Home() {
                       <div className="mt-2 pt-2 border-t">
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-[10px] text-muted-foreground font-medium">Kesim Durumu</span>
-                          <span className="text-[10px] font-bold text-emerald-600">{projTotals.kesildi}/{projTotals.groups} (%{projKesildiPercent})</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold text-emerald-600">{projTotals.kesildi}/{projTotals.groups} (%{projKesildiPercent})</span>
+                            {projLastKesildiAt && (
+                              <span className="text-[9px] text-muted-foreground">
+                                (son: {new Date(projLastKesildiAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })})
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
                           <div

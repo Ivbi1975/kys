@@ -115,7 +115,7 @@ router.post("/projects", async (req, res) => {
       createdAt: now,
     });
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-    res.status(201).json({ ...project, stats: { donorCount: 0, shareCount: 0, groupCount: 0 } });
+    res.status(201).json({ ...project, stats: { donorCount: 0, shareCount: 0, groupCount: 0, kesildiCount: 0, lastKesildiAt: null } });
   } catch (err) {
     console.error("POST /projects error:", err);
     res.status(500).json({ error: "Failed to create project" });
@@ -134,7 +134,7 @@ router.put("/projects/:id", async (req, res) => {
 
     await db.update(projectsTable).set({ name: name.trim() }).where(eq(projectsTable.id, id));
     const [updated] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-    res.json({ ...updated, stats: { donorCount: 0, shareCount: 0, groupCount: 0 } });
+    res.json({ ...updated, stats: { donorCount: 0, shareCount: 0, groupCount: 0, kesildiCount: 0, lastKesildiAt: null } });
   } catch (err) {
     console.error("PUT /projects/:id error:", err);
     res.status(500).json({ error: "Failed to update project" });
@@ -164,7 +164,7 @@ router.post("/projects/:id/restore", async (req, res) => {
 
     await db.update(projectsTable).set({ deletedAt: null }).where(eq(projectsTable.id, id));
     const [restored] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-    res.json({ ...restored, stats: { donorCount: 0, shareCount: 0, groupCount: 0 } });
+    res.json({ ...restored, stats: { donorCount: 0, shareCount: 0, groupCount: 0, kesildiCount: 0, lastKesildiAt: null } });
   } catch (err) {
     console.error("POST /projects/:id/restore error:", err);
     res.status(500).json({ error: "Failed to restore project" });
@@ -181,6 +181,81 @@ router.get("/projects/deleted", async (_req, res) => {
   } catch (err) {
     console.error("GET /projects/deleted error:", err);
     res.status(500).json({ error: "Failed to fetch deleted projects" });
+  }
+});
+
+router.get("/projects/:id/dashboard", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
+    if (!project) return res.status(404).json({ error: "Project not found" });
+
+    const kesimRows = await db.select({
+      id: kesimAlanlariTable.id,
+      name: kesimAlanlariTable.name,
+    }).from(kesimAlanlariTable).where(
+      and(
+        eq(kesimAlanlariTable.projectId, id),
+        isNull(kesimAlanlariTable.deletedAt)
+      )
+    );
+
+    const kesimIds = kesimRows.map(k => k.id);
+    if (kesimIds.length === 0) {
+      res.json({
+        projectId: id,
+        projectName: project.name,
+        totalAnimals: 0,
+        kesildiCount: 0,
+        remainingCount: 0,
+        kesildiPercent: 0,
+        lastKesildiAt: null,
+        kesimAlanlari: [],
+      });
+      return;
+    }
+
+    const groups = await db.select({
+      id: animalGroupsTable.id,
+      kesimAlaniId: animalGroupsTable.kesimAlaniId,
+      kesildi: animalGroupsTable.kesildi,
+      kesildiAt: animalGroupsTable.kesildiAt,
+    }).from(animalGroupsTable).where(
+      inArray(animalGroupsTable.kesimAlaniId, kesimIds)
+    );
+
+    const totalAnimals = groups.length;
+    const kesildiCount = groups.filter(g => g.kesildi).length;
+    const allTimes = groups.filter(g => g.kesildiAt).map(g => g.kesildiAt!).sort();
+    const lastKesildiAt = allTimes.length > 0 ? allTimes[allTimes.length - 1] : null;
+
+    const perArea = kesimRows.map(k => {
+      const areaGroups = groups.filter(g => g.kesimAlaniId === k.id);
+      const areaKesildi = areaGroups.filter(g => g.kesildi).length;
+      const areaTimes = areaGroups.filter(g => g.kesildiAt).map(g => g.kesildiAt!).sort();
+      return {
+        id: k.id,
+        name: k.name,
+        totalAnimals: areaGroups.length,
+        kesildiCount: areaKesildi,
+        kesildiPercent: areaGroups.length > 0 ? Math.round((areaKesildi / areaGroups.length) * 100) : 0,
+        lastKesildiAt: areaTimes.length > 0 ? areaTimes[areaTimes.length - 1] : null,
+      };
+    });
+
+    res.json({
+      projectId: id,
+      projectName: project.name,
+      totalAnimals,
+      kesildiCount,
+      remainingCount: totalAnimals - kesildiCount,
+      kesildiPercent: totalAnimals > 0 ? Math.round((kesildiCount / totalAnimals) * 100) : 0,
+      lastKesildiAt,
+      kesimAlanlari: perArea,
+    });
+  } catch (err) {
+    console.error("GET /projects/:id/dashboard error:", err);
+    res.status(500).json({ error: "Failed to fetch project dashboard" });
   }
 });
 
