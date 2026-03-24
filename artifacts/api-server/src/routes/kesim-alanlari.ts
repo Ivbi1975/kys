@@ -7,7 +7,9 @@ import {
   animalGroupDonationsTable,
   donationTagsTable,
   projectsTable,
+  trackingNotesTable,
 } from "@workspace/db/schema";
+import { desc } from "drizzle-orm";
 import { eq, inArray, isNull, isNotNull, and } from "drizzle-orm";
 import { z } from "zod";
 import crypto from "crypto";
@@ -1499,6 +1501,133 @@ router.get("/kesim-alanlari/:id/dashboard", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`GET /kesim-alanlari/${kesimAlaniId}/dashboard error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/tracking/:token/notes", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const [ka] = await db.select().from(kesimAlanlariTable)
+      .where(eq(kesimAlanlariTable.trackingToken, token));
+    if (!ka || ka.deletedAt) {
+      res.status(404).json({ error: "Takip linki bulunamadı" });
+      return;
+    }
+
+    const notes = await db.select().from(trackingNotesTable)
+      .where(eq(trackingNotesTable.kesimAlaniId, ka.id))
+      .orderBy(desc(trackingNotesTable.createdAt));
+
+    res.json(notes);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`GET /tracking/${req.params.token}/notes error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/tracking/:token/notes", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const [ka] = await db.select().from(kesimAlanlariTable)
+      .where(eq(kesimAlanlariTable.trackingToken, token));
+    if (!ka || ka.deletedAt) {
+      res.status(404).json({ error: "Takip linki bulunamadı" });
+      return;
+    }
+
+    const schema = z.object({
+      animalGroupId: z.string().optional(),
+      type: z.enum(["note", "edit_request"]),
+      content: z.string().default(""),
+      fieldName: z.string().optional(),
+      oldValue: z.string().optional(),
+      newValue: z.string().optional(),
+    });
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+      return;
+    }
+
+    const { animalGroupId, type, content, fieldName, oldValue, newValue } = parsed.data;
+
+    if (animalGroupId) {
+      const [group] = await db.select({ id: animalGroupsTable.id })
+        .from(animalGroupsTable)
+        .where(and(eq(animalGroupsTable.id, animalGroupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
+      if (!group) {
+        res.status(400).json({ error: "Geçersiz hayvan grubu" });
+        return;
+      }
+    }
+
+    const noteId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    await db.insert(trackingNotesTable).values({
+      id: noteId,
+      kesimAlaniId: ka.id,
+      animalGroupId: animalGroupId || null,
+      type,
+      content,
+      fieldName: fieldName || null,
+      oldValue: oldValue || null,
+      newValue: newValue || null,
+      status: "pending",
+      createdAt: now,
+    });
+
+    const [created] = await db.select().from(trackingNotesTable).where(eq(trackingNotesTable.id, noteId));
+    res.status(201).json(created);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`POST /tracking/${req.params.token}/notes error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/kesim-alanlari/:id/tracking-notes", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const check = await requireActiveKesimAlani(id);
+    if (check.error) { res.status(check.status).json({ error: check.error }); return; }
+
+    const notes = await db.select().from(trackingNotesTable)
+      .where(eq(trackingNotesTable.kesimAlaniId, id))
+      .orderBy(desc(trackingNotesTable.createdAt));
+
+    res.json(notes);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`GET /kesim-alanlari/${req.params.id}/tracking-notes error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.put("/kesim-alanlari/:id/tracking-notes/:noteId/status", async (req, res) => {
+  try {
+    const { id, noteId } = req.params;
+    const check = await requireActiveKesimAlani(id);
+    if (check.error) { res.status(check.status).json({ error: check.error }); return; }
+
+    const statusSchema = z.object({ status: z.enum(["pending", "approved", "rejected"]) });
+    const parsed = statusSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Geçersiz durum" });
+      return;
+    }
+
+    await db.update(trackingNotesTable)
+      .set({ status: parsed.data.status })
+      .where(and(eq(trackingNotesTable.id, noteId), eq(trackingNotesTable.kesimAlaniId, id)));
+
+    res.json({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`PUT /kesim-alanlari/${req.params.id}/tracking-notes/${req.params.noteId}/status error:`, message);
     res.status(500).json({ error: message });
   }
 });

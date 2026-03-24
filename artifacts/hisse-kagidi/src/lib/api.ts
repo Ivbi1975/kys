@@ -466,3 +466,45 @@ export async function toggleKesildi(token: string, groupId: string, kesildi: boo
     body: JSON.stringify({ kesildi }),
   });
 }
+
+export interface TrackingNote {
+  id: string;
+  kesimAlaniId: string;
+  animalGroupId: string | null;
+  type: "note" | "edit_request";
+  content: string;
+  fieldName: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+}
+
+export async function fetchTrackingNotes(token: string): Promise<TrackingNote[]> {
+  return apiFetch<TrackingNote[]>(`/tracking/${token}/notes`);
+}
+
+export async function createTrackingNote(token: string, data: {
+  animalGroupId?: string;
+  type: "note" | "edit_request";
+  content?: string;
+  fieldName?: string;
+  oldValue?: string;
+  newValue?: string;
+}): Promise<TrackingNote> {
+  return apiFetch<TrackingNote>(`/tracking/${token}/notes`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchKesimAlaniTrackingNotes(kesimAlaniId: string): Promise<TrackingNote[]> {
+  return apiFetch<TrackingNote[]>(`/kesim-alanlari/${kesimAlaniId}/tracking-notes`);
+}
+
+export async function updateTrackingNoteStatus(kesimAlaniId: string, noteId: string, status: "pending" | "approved" | "rejected"): Promise<void> {
+  await apiFetch(`/kesim-alanlari/${kesimAlaniId}/tracking-notes/${noteId}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status }),
+  });
+}

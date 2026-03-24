@@ -95,11 +95,14 @@ import {
   ChevronRight,
   Link2,
   Copy,
+  MessageSquarePlus,
+  Edit3,
+  Check,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
 import { Tag } from "lucide-react";
-import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani, generateTrackingToken } from "@/lib/api";
-import type { DeletedDonation } from "@/lib/api";
+import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani, generateTrackingToken, fetchKesimAlaniTrackingNotes, updateTrackingNoteStatus } from "@/lib/api";
+import type { DeletedDonation, TrackingNote } from "@/lib/api";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
 import { useHistory } from "@/lib/useHistory";
@@ -297,6 +300,10 @@ export default function KesimAlaniPage() {
   const [splitShareDialog, setSplitShareDialog] = useState<{ donationId: string; totalShares: number } | null>(null);
   const [splitGroupDialog, setSplitGroupDialog] = useState<{ groupIdx: number; splitAt: number } | null>(null);
   const [personBulkDeleteConfirm, setPersonBulkDeleteConfirm] = useState<string | null>(null);
+
+  const [trackingNotesOpen, setTrackingNotesOpen] = useState(false);
+  const [trackingNotes, setTrackingNotes] = useState<TrackingNote[]>([]);
+  const [trackingNotesLoading, setTrackingNotesLoading] = useState(false);
 
   const [findDeleteOpen, setFindDeleteOpen] = useState(false);
   const [findDeleteColumn, setFindDeleteColumn] = useState<"name" | "description" | "donationType" | "vekalet" | "notes">("description");
@@ -3100,6 +3107,23 @@ export default function KesimAlaniPage() {
               >
                 <Link2 className="w-4 h-4" />
                 <span className="hidden sm:inline ml-1">Takip Linki</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  setTrackingNotesOpen(true);
+                  setTrackingNotesLoading(true);
+                  try {
+                    const notes = await fetchKesimAlaniTrackingNotes(kesim.id);
+                    setTrackingNotes(notes);
+                  } catch {} finally {
+                    setTrackingNotesLoading(false);
+                  }
+                }}
+              >
+                <MessageSquarePlus className="w-4 h-4" />
+                <span className="hidden sm:inline ml-1">Saha Notları</span>
               </Button>
               <Button
                 size="sm"
@@ -6270,6 +6294,128 @@ export default function KesimAlaniPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={trackingNotesOpen} onOpenChange={setTrackingNotesOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquarePlus className="w-5 h-5" />
+              Saha Notları ve Düzenleme Talepleri
+            </DialogTitle>
+          </DialogHeader>
+          {trackingNotesLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+          ) : trackingNotes.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              Henüz saha notu veya düzenleme talebi yok.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {trackingNotes.map(note => {
+                const groupNo = note.animalGroupId && kesim
+                  ? kesim.animalGroups.find(g => g.id === note.animalGroupId)?.animalNo
+                  : null;
+                return (
+                  <div
+                    key={note.id}
+                    className={`rounded-lg p-3 text-sm border ${
+                      note.type === "edit_request"
+                        ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
+                        : "bg-muted/30 border-border"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-1.5">
+                        {note.type === "edit_request" ? (
+                          <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                        ) : (
+                          <MessageSquarePlus className="w-3.5 h-3.5 text-blue-500" />
+                        )}
+                        <span className="text-xs font-semibold">
+                          {note.type === "edit_request" ? "Düzenleme Talebi" : "Not"}
+                          {groupNo != null && ` — Hayvan ${groupNo}`}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground shrink-0">
+                        {new Date(note.createdAt).toLocaleString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+
+                    {note.type === "edit_request" ? (
+                      <>
+                        <div className="text-xs mb-1">
+                          <span className="font-medium">{
+                            note.fieldName === "name" ? "Adına Kesilen" :
+                            note.fieldName === "description" ? "Vekaleti Veren" :
+                            note.fieldName === "donationType" ? "Cinsi" :
+                            note.fieldName === "vekalet" ? "Vekalet" :
+                            note.fieldName === "notes" ? "Notlar" : note.fieldName
+                          }</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs flex-wrap">
+                          <span className="line-through text-red-400">{note.oldValue || "—"}</span>
+                          <span className="text-muted-foreground">→</span>
+                          <span className="font-medium text-emerald-600">{note.newValue}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-2">
+                          {note.status === "pending" ? (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-2 text-[10px] text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                                onClick={async () => {
+                                  try {
+                                    await updateTrackingNoteStatus(kesim!.id, note.id, "approved");
+                                    setTrackingNotes(prev => prev.map(n => n.id === note.id ? { ...n, status: "approved" as const } : n));
+                                    toast({ title: "Talep onaylandı" });
+                                  } catch {
+                                    toast({ title: "Hata", variant: "destructive" });
+                                  }
+                                }}
+                              >
+                                <Check className="w-2.5 h-2.5 mr-0.5" /> Onayla
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-2 text-[10px] text-red-600 border-red-300 hover:bg-red-50"
+                                onClick={async () => {
+                                  try {
+                                    await updateTrackingNoteStatus(kesim!.id, note.id, "rejected");
+                                    setTrackingNotes(prev => prev.map(n => n.id === note.id ? { ...n, status: "rejected" as const } : n));
+                                    toast({ title: "Talep reddedildi" });
+                                  } catch {
+                                    toast({ title: "Hata", variant: "destructive" });
+                                  }
+                                }}
+                              >
+                                <X className="w-2.5 h-2.5 mr-0.5" /> Reddet
+                              </Button>
+                            </>
+                          ) : (
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                              note.status === "approved"
+                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
+                                : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
+                            }`}>
+                              {note.status === "approved" ? "Onaylandı" : "Reddedildi"}
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-xs whitespace-pre-wrap">{note.content}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,15 +1,29 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "wouter";
-import { fetchTrackingData, toggleKesildi } from "@/lib/api";
-import type { TrackingData, TrackingGroup } from "@/lib/api";
+import { fetchTrackingData, toggleKesildi, fetchTrackingNotes, createTrackingNote } from "@/lib/api";
+import type { TrackingData, TrackingGroup, TrackingNote } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Circle, Loader2, AlertTriangle, Beef, Clock, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import {
+  CheckCircle2, Circle, Loader2, AlertTriangle, Beef, Clock, X,
+  ChevronLeft, ChevronRight, MessageSquarePlus, Mic, MicOff, Send,
+  StickyNote, Edit3, ChevronDown, ChevronUp
+} from "lucide-react";
 
 const colorMap: Record<string, string> = {
   green: "#22c55e",
   orange: "#f97316",
   red: "#ef4444",
+};
+
+const FIELD_LABELS: Record<string, string> = {
+  name: "Adına Kesilen",
+  description: "Vekaleti Veren",
+  donationType: "Cinsi",
+  vekalet: "Vekalet",
+  notes: "Notlar",
 };
 
 function formatKesildiTime(isoString: string | null): string {
@@ -22,18 +36,312 @@ function formatKesildiTime(isoString: string | null): string {
   }
 }
 
+function formatNoteTime(isoString: string): string {
+  try {
+    const d = new Date(isoString);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    if (isToday) {
+      return d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+    }
+    return d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" }) + " " +
+      d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
+function useSpeechRecognition() {
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const recognitionRef = useRef<any>(null);
+
+  const isSupported = typeof window !== "undefined" &&
+    ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+
+  const startListening = useCallback(() => {
+    if (!isSupported) return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "tr-TR";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onresult = (event: any) => {
+      let finalTranscript = "";
+      for (let i = 0; i < event.results.length; i++) {
+        finalTranscript += event.results[i][0].transcript;
+      }
+      setTranscript(finalTranscript);
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+    setTranscript("");
+  }, [isSupported]);
+
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+  }, []);
+
+  return { isSupported, isListening, transcript, startListening, stopListening, setTranscript };
+}
+
+function NoteInput({
+  groupId,
+  token,
+  onNoteAdded,
+}: {
+  groupId?: string;
+  token: string;
+  onNoteAdded: (note: TrackingNote) => void;
+}) {
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const speech = useSpeechRecognition();
+
+  const handleSend = async () => {
+    const content = (speech.isListening ? speech.transcript : text).trim();
+    if (!content || sending) return;
+    setSending(true);
+    try {
+      const note = await createTrackingNote(token, {
+        animalGroupId: groupId,
+        type: "note",
+        content,
+      });
+      onNoteAdded(note);
+      setText("");
+      speech.setTranscript("");
+      if (speech.isListening) speech.stopListening();
+    } catch {
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleMicToggle = () => {
+    if (speech.isListening) {
+      speech.stopListening();
+      if (speech.transcript) {
+        setText(prev => (prev ? prev + " " : "") + speech.transcript);
+      }
+    } else {
+      speech.startListening();
+    }
+  };
+
+  const displayText = speech.isListening ? speech.transcript : text;
+
+  return (
+    <div className="flex gap-1.5 items-end">
+      <div className="flex-1 relative">
+        <Textarea
+          placeholder="Not yazın..."
+          value={displayText}
+          onChange={(e) => {
+            if (!speech.isListening) setText(e.target.value);
+          }}
+          className="min-h-[40px] max-h-[100px] text-sm pr-10 resize-none"
+          rows={1}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+        />
+        {speech.isListening && (
+          <span className="absolute right-2 top-2 text-[10px] text-red-500 font-semibold animate-pulse">REC</span>
+        )}
+      </div>
+      {speech.isSupported && (
+        <Button
+          variant={speech.isListening ? "destructive" : "outline"}
+          size="sm"
+          className="h-9 w-9 p-0 shrink-0"
+          onClick={handleMicToggle}
+        >
+          {speech.isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+        </Button>
+      )}
+      <Button
+        size="sm"
+        className="h-9 w-9 p-0 shrink-0"
+        onClick={handleSend}
+        disabled={!displayText.trim() || sending}
+      >
+        {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+      </Button>
+    </div>
+  );
+}
+
+function EditRequestForm({
+  donor,
+  donorIndex,
+  groupId,
+  token,
+  onNoteAdded,
+  onClose,
+}: {
+  donor: TrackingGroup["donors"][0];
+  donorIndex: number;
+  groupId: string;
+  token: string;
+  onNoteAdded: (note: TrackingNote) => void;
+  onClose: () => void;
+}) {
+  const [field, setField] = useState<string>("name");
+  const [newValue, setNewValue] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const currentValue = (donor as any)[field] || "";
+
+  const handleSubmit = async () => {
+    if (!newValue.trim() || sending) return;
+    setSending(true);
+    try {
+      const note = await createTrackingNote(token, {
+        animalGroupId: groupId,
+        type: "edit_request",
+        content: `Sıra ${donorIndex + 1}: ${FIELD_LABELS[field] || field} değişiklik talebi`,
+        fieldName: field,
+        oldValue: currentValue,
+        newValue: newValue.trim(),
+      });
+      onNoteAdded(note);
+      onClose();
+    } catch {
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-lg p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1">
+          <Edit3 className="w-3 h-3" /> Düzenleme Talebi — Sıra {donorIndex + 1}
+        </span>
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}>
+          <X className="w-3 h-3" />
+        </Button>
+      </div>
+      <div className="flex gap-1 flex-wrap">
+        {Object.entries(FIELD_LABELS).map(([key, label]) => (
+          <button
+            key={key}
+            className={`text-[10px] px-2 py-0.5 rounded-full border ${
+              field === key
+                ? "bg-amber-200 dark:bg-amber-800 border-amber-400 font-semibold"
+                : "bg-background border-border"
+            }`}
+            onClick={() => { setField(key); setNewValue(""); }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {currentValue && (
+        <div className="text-xs">
+          <span className="text-muted-foreground">Mevcut: </span>
+          <span className="line-through text-red-500">{currentValue}</span>
+        </div>
+      )}
+      <Input
+        placeholder="Yeni değer..."
+        value={newValue}
+        onChange={(e) => setNewValue(e.target.value)}
+        className="h-8 text-sm"
+        onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
+      />
+      <Button size="sm" className="w-full h-8" onClick={handleSubmit} disabled={!newValue.trim() || sending}>
+        {sending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+        Talep Gönder
+      </Button>
+    </div>
+  );
+}
+
+function NotesList({ notes, groupId }: { notes: TrackingNote[]; groupId?: string }) {
+  const filtered = groupId ? notes.filter(n => n.animalGroupId === groupId) : notes;
+  if (filtered.length === 0) return null;
+
+  return (
+    <div className="space-y-1.5">
+      {filtered.map(note => (
+        <div
+          key={note.id}
+          className={`rounded-lg p-2 text-xs ${
+            note.type === "edit_request"
+              ? "bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800"
+              : "bg-muted/50"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              {note.type === "edit_request" ? (
+                <>
+                  <span className="font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-0.5 mb-0.5">
+                    <Edit3 className="w-2.5 h-2.5" /> {FIELD_LABELS[note.fieldName || ""] || note.fieldName}
+                  </span>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className="line-through text-red-400">{note.oldValue || "—"}</span>
+                    <span className="text-muted-foreground">→</span>
+                    <span className="font-medium text-emerald-600">{note.newValue}</span>
+                  </div>
+                  {note.status !== "pending" && (
+                    <span className={`text-[10px] mt-0.5 inline-block px-1.5 py-0.5 rounded-full font-semibold ${
+                      note.status === "approved" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                    }`}>
+                      {note.status === "approved" ? "Onaylandı" : "Reddedildi"}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <p className="whitespace-pre-wrap">{note.content}</p>
+              )}
+            </div>
+            <span className="text-[10px] text-muted-foreground shrink-0">{formatNoteTime(note.createdAt)}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function KesimKagidiOverlay({
   groups,
   initialIndex,
   toggling,
+  notes,
+  token,
   onToggle,
   onClose,
+  onNoteAdded,
 }: {
   groups: TrackingGroup[];
   initialIndex: number;
   toggling: Set<string>;
+  notes: TrackingNote[];
+  token: string;
   onToggle: (group: TrackingGroup) => void;
   onClose: () => void;
+  onNoteAdded: (note: TrackingNote) => void;
 }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const touchStartX = useRef(0);
@@ -43,15 +351,19 @@ function KesimKagidiOverlay({
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
+  const [showNotes, setShowNotes] = useState(false);
+  const [editDonorIdx, setEditDonorIdx] = useState<number | null>(null);
 
   const group = groups[currentIndex];
   if (!group) return null;
 
   const goNext = () => {
     if (currentIndex < groups.length - 1) setCurrentIndex(currentIndex + 1);
+    setEditDonorIdx(null);
   };
   const goPrev = () => {
     if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
+    setEditDonorIdx(null);
   };
 
   const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
@@ -104,10 +416,12 @@ function KesimKagidiOverlay({
       cinsi: donor?.donationType || "",
       notlar: donor?.notes || "",
       empty: !donor,
+      donor,
     });
   }
 
   const isToggling = toggling.has(group.id);
+  const groupNoteCount = notes.filter(n => n.animalGroupId === group.id).length;
 
   return (
     <div
@@ -172,6 +486,7 @@ function KesimKagidiOverlay({
                     <th className="text-left p-2 font-semibold border-b">ADINA KESİLEN</th>
                     <th className="text-left p-2 font-semibold border-b">CİNSİ</th>
                     <th className="text-left p-2 font-semibold border-b">NOTLAR</th>
+                    <th className="text-center p-2 font-semibold border-b w-8"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -186,6 +501,17 @@ function KesimKagidiOverlay({
                       <td className="p-2 border-b">{row.adinaKesilen || "—"}</td>
                       <td className="p-2 border-b text-xs">{row.cinsi || "—"}</td>
                       <td className="p-2 border-b text-xs">{row.notlar || "—"}</td>
+                      <td className="p-2 border-b text-center">
+                        {!row.empty && (
+                          <button
+                            className="text-amber-500 hover:text-amber-700"
+                            onClick={(e) => { e.stopPropagation(); setEditDonorIdx(editDonorIdx === idx ? null : idx); }}
+                            title="Düzenleme talebi"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -223,9 +549,47 @@ function KesimKagidiOverlay({
                         </>
                       )}
                     </div>
+                    {!row.empty && (
+                      <button
+                        className="text-amber-500 hover:text-amber-700 shrink-0 mt-0.5"
+                        onClick={(e) => { e.stopPropagation(); setEditDonorIdx(editDonorIdx === idx ? null : idx); }}
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
+            </div>
+
+            {editDonorIdx !== null && rows[editDonorIdx]?.donor && (
+              <div className="mt-3">
+                <EditRequestForm
+                  donor={rows[editDonorIdx].donor!}
+                  donorIndex={editDonorIdx}
+                  groupId={group.id}
+                  token={token}
+                  onNoteAdded={onNoteAdded}
+                  onClose={() => setEditDonorIdx(null)}
+                />
+              </div>
+            )}
+
+            <div className="mt-3">
+              <button
+                className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground mb-2"
+                onClick={() => setShowNotes(!showNotes)}
+              >
+                <MessageSquarePlus className="w-3.5 h-3.5" />
+                Notlar {groupNoteCount > 0 && `(${groupNoteCount})`}
+                {showNotes ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+              {showNotes && (
+                <div className="space-y-2">
+                  <NoteInput groupId={group.id} token={token} onNoteAdded={onNoteAdded} />
+                  <NotesList notes={notes} groupId={group.id} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -258,7 +622,7 @@ function KesimKagidiOverlay({
               className={`w-2 h-2 rounded-full transition-all ${
                 idx === currentIndex ? "bg-white scale-125" : "bg-white/40"
               }`}
-              onClick={() => setCurrentIndex(idx)}
+              onClick={() => { setCurrentIndex(idx); setEditDonorIdx(null); }}
             />
           ))}
         </div>
@@ -276,12 +640,18 @@ export default function KesimTakipPage() {
   const [error, setError] = useState<string | null>(null);
   const [toggling, setToggling] = useState<Set<string>>(new Set());
   const [overlayIndex, setOverlayIndex] = useState<number | null>(null);
+  const [notes, setNotes] = useState<TrackingNote[]>([]);
+  const [showGlobalNotes, setShowGlobalNotes] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!params.token) return;
     try {
-      const result = await fetchTrackingData(params.token);
+      const [result, trackingNotes] = await Promise.all([
+        fetchTrackingData(params.token),
+        fetchTrackingNotes(params.token),
+      ]);
       setData(result);
+      setNotes(trackingNotes);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Veri yüklenemedi");
@@ -295,6 +665,10 @@ export default function KesimTakipPage() {
     const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
   }, [loadData]);
+
+  const handleNoteAdded = useCallback((note: TrackingNote) => {
+    setNotes(prev => [note, ...prev]);
+  }, []);
 
   async function handleToggle(group: TrackingGroup) {
     if (!params.token || toggling.has(group.id)) return;
@@ -344,6 +718,13 @@ export default function KesimTakipPage() {
 
   const progressPercent = data.totalGroups > 0 ? Math.round((data.kesildiCount / data.totalGroups) * 100) : 0;
   const filledGroups = data.groups.filter(g => g.filledCount > 0);
+  const noteCountByGroup: Record<string, number> = {};
+  for (const n of notes) {
+    if (n.animalGroupId) {
+      noteCountByGroup[n.animalGroupId] = (noteCountByGroup[n.animalGroupId] || 0) + 1;
+    }
+  }
+  const editRequestCount = notes.filter(n => n.type === "edit_request" && n.status === "pending").length;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white dark:from-emerald-950 dark:to-background">
@@ -373,9 +754,35 @@ export default function KesimTakipPage() {
           <p className="text-xs text-muted-foreground mt-1 text-right">%{progressPercent} tamamlandı</p>
         </Card>
 
+        <Card className="p-3 mb-4">
+          <button
+            className="flex items-center justify-between w-full text-sm"
+            onClick={() => setShowGlobalNotes(!showGlobalNotes)}
+          >
+            <span className="flex items-center gap-1.5 font-medium">
+              <StickyNote className="w-4 h-4 text-primary" />
+              Genel Notlar
+              {notes.length > 0 && (
+                <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-semibold">{notes.length}</span>
+              )}
+              {editRequestCount > 0 && (
+                <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold">{editRequestCount} talep</span>
+              )}
+            </span>
+            {showGlobalNotes ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+          {showGlobalNotes && (
+            <div className="mt-3 space-y-2">
+              <NoteInput token={params.token!} onNoteAdded={handleNoteAdded} />
+              <NotesList notes={notes} />
+            </div>
+          )}
+        </Card>
+
         <div className="space-y-2">
           {filledGroups.map((group, idx) => {
             const isToggling = toggling.has(group.id);
+            const groupNotes = noteCountByGroup[group.id] || 0;
             return (
               <Card
                 key={group.id}
@@ -401,6 +808,12 @@ export default function KesimTakipPage() {
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm">Hayvan {group.animalNo}</span>
                       <span className="text-xs text-muted-foreground">({group.filledCount}/7 dolu)</span>
+                      {groupNotes > 0 && (
+                        <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
+                          <MessageSquarePlus className="w-2.5 h-2.5" />
+                          {groupNotes}
+                        </span>
+                      )}
                       {group.kesildi && (
                         <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
                           Kesildi
@@ -440,8 +853,11 @@ export default function KesimTakipPage() {
           groups={filledGroups}
           initialIndex={overlayIndex}
           toggling={toggling}
+          notes={notes}
+          token={params.token!}
           onToggle={handleToggle}
           onClose={() => setOverlayIndex(null)}
+          onNoteAdded={handleNoteAdded}
         />
       )}
     </div>

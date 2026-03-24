@@ -97,6 +97,26 @@ export const donationTagsTable = pgTable("donation_tags", {
   unique("uq_dt_donation_tag").on(table.donationId, table.tagId),
 ]);
 
+export const trackingNotesTable = pgTable("tracking_notes", {
+  id: text("id").primaryKey(),
+  kesimAlaniId: text("kesim_alani_id").notNull().references(() => kesimAlanlariTable.id, { onDelete: "cascade" }),
+  animalGroupId: text("animal_group_id").references(() => animalGroupsTable.id, { onDelete: "cascade" }),
+  type: text("type").notNull().default("note"),
+  content: text("content").notNull().default(""),
+  fieldName: text("field_name"),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  status: text("status").notNull().default("pending"),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  index("idx_tracking_notes_kesim_alani_id").on(table.kesimAlaniId),
+  index("idx_tracking_notes_animal_group_id").on(table.animalGroupId),
+]);
+
+export const insertTrackingNoteSchema = createInsertSchema(trackingNotesTable);
+export type InsertTrackingNote = z.infer<typeof insertTrackingNoteSchema>;
+export type TrackingNoteRow = typeof trackingNotesTable.$inferSelect;
+
 export const appSettingsTable = pgTable("app_settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
