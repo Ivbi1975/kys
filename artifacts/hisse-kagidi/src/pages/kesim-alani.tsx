@@ -2959,13 +2959,29 @@ export default function KesimAlaniPage() {
       case "notes":
         return (
           <td key={colKey} className={cellPad} data-group-cell={`${groupIdx}-${dIdx}-notes`}>
-            <Input
-              className={`${inputH} border-0 bg-transparent p-0 focus:bg-primary/5 focus:ring-1 focus:ring-primary/30 rounded transition-colors`}
-              value={d.notes || ""}
-              onChange={(e) => updateGroupDonation(groupIdx, dIdx, "notes", e.target.value)}
-              onKeyDown={(e) => handleGroupCellTab(e, groupIdx, dIdx, "notes")}
-              placeholder="—"
-            />
+            <div className="flex flex-col gap-0.5">
+              <Input
+                className={`${inputH} border-0 bg-transparent p-0 focus:bg-primary/5 focus:ring-1 focus:ring-primary/30 rounded transition-colors`}
+                value={d.notes || ""}
+                onChange={(e) => updateGroupDonation(groupIdx, dIdx, "notes", e.target.value)}
+                onKeyDown={(e) => handleGroupCellTab(e, groupIdx, dIdx, "notes")}
+                placeholder="—"
+              />
+              {((d.aiCategories && d.aiCategories.length > 0) || (d.aiWarnings && d.aiWarnings.trim())) && (
+                <div className="flex gap-0.5 flex-wrap">
+                  {(d.aiCategories || []).map(cat => (
+                    <span key={cat} className="px-1 py-0 rounded-full text-[8px] font-medium bg-violet-100 dark:bg-violet-900 text-violet-600 dark:text-violet-400 border border-violet-200/50 dark:border-violet-800/50 opacity-70">
+                      {cat}
+                    </span>
+                  ))}
+                  {d.aiWarnings && d.aiWarnings.trim() && (
+                    <span className="px-1 py-0 rounded-full text-[8px] font-medium bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-800/50 opacity-70 flex items-center gap-0.5" title={d.aiWarnings}>
+                      ⚠
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </td>
         );
       case "actions":
@@ -4083,7 +4099,7 @@ export default function KesimAlaniPage() {
                 </div>
               ) : (
                 <TableVirtuoso
-                  style={{ height: `min(calc(100vh - 280px), ${filteredDonations.length * 45 + 50}px)`, minHeight: 200 }}
+                  style={{ height: `min(calc(100vh - 150px), ${filteredDonations.length * 45 + 50}px)`, minHeight: 200 }}
                   data={filteredDonations}
                   overscan={30}
                   itemKey={(_idx, d) => d.id}

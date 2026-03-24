@@ -156,13 +156,29 @@ export default function PrintPage() {
     updatePrefs((prev) => ({ ...prev, template: t }));
   }
 
+  function getAiLabel(d: AnimalGroup["donations"][0]): string {
+    const parts: string[] = [];
+    if (d.aiCategories && d.aiCategories.length > 0) {
+      parts.push(d.aiCategories.join(", "));
+    }
+    if (d.aiWarnings && d.aiWarnings.trim()) {
+      parts.push(`⚠ ${d.aiWarnings.trim()}`);
+    }
+    return parts.join(" | ");
+  }
+
   function getCellContent(columnKey: ColumnKey, d: AnimalGroup["donations"][0]): string {
     switch (columnKey) {
       case "vekalet": return d.vekalet || "";
       case "vekaleti-veren": return d.description || "";
       case "adina-kesilen": return d.name || "";
       case "cinsi": return d.donationType || "";
-      case "notlar": return d.notes || "";
+      case "notlar": {
+        const notes = d.notes || "";
+        const ai = getAiLabel(d);
+        if (ai) return notes ? `${notes} [${ai}]` : `[${ai}]`;
+        return notes;
+      }
       default: return "";
     }
   }
@@ -451,7 +467,14 @@ export default function PrintPage() {
                     const groupNotes = [...new Set(
                       filledDonors
                         .filter(d => !shouldHideContent("notlar", d.donationType))
-                        .map(d => d.notes).filter(Boolean)
+                        .map(d => {
+                          const note = d.notes || "";
+                          const ai = getAiLabel(d);
+                          if (note && ai) return `${note} [${ai}]`;
+                          if (note) return note;
+                          if (ai) return `[${ai}]`;
+                          return "";
+                        }).filter(Boolean)
                     )].join("; ");
                     return (
                       <tr key={group.id}>
@@ -662,7 +685,14 @@ export default function PrintPage() {
                       const notes = [...new Set(
                         filled
                           .filter(d => !shouldHideContent("notlar", d.donationType))
-                          .map(d => d.notes).filter(Boolean)
+                          .map(d => {
+                            const note = d.notes || "";
+                            const ai = getAiLabel(d);
+                            if (note && ai) return `${note} [${ai}]`;
+                            if (note) return note;
+                            if (ai) return `[${ai}]`;
+                            return "";
+                          }).filter(Boolean)
                       )].join("; ");
                       return (
                         <tr key={group.id}>
