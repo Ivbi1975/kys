@@ -124,10 +124,10 @@ function generateId(): string {
 const emptyDonations: Donation[] = [];
 const emptyGroups: AnimalGroup[] = [];
 
-const VirtuosoTable = forwardRef<HTMLTableElement, any>((props, ref) => (
+const VirtuosoTable = forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>((props, ref) => (
   <table {...props} ref={ref} className="w-full text-sm" />
 ));
-const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, any>((props, ref) => (
+const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>((props, ref) => (
   <thead {...props} ref={ref} className="bg-background sticky top-0 z-10" />
 ));
 
@@ -818,7 +818,12 @@ export default function KesimAlaniPage() {
         }
       }
       const mergedDonations = [...kesim.donations, ...newDonations];
-      save({ ...kesim, donations: mergedDonations, animalGroups: finalGroups }, `Otomatik gruplama yapıldı: ${finalGroups.length} hayvan (${lockedGroups.length} kilitli korundu)`, true);
+      const updated = { ...kesim, donations: mergedDonations, animalGroups: finalGroups };
+      if (newDonations.length > 0) {
+        save(updated, `Otomatik gruplama yapıldı: ${finalGroups.length} hayvan (${lockedGroups.length} kilitli korundu)`, true);
+      } else {
+        save(updated, `Otomatik gruplama yapıldı: ${finalGroups.length} hayvan (${lockedGroups.length} kilitli korundu)`, true, 'groups');
+      }
       const found = checkGroupConflicts(finalGroups);
       setConflicts(found);
       if (found.length > 0) setShowConflicts(true);
@@ -2351,7 +2356,7 @@ export default function KesimAlaniPage() {
   const virtuosoTableComponents = useMemo(() => ({
     Table: VirtuosoTable,
     TableHead: VirtuosoTableHead,
-    TableRow: ({ item: d, ...props }: any) => (
+    TableRow: ({ item: d, ...props }: React.HTMLAttributes<HTMLTableRowElement> & { item?: Donation }) => (
       <tr
         {...props}
         className={`border-b hover:bg-muted/30 transition-colors ${d && selectedIds.has(d.id) ? "bg-primary/5" : ""} ${d?.excluded ? "opacity-40 line-through" : ""}`}
