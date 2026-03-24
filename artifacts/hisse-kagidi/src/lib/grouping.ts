@@ -39,6 +39,18 @@ interface GroupedSegment {
   shares: number;
 }
 
+function createEmptyDonation(): Donation {
+  return {
+    id: generateId(),
+    name: "",
+    description: "",
+    donationType: "",
+    shareCount: 1,
+    vekalet: "",
+    notes: "",
+  };
+}
+
 function buildGroupDonations(segments: GroupedSegment[]): Donation[] {
   const groupDonations: Donation[] = [];
   for (const g of segments) {
@@ -47,10 +59,7 @@ function buildGroupDonations(segments: GroupedSegment[]): Donation[] {
     }
     const extraSlots = g.shares - g.donations.length;
     for (let s = 0; s < extraSlots; s++) {
-      groupDonations.push({
-        ...g.templateDonation,
-        id: generateId(),
-      });
+      groupDonations.push(createEmptyDonation());
     }
   }
 
@@ -64,15 +73,7 @@ function buildGroupDonations(segments: GroupedSegment[]): Donation[] {
   const sorted = [...filled, ...empty];
 
   while (sorted.length < 7) {
-    sorted.push({
-      id: generateId(),
-      name: "",
-      description: "",
-      donationType: "",
-      shareCount: 1,
-      vekalet: "",
-      notes: "",
-    });
+    sorted.push(createEmptyDonation());
   }
 
   return sorted.slice(0, 7);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, createElement } from "react";
 import { useParams, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -366,6 +366,47 @@ export default function KesimAlaniPage() {
   const [mobileTab, setMobileTab] = useState<"donors" | "groups">("donors");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const buildErrorDescription = useCallback((errMsg: string) => {
+    const animalNoMatches = errMsg.match(/[Hh]ayvan\s*(?:No|no|#)?\s*[:.]?\s*(\d+(?:\s*[,\/]\s*\d+)*)/g);
+    if (animalNoMatches) {
+      const parts: (string | ReturnType<typeof createElement>)[] = [];
+      let lastIndex = 0;
+      for (const match of animalNoMatches) {
+        const matchIndex = errMsg.indexOf(match, lastIndex);
+        if (matchIndex > lastIndex) {
+          parts.push(errMsg.substring(lastIndex, matchIndex));
+        }
+        const numbers = match.match(/\d+/g) || [];
+        const prefix = match.replace(/\d+(?:\s*[,\/]\s*\d+)*/g, "").trim();
+        parts.push(prefix + " ");
+        numbers.forEach((num, idx) => {
+          if (idx > 0) parts.push(", ");
+          const animalNo = parseInt(num, 10);
+          parts.push(
+            createElement(
+              "button",
+              {
+                key: `animal-${animalNo}-${idx}`,
+                className: "underline font-semibold hover:text-red-300 cursor-pointer",
+                onClick: () => {
+                  const el = document.getElementById(`animal-group-${animalNo}`);
+                  if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                },
+              },
+              String(animalNo)
+            )
+          );
+        });
+        lastIndex = matchIndex + match.length;
+      }
+      if (lastIndex < errMsg.length) {
+        parts.push(errMsg.substring(lastIndex));
+      }
+      return createElement("span", null, ...parts);
+    }
+    return errMsg;
+  }, []);
+
   const saveToApi = useCallback((data: KesimAlani) => {
     setSaveStatus("saving");
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -377,14 +418,15 @@ export default function KesimAlaniPage() {
       })
       .catch(err => {
         setSaveStatus("error");
+        const errMsg = err instanceof Error ? err.message : "Veriler kaydedilemedi";
         toast({
           title: "Kaydetme hatası",
-          description: err instanceof Error ? err.message : "Veriler kaydedilemedi",
+          description: buildErrorDescription(errMsg),
           variant: "destructive",
         });
         saveTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 5000);
       });
-  }, [toast]);
+  }, [toast, buildErrorDescription]);
 
   const save = useCallback(
     (updated: KesimAlani, desc?: string) => {
