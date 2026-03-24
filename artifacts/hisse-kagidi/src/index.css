@@ -264,6 +264,14 @@
   flex-direction: column;
   overflow: hidden;
   box-sizing: border-box;
+  position: relative;
+}
+
+.print-qr-code {
+  position: absolute;
+  bottom: 3mm;
+  right: 3mm;
+  opacity: 0.85;
 }
 
 @media print {

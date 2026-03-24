@@ -7,6 +7,7 @@ export interface PrintPreferences {
   contentHideRules: Record<string, string[]>;
   template: PrintTemplate;
   columnFontSizes: Record<string, number>;
+  showQrCode: boolean;
 }
 
 export const DEFAULT_PRINT_PREFS: PrintPreferences = {
@@ -16,6 +17,7 @@ export const DEFAULT_PRINT_PREFS: PrintPreferences = {
   },
   template: "standard",
   columnFontSizes: {},
+  showQrCode: false,
 };
 
 export const PRINT_TEMPLATES: { value: PrintTemplate; label: string; description: string }[] = [
@@ -59,12 +61,13 @@ export function loadPrintPreferences(): PrintPreferences {
           }
         }
       }
-      return { hiddenColumns, contentHideRules, template, columnFontSizes };
+      const showQrCode = typeof parsed.showQrCode === "boolean" ? parsed.showQrCode : false;
+      return { hiddenColumns, contentHideRules, template, columnFontSizes, showQrCode };
     }
   } catch {
     console.warn("Print preferences could not be loaded, using defaults");
   }
-  return { ...DEFAULT_PRINT_PREFS, contentHideRules: { ...DEFAULT_PRINT_PREFS.contentHideRules }, columnFontSizes: {} };
+  return { ...DEFAULT_PRINT_PREFS, contentHideRules: { ...DEFAULT_PRINT_PREFS.contentHideRules }, columnFontSizes: {}, showQrCode: false };
 }
 
 export function resetPrintPreferences(): void {

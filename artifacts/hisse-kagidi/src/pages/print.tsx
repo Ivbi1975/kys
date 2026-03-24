@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
+import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Printer, Settings2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff, FileSpreadsheet, FileText, LayoutTemplate } from "lucide-react";
+import { ArrowLeft, Printer, Settings2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff, FileSpreadsheet, FileText, LayoutTemplate, QrCode } from "lucide-react";
 import type { KesimAlani, AnimalGroup } from "@/lib/types";
 import { fetchKesimAlani, fetchLogo } from "@/lib/api";
 import * as XLSX from "xlsx-js-style";
@@ -365,6 +366,11 @@ export default function PrintPage() {
               <span>Sayfa {group.animalNo} / {kesim.animalGroups.length}</span>
               <span>{new Date().toLocaleDateString("tr-TR")}</span>
             </div>
+            {prefs.showQrCode && trackingUrl && (
+              <div className="print-qr-code">
+                <QRCodeSVG value={trackingUrl} size={60} level="M" />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -416,6 +422,11 @@ export default function PrintPage() {
               <span>Sayfa {group.animalNo} / {kesim.animalGroups.length}</span>
               <span>{new Date().toLocaleDateString("tr-TR")}</span>
             </div>
+            {prefs.showQrCode && trackingUrl && (
+              <div className="print-qr-code">
+                <QRCodeSVG value={trackingUrl} size={60} level="M" />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -495,6 +506,11 @@ export default function PrintPage() {
               <span>Sayfa {pageIdx + 1} / {pages.length}</span>
               <span>{new Date().toLocaleDateString("tr-TR")}</span>
             </div>
+            {prefs.showQrCode && trackingUrl && (
+              <div className="print-qr-code">
+                <QRCodeSVG value={trackingUrl} size={60} level="M" />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -565,6 +581,11 @@ export default function PrintPage() {
               <span>Sayfa {pageIdx + 1} / {pages.length} — Toplam {allDonations.length} bağışçı</span>
               <span>{new Date().toLocaleDateString("tr-TR")}</span>
             </div>
+            {prefs.showQrCode && trackingUrl && (
+              <div className="print-qr-code">
+                <QRCodeSVG value={trackingUrl} size={60} level="M" />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -714,11 +735,21 @@ export default function PrintPage() {
               <span>Sayfa {pageIdx + 1} / {totalPages}</span>
               <span>{new Date().toLocaleDateString("tr-TR")}</span>
             </div>
+            {prefs.showQrCode && trackingUrl && (
+              <div className="print-qr-code">
+                <QRCodeSVG value={trackingUrl} size={60} level="M" />
+              </div>
+            )}
           </div>
         ))}
       </div>
     );
   }
+
+  const trackingUrl = useMemo(() => {
+    if (!kesim?.trackingToken) return null;
+    return `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/takip/${kesim.trackingToken}`;
+  }, [kesim?.trackingToken]);
 
   const pageStyle = useMemo(() => {
     if (prefs.template === "portrait" || prefs.template === "namelist") {
@@ -794,6 +825,26 @@ export default function PrintPage() {
                 </p>
               )}
             </Card>
+
+            {trackingUrl && (
+              <Card className="p-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={prefs.showQrCode}
+                    onChange={(e) => updatePrefs((prev) => ({ ...prev, showQrCode: e.target.checked }))}
+                    className="rounded w-4 h-4"
+                  />
+                  <div>
+                    <div className="text-sm font-semibold flex items-center gap-1.5">
+                      <QrCode className="w-4 h-4" />
+                      QR Kod Göster
+                    </div>
+                    <p className="text-xs text-muted-foreground">Her sayfanın köşesinde takip linki QR kodu basılsın.</p>
+                  </div>
+                </label>
+              </Card>
+            )}
 
             {prefs.template !== "namelist" && (
               <>

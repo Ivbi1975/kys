@@ -47,7 +47,9 @@ import {
   Loader2,
   Link2,
   ExternalLink,
+  QrCode,
 } from "lucide-react";
+import QrCodeModal from "@/components/QrCodeModal";
 import { useToast } from "@/hooks/use-toast";
 import type { KesimAlani, Project } from "@/lib/types";
 import {
@@ -94,6 +96,10 @@ export default function ProjeDetayPage() {
   const [conflictSearchQuery, setConflictSearchQuery] = useState("");
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [showConflicts, setShowConflicts] = useState(false);
+
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrUrl, setQrUrl] = useState("");
+  const [qrTitle, setQrTitle] = useState("");
 
   const [transferDialog, setTransferDialog] = useState<{
     entry: ConflictEntry;
@@ -564,6 +570,30 @@ export default function ProjeDetayPage() {
                         variant="ghost"
                         size="sm"
                         className="h-7 w-7 p-0"
+                        title="QR Kod"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            let token = k.trackingToken;
+                            if (!token) {
+                              token = await generateTrackingToken(k.id);
+                              setKesimAlanlari(prev => prev.map(ka => ka.id === k.id ? { ...ka, trackingToken: token } : ka));
+                            }
+                            const url = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/takip/${token}`;
+                            setQrUrl(url);
+                            setQrTitle(k.name);
+                            setQrModalOpen(true);
+                          } catch {
+                            toast({ title: "Hata", description: "QR kod oluşturulamadı.", variant: "destructive" });
+                          }
+                        }}
+                      >
+                        <QrCode className="w-4 h-4 text-muted-foreground" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
                         onClick={(e) => {
                           e.stopPropagation();
                           requestDelete(k.id);
@@ -997,6 +1027,13 @@ export default function ProjeDetayPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <QrCodeModal
+        open={qrModalOpen}
+        onOpenChange={setQrModalOpen}
+        url={qrUrl}
+        title={qrTitle}
+      />
     </div>
   );
 }

@@ -27,7 +27,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ChevronRight, ChevronDown, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, RotateCcw, Clock, Calendar, FolderOpen, FolderPlus, MoveRight, Link2, ExternalLink } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronDown, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, RotateCcw, Clock, Calendar, FolderOpen, FolderPlus, MoveRight, Link2, ExternalLink, QrCode } from "lucide-react";
+import QrCodeModal from "@/components/QrCodeModal";
 import type { KesimAlani, CustomTag, Project } from "@/lib/types";
 import {
   fetchKesimAlanlari,
@@ -94,6 +95,9 @@ export default function Home() {
   const [movingKesim, setMovingKesim] = useState<{ id: string; name: string; currentProjectId: string | null } | null>(null);
   const [moveTargetProjectId, setMoveTargetProjectId] = useState<string>("__none__");
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrUrl, setQrUrl] = useState("");
+  const [qrTitle, setQrTitle] = useState("");
   const { toast } = useToast();
 
   const TAG_COLORS = [
@@ -591,6 +595,23 @@ export default function Home() {
     }
   }
 
+  async function handleShowQrCode(e: React.MouseEvent, k: KesimAlani) {
+    e.stopPropagation();
+    try {
+      let token = k.trackingToken;
+      if (!token) {
+        token = await generateTrackingToken(k.id);
+        setKesimAlanlari(prev => prev.map(ka => ka.id === k.id ? { ...ka, trackingToken: token } : ka));
+      }
+      const url = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/takip/${token}`;
+      setQrUrl(url);
+      setQrTitle(k.name);
+      setQrModalOpen(true);
+    } catch {
+      toast({ title: "Hata", description: "QR kod oluşturulamadı.", variant: "destructive" });
+    }
+  }
+
   function renderKesimCard(k: KesimAlani) {
     const shares = getTotalShares(k.donations);
     const animals = getRequiredAnimals(k.donations);
@@ -645,6 +666,15 @@ export default function Home() {
               onClick={(e) => handleOpenTrackingPage(e, k)}
             >
               <ExternalLink className="w-4 h-4 text-muted-foreground" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              title="QR Kod"
+              onClick={(e) => handleShowQrCode(e, k)}
+            >
+              <QrCode className="w-4 h-4 text-muted-foreground" />
             </Button>
             <Button
               variant="ghost"
@@ -1371,6 +1401,13 @@ export default function Home() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <QrCodeModal
+        open={qrModalOpen}
+        onOpenChange={setQrModalOpen}
+        url={qrUrl}
+        title={qrTitle}
+      />
     </div>
   );
 }

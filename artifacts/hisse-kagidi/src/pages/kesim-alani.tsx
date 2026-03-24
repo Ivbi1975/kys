@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, createElement, useMemo, forwardRef, useTransition } from "react";
 import { TableVirtuoso } from "react-virtuoso";
+import QrCodeModal from "@/components/QrCodeModal";
 import { useParams, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -98,6 +99,7 @@ import {
   MessageSquarePlus,
   Edit3,
   Check,
+  QrCode,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
 import { Tag } from "lucide-react";
@@ -300,6 +302,9 @@ export default function KesimAlaniPage() {
   const [splitShareDialog, setSplitShareDialog] = useState<{ donationId: string; totalShares: number } | null>(null);
   const [splitGroupDialog, setSplitGroupDialog] = useState<{ groupIdx: number; splitAt: number } | null>(null);
   const [personBulkDeleteConfirm, setPersonBulkDeleteConfirm] = useState<string | null>(null);
+
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrUrl, setQrUrl] = useState("");
 
   const [trackingNotesOpen, setTrackingNotesOpen] = useState(false);
   const [trackingNotes, setTrackingNotes] = useState<TrackingNote[]>([]);
@@ -3107,6 +3112,27 @@ export default function KesimAlaniPage() {
               >
                 <Link2 className="w-4 h-4" />
                 <span className="hidden sm:inline ml-1">Takip Linki</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    let token = kesim.trackingToken;
+                    if (!token) {
+                      token = await generateTrackingToken(kesim.id);
+                      setKesim(prev => prev ? { ...prev, trackingToken: token } : prev);
+                    }
+                    const url = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/takip/${token}`;
+                    setQrUrl(url);
+                    setQrModalOpen(true);
+                  } catch {
+                    toast({ title: "Hata", description: "QR kod oluşturulamadı", variant: "destructive" });
+                  }
+                }}
+              >
+                <QrCode className="w-4 h-4" />
+                <span className="hidden sm:inline ml-1">QR Kod</span>
               </Button>
               <Button
                 size="sm"
@@ -6416,6 +6442,13 @@ export default function KesimAlaniPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <QrCodeModal
+        open={qrModalOpen}
+        onOpenChange={setQrModalOpen}
+        url={qrUrl}
+        title={kesim?.name}
+      />
     </div>
   );
 }
