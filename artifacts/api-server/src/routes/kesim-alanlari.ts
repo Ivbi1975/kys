@@ -94,37 +94,38 @@ async function getFullKesimAlani(id: string) {
     .where(eq(kesimAlanlariTable.id, id));
   if (!ka) return null;
 
-  const donations = await db.select().from(donationsTable)
-    .where(eq(donationsTable.kesimAlaniId, id))
-    .orderBy(donationsTable.sortOrder);
+  const [donations, groups] = await Promise.all([
+    db.select().from(donationsTable)
+      .where(eq(donationsTable.kesimAlaniId, id))
+      .orderBy(donationsTable.sortOrder),
+    db.select().from(animalGroupsTable)
+      .where(eq(animalGroupsTable.kesimAlaniId, id))
+      .orderBy(animalGroupsTable.sortOrder),
+  ]);
 
   const donationIds = donations.map(d => d.id);
-  let donationTags: { donationId: string; tagId: string }[] = [];
-  if (donationIds.length > 0) {
-    donationTags = await db.select({
-      donationId: donationTagsTable.donationId,
-      tagId: donationTagsTable.tagId,
-    }).from(donationTagsTable).where(inArray(donationTagsTable.donationId, donationIds));
-  }
+  const groupIds = groups.map(g => g.id);
+
+  const [donationTags, groupDonationLinks] = await Promise.all([
+    donationIds.length > 0
+      ? db.select({
+          donationId: donationTagsTable.donationId,
+          tagId: donationTagsTable.tagId,
+        }).from(donationTagsTable).where(inArray(donationTagsTable.donationId, donationIds))
+      : Promise.resolve([] as { donationId: string; tagId: string }[]),
+    groupIds.length > 0
+      ? db.select({
+          groupId: animalGroupDonationsTable.groupId,
+          donationId: animalGroupDonationsTable.donationId,
+          sortOrder: animalGroupDonationsTable.sortOrder,
+        }).from(animalGroupDonationsTable).where(inArray(animalGroupDonationsTable.groupId, groupIds))
+      : Promise.resolve([] as { groupId: string; donationId: string; sortOrder: number }[]),
+  ]);
 
   const tagsByDonation: Record<string, string[]> = {};
   for (const dt of donationTags) {
     if (!tagsByDonation[dt.donationId]) tagsByDonation[dt.donationId] = [];
     tagsByDonation[dt.donationId].push(dt.tagId);
-  }
-
-  const groups = await db.select().from(animalGroupsTable)
-    .where(eq(animalGroupsTable.kesimAlaniId, id))
-    .orderBy(animalGroupsTable.sortOrder);
-
-  const groupIds = groups.map(g => g.id);
-  let groupDonationLinks: { groupId: string; donationId: string; sortOrder: number }[] = [];
-  if (groupIds.length > 0) {
-    groupDonationLinks = await db.select({
-      groupId: animalGroupDonationsTable.groupId,
-      donationId: animalGroupDonationsTable.donationId,
-      sortOrder: animalGroupDonationsTable.sortOrder,
-    }).from(animalGroupDonationsTable).where(inArray(animalGroupDonationsTable.groupId, groupIds));
   }
 
   const donationsById: Record<string, DonationOutput> = {};

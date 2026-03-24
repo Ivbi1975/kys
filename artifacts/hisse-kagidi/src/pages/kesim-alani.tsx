@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef, createElement } from "react";
+import { useState, useEffect, useCallback, useRef, createElement, useMemo, forwardRef } from "react";
+import { TableVirtuoso } from "react-virtuoso";
 import { useParams, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -120,6 +121,16 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
+const emptyDonations: Donation[] = [];
+const emptyGroups: AnimalGroup[] = [];
+
+const VirtuosoTable = forwardRef<HTMLTableElement, any>((props, ref) => (
+  <table {...props} ref={ref} className="w-full text-sm" />
+));
+const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, any>((props, ref) => (
+  <thead {...props} ref={ref} className="bg-background sticky top-0 z-10" />
+));
+
 export default function KesimAlaniPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
@@ -163,6 +174,7 @@ export default function KesimAlaniPage() {
   const [personEditDesc, setPersonEditDesc] = useState<string | null>(null);
   const [personSearchQuery, setPersonSearchQuery] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [filterUngrouped, setFilterUngrouped] = useState(false);
   const [groupSearchQuery, setGroupSearchQuery] = useState("");
   const [groupSearchMatchIdx, setGroupSearchMatchIdx] = useState(0);
@@ -371,6 +383,13 @@ export default function KesimAlaniPage() {
   const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
   const [mobileTab, setMobileTab] = useState<"donors" | "groups">("donors");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef<KesimAlani | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const buildErrorDescription = useCallback((errMsg: string) => {
     const animalNoMatches = errMsg.match(/[Hh]ayvan\s*(?:No|no|#)?\s*[:.]?\s*(\d+(?:\s*[,\/]\s*\d+)*)/g);
@@ -434,32 +453,67 @@ export default function KesimAlaniPage() {
       });
   }, [toast, buildErrorDescription]);
 
+  const debouncedSaveToApi = useCallback((data: KesimAlani) => {
+    pendingSaveRef.current = data;
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      if (pendingSaveRef.current) {
+        saveToApi(pendingSaveRef.current);
+        pendingSaveRef.current = null;
+      }
+    }, 600);
+  }, [saveToApi]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      if (pendingSaveRef.current) {
+        saveToApi(pendingSaveRef.current);
+      }
+    };
+  }, [saveToApi]);
+
+  const discardPendingSave = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    pendingSaveRef.current = null;
+  }, []);
+
   const save = useCallback(
-    (updated: KesimAlani, desc?: string) => {
+    (updated: KesimAlani, desc?: string, immediate?: boolean) => {
       setKesim(updated);
-      saveToApi(updated);
+      if (immediate) {
+        discardPendingSave();
+        saveToApi(updated);
+      } else {
+        debouncedSaveToApi(updated);
+      }
       if (desc) {
         history.push(updated, desc);
       }
     },
-    [saveToApi]
+    [saveToApi, debouncedSaveToApi, discardPendingSave]
   );
 
   const handleUndo = useCallback(() => {
     const prev = history.undo();
     if (prev) {
       setKesim(prev);
+      discardPendingSave();
       saveToApi(prev);
     }
-  }, [history, saveToApi]);
+  }, [history, saveToApi, discardPendingSave]);
 
   const handleRedo = useCallback(() => {
     const next = history.redo();
     if (next) {
       setKesim(next);
+      discardPendingSave();
       saveToApi(next);
     }
-  }, [history, saveToApi]);
+  }, [history, saveToApi, discardPendingSave]);
 
   const handleGoToStep = useCallback((index: number) => {
     const target = history.goToStep(index);
@@ -708,7 +762,7 @@ export default function KesimAlaniPage() {
       }
     }
 
-    save({ ...kesim, donations: [...kesim.donations, ...newDonations] }, `${newDonations.length} bağışçı toplu eklendi`);
+    save({ ...kesim, donations: [...kesim.donations, ...newDonations] }, `${newDonations.length} bağışçı toplu eklendi`, true);
     resetBulkDialog();
   }
 
@@ -756,7 +810,7 @@ export default function KesimAlaniPage() {
         }
       }
       const mergedDonations = [...kesim.donations, ...newDonations];
-      save({ ...kesim, donations: mergedDonations, animalGroups: finalGroups }, `Otomatik gruplama yapıldı: ${finalGroups.length} hayvan (${lockedGroups.length} kilitli korundu)`);
+      save({ ...kesim, donations: mergedDonations, animalGroups: finalGroups }, `Otomatik gruplama yapıldı: ${finalGroups.length} hayvan (${lockedGroups.length} kilitli korundu)`, true);
       const found = checkGroupConflicts(finalGroups);
       setConflicts(found);
       if (found.length > 0) setShowConflicts(true);
@@ -793,7 +847,7 @@ export default function KesimAlaniPage() {
         ? String(aVal).localeCompare(String(bVal), "tr")
         : String(bVal).localeCompare(String(aVal), "tr");
     });
-    save({ ...kesim, donations: sorted }, `Sıralama değiştirildi`);
+    save({ ...kesim, donations: sorted }, `Sıralama değiştirildi`, true);
   }
 
   function isGroupLocked(groupIdx: number): boolean {
@@ -2165,102 +2219,143 @@ export default function KesimAlaniPage() {
     });
   }
 
+  const donations = kesim ? kesim.donations : emptyDonations;
+  const animalGroups = kesim ? kesim.animalGroups : emptyGroups;
+
+  const descCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const d of donations) {
+      if (d.excluded) continue;
+      const normalizedDesc = d.description.trim().toLowerCase();
+      if (normalizedDesc) {
+        map.set(normalizedDesc, (map.get(normalizedDesc) || 0) + 1);
+      }
+    }
+    return map;
+  }, [donations]);
+
+  const groupedDonorIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const g of animalGroups) {
+      for (const d of g.donations) {
+        if (d.name.trim()) ids.add(d.id);
+      }
+    }
+    return ids;
+  }, [animalGroups]);
+
+  const ungroupedDonors = useMemo(() =>
+    donations.filter(d => !d.excluded && !groupedDonorIds.has(d.id)),
+    [donations, groupedDonorIds]
+  );
+
+  const ungroupedShareCount = useMemo(() => {
+    const ungroupedEffective = computeEffectiveShares(ungroupedDonors);
+    const processed = new Set<string>();
+    let count = 0;
+    for (const d of ungroupedDonors) {
+      const key = d.description.trim().toLowerCase();
+      if (key && processed.has(key)) continue;
+      processed.add(key);
+      count += ungroupedEffective.get(d.id) || d.shareCount;
+    }
+    return count;
+  }, [ungroupedDonors]);
+
+  const effectiveShareMap = useMemo(() =>
+    computeEffectiveShares(donations),
+    [donations]
+  );
+
+  const shareDistribution = useMemo(() => {
+    const dist: Record<number, number> = {};
+    for (let i = 1; i <= 7; i++) dist[i] = 0;
+    const processed = new Set<string>();
+    for (const d of donations) {
+      if (d.excluded) continue;
+      const key = d.description.trim().toLowerCase();
+      if (key && processed.has(key)) continue;
+      processed.add(key);
+      const eff = effectiveShareMap.get(d.id) || d.shareCount;
+      const sc = Math.max(1, Math.min(7, eff));
+      dist[sc] = (dist[sc] || 0) + 1;
+    }
+    return dist;
+  }, [donations, effectiveShareMap]);
+
+  const groupCompositions = useMemo(() => {
+    const compositions = new Map<string, number>();
+    for (const g of animalGroups) {
+      const filled = g.donations.filter(d => d.name.trim());
+      const shareMap = new Map<string, number>();
+      for (const d of filled) {
+        const key = d.description.trim().toLowerCase() || d.id;
+        shareMap.set(key, (shareMap.get(key) || 0) + 1);
+      }
+      const parts = Array.from(shareMap.values()).sort((a, b) => a - b);
+      const emptySlots = 7 - filled.length;
+      const label = parts.length > 0
+        ? (emptySlots > 0 ? [...parts, `${emptySlots}boş`].join("+") : parts.join("+"))
+        : "Boş";
+      compositions.set(label, (compositions.get(label) || 0) + 1);
+    }
+    return compositions;
+  }, [animalGroups]);
+
+  const filteredDonations = useMemo(() => {
+    const preFiltered = showRemovedFilter
+      ? donations.filter(d => removedFromGroupIds.has(d.id))
+      : filterUngrouped
+      ? donations.filter(d => !d.excluded && !groupedDonorIds.has(d.id))
+      : donations;
+
+    const advFiltered = preFiltered.filter(d => {
+      if (filterStatus === "active" && d.excluded) return false;
+      if (filterStatus === "excluded" && !d.excluded) return false;
+      if (filterCinsi !== "all" && d.donationType.toLowerCase() !== filterCinsi.toLowerCase()) return false;
+      if (filterHisseMin > 0 && d.shareCount < filterHisseMin) return false;
+      if (filterHisseMax > 0 && d.shareCount > filterHisseMax) return false;
+      if (filterTags.length > 0) {
+        const donorTags = d.tags || [];
+        if (!filterTags.some(ft => donorTags.includes(ft))) return false;
+      }
+      return true;
+    });
+
+    if (!debouncedSearchQuery.trim()) return advFiltered;
+    const q = debouncedSearchQuery.trim().toLowerCase();
+    return advFiltered.filter(d =>
+      d.name.toLowerCase().includes(q) ||
+      d.description.toLowerCase().includes(q) ||
+      d.vekalet.toLowerCase().includes(q) ||
+      d.donationType.toLowerCase().includes(q) ||
+      (d.notes || "").toLowerCase().includes(q)
+    );
+  }, [donations, showRemovedFilter, removedFromGroupIds, filterUngrouped, groupedDonorIds, filterStatus, filterCinsi, filterHisseMin, filterHisseMax, filterTags, debouncedSearchQuery]);
+
+  const uniqueDonationTypes = useMemo(() =>
+    Array.from(new Set(
+      donations.map(d => d.donationType.trim()).filter(Boolean)
+    )).sort(),
+    [donations]
+  );
+
+  const virtuosoTableComponents = useMemo(() => ({
+    Table: VirtuosoTable,
+    TableHead: VirtuosoTableHead,
+    TableRow: ({ item: d, ...props }: any) => (
+      <tr
+        {...props}
+        className={`border-b hover:bg-muted/30 transition-colors ${d && selectedIds.has(d.id) ? "bg-primary/5" : ""} ${d?.excluded ? "opacity-40 line-through" : ""}`}
+      />
+    ),
+  }), [selectedIds]);
+
   if (!kesim) return null;
 
   const totalShares = getTotalShares(kesim.donations);
   const requiredAnimals = getRequiredAnimals(kesim.donations);
   const remainingSlots = requiredAnimals * 7 - totalShares;
-
-  const descCountMap = new Map<string, number>();
-  for (const d of kesim.donations) {
-    if (d.excluded) continue;
-    const normalizedDesc = d.description.trim().toLowerCase();
-    if (normalizedDesc) {
-      descCountMap.set(normalizedDesc, (descCountMap.get(normalizedDesc) || 0) + 1);
-    }
-  }
-
-  const groupedDonorIds = new Set<string>();
-  for (const g of kesim.animalGroups) {
-    for (const d of g.donations) {
-      if (d.name.trim()) groupedDonorIds.add(d.id);
-    }
-  }
-  const ungroupedDonors = kesim.donations.filter(d => !d.excluded && !groupedDonorIds.has(d.id));
-
-  const ungroupedEffective = computeEffectiveShares(ungroupedDonors);
-  const ungroupedDescProcessed = new Set<string>();
-  let ungroupedShareCount = 0;
-  for (const d of ungroupedDonors) {
-    const key = d.description.trim().toLowerCase();
-    if (key && ungroupedDescProcessed.has(key)) continue;
-    ungroupedDescProcessed.add(key);
-    ungroupedShareCount += ungroupedEffective.get(d.id) || d.shareCount;
-  }
-
-  const effectiveShareMap = computeEffectiveShares(kesim.donations);
-  const shareDistribution: Record<number, number> = {};
-  for (let i = 1; i <= 7; i++) shareDistribution[i] = 0;
-  const distDescProcessed = new Set<string>();
-  for (const d of kesim.donations) {
-    if (d.excluded) continue;
-    const key = d.description.trim().toLowerCase();
-    if (key && distDescProcessed.has(key)) continue;
-    distDescProcessed.add(key);
-    const eff = effectiveShareMap.get(d.id) || d.shareCount;
-    const sc = Math.max(1, Math.min(7, eff));
-    shareDistribution[sc] = (shareDistribution[sc] || 0) + 1;
-  }
-
-  const groupCompositions = new Map<string, number>();
-  for (const g of kesim.animalGroups) {
-    const filled = g.donations.filter(d => d.name.trim());
-    const shareMap = new Map<string, number>();
-    for (const d of filled) {
-      const key = d.description.trim().toLowerCase() || d.id;
-      shareMap.set(key, (shareMap.get(key) || 0) + 1);
-    }
-    const parts = Array.from(shareMap.values()).sort((a, b) => a - b);
-    const emptySlots = 7 - filled.length;
-    const label = parts.length > 0
-      ? (emptySlots > 0 ? [...parts, `${emptySlots}boş`].join("+") : parts.join("+"))
-      : "Boş";
-    groupCompositions.set(label, (groupCompositions.get(label) || 0) + 1);
-  }
-
-  const preFilteredDonations = showRemovedFilter
-    ? kesim.donations.filter(d => removedFromGroupIds.has(d.id))
-    : filterUngrouped
-    ? kesim.donations.filter(d => !d.excluded && !groupedDonorIds.has(d.id))
-    : kesim.donations;
-
-  const advancedFilteredDonations = preFilteredDonations.filter(d => {
-    if (filterStatus === "active" && d.excluded) return false;
-    if (filterStatus === "excluded" && !d.excluded) return false;
-    if (filterCinsi !== "all" && d.donationType.toLowerCase() !== filterCinsi.toLowerCase()) return false;
-    if (filterHisseMin > 0 && d.shareCount < filterHisseMin) return false;
-    if (filterHisseMax > 0 && d.shareCount > filterHisseMax) return false;
-    if (filterTags.length > 0) {
-      const donorTags = d.tags || [];
-      if (!filterTags.some(ft => donorTags.includes(ft))) return false;
-    }
-    return true;
-  });
-
-  const filteredDonations = searchQuery.trim()
-    ? advancedFilteredDonations.filter(d => {
-        const q = searchQuery.trim().toLowerCase();
-        return d.name.toLowerCase().includes(q) ||
-          d.description.toLowerCase().includes(q) ||
-          d.vekalet.toLowerCase().includes(q) ||
-          d.donationType.toLowerCase().includes(q) ||
-          (d.notes || "").toLowerCase().includes(q);
-      })
-    : advancedFilteredDonations;
-
-  const uniqueDonationTypes = Array.from(new Set(
-    kesim.donations.map(d => d.donationType.trim()).filter(Boolean)
-  )).sort();
 
   const activeFilterCount =
     (filterCinsi !== "all" ? 1 : 0) +
@@ -3312,9 +3407,18 @@ export default function KesimAlaniPage() {
             )}
 
             <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
+              {filteredDonations.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground text-sm">
+                  {searchQuery.trim() ? `"${searchQuery}" için sonuç bulunamadı` : filterUngrouped ? "Tüm bağışçılar gruplara atanmış" : 'Henüz bağışçı eklenmedi. "Toplu Ekle" ile Excel yükleyin veya yapıştırın.'}
+                </div>
+              ) : (
+                <TableVirtuoso
+                  style={{ height: `min(calc(100vh - 280px), ${filteredDonations.length * 45 + 50}px)`, minHeight: 200 }}
+                  data={filteredDonations}
+                  overscan={30}
+                  itemKey={(_idx, d) => d.id}
+                  components={virtuosoTableComponents}
+                  fixedHeaderContent={() => (
                     <tr className="border-b bg-muted/50">
                       <th className="p-2 w-8">
                         <input
@@ -3377,23 +3481,11 @@ export default function KesimAlaniPage() {
                       </th>
                       <th className="p-2 w-10"></th>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filteredDonations.length === 0 ? (
-                      <tr>
-                        <td colSpan={9} className="p-8 text-center text-muted-foreground">
-                          {searchQuery.trim() ? `"${searchQuery}" için sonuç bulunamadı` : filterUngrouped ? "Tüm bağışçılar gruplara atanmış" : 'Henüz bağışçı eklenmedi. "Toplu Ekle" ile Excel yükleyin veya yapıştırın.'}
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredDonations.map((d, idx) => {
-                        const descCount = d.excluded ? 0 : (descCountMap.get(d.description.trim().toLowerCase()) || 1);
-                        const effectiveShare = descCount > 1 ? descCount : d.shareCount;
-                        return (
-                        <tr
-                          key={d.id}
-                          className={`border-b hover:bg-muted/30 transition-colors ${selectedIds.has(d.id) ? "bg-primary/5" : ""} ${d.excluded ? "opacity-40 line-through" : ""}`}
-                        >
+                  )}
+                  itemContent={(idx, d) => {
+                    const descCount = d.excluded ? 0 : (descCountMap.get(d.description.trim().toLowerCase()) || 1);
+                    const effectiveShare = descCount > 1 ? descCount : d.shareCount;
+                    return (<>
                           <td className="p-2">
                             <input
                               type="checkbox"
@@ -3647,13 +3739,10 @@ export default function KesimAlaniPage() {
                               </Button>
                             </div>
                           </td>
-                        </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    </>);
+                  }}
+                />
+              )}
             </Card>
 
           </div>}

@@ -55,6 +55,27 @@ export async function apiUpdateKesimAlani(data: KesimAlani): Promise<KesimAlani>
   });
 }
 
+export async function apiUpdateBulkAnimalGroups(kesimAlaniId: string, animalGroups: KesimAlani["animalGroups"]): Promise<KesimAlani> {
+  return apiFetch<KesimAlani>(`/kesim-alanlari/${kesimAlaniId}/animal-groups/bulk`, {
+    method: "PUT",
+    body: JSON.stringify({ animalGroups }),
+  });
+}
+
+export async function apiUpdateDonationsOnly(data: KesimAlani): Promise<KesimAlani> {
+  return apiFetch<KesimAlani>(`/kesim-alanlari/${data.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ donations: data.donations }),
+  });
+}
+
+export async function apiUpdateGroupsOnly(data: KesimAlani): Promise<KesimAlani> {
+  return apiFetch<KesimAlani>(`/kesim-alanlari/${data.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ animalGroups: data.animalGroups }),
+  });
+}
+
 export async function apiDeleteKesimAlani(id: string): Promise<{ success: boolean }> {
   return apiFetch<{ success: boolean }>(`/kesim-alanlari/${id}`, { method: "DELETE" });
 }
