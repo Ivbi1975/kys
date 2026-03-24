@@ -91,7 +91,7 @@ import {
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
 import { Tag } from "lucide-react";
-import { fetchKesimAlani, apiUpdateKesimAlani, apiUpdateDonationsOnly, apiUpdateBulkAnimalGroups, fetchTags } from "@/lib/api";
+import { fetchKesimAlani, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, fetchTags } from "@/lib/api";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
 import { useHistory } from "@/lib/useHistory";
@@ -435,11 +435,9 @@ export default function KesimAlaniPage() {
   const saveToApi = useCallback((data: KesimAlani, saveType: 'full' | 'donations' | 'groups' = 'full') => {
     setSaveStatus("saving");
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    const apiCall = saveType === 'donations'
-      ? apiUpdateDonationsOnly(data)
-      : saveType === 'groups'
-        ? apiUpdateBulkAnimalGroups(data.id, data.animalGroups)
-        : apiUpdateKesimAlani(data);
+    const apiCall = saveType === 'groups'
+      ? apiUpdateBulkAnimalGroups(data.id, data.animalGroups)
+      : apiUpdateKesimAlani(data);
     apiCall
       .then(() => {
         setSaveStatus("saved");
@@ -545,7 +543,7 @@ export default function KesimAlaniPage() {
       vekalet: newDonation.vekalet.trim(),
       notes: newDonation.notes.trim(),
     };
-    save({ ...kesim, donations: [...kesim.donations, donation] }, `Bağışçı eklendi: ${donation.description || donation.name}`, false, 'donations');
+    save({ ...kesim, donations: [...kesim.donations, donation] }, `Bağışçı eklendi: ${donation.description || donation.name}`);
     setNewDonation({ name: "", description: "", donationType: "", shareCount: 1, vekalet: "", notes: "" });
     setAddDialogOpen(false);
   }
@@ -556,7 +554,7 @@ export default function KesimAlaniPage() {
     save({
       ...kesim,
       donations: kesim.donations.filter((d) => d.id !== id),
-    }, `Bağışçı silindi: ${target?.description || target?.name || ""}`, false, 'donations');
+    }, `Bağışçı silindi: ${target?.description || target?.name || ""}`);
     setSelectedIds((prev) => {
       const next = new Set(prev);
       next.delete(id);
@@ -569,7 +567,7 @@ export default function KesimAlaniPage() {
     save({
       ...kesim,
       donations: kesim.donations.filter((d) => !selectedIds.has(d.id)),
-    }, `${selectedIds.size} bağışçı silindi`, false, 'donations');
+    }, `${selectedIds.size} bağışçı silindi`);
     setSelectedIds(new Set());
   }
 
@@ -602,7 +600,7 @@ export default function KesimAlaniPage() {
           donations: kesim.donations.map((d) =>
             d.description.trim().toLowerCase() === key ? { ...d, excluded: true } : d
           ),
-        }, `Hariç tutuldu: ${target.description}`, false, 'donations');
+        }, `Hariç tutuldu: ${target.description}`);
         return;
       }
     }
@@ -615,7 +613,7 @@ export default function KesimAlaniPage() {
           donations: kesim.donations.map((d) =>
             d.description.trim().toLowerCase() === key ? { ...d, excluded: false } : d
           ),
-        }, `Dahil edildi: ${target.description}`, false, 'donations');
+        }, `Dahil edildi: ${target.description}`);
         return;
       }
     }
@@ -624,7 +622,7 @@ export default function KesimAlaniPage() {
       donations: kesim.donations.map((d) =>
         d.id === id ? { ...d, [field]: value } : d
       ),
-    }, `Bağışçı güncellendi`, false, 'donations');
+    }, `Bağışçı güncellendi`);
   }
 
   function toggleDonationTag(donationId: string, tagId: string) {
@@ -653,7 +651,7 @@ export default function KesimAlaniPage() {
       donations: kesim.donations.map((d) =>
         d.description.trim().toLowerCase() === key ? { ...d, excluded } : d
       ),
-    }, excluded ? `Toplu hariç tutuldu: ${description}` : `Toplu dahil edildi: ${description}`, false, 'donations');
+    }, excluded ? `Toplu hariç tutuldu: ${description}` : `Toplu dahil edildi: ${description}`);
   }
 
   function bulkDeleteByDesc(description: string) {
@@ -664,7 +662,7 @@ export default function KesimAlaniPage() {
       donations: kesim.donations.filter((d) =>
         d.description.trim().toLowerCase() !== key
       ),
-    }, `Toplu silindi: ${description}`, false, 'donations');
+    }, `Toplu silindi: ${description}`);
     setPersonEditDesc(null);
   }
 
@@ -693,7 +691,7 @@ export default function KesimAlaniPage() {
     save({
       ...kesim,
       donations: kesim.donations.filter((d) => !matchIds.has(d.id)),
-    }, `Toplu silindi: ${matches.length} bağışçı (${findDeleteColumnLabel[findDeleteColumn]}: "${findDeleteValue}")`, false, 'donations');
+    }, `Toplu silindi: ${matches.length} bağışçı (${findDeleteColumnLabel[findDeleteColumn]}: "${findDeleteValue}")`);
     setFindDeleteOpen(false);
     setFindDeleteValue("");
     setFindDeleteConfirm(false);
@@ -773,7 +771,7 @@ export default function KesimAlaniPage() {
       }
     }
 
-    save({ ...kesim, donations: [...kesim.donations, ...newDonations] }, `${newDonations.length} bağışçı toplu eklendi`, true, 'donations');
+    save({ ...kesim, donations: [...kesim.donations, ...newDonations] }, `${newDonations.length} bağışçı toplu eklendi`, true);
     resetBulkDialog();
   }
 
@@ -863,7 +861,7 @@ export default function KesimAlaniPage() {
         ? String(aVal).localeCompare(String(bVal), "tr")
         : String(bVal).localeCompare(String(aVal), "tr");
     });
-    save({ ...kesim, donations: sorted }, `Sıralama değiştirildi`, true, 'donations');
+    save({ ...kesim, donations: sorted }, `Sıralama değiştirildi`, true);
   }
 
   function isGroupLocked(groupIdx: number): boolean {
@@ -1148,7 +1146,7 @@ export default function KesimAlaniPage() {
         return { ...d, [bulkEditField]: bulkEditValue };
       }),
     };
-    save(updated, `${selectedIds.size} bağışçı toplu düzenlendi`, false, 'donations');
+    save(updated, `${selectedIds.size} bağışçı toplu düzenlendi`);
     setBulkEditOpen(false);
     setBulkEditValue("");
   }
@@ -2212,7 +2210,7 @@ export default function KesimAlaniPage() {
       description: `${baseName} (2/${splitA + splitB})`,
     };
     updatedDonations.push(newDonor);
-    save({ ...kesim, donations: updatedDonations }, `${baseName}: ${splitA + splitB} hisse → ${splitA}+${splitB} olarak bölündü`, false, 'donations');
+    save({ ...kesim, donations: updatedDonations }, `${baseName}: ${splitA + splitB} hisse → ${splitA}+${splitB} olarak bölündü`);
     setSplitShareDialog(null);
   }
 
