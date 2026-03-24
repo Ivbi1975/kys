@@ -75,6 +75,7 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - Data persisted in PostgreSQL via API server (migrated from localStorage)
 - One-time automatic localStorage → PostgreSQL migration on first load
 - Soft delete for kesim alanları (trash/restore functionality with permanent delete option)
+- Soft delete for donations (Bağış Çöp Kutusu): all deletion paths (single delete, bulk select delete, bulkDeleteByDesc, findDelete) use soft-delete API; deleted donations viewable in "Çöp Kutusu" dialog on kesim-alani page with restore and permanent-delete options; `deletedAt` column on donations table
 - Toast notifications for all user actions (success/error feedback)
 - AlertDialog for destructive operations (modern UI instead of browser confirm())
 - Save button in header with last save timestamp (HH:MM:SS), auto-save on changes + manual save button

@@ -7,7 +7,7 @@ import {
   animalGroupDonationsTable,
   donationTagsTable,
 } from "@workspace/db/schema";
-import { eq, inArray, isNull, isNotNull } from "drizzle-orm";
+import { eq, inArray, isNull, isNotNull, and } from "drizzle-orm";
 import { z } from "zod";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -96,7 +96,7 @@ async function getFullKesimAlani(id: string) {
 
   const [donations, groups] = await Promise.all([
     db.select().from(donationsTable)
-      .where(eq(donationsTable.kesimAlaniId, id))
+      .where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)))
       .orderBy(donationsTable.sortOrder),
     db.select().from(animalGroupsTable)
       .where(eq(animalGroupsTable.kesimAlaniId, id))
@@ -287,7 +287,7 @@ router.put("/kesim-alanlari/:id", async (req, res) => {
       if (donations !== undefined && animalGroups !== undefined) {
         await tx.delete(donationTagsTable).where(
           inArray(donationTagsTable.donationId,
-            tx.select({ id: donationsTable.id }).from(donationsTable).where(eq(donationsTable.kesimAlaniId, id))
+            tx.select({ id: donationsTable.id }).from(donationsTable).where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)))
           )
         );
         await tx.delete(animalGroupDonationsTable).where(
@@ -296,13 +296,13 @@ router.put("/kesim-alanlari/:id", async (req, res) => {
           )
         );
         await tx.delete(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id));
-        await tx.delete(donationsTable).where(eq(donationsTable.kesimAlaniId, id));
+        await tx.delete(donationsTable).where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)));
         await saveDonations(tx, id, donations);
         await saveAnimalGroups(tx, id, animalGroups);
       } else if (donations !== undefined) {
         await tx.delete(donationTagsTable).where(
           inArray(donationTagsTable.donationId,
-            tx.select({ id: donationsTable.id }).from(donationsTable).where(eq(donationsTable.kesimAlaniId, id))
+            tx.select({ id: donationsTable.id }).from(donationsTable).where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)))
           )
         );
         await tx.delete(animalGroupDonationsTable).where(
@@ -310,7 +310,7 @@ router.put("/kesim-alanlari/:id", async (req, res) => {
             tx.select({ id: animalGroupsTable.id }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id))
           )
         );
-        await tx.delete(donationsTable).where(eq(donationsTable.kesimAlaniId, id));
+        await tx.delete(donationsTable).where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)));
         await saveDonations(tx, id, donations);
       } else if (animalGroups !== undefined) {
         await tx.delete(animalGroupDonationsTable).where(
@@ -496,6 +496,7 @@ router.put("/kesim-alanlari/:id/donations/:donationId", async (req, res) => {
 router.delete("/kesim-alanlari/:id/donations/:donationId", async (req, res) => {
   try {
     const { id: kesimAlaniId, donationId } = req.params;
+    const permanent = req.query.permanent === "true";
     const kaCheck = await requireActiveKesimAlani(kesimAlaniId);
     if (kaCheck.error) {
       res.status(kaCheck.status).json({ error: kaCheck.error });
@@ -506,11 +507,86 @@ router.delete("/kesim-alanlari/:id/donations/:donationId", async (req, res) => {
       res.status(404).json({ error: "Bağışçı bulunamadı" });
       return;
     }
-    await db.delete(donationsTable).where(eq(donationsTable.id, donationId));
+    if (permanent) {
+      await db.delete(donationsTable).where(eq(donationsTable.id, donationId));
+    } else {
+      await db.update(donationsTable)
+        .set({ deletedAt: new Date().toISOString() })
+        .where(eq(donationsTable.id, donationId));
+    }
     res.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`DELETE donation ${req.params.donationId} error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/kesim-alanlari/:id/donations/:donationId/restore", async (req, res) => {
+  try {
+    const { id: kesimAlaniId, donationId } = req.params;
+    const [existing] = await db.select().from(donationsTable).where(eq(donationsTable.id, donationId));
+    if (!existing || existing.kesimAlaniId !== kesimAlaniId) {
+      res.status(404).json({ error: "Bağışçı bulunamadı" });
+      return;
+    }
+    if (!existing.deletedAt) {
+      res.status(400).json({ error: "Bu bağışçı zaten aktif" });
+      return;
+    }
+    await db.update(donationsTable)
+      .set({ deletedAt: null })
+      .where(eq(donationsTable.id, donationId));
+    const result = await getFullKesimAlani(kesimAlaniId);
+    res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`POST restore donation ${req.params.donationId} error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/kesim-alanlari/:id/donations/deleted", async (req, res) => {
+  try {
+    const { id: kesimAlaniId } = req.params;
+    const [ka] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, kesimAlaniId));
+    if (!ka) {
+      res.status(404).json({ error: "Kesim alanı bulunamadı" });
+      return;
+    }
+    const deletedDonations = await db.select().from(donationsTable)
+      .where(and(eq(donationsTable.kesimAlaniId, kesimAlaniId), isNotNull(donationsTable.deletedAt)))
+      .orderBy(donationsTable.deletedAt);
+
+    const donationIds = deletedDonations.map(d => d.id);
+    const donationTags = donationIds.length > 0
+      ? await db.select({ donationId: donationTagsTable.donationId, tagId: donationTagsTable.tagId })
+          .from(donationTagsTable).where(inArray(donationTagsTable.donationId, donationIds))
+      : [];
+
+    const tagsByDonation: Record<string, string[]> = {};
+    for (const dt of donationTags) {
+      if (!tagsByDonation[dt.donationId]) tagsByDonation[dt.donationId] = [];
+      tagsByDonation[dt.donationId].push(dt.tagId);
+    }
+
+    const result = deletedDonations.map(d => ({
+      id: d.id,
+      kesimAlaniId: d.kesimAlaniId,
+      name: d.name,
+      description: d.description,
+      donationType: d.donationType,
+      shareCount: d.shareCount,
+      vekalet: d.vekalet,
+      notes: d.notes,
+      excluded: d.excluded,
+      deletedAt: d.deletedAt,
+      tags: tagsByDonation[d.id] || [],
+    }));
+    res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`GET deleted donations for ${req.params.id} error:`, message);
     res.status(500).json({ error: message });
   }
 });

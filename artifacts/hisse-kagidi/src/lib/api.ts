@@ -110,6 +110,36 @@ export async function apiRestoreKesimAlani(id: string): Promise<KesimAlani> {
   return apiFetch<KesimAlani>(`/kesim-alanlari/${id}/restore`, { method: "POST" });
 }
 
+export interface DeletedDonation {
+  id: string;
+  kesimAlaniId: string;
+  name: string;
+  description: string;
+  donationType: string;
+  shareCount: number;
+  vekalet: string;
+  notes: string;
+  excluded: boolean;
+  deletedAt: string;
+  tags: string[];
+}
+
+export async function fetchDeletedDonations(kesimAlaniId: string): Promise<DeletedDonation[]> {
+  return apiFetch<DeletedDonation[]>(`/kesim-alanlari/${kesimAlaniId}/donations/deleted`);
+}
+
+export async function apiSoftDeleteDonation(kesimAlaniId: string, donationId: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/kesim-alanlari/${kesimAlaniId}/donations/${donationId}`, { method: "DELETE" });
+}
+
+export async function apiRestoreDonation(kesimAlaniId: string, donationId: string): Promise<KesimAlani> {
+  return apiFetch<KesimAlani>(`/kesim-alanlari/${kesimAlaniId}/donations/${donationId}/restore`, { method: "POST" });
+}
+
+export async function apiPermanentDeleteDonation(kesimAlaniId: string, donationId: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/kesim-alanlari/${kesimAlaniId}/donations/${donationId}?permanent=true`, { method: "DELETE" });
+}
+
 export async function fetchTags(): Promise<CustomTag[]> {
   return apiFetch<CustomTag[]>("/tags");
 }

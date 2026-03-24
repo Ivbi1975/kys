@@ -88,10 +88,12 @@ import {
   ShoppingBag,
   Package,
   SearchX,
+  RotateCcw,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
 import { Tag } from "lucide-react";
-import { fetchKesimAlani, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags } from "@/lib/api";
+import { fetchKesimAlani, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation } from "@/lib/api";
+import type { DeletedDonation } from "@/lib/api";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
 import { useHistory } from "@/lib/useHistory";
@@ -253,6 +255,11 @@ export default function KesimAlaniPage() {
   const [findDeleteColumn, setFindDeleteColumn] = useState<"name" | "description" | "donationType" | "vekalet" | "notes">("description");
   const [findDeleteValue, setFindDeleteValue] = useState("");
   const [findDeleteConfirm, setFindDeleteConfirm] = useState(false);
+
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [trashItems, setTrashItems] = useState<DeletedDonation[]>([]);
+  const [trashLoading, setTrashLoading] = useState(false);
+  const [trashPermanentConfirm, setTrashPermanentConfirm] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -588,27 +595,52 @@ export default function KesimAlaniPage() {
     setAddDialogOpen(false);
   }
 
-  function deleteDonation(id: string) {
+  async function deleteDonation(id: string) {
     if (!kesim) return;
     const target = kesim.donations.find(d => d.id === id);
-    save({
-      ...kesim,
-      donations: kesim.donations.filter((d) => d.id !== id),
-    }, `Bağışçı silindi: ${target?.description || target?.name || ""}`);
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
+    try {
+      await apiSoftDeleteDonation(kesim.id, id);
+      const updated = {
+        ...kesim,
+        donations: kesim.donations.filter((d) => d.id !== id),
+        animalGroups: kesim.animalGroups.map(g => ({
+          ...g,
+          donations: g.donations.filter(d => d.id !== id),
+        })),
+      };
+      setKesim(updated);
+      history.push(updated, `Bağışçı silindi: ${target?.description || target?.name || ""}`);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      toast({ title: "Çöp kutusuna taşındı", description: `"${target?.description || target?.name || id}" çöp kutusuna taşındı.` });
+    } catch (err) {
+      toast({ title: "Silme hatası", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+    }
   }
 
-  function deleteSelected() {
+  async function deleteSelected() {
     if (!kesim || selectedIds.size === 0) return;
-    save({
-      ...kesim,
-      donations: kesim.donations.filter((d) => !selectedIds.has(d.id)),
-    }, `${selectedIds.size} bağışçı silindi`);
-    setSelectedIds(new Set());
+    const ids = Array.from(selectedIds);
+    try {
+      await Promise.all(ids.map(id => apiSoftDeleteDonation(kesim.id, id)));
+      const updated = {
+        ...kesim,
+        donations: kesim.donations.filter((d) => !selectedIds.has(d.id)),
+        animalGroups: kesim.animalGroups.map(g => ({
+          ...g,
+          donations: g.donations.filter(d => !selectedIds.has(d.id)),
+        })),
+      };
+      setKesim(updated);
+      history.push(updated, `${ids.length} bağışçı silindi`);
+      setSelectedIds(new Set());
+      toast({ title: "Çöp kutusuna taşındı", description: `${ids.length} bağışçı çöp kutusuna taşındı.` });
+    } catch (err) {
+      toast({ title: "Silme hatası", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+    }
   }
 
   function toggleSelect(id: string) {
@@ -697,16 +729,29 @@ export default function KesimAlaniPage() {
     }, excluded ? `Toplu hariç tutuldu: ${description}` : `Toplu dahil edildi: ${description}`);
   }
 
-  function bulkDeleteByDesc(description: string) {
+  async function bulkDeleteByDesc(description: string) {
     if (!kesim) return;
     const key = description.trim().toLowerCase();
-    save({
-      ...kesim,
-      donations: kesim.donations.filter((d) =>
-        d.description.trim().toLowerCase() !== key
-      ),
-    }, `Toplu silindi: ${description}`);
-    setPersonEditDesc(null);
+    const toDelete = kesim.donations.filter(d => d.description.trim().toLowerCase() === key);
+    if (toDelete.length === 0) return;
+    try {
+      await Promise.all(toDelete.map(d => apiSoftDeleteDonation(kesim.id, d.id)));
+      const deleteIds = new Set(toDelete.map(d => d.id));
+      const updated = {
+        ...kesim,
+        donations: kesim.donations.filter(d => !deleteIds.has(d.id)),
+        animalGroups: kesim.animalGroups.map(g => ({
+          ...g,
+          donations: g.donations.filter(d => !deleteIds.has(d.id)),
+        })),
+      };
+      setKesim(updated);
+      history.push(updated, `Toplu silindi: ${description}`);
+      setPersonEditDesc(null);
+      toast({ title: "Çöp kutusuna taşındı", description: `${toDelete.length} bağışçı çöp kutusuna taşındı.` });
+    } catch (err) {
+      toast({ title: "Silme hatası", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+    }
   }
 
   const findDeleteColumnLabel: Record<string, string> = {
@@ -726,18 +771,68 @@ export default function KesimAlaniPage() {
     });
   }
 
-  function executeFindDelete() {
+  async function executeFindDelete() {
     if (!kesim) return;
     const matches = getFindDeleteMatches();
     if (matches.length === 0) return;
     const matchIds = new Set(matches.map((d) => d.id));
-    save({
-      ...kesim,
-      donations: kesim.donations.filter((d) => !matchIds.has(d.id)),
-    }, `Toplu silindi: ${matches.length} bağışçı (${findDeleteColumnLabel[findDeleteColumn]}: "${findDeleteValue}")`);
-    setFindDeleteOpen(false);
-    setFindDeleteValue("");
-    setFindDeleteConfirm(false);
+    try {
+      await Promise.all(matches.map(d => apiSoftDeleteDonation(kesim.id, d.id)));
+      const updated = {
+        ...kesim,
+        donations: kesim.donations.filter((d) => !matchIds.has(d.id)),
+        animalGroups: kesim.animalGroups.map(g => ({
+          ...g,
+          donations: g.donations.filter(d => !matchIds.has(d.id)),
+        })),
+      };
+      setKesim(updated);
+      history.push(updated, `Toplu silindi: ${matches.length} bağışçı (${findDeleteColumnLabel[findDeleteColumn]}: "${findDeleteValue}")`);
+      setFindDeleteOpen(false);
+      setFindDeleteValue("");
+      setFindDeleteConfirm(false);
+      toast({ title: "Çöp kutusuna taşındı", description: `${matches.length} bağışçı çöp kutusuna taşındı.` });
+    } catch (err) {
+      toast({ title: "Silme hatası", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+    }
+  }
+
+  async function openTrash() {
+    if (!kesim) return;
+    setTrashOpen(true);
+    setTrashLoading(true);
+    try {
+      const items = await fetchDeletedDonations(kesim.id);
+      setTrashItems(items);
+    } catch (err) {
+      toast({ title: "Çöp kutusu yüklenemedi", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+    } finally {
+      setTrashLoading(false);
+    }
+  }
+
+  async function restoreDonation(donationId: string) {
+    if (!kesim) return;
+    try {
+      const updated = await apiRestoreDonation(kesim.id, donationId);
+      setKesim(updated);
+      setTrashItems(prev => prev.filter(d => d.id !== donationId));
+      toast({ title: "Geri yüklendi", description: "Bağışçı başarıyla geri yüklendi." });
+    } catch (err) {
+      toast({ title: "Geri yükleme hatası", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+    }
+  }
+
+  async function permanentDeleteDonation(donationId: string) {
+    if (!kesim) return;
+    try {
+      await apiPermanentDeleteDonation(kesim.id, donationId);
+      setTrashItems(prev => prev.filter(d => d.id !== donationId));
+      setTrashPermanentConfirm(null);
+      toast({ title: "Kalıcı olarak silindi" });
+    } catch (err) {
+      toast({ title: "Kalıcı silme hatası", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+    }
   }
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -3230,6 +3325,11 @@ export default function KesimAlaniPage() {
                   </DialogContent>
                 </Dialog>
 
+                <Button variant="outline" size="sm" onClick={openTrash} title="Bağış Çöp Kutusu">
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Çöp Kutusu
+                </Button>
+
                 <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
                   <DialogTrigger asChild>
                     <Button size="sm">
@@ -5108,7 +5208,7 @@ export default function KesimAlaniPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Toplu Silme Onayı</AlertDialogTitle>
             <AlertDialogDescription>
-              "{personBulkDeleteConfirm}" adlı kişinin tüm kayıtları silinecek. Bu işlem geri alınamaz. Devam etmek istiyor musunuz?
+              "{personBulkDeleteConfirm}" adlı kişinin tüm kayıtları çöp kutusuna taşınacak. Çöp kutusundan geri yükleyebilirsiniz. Devam etmek istiyor musunuz?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -5225,6 +5325,101 @@ export default function KesimAlaniPage() {
           <ChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-300" />
         </button>
       )}
+
+      {/* Trash Bin Dialog */}
+      <Dialog open={trashOpen} onOpenChange={setTrashOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-destructive" />
+              Çöp Kutusu — Silinen Bağışçılar
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto mt-2">
+            {trashLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : trashItems.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Trash2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Çöp kutusu boş</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {trashItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm truncate">{item.description || item.name || "—"}</span>
+                        {item.name && item.name !== item.description && (
+                          <span className="text-xs text-muted-foreground truncate">({item.name})</span>
+                        )}
+                        {item.donationType && (
+                          <span className="text-xs bg-muted px-1.5 py-0.5 rounded">{item.donationType}</span>
+                        )}
+                        {item.shareCount > 1 && (
+                          <span className="text-xs text-muted-foreground">{item.shareCount} hisse</span>
+                        )}
+                      </div>
+                      {item.deletedAt && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Silindi: {new Date(item.deletedAt).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => restoreDonation(item.id)}
+                        title="Geri Yükle"
+                      >
+                        <RotateCcw className="w-3 h-3 mr-1" />
+                        Geri Yükle
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                        onClick={() => setTrashPermanentConfirm(item.id)}
+                        title="Kalıcı Sil"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Permanent Delete Confirmation */}
+      <AlertDialog open={!!trashPermanentConfirm} onOpenChange={(open) => { if (!open) setTrashPermanentConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Kalıcı olarak sil?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bu bağışçı kalıcı olarak silinecek ve geri alınamaz. Devam etmek istiyor musunuz?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => trashPermanentConfirm && permanentDeleteDonation(trashPermanentConfirm)}
+            >
+              Kalıcı Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
