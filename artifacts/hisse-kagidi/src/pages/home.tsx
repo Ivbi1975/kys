@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ChevronRight, ChevronDown, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, PieChart, RotateCcw, Clock, Calendar, FolderOpen, FolderPlus, MoveRight, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronDown, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, RotateCcw, Clock, Calendar, FolderOpen, FolderPlus, MoveRight } from "lucide-react";
 import type { KesimAlani, CustomTag, Project } from "@/lib/types";
 import {
   fetchKesimAlanlari,
@@ -53,7 +53,6 @@ import {
   restoreProject,
   fetchDeletedProjects,
   moveKesimAlani,
-  fetchCatismaTespiti,
 } from "@/lib/api";
 import { useTheme } from "@/lib/useTheme";
 import type { ThemeMode } from "@/lib/useTheme";
@@ -83,7 +82,6 @@ export default function Home() {
   const [editTagColor, setEditTagColor] = useState("");
   const [loading, setLoading] = useState(true);
   const [migrationDone, setMigrationDone] = useState(false);
-  const [conflictCount, setConflictCount] = useState(0);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string; hasDonations: boolean } | null>(null);
   const [permanentDeleteConfirm, setPermanentDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
@@ -117,10 +115,6 @@ export default function Home() {
         setGlobalTags(tags);
         setLogoPreview(logo);
         setProjects(projs);
-        try {
-          const catisma = await fetchCatismaTespiti();
-          setConflictCount(catisma.totalConflicts);
-        } catch {}
         try {
           const [deleted, deletedProjs] = await Promise.all([
             fetchDeletedKesimAlanlari(),
@@ -1005,20 +999,6 @@ export default function Home() {
             </DialogContent>
           </Dialog>
 
-          <Button
-            variant="outline"
-            size="default"
-            className="relative"
-            onClick={() => setLocation("/catisma-tespiti")}
-          >
-            <AlertTriangle className="w-4 h-4 mr-2 text-amber-500" />
-            Çatışma Tespiti
-            {conflictCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1">
-                {conflictCount}
-              </span>
-            )}
-          </Button>
         </div>
 
         {kesimAlanlari.length === 0 && projects.length === 0 ? (
@@ -1043,57 +1023,6 @@ export default function Home() {
           </Card>
         ) : (
           <>
-            {kesimAlanlari.length >= 1 && (() => {
-              const totals = kesimAlanlari.reduce((acc, k) => {
-                const shares = getTotalShares(k.donations);
-                const animals = getRequiredAnimals(k.donations);
-                const activeDonors = k.donations.filter(d => !d.excluded).length;
-                const totalSlots = k.animalGroups.length * 7;
-                const filledSlots = k.animalGroups.reduce(
-                  (s, g) => s + g.donations.filter(d => d.name.trim() !== "").length, 0
-                );
-                return {
-                  donors: acc.donors + activeDonors,
-                  shares: acc.shares + shares,
-                  animals: acc.animals + animals,
-                  grouped: acc.grouped + k.animalGroups.length,
-                  totalSlots: acc.totalSlots + totalSlots,
-                  filledSlots: acc.filledSlots + filledSlots,
-                };
-              }, { donors: 0, shares: 0, animals: 0, grouped: 0, totalSlots: 0, filledSlots: 0 });
-              const occupancy = totals.totalSlots > 0 ? Math.round((totals.filledSlots / totals.totalSlots) * 100) : 0;
-              return (
-                <Card className="p-4 mb-4 bg-primary/5 border-primary/20">
-                  <div className="flex items-center gap-2 mb-3">
-                    <PieChart className="w-4 h-4 text-primary" />
-                    <h3 className="text-sm font-semibold text-foreground">Genel Özet</h3>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-primary">{totals.donors}</div>
-                      <div className="text-xs text-muted-foreground">Aktif Bağışçı</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-primary">{totals.shares}</div>
-                      <div className="text-xs text-muted-foreground">Toplam Hisse</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-primary">{totals.animals}</div>
-                      <div className="text-xs text-muted-foreground">Gereken Hayvan</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-primary">{totals.grouped}</div>
-                      <div className="text-xs text-muted-foreground">Gruplandırılmış</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-primary">%{occupancy}</div>
-                      <div className="text-xs text-muted-foreground">Doluluk Oranı</div>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })()}
-
             {projects.map(project => {
               const projectKesimAlanlari = kesimAlanlari.filter(k => k.projectId === project.id);
               const isCollapsed = collapsedProjects.has(project.id);

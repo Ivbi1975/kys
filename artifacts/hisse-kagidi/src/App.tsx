@@ -8,7 +8,6 @@ import PrintPage from "@/pages/print";
 import NotFound from "@/pages/not-found";
 import NotDuzenlemePage from "@/pages/not-duzenleme";
 import AiPromptAyarlariPage from "@/pages/ai-prompt-ayarlari";
-import CatismaTespitiPage from "@/pages/catisma-tespiti";
 import ProjeDetayPage from "@/pages/proje-detay";
 import { useTheme } from "@/lib/useTheme";
 import PasswordGate from "@/components/PasswordGate";
@@ -23,7 +22,6 @@ function Router() {
       <Route path="/print/:id" component={PrintPage} />
       <Route path="/not-duzenleme/:id" component={NotDuzenlemePage} />
       <Route path="/ai-prompt-ayarlari" component={AiPromptAyarlariPage} />
-      <Route path="/catisma-tespiti" component={CatismaTespitiPage} />
       <Route path="/proje/:id" component={ProjeDetayPage} />
       <Route component={NotFound} />
     </Switch>
