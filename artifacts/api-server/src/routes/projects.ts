@@ -47,12 +47,12 @@ router.get("/projects", async (_req, res) => {
       for (const pid of projectIds) {
         const kesimIds = projectKesimIds[pid] || [];
         if (kesimIds.length === 0) {
-          statsMap[pid] = { donorCount: 0, shareCount: 0, groupCount: 0 };
+          statsMap[pid] = { donorCount: 0, shareCount: 0, groupCount: 0, kesildiCount: 0, lastKesildiAt: null };
           continue;
         }
 
         const kesimIdList = sql`ARRAY[${sql.join(kesimIds.map(id => sql`${id}`), sql`, `)}]`;
-        const [donorStats, groupStats] = await Promise.all([
+        const [donorStats, groupStats, kesildiStats] = await Promise.all([
           db
             .select({
               count: sql<number>`count(*)::int`,
@@ -70,19 +70,28 @@ router.get("/projects", async (_req, res) => {
             .select({ count: sql<number>`count(*)::int` })
             .from(animalGroupsTable)
             .where(sql`${animalGroupsTable.kesimAlaniId} = ANY(${kesimIdList})`),
+          db
+            .select({
+              kesildiCount: sql<number>`count(*) filter (where ${animalGroupsTable.kesildi} = true)::int`,
+              lastKesildiAt: sql<string | null>`max(${animalGroupsTable.kesildiAt})`,
+            })
+            .from(animalGroupsTable)
+            .where(sql`${animalGroupsTable.kesimAlaniId} = ANY(${kesimIdList})`),
         ]);
 
         statsMap[pid] = {
           donorCount: donorStats[0]?.count ?? 0,
           shareCount: donorStats[0]?.shares ?? 0,
           groupCount: groupStats[0]?.count ?? 0,
+          kesildiCount: kesildiStats[0]?.kesildiCount ?? 0,
+          lastKesildiAt: kesildiStats[0]?.lastKesildiAt ?? null,
         };
       }
     }
 
     const result = projects.map((p) => ({
       ...p,
-      stats: statsMap[p.id] || { donorCount: 0, shareCount: 0, groupCount: 0 },
+      stats: statsMap[p.id] || { donorCount: 0, shareCount: 0, groupCount: 0, kesildiCount: 0, lastKesildiAt: null },
     }));
 
     res.json(result);

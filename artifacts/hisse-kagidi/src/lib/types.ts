@@ -47,6 +47,8 @@ export interface ProjectStats {
   donorCount: number;
   shareCount: number;
   groupCount: number;
+  kesildiCount: number;
+  lastKesildiAt: string | null;
 }
 
 export interface Project {
