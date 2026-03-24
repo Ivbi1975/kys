@@ -45,6 +45,8 @@ import {
   ChevronUp,
   MoveRight,
   Loader2,
+  Link2,
+  ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { KesimAlani, Project } from "@/lib/types";
@@ -57,6 +59,7 @@ import {
   deleteProject,
   fetchCatismaTespiti,
   transferDonation,
+  generateTrackingToken,
 } from "@/lib/api";
 import type { Conflict, ConflictEntry } from "@/lib/api";
 import { getTotalShares, getRequiredAnimals } from "@/lib/grouping";
@@ -320,6 +323,36 @@ export default function ProjeDetayPage() {
     }
   }
 
+  async function handleCopyTrackingLink(e: React.MouseEvent, k: KesimAlani) {
+    e.stopPropagation();
+    try {
+      let token = k.trackingToken;
+      if (!token) {
+        token = await generateTrackingToken(k.id);
+        setKesimAlanlari(prev => prev.map(ka => ka.id === k.id ? { ...ka, trackingToken: token } : ka));
+      }
+      const url = `${window.location.origin}/hisse-kagidi/takip/${token}`;
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Link kopyalandı", description: "Takip linki panoya kopyalandı." });
+    } catch (err) {
+      toast({ title: "Hata", description: "Link kopyalanamadı.", variant: "destructive" });
+    }
+  }
+
+  async function handleOpenTrackingPage(e: React.MouseEvent, k: KesimAlani) {
+    e.stopPropagation();
+    try {
+      let token = k.trackingToken;
+      if (!token) {
+        token = await generateTrackingToken(k.id);
+        setKesimAlanlari(prev => prev.map(ka => ka.id === k.id ? { ...ka, trackingToken: token } : ka));
+      }
+      window.open(`/hisse-kagidi/takip/${token}`, "_blank");
+    } catch (err) {
+      toast({ title: "Hata", description: "Takip sayfası açılamadı.", variant: "destructive" });
+    }
+  }
+
   const totals = kesimAlanlari.reduce(
     (acc, k) => {
       const shares = getTotalShares(k.donations);
@@ -509,6 +542,24 @@ export default function ProjeDetayPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        title="Takip linkini kopyala"
+                        onClick={(e) => handleCopyTrackingLink(e, k)}
+                      >
+                        <Link2 className="w-4 h-4 text-muted-foreground" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        title="Takip sayfasını aç"
+                        onClick={(e) => handleOpenTrackingPage(e, k)}
+                      >
+                        <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"

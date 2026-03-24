@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ChevronRight, ChevronDown, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, RotateCcw, Clock, Calendar, FolderOpen, FolderPlus, MoveRight } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronDown, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, RotateCcw, Clock, Calendar, FolderOpen, FolderPlus, MoveRight, Link2, ExternalLink } from "lucide-react";
 import type { KesimAlani, CustomTag, Project } from "@/lib/types";
 import {
   fetchKesimAlanlari,
@@ -53,6 +53,7 @@ import {
   restoreProject,
   fetchDeletedProjects,
   moveKesimAlani,
+  generateTrackingToken,
 } from "@/lib/api";
 import { useTheme } from "@/lib/useTheme";
 import type { ThemeMode } from "@/lib/useTheme";
@@ -560,6 +561,36 @@ export default function Home() {
     setMoveDialogOpen(true);
   }
 
+  async function handleCopyTrackingLink(e: React.MouseEvent, k: KesimAlani) {
+    e.stopPropagation();
+    try {
+      let token = k.trackingToken;
+      if (!token) {
+        token = await generateTrackingToken(k.id);
+        setKesimAlanlari(prev => prev.map(ka => ka.id === k.id ? { ...ka, trackingToken: token } : ka));
+      }
+      const url = `${window.location.origin}/hisse-kagidi/takip/${token}`;
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Link kopyalandı", description: "Takip linki panoya kopyalandı." });
+    } catch (err) {
+      toast({ title: "Hata", description: "Link kopyalanamadı.", variant: "destructive" });
+    }
+  }
+
+  async function handleOpenTrackingPage(e: React.MouseEvent, k: KesimAlani) {
+    e.stopPropagation();
+    try {
+      let token = k.trackingToken;
+      if (!token) {
+        token = await generateTrackingToken(k.id);
+        setKesimAlanlari(prev => prev.map(ka => ka.id === k.id ? { ...ka, trackingToken: token } : ka));
+      }
+      window.open(`/hisse-kagidi/takip/${token}`, "_blank");
+    } catch (err) {
+      toast({ title: "Hata", description: "Takip sayfası açılamadı.", variant: "destructive" });
+    }
+  }
+
   function renderKesimCard(k: KesimAlani) {
     const shares = getTotalShares(k.donations);
     const animals = getRequiredAnimals(k.donations);
@@ -597,6 +628,24 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              title="Takip linkini kopyala"
+              onClick={(e) => handleCopyTrackingLink(e, k)}
+            >
+              <Link2 className="w-4 h-4 text-muted-foreground" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              title="Takip sayfasını aç"
+              onClick={(e) => handleOpenTrackingPage(e, k)}
+            >
+              <ExternalLink className="w-4 h-4 text-muted-foreground" />
+            </Button>
             <Button
               variant="ghost"
               size="sm"
