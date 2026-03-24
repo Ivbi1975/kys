@@ -91,7 +91,7 @@ import {
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
 import { Tag } from "lucide-react";
-import { fetchKesimAlani, apiUpdateKesimAlani, apiUpdateDonationsOnly, apiUpdateGroupsOnly, fetchTags } from "@/lib/api";
+import { fetchKesimAlani, apiUpdateKesimAlani, apiUpdateDonationsOnly, apiUpdateBulkAnimalGroups, fetchTags } from "@/lib/api";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
 import { useHistory } from "@/lib/useHistory";
@@ -438,7 +438,7 @@ export default function KesimAlaniPage() {
     const apiCall = saveType === 'donations'
       ? apiUpdateDonationsOnly(data)
       : saveType === 'groups'
-        ? apiUpdateGroupsOnly(data)
+        ? apiUpdateBulkAnimalGroups(data.id, data.animalGroups)
         : apiUpdateKesimAlani(data);
     apiCall
       .then(() => {
