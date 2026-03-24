@@ -73,6 +73,8 @@ interface LocalDonation {
   donationType: string;
   vekalet: string;
   notes: string;
+  aiCategories?: string[];
+  aiWarnings?: string;
 }
 
 interface AiResult extends AiClassificationResult {
@@ -188,17 +190,33 @@ export default function NotDuzenlemePage() {
       const allDonations: LocalDonation[] = [];
       for (const d of data.donations) {
         if (!allDonations.find(x => x.id === d.id)) {
-          allDonations.push({ id: d.id, name: d.name, description: d.description, donationType: d.donationType, vekalet: d.vekalet, notes: d.notes });
+          allDonations.push({ id: d.id, name: d.name, description: d.description, donationType: d.donationType, vekalet: d.vekalet, notes: d.notes, aiCategories: d.aiCategories, aiWarnings: d.aiWarnings });
         }
       }
       for (const g of data.animalGroups) {
         for (const d of g.donations) {
           if (!allDonations.find(x => x.id === d.id)) {
-            allDonations.push({ id: d.id, name: d.name, description: d.description, donationType: d.donationType, vekalet: d.vekalet, notes: d.notes });
+            allDonations.push({ id: d.id, name: d.name, description: d.description, donationType: d.donationType, vekalet: d.vekalet, notes: d.notes, aiCategories: d.aiCategories, aiWarnings: d.aiWarnings });
           }
         }
       }
       setDonations(allDonations);
+      const initialAiResults = new Map<string, AiResult>();
+      for (const d of allDonations) {
+        if (d.aiCategories && d.aiCategories.length > 0 || (d.aiWarnings && d.aiWarnings.trim() !== "")) {
+          initialAiResults.set(d.id, {
+            donationId: d.id,
+            categories: d.aiCategories || [],
+            warnings: d.aiWarnings || "",
+            requests: "",
+            summary: "",
+            donationType: d.donationType,
+          });
+        }
+      }
+      if (initialAiResults.size > 0) {
+        setAiResults(initialAiResults);
+      }
       historyRef.current = [allDonations];
       historyIndexRef.current = 0;
       updateHistoryState();
