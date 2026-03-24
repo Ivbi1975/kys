@@ -15,6 +15,13 @@
       "when": 1774300000000,
       "tag": "0001_donations_deleted_at",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774361702290,
+      "tag": "0002_overjoyed_thor",
+      "breakpoints": true
     }
   ]
 }
