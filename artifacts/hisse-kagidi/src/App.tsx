@@ -11,6 +11,7 @@ import AiPromptAyarlariPage from "@/pages/ai-prompt-ayarlari";
 import CatismaTespitiPage from "@/pages/catisma-tespiti";
 import ProjeDetayPage from "@/pages/proje-detay";
 import { useTheme } from "@/lib/useTheme";
+import PasswordGate from "@/components/PasswordGate";
 
 const queryClient = new QueryClient();
 
@@ -32,14 +33,16 @@ function Router() {
 function App() {
   useTheme();
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <PasswordGate>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </PasswordGate>
   );
 }
 
