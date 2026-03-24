@@ -152,6 +152,7 @@ export default function KesimAlaniPage() {
   const [hasHeaderRow, setHasHeaderRow] = useState(true);
   const [bulkStep, setBulkStep] = useState<"input" | "mapping" | "review">("input");
   const [bulkReviewRows, setBulkReviewRows] = useState<{ idx: number; row: string[]; rawShareCount: number; selected: boolean; groupKey: string; groupTotal: number }[]>([]);
+  const [bulkReviewExpanded, setBulkReviewExpanded] = useState<Set<string>>(new Set());
   const [jumpDialogOpen, setJumpDialogOpen] = useState(false);
   const [jumpDialogValue, setJumpDialogValue] = useState("");
 
@@ -1023,6 +1024,7 @@ export default function KesimAlaniPage() {
     setColumnMappings([]);
     setHasHeaderRow(true);
     setBulkReviewRows([]);
+    setBulkReviewExpanded(new Set());
   }
 
   async function handleAutoGroup() {
@@ -3227,12 +3229,13 @@ export default function KesimAlaniPage() {
 
                     {bulkStep === "review" && (() => {
                       const groupKeys = [...new Set(bulkReviewRows.map(r => r.groupKey))];
+                      const selectedGroupCount = groupKeys.filter(gk => bulkReviewRows.filter(r => r.groupKey === gk).every(r => r.selected)).length;
                       return (
                       <div className="flex flex-col min-h-0 flex-1 pt-4">
                         <div className="flex items-center gap-3 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg mb-4 flex-shrink-0">
                           <AlertTriangle className="w-5 h-5 text-orange-500 flex-shrink-0" />
                           <p className="text-sm">
-                            Aşağıdaki vekaleti verenlerin toplam hisse sayısı 50'den fazla. Bunlar muhtemelen hatalı verilerdir. Dahil etmek istemediklerinizi işaretli bırakın.
+                            Aşağıdaki vekaleti verenlerin toplam hisse sayısı 50'den fazla. Dahil etmek istemediklerinizi işaretli bırakın.
                           </p>
                         </div>
 
@@ -3252,61 +3255,92 @@ export default function KesimAlaniPage() {
                             Tümünü Kaldır
                           </Button>
                           <span className="text-xs text-muted-foreground ml-auto">
-                            {bulkReviewRows.filter(r => r.selected).length} / {bulkReviewRows.length} satır dahil edilmeyecek
+                            {selectedGroupCount} / {groupKeys.length} grup dahil edilmeyecek
                           </span>
                         </div>
 
                         <div className="border rounded-lg overflow-hidden min-h-0 flex-1">
-                          <div className="overflow-auto max-h-full">
+                          <div className="overflow-auto max-h-full divide-y">
                             {groupKeys.map((gk) => {
                               const groupRows = bulkReviewRows.filter(r => r.groupKey === gk);
                               const groupTotal = groupRows[0]?.groupTotal ?? 0;
                               const descColIdx = columnMappings.indexOf("description");
                               const displayName = descColIdx >= 0 ? String(groupRows[0]?.row[descColIdx] ?? "").trim() : gk;
                               const allSelected = groupRows.every(r => r.selected);
+                              const isExpanded = bulkReviewExpanded.has(gk);
                               return (
-                                <div key={gk} className="border-b last:border-0">
-                                  <div className="flex items-center gap-2 px-3 py-2 bg-orange-500/5">
+                                <div key={gk}>
+                                  <div className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors ${allSelected ? "bg-red-500/5" : ""}`}>
                                     <input
                                       type="checkbox"
                                       checked={allSelected}
-                                      onChange={() => {
+                                      onChange={(e) => {
+                                        e.stopPropagation();
                                         const newVal = !allSelected;
                                         setBulkReviewRows(prev => prev.map(r => r.groupKey === gk ? { ...r, selected: newVal } : r));
                                       }}
-                                      className="rounded"
+                                      className="rounded flex-shrink-0"
                                     />
-                                    <span className="text-sm font-semibold flex-1">{displayName}</span>
-                                    <span className="text-xs font-mono text-red-600 font-bold">
-                                      Toplam: {groupTotal} hisse ({groupRows.length} satır)
+                                    <button
+                                      className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                                      onClick={() => {
+                                        setBulkReviewExpanded(prev => {
+                                          const next = new Set(prev);
+                                          if (next.has(gk)) next.delete(gk); else next.add(gk);
+                                          return next;
+                                        });
+                                      }}
+                                    >
+                                      {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
+                                      <span className="text-sm font-medium truncate flex-1">{displayName}</span>
+                                    </button>
+                                    <span className={`text-xs font-mono font-bold flex-shrink-0 ${allSelected ? "text-red-600" : "text-muted-foreground"}`}>
+                                      {groupTotal} hisse
+                                    </span>
+                                    <span className="text-xs text-muted-foreground flex-shrink-0">
+                                      ({groupRows.length} satır)
                                     </span>
                                   </div>
-                                  <table className="w-full text-sm">
-                                    <tbody>
-                                      {groupRows.map((item) => {
-                                        const globalIdx = bulkReviewRows.indexOf(item);
-                                        const nameColIdx = columnMappings.indexOf("name");
-                                        const name = nameColIdx >= 0 ? String(item.row[nameColIdx] ?? "").trim() : "";
-                                        return (
-                                          <tr key={item.idx} className={`border-b last:border-0 ${item.selected ? "bg-red-500/5" : ""}`}>
-                                            <td className="p-2 pl-8 w-10 text-center">
-                                              <input
-                                                type="checkbox"
-                                                checked={item.selected}
-                                                onChange={() => {
-                                                  setBulkReviewRows(prev => prev.map((r, ri) => ri === globalIdx ? { ...r, selected: !r.selected } : r));
-                                                }}
-                                                className="rounded"
-                                              />
-                                            </td>
-                                            <td className="p-2 text-xs text-muted-foreground w-12">{item.idx + 1}</td>
-                                            <td className="p-2 text-sm font-medium">{name || "—"}</td>
-                                            <td className="p-2 text-sm text-right font-mono">{item.rawShareCount} hisse</td>
+                                  {isExpanded && (
+                                    <div className="bg-muted/20 border-t">
+                                      <table className="w-full text-sm">
+                                        <thead>
+                                          <tr className="border-b bg-muted/30">
+                                            <th className="p-1.5 pl-10 w-10 text-center text-xs font-medium text-muted-foreground">Dahil</th>
+                                            <th className="p-1.5 text-left text-xs font-medium text-muted-foreground">Adına Kesilen</th>
+                                            <th className="p-1.5 text-left text-xs font-medium text-muted-foreground">Cinsi</th>
+                                            <th className="p-1.5 text-right text-xs font-medium text-muted-foreground">Hisse</th>
                                           </tr>
-                                        );
-                                      })}
-                                    </tbody>
-                                  </table>
+                                        </thead>
+                                        <tbody>
+                                          {groupRows.map((item) => {
+                                            const globalIdx = bulkReviewRows.indexOf(item);
+                                            const nameColIdx = columnMappings.indexOf("name");
+                                            const typeColIdx = columnMappings.indexOf("donationType");
+                                            const name = nameColIdx >= 0 ? String(item.row[nameColIdx] ?? "").trim() : "";
+                                            const dtype = typeColIdx >= 0 ? String(item.row[typeColIdx] ?? "").trim() : "";
+                                            return (
+                                              <tr key={item.idx} className={`border-b last:border-0 ${item.selected ? "bg-red-500/5 text-muted-foreground line-through" : ""}`}>
+                                                <td className="p-1.5 pl-10 text-center">
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={!item.selected}
+                                                    onChange={() => {
+                                                      setBulkReviewRows(prev => prev.map((r, ri) => ri === globalIdx ? { ...r, selected: !r.selected } : r));
+                                                    }}
+                                                    className="rounded"
+                                                  />
+                                                </td>
+                                                <td className="p-1.5 text-sm">{name || "—"}</td>
+                                                <td className="p-1.5 text-sm">{dtype || "—"}</td>
+                                                <td className="p-1.5 text-sm text-right font-mono">{item.rawShareCount}</td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })}
