@@ -85,6 +85,7 @@ export default function NotDuzenlemePage() {
   const aiStopRef = useRef(false);
   const [aiResults, setAiResults] = useState<Map<string, AiResult>>(new Map());
   const [aiProgress, setAiProgress] = useState({ done: 0, total: 0 });
+  const [aiSaveStatus, setAiSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [batchSize, setBatchSize] = useState(25);
   const [maxCount, setMaxCount] = useState<"all" | number>("all");
   const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
@@ -200,6 +201,7 @@ export default function NotDuzenlemePage() {
     setAiRunning(true);
     setAiStopped(false);
     setAiResults(new Map());
+    setAiSaveStatus("idle");
 
     const toProcess = maxCount === "all" ? donations : donations.slice(0, maxCount);
     const withNotes = toProcess.filter(d => d.notes.trim() !== "");
@@ -242,12 +244,15 @@ export default function NotDuzenlemePage() {
         });
 
         try {
+          setAiSaveStatus("saving");
           await saveAiClassifications(results.map(r => ({
             donationId: r.donationId,
             categories: r.categories || [],
             warnings: r.warnings || "",
           })));
+          setAiSaveStatus("saved");
         } catch {
+          setAiSaveStatus("error");
         }
 
         done += batch.length;
@@ -530,6 +535,21 @@ export default function NotDuzenlemePage() {
                     <span>{resultsCount} bağışçı analiz edildi</span>
                     {warningsCount > 0 && (
                       <Badge variant="destructive" className="text-xs">{warningsCount} uyarı</Badge>
+                    )}
+                    {aiSaveStatus === "saving" && (
+                      <Badge variant="outline" className="text-xs flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Kaydediliyor...
+                      </Badge>
+                    )}
+                    {aiSaveStatus === "saved" && (
+                      <Badge variant="outline" className="text-xs text-green-600 border-green-300 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Kaydedildi
+                      </Badge>
+                    )}
+                    {aiSaveStatus === "error" && (
+                      <Badge variant="outline" className="text-xs text-red-600 border-red-300 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> Kaydetme hatası
+                      </Badge>
                     )}
                   </div>
                 </div>
