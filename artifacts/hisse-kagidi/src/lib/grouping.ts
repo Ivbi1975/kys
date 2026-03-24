@@ -59,7 +59,10 @@ function buildGroupDonations(segments: GroupedSegment[]): Donation[] {
     }
     const extraSlots = g.shares - g.donations.length;
     for (let s = 0; s < extraSlots; s++) {
-      groupDonations.push(createEmptyDonation());
+      groupDonations.push({
+        ...g.templateDonation,
+        id: generateId(),
+      });
     }
   }
 
