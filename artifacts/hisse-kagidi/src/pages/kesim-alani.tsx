@@ -639,12 +639,14 @@ export default function KesimAlaniPage() {
         return;
       }
     }
-    setKesim({
+    const updated = {
       ...kesim,
       donations: kesim.donations.map((d) =>
         d.id === id ? { ...d, [field]: value } : d
       ),
-    });
+    };
+    setKesim(updated);
+    history.push(updated, `Bağışçı güncellendi`);
     saveSingleDonationField(id, { [field]: value });
   }
 
@@ -1154,7 +1156,9 @@ export default function KesimAlaniPage() {
     const groups = kesim.animalGroups.map((g, i) =>
       i === groupIdx ? { ...g, colorTag: tag } : g
     );
-    setKesim({ ...kesim, animalGroups: groups });
+    const updated = { ...kesim, animalGroups: groups };
+    setKesim(updated);
+    history.push(updated, `Grup rengi değiştirildi: Hayvan ${groups[groupIdx].animalNo}`);
     saveSingleGroupField(group.id, { colorTag: tag });
   }
 
@@ -1182,7 +1186,9 @@ export default function KesimAlaniPage() {
     const groups = kesim.animalGroups.map((g, i) =>
       i === groupIdx ? { ...g, notes } : g
     );
-    setKesim({ ...kesim, animalGroups: groups });
+    const updated = { ...kesim, animalGroups: groups };
+    setKesim(updated);
+    history.push(updated, `Grup notu güncellendi: Hayvan ${groups[groupIdx].animalNo}`);
     saveSingleGroupField(group.id, { notes });
   }
 
@@ -1193,7 +1199,9 @@ export default function KesimAlaniPage() {
     const groups = kesim.animalGroups.map((g, i) =>
       i === groupIdx ? { ...g, locked: newLocked } : g
     );
-    setKesim({ ...kesim, animalGroups: groups });
+    const updated = { ...kesim, animalGroups: groups };
+    setKesim(updated);
+    history.push(updated, `Grup ${newLocked ? "kilitlendi" : "kilidi açıldı"}: Hayvan ${group.animalNo}`);
     saveSingleGroupField(group.id, { locked: newLocked });
   }
 
