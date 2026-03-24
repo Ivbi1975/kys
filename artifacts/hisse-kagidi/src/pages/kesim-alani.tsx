@@ -666,7 +666,18 @@ export default function KesimAlaniPage() {
       const lockedGroups = kesim.animalGroups.filter(g => g.locked);
       const finalGroups: AnimalGroup[] = [...lockedGroups, ...newGroups];
       finalGroups.forEach((g, i) => { g.animalNo = i + 1; });
-      save({ ...kesim, animalGroups: finalGroups }, `Otomatik gruplama yapıldı: ${finalGroups.length} hayvan (${lockedGroups.length} kilitli korundu)`);
+      const existingDonationIds = new Set(kesim.donations.map(d => d.id));
+      const newDonations: Donation[] = [];
+      for (const g of finalGroups) {
+        for (const d of g.donations) {
+          if (!existingDonationIds.has(d.id)) {
+            existingDonationIds.add(d.id);
+            newDonations.push(d);
+          }
+        }
+      }
+      const mergedDonations = [...kesim.donations, ...newDonations];
+      save({ ...kesim, donations: mergedDonations, animalGroups: finalGroups }, `Otomatik gruplama yapıldı: ${finalGroups.length} hayvan (${lockedGroups.length} kilitli korundu)`);
       const found = checkGroupConflicts(finalGroups);
       setConflicts(found);
       if (found.length > 0) setShowConflicts(true);
@@ -4068,7 +4079,21 @@ export default function KesimAlaniPage() {
                             {conflicts.filter(c => !c.isExpected).map((c, i) => (
                               <li key={i} className="text-sm text-amber-700 flex items-center gap-2 flex-wrap">
                                 <span className="font-semibold">{c.description}</span>
-                                <span className="text-xs">({c.totalShares} hisse) → Hayvan No: {c.animalNos.join(", ")}</span>
+                                <span className="text-xs">({c.totalShares} hisse) → Hayvan No: {c.animalNos.map((no, idx) => (
+                                  <span key={no}>
+                                    {idx > 0 && ", "}
+                                    <button
+                                      className="underline font-semibold hover:text-amber-900 cursor-pointer"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const el = document.getElementById(`animal-group-${no}`);
+                                        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                                      }}
+                                    >
+                                      {no}
+                                    </button>
+                                  </span>
+                                ))}</span>
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -4088,7 +4113,21 @@ export default function KesimAlaniPage() {
                                 {conflicts.filter(c => c.isExpected).map((c, i) => (
                                   <li key={i} className="text-xs text-amber-500 flex items-center gap-2">
                                     <span>{c.description}</span>
-                                    <span>({c.totalShares} hisse) → Hayvan No: {c.animalNos.join(", ")}</span>
+                                    <span>({c.totalShares} hisse) → Hayvan No: {c.animalNos.map((no, idx) => (
+                                      <span key={no}>
+                                        {idx > 0 && ", "}
+                                        <button
+                                          className="underline font-semibold hover:text-amber-700 cursor-pointer"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            const el = document.getElementById(`animal-group-${no}`);
+                                            if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                                          }}
+                                        >
+                                          {no}
+                                        </button>
+                                      </span>
+                                    ))}</span>
                                   </li>
                                 ))}
                               </ul>

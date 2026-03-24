@@ -420,10 +420,9 @@ router.post("/kesim-alanlari/:id/donations", async (req, res) => {
       });
 
       if (donation.tags && donation.tags.length > 0) {
-        for (const tagId of donation.tags) {
-          await tx.insert(donationTagsTable).values({ donationId: donation.id, tagId })
-            .onConflictDoNothing();
-        }
+        await tx.insert(donationTagsTable)
+          .values(donation.tags.map(tagId => ({ donationId: donation.id, tagId })))
+          .onConflictDoNothing();
       }
     });
 
@@ -476,8 +475,9 @@ router.put("/kesim-alanlari/:id/donations/:donationId", async (req, res) => {
 
       if (updates.tags !== undefined) {
         await tx.delete(donationTagsTable).where(eq(donationTagsTable.donationId, donationId));
-        for (const tagId of updates.tags) {
-          await tx.insert(donationTagsTable).values({ donationId, tagId })
+        if (updates.tags.length > 0) {
+          await tx.insert(donationTagsTable)
+            .values(updates.tags.map(tagId => ({ donationId, tagId })))
             .onConflictDoNothing();
         }
       }
@@ -546,13 +546,13 @@ router.post("/kesim-alanlari/:id/animal-groups", async (req, res) => {
       });
 
       if (group.donations && group.donations.length > 0) {
-        for (let j = 0; j < group.donations.length; j++) {
-          await tx.insert(animalGroupDonationsTable).values({
+        await tx.insert(animalGroupDonationsTable)
+          .values(group.donations.map((d, j) => ({
             groupId: group.id,
-            donationId: group.donations[j].id,
+            donationId: d.id,
             sortOrder: j,
-          }).onConflictDoNothing();
-        }
+          })))
+          .onConflictDoNothing();
       }
     });
 
@@ -642,12 +642,14 @@ router.put("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => {
 
       if (updates.donations !== undefined) {
         await tx.delete(animalGroupDonationsTable).where(eq(animalGroupDonationsTable.groupId, groupId));
-        for (let j = 0; j < updates.donations.length; j++) {
-          await tx.insert(animalGroupDonationsTable).values({
-            groupId,
-            donationId: updates.donations[j].id,
-            sortOrder: j,
-          }).onConflictDoNothing();
+        if (updates.donations.length > 0) {
+          await tx.insert(animalGroupDonationsTable)
+            .values(updates.donations.map((d, j) => ({
+              groupId,
+              donationId: d.id,
+              sortOrder: j,
+            })))
+            .onConflictDoNothing();
         }
       }
     });
@@ -683,55 +685,91 @@ router.delete("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => 
   }
 });
 
-async function saveDonations(tx: Tx, kesimAlaniId: string, donations: DonationPayload[]) {
-  for (let i = 0; i < donations.length; i++) {
-    const d = donations[i];
-    await tx.insert(donationsTable).values({
-      id: d.id,
-      kesimAlaniId,
-      name: d.name || "",
-      description: d.description || "",
-      donationType: d.donationType || "",
-      shareCount: d.shareCount || 1,
-      vekalet: d.vekalet || "",
-      notes: d.notes || "",
-      excluded: d.excluded || false,
-      sortOrder: i,
-    });
+const BATCH_SIZE = 500;
 
+async function saveDonations(tx: Tx, kesimAlaniId: string, donations: DonationPayload[]) {
+  if (donations.length === 0) return;
+
+  const donationRows = donations.map((d, i) => ({
+    id: d.id,
+    kesimAlaniId,
+    name: d.name || "",
+    description: d.description || "",
+    donationType: d.donationType || "",
+    shareCount: d.shareCount || 1,
+    vekalet: d.vekalet || "",
+    notes: d.notes || "",
+    excluded: d.excluded || false,
+    sortOrder: i,
+  }));
+
+  for (let i = 0; i < donationRows.length; i += BATCH_SIZE) {
+    await tx.insert(donationsTable).values(donationRows.slice(i, i + BATCH_SIZE));
+  }
+
+  const tagRows: { donationId: string; tagId: string }[] = [];
+  for (const d of donations) {
     if (d.tags && d.tags.length > 0) {
       for (const tagId of d.tags) {
-        await tx.insert(donationTagsTable).values({
-          donationId: d.id,
-          tagId,
-        }).onConflictDoNothing();
+        tagRows.push({ donationId: d.id, tagId });
       }
+    }
+  }
+  if (tagRows.length > 0) {
+    for (let i = 0; i < tagRows.length; i += BATCH_SIZE) {
+      await tx.insert(donationTagsTable).values(tagRows.slice(i, i + BATCH_SIZE)).onConflictDoNothing();
     }
   }
 }
 
 async function saveAnimalGroups(tx: Tx, kesimAlaniId: string, groups: AnimalGroupPayload[]) {
-  for (let i = 0; i < groups.length; i++) {
-    const g = groups[i];
-    await tx.insert(animalGroupsTable).values({
-      id: g.id,
-      kesimAlaniId,
-      animalNo: g.animalNo || 0,
-      colorTag: g.colorTag || "",
-      locked: g.locked || false,
-      notes: g.notes || "",
-      sortOrder: i,
-    });
+  if (groups.length === 0) return;
 
+  const groupRows = groups.map((g, i) => ({
+    id: g.id,
+    kesimAlaniId,
+    animalNo: g.animalNo || 0,
+    colorTag: g.colorTag || "",
+    locked: g.locked || false,
+    notes: g.notes || "",
+    sortOrder: i,
+  }));
+
+  for (let i = 0; i < groupRows.length; i += BATCH_SIZE) {
+    await tx.insert(animalGroupsTable).values(groupRows.slice(i, i + BATCH_SIZE));
+  }
+
+  const allDonationIds = new Set<string>();
+  for (const g of groups) {
+    if (g.donations) {
+      for (const d of g.donations) allDonationIds.add(d.id);
+    }
+  }
+
+  const existingDonationRows = allDonationIds.size > 0
+    ? await tx.select({ id: donationsTable.id }).from(donationsTable).where(
+        inArray(donationsTable.id, Array.from(allDonationIds))
+      )
+    : [];
+  const validDonationIds = new Set(existingDonationRows.map(r => r.id));
+
+  const junctionRows: { groupId: string; donationId: string; sortOrder: number }[] = [];
+  const seenKeys = new Set<string>();
+  for (const g of groups) {
     if (g.donations && g.donations.length > 0) {
       for (let j = 0; j < g.donations.length; j++) {
         const d = g.donations[j];
-        await tx.insert(animalGroupDonationsTable).values({
-          groupId: g.id,
-          donationId: d.id,
-          sortOrder: j,
-        }).onConflictDoNothing();
+        if (!validDonationIds.has(d.id)) continue;
+        const key = `${g.id}:${d.id}`;
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        junctionRows.push({ groupId: g.id, donationId: d.id, sortOrder: j });
       }
+    }
+  }
+  if (junctionRows.length > 0) {
+    for (let i = 0; i < junctionRows.length; i += BATCH_SIZE) {
+      await tx.insert(animalGroupDonationsTable).values(junctionRows.slice(i, i + BATCH_SIZE)).onConflictDoNothing();
     }
   }
 }
