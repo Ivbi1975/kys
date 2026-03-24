@@ -86,6 +86,7 @@ import {
   Save,
   ShoppingBag,
   Package,
+  SearchX,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
 import { Tag } from "lucide-react";
@@ -232,6 +233,11 @@ export default function KesimAlaniPage() {
   const [splitShareDialog, setSplitShareDialog] = useState<{ donationId: string; totalShares: number } | null>(null);
   const [splitGroupDialog, setSplitGroupDialog] = useState<{ groupIdx: number; splitAt: number } | null>(null);
   const [personBulkDeleteConfirm, setPersonBulkDeleteConfirm] = useState<string | null>(null);
+
+  const [findDeleteOpen, setFindDeleteOpen] = useState(false);
+  const [findDeleteColumn, setFindDeleteColumn] = useState<"name" | "description" | "donationType" | "vekalet" | "notes">("description");
+  const [findDeleteValue, setFindDeleteValue] = useState("");
+  const [findDeleteConfirm, setFindDeleteConfirm] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -595,6 +601,37 @@ export default function KesimAlaniPage() {
       ),
     }, `Toplu silindi: ${description}`);
     setPersonEditDesc(null);
+  }
+
+  const findDeleteColumnLabel: Record<string, string> = {
+    name: "Adına Kesilen",
+    description: "Vekaleti Veren",
+    donationType: "Cinsi",
+    vekalet: "Vekalet No",
+    notes: "Notlar",
+  };
+
+  function getFindDeleteMatches() {
+    if (!kesim || !findDeleteValue.trim()) return [];
+    const q = findDeleteValue.trim().toLowerCase();
+    return kesim.donations.filter((d) => {
+      const val = (d[findDeleteColumn] || "").toString().toLowerCase();
+      return val.includes(q);
+    });
+  }
+
+  function executeFindDelete() {
+    if (!kesim) return;
+    const matches = getFindDeleteMatches();
+    if (matches.length === 0) return;
+    const matchIds = new Set(matches.map((d) => d.id));
+    save({
+      ...kesim,
+      donations: kesim.donations.filter((d) => !matchIds.has(d.id)),
+    }, `Toplu silindi: ${matches.length} bağışçı (${findDeleteColumnLabel[findDeleteColumn]}: "${findDeleteValue}")`);
+    setFindDeleteOpen(false);
+    setFindDeleteValue("");
+    setFindDeleteConfirm(false);
   }
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -2920,6 +2957,111 @@ export default function KesimAlaniPage() {
                   </DialogContent>
                 </Dialog>
 
+                <Dialog open={findDeleteOpen} onOpenChange={(open) => { setFindDeleteOpen(open); if (!open) { setFindDeleteValue(""); setFindDeleteConfirm(false); } }}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" title="Sütuna Göre Bul ve Sil">
+                      <SearchX className="w-4 h-4 mr-1" />
+                      Bul ve Sil
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Sütuna Göre Bul ve Sil</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-2">
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Sütun Seç</label>
+                        <Select value={findDeleteColumn} onValueChange={(v: "name" | "description" | "donationType" | "vekalet" | "notes") => { setFindDeleteColumn(v); setFindDeleteValue(""); setFindDeleteConfirm(false); }}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="description">Vekaleti Veren</SelectItem>
+                            <SelectItem value="name">Adına Kesilen</SelectItem>
+                            <SelectItem value="donationType">Cinsi</SelectItem>
+                            <SelectItem value="vekalet">Vekalet No</SelectItem>
+                            <SelectItem value="notes">Notlar</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Aranacak Değer</label>
+                        <Input
+                          placeholder={`${findDeleteColumnLabel[findDeleteColumn]} içinde ara...`}
+                          value={findDeleteValue}
+                          onChange={(e) => { setFindDeleteValue(e.target.value); setFindDeleteConfirm(false); }}
+                        />
+                      </div>
+                      {findDeleteValue.trim() && (() => {
+                        const matches = getFindDeleteMatches();
+                        return (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">
+                                {matches.length > 0
+                                  ? `${matches.length} kayıt bulundu`
+                                  : "Eşleşen kayıt bulunamadı"}
+                              </span>
+                            </div>
+                            {matches.length > 0 && (
+                              <div className="border rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                                <table className="w-full text-xs">
+                                  <thead>
+                                    <tr className="bg-muted/50 border-b">
+                                      <th className="p-2 text-left font-medium">Vekaleti Veren</th>
+                                      <th className="p-2 text-left font-medium">Adına Kesilen</th>
+                                      <th className="p-2 text-left font-medium">Cinsi</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {matches.slice(0, 50).map((d) => (
+                                      <tr key={d.id} className="border-b last:border-0">
+                                        <td className="p-2">{d.description || "—"}</td>
+                                        <td className="p-2">{d.name || "—"}</td>
+                                        <td className="p-2">{d.donationType || "—"}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                                {matches.length > 50 && (
+                                  <div className="p-2 text-xs text-muted-foreground text-center bg-muted/20">
+                                    ... ve {matches.length - 50} kayıt daha
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {matches.length > 0 && !findDeleteConfirm && (
+                              <Button
+                                variant="destructive"
+                                className="w-full"
+                                onClick={() => setFindDeleteConfirm(true)}
+                              >
+                                <Trash2 className="w-4 h-4 mr-1" />
+                                {matches.length} Kaydı Sil
+                              </Button>
+                            )}
+                            {matches.length > 0 && findDeleteConfirm && (
+                              <div className="space-y-2 border border-destructive/50 rounded-lg p-3 bg-destructive/5">
+                                <p className="text-sm font-medium text-destructive">
+                                  {matches.length} bağışçı kalıcı olarak silinecek. Emin misiniz?
+                                </p>
+                                <div className="flex gap-2">
+                                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setFindDeleteConfirm(false)}>
+                                    İptal
+                                  </Button>
+                                  <Button variant="destructive" size="sm" className="flex-1" onClick={executeFindDelete}>
+                                    Evet, Sil
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
                 <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
                   <DialogTrigger asChild>
                     <Button size="sm">
@@ -3101,12 +3243,18 @@ export default function KesimAlaniPage() {
                     </div>
                   )}
                 </div>
-                {activeFilterCount > 0 && (
+                {(activeFilterCount > 0 || searchQuery.trim() || filterUngrouped || showRemovedFilter) && (
                   <div className="text-xs text-muted-foreground">
                     {filteredDonations.length} / {kesim.donations.length} bağışçı gösteriliyor
                   </div>
                 )}
               </Card>
+            )}
+
+            {!showAdvancedFilter && (searchQuery.trim() || filterUngrouped || showRemovedFilter) && (
+              <div className="text-xs text-muted-foreground mb-2 px-1">
+                {filteredDonations.length} / {kesim.donations.length} bağışçı gösteriliyor
+              </div>
             )}
 
             {selectedIds.size > 0 && (
