@@ -2079,6 +2079,7 @@ export default function KesimAlaniPage() {
 
   const totalShares = getTotalShares(kesim.donations);
   const requiredAnimals = getRequiredAnimals(kesim.donations);
+  const remainingSlots = requiredAnimals * 7 - totalShares;
 
   const descCountMap = new Map<string, number>();
   for (const d of kesim.donations) {
@@ -2486,7 +2487,9 @@ export default function KesimAlaniPage() {
           <Card className="p-3 text-center">
             <div className="text-2xl font-bold text-primary">{requiredAnimals}</div>
             <div className="text-xs text-muted-foreground">Gereken Hayvan</div>
-            {(() => { const remaining = requiredAnimals * 7 - totalShares; return remaining > 0 ? <div className="text-[10px] text-orange-500 mt-0.5">({remaining} boş slot)</div> : null; })()}
+            {remainingSlots > 0 && (
+              <div className="text-[10px] text-orange-500 mt-0.5">({remainingSlots} boş slot)</div>
+            )}
           </Card>
           <Card className="p-3 text-center">
             <div className="text-2xl font-bold text-primary">
