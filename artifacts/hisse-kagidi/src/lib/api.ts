@@ -445,7 +445,7 @@ export interface TrackingGroup {
   kesildi: boolean;
   kesildiAt: string | null;
   filledCount: number;
-  donors: { name: string; description: string; donationType: string }[];
+  donors: { name: string; description: string; donationType: string; vekalet: string; notes: string }[];
 }
 
 export interface TrackingData {

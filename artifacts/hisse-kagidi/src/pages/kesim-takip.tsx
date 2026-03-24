@@ -98,9 +98,11 @@ function KesimKagidiOverlay({
     const donor = group.donors[i];
     rows.push({
       sira: i + 1,
-      vekalet: donor?.donationType || "",
-      vekaletVeren: donor?.name || "",
-      adinaKesilen: donor?.description || "",
+      vekalet: donor?.vekalet || "",
+      vekaletVeren: donor?.description || "",
+      adinaKesilen: donor?.name || "",
+      cinsi: donor?.donationType || "",
+      notlar: donor?.notes || "",
       empty: !donor,
     });
   }
@@ -163,19 +165,27 @@ function KesimKagidiOverlay({
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="bg-muted/50">
-                    <th className="text-left p-2 font-semibold border-b w-10">SIRA</th>
+                    <th className="text-center p-2 font-semibold border-b w-10">HAYVAN</th>
+                    <th className="text-center p-2 font-semibold border-b w-10">SIRA</th>
                     <th className="text-left p-2 font-semibold border-b">VEKALET</th>
                     <th className="text-left p-2 font-semibold border-b">VEKALETİ VEREN</th>
                     <th className="text-left p-2 font-semibold border-b">ADINA KESİLEN</th>
+                    <th className="text-left p-2 font-semibold border-b">CİNSİ</th>
+                    <th className="text-left p-2 font-semibold border-b">NOTLAR</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((row, idx) => (
                     <tr key={idx} className={`${row.empty ? "text-muted-foreground/30" : ""} ${idx % 2 === 0 ? "bg-background" : "bg-muted/20"}`}>
+                      {idx === 0 && (
+                        <td rowSpan={7} className="p-2 border-b text-center font-bold text-lg align-middle border-r">{group.animalNo}</td>
+                      )}
                       <td className="p-2 border-b text-center font-medium">{row.sira}</td>
                       <td className="p-2 border-b text-xs">{row.vekalet || "—"}</td>
                       <td className="p-2 border-b">{row.vekaletVeren || "—"}</td>
                       <td className="p-2 border-b">{row.adinaKesilen || "—"}</td>
+                      <td className="p-2 border-b text-xs">{row.cinsi || "—"}</td>
+                      <td className="p-2 border-b text-xs">{row.notlar || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -199,8 +209,16 @@ function KesimKagidiOverlay({
                           {row.adinaKesilen && row.adinaKesilen !== row.vekaletVeren && (
                             <p className="text-xs text-muted-foreground truncate">→ {row.adinaKesilen}</p>
                           )}
-                          {row.vekalet && (
-                            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded mt-0.5 inline-block">{row.vekalet}</span>
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {row.vekalet && (
+                              <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">{row.vekalet}</span>
+                            )}
+                            {row.cinsi && (
+                              <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded">{row.cinsi}</span>
+                            )}
+                          </div>
+                          {row.notlar && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5 italic truncate">{row.notlar}</p>
                           )}
                         </>
                       )}

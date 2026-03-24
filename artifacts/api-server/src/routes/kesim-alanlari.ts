@@ -1388,9 +1388,9 @@ router.get("/tracking/:token", async (req, res) => {
       ? await db.select().from(donationsTable).where(inArray(donationsTable.id, donationIds))
       : [];
 
-    const donationsById: Record<string, { name: string; description: string; donationType: string }> = {};
+    const donationsById: Record<string, { name: string; description: string; donationType: string; vekalet: string; notes: string }> = {};
     for (const d of donations) {
-      donationsById[d.id] = { name: d.name, description: d.description, donationType: d.donationType };
+      donationsById[d.id] = { name: d.name, description: d.description, donationType: d.donationType, vekalet: d.vekalet || "", notes: d.notes || "" };
     }
 
     const groupDonationsByGroup: Record<string, typeof groupDonationLinks> = {};
@@ -1417,7 +1417,7 @@ router.get("/tracking/:token", async (req, res) => {
         kesildi: g.kesildi,
         kesildiAt: g.kesildiAt || null,
         filledCount: filledDonations.length,
-        donors: filledDonations.map(d => ({ name: d.name, description: d.description, donationType: d.donationType })),
+        donors: filledDonations.map(d => ({ name: d.name, description: d.description, donationType: d.donationType, vekalet: d.vekalet || "", notes: d.notes || "" })),
       };
     });
 
