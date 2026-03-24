@@ -77,6 +77,7 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - One-time automatic localStorage → PostgreSQL migration on first load
 - Soft delete for kesim alanları (trash/restore functionality with permanent delete option)
 - Soft delete for donations (Bağış Çöp Kutusu): all deletion paths (single delete, bulk select delete, bulkDeleteByDesc, findDelete) use soft-delete API; deleted donations viewable in "Çöp Kutusu" dialog on kesim-alani page with restore and permanent-delete options; `deletedAt` column on donations table
+- Kesim tracking public link system: generates a unique token per kesim alanı; public page at `/takip/:token` (no password required) shows animal groups with kesildi toggle checkboxes, progress bar, auto-refresh every 30s; "Takip Linki" button in kesim-alani header copies the tracking URL to clipboard; kesildi stats shown in both kesim-alani and proje-detay pages
 - Toast notifications for all user actions (success/error feedback)
 - AlertDialog for destructive operations (modern UI instead of browser confirm())
 - Save button in header with last save timestamp (HH:MM:SS), auto-save on changes + manual save button
@@ -91,7 +92,7 @@ Data model (Donation):
 - `id`, `name` (adına kesilen), `description` (vekaleti veren), `donationType` (cinsi), `shareCount`, `vekalet` (vekalet no), `notes` (notlar), `excluded?`, `tags?`
 
 Data model (AnimalGroup):
-- `id`, `animalNo`, `donations[]`, `colorTag?` (green/orange/red), `locked?`, `notes?`
+- `id`, `animalNo`, `donations[]`, `colorTag?` (green/orange/red), `locked?`, `notes?`, `kesildi?` (boolean, tracks slaughter status)
 
 Key files:
 - `src/lib/types.ts` - TypeScript types (Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag, Project, ProjectStats)
@@ -104,6 +105,7 @@ Key files:
 - `src/pages/home.tsx` - Home page with project cards (collapsible), kesim alanı list grouped by project, project CRUD, move kesim alanı between projects, settings (logo, backup, theme selector, tag management)
 - `src/pages/kesim-alani.tsx` - Main editing page with donor table, animal groups, stats, export
 - `src/pages/print.tsx` - Print-optimized A4 landscape view matching Excel design
+- `src/pages/kesim-takip.tsx` - Public kesim tracking page (no auth), shows animal groups with kesildi toggle
 
 ## TypeScript & Composite Projects
 
@@ -137,7 +139,7 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
 Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
 
 - `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — table definitions with Drizzle-Zod insert schemas: `projectsTable`, `kesimAlanlariTable` (with `projectId` FK to projects), `donationsTable` (with `deletedAt` for soft-delete, `aiCategories` text JSON array, `aiWarnings` text for AI classification persistence), `animalGroupsTable`, `animalGroupDonationsTable`, `customTagsTable`, `donationTagsTable`, `appSettingsTable`
+- `src/schema/index.ts` — table definitions with Drizzle-Zod insert schemas: `projectsTable`, `kesimAlanlariTable` (with `projectId` FK to projects, `trackingToken` for public tracking links), `donationsTable` (with `deletedAt` for soft-delete, `aiCategories` text JSON array, `aiWarnings` text for AI classification persistence), `animalGroupsTable` (with `kesildi` boolean for slaughter tracking), `animalGroupDonationsTable`, `customTagsTable`, `donationTagsTable`, `appSettingsTable`
 - `drizzle/` — generated migration files
 - `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
 - Exports: `.` (pool, db, schema), `./schema` (schema only)

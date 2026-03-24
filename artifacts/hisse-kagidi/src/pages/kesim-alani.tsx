@@ -93,10 +93,12 @@ import {
   Send,
   Home,
   ChevronRight,
+  Link2,
+  Copy,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
 import { Tag } from "lucide-react";
-import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani } from "@/lib/api";
+import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani, generateTrackingToken } from "@/lib/api";
 import type { DeletedDonation } from "@/lib/api";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
@@ -3077,19 +3079,42 @@ export default function KesimAlaniPage() {
                 {kesim.donations.length} bağışçı • {totalShares} hisse • {requiredAnimals} hayvan
               </p>
             </div>
-            <Button
-              size="sm"
-              className="shrink-0"
-              onClick={() => saveToApi(kesim)}
-              disabled={saveStatus === "saving"}
-            >
-              {saveStatus === "saving" ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              <span className="hidden sm:inline ml-1">Kaydet</span>
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    let token = kesim.trackingToken;
+                    if (!token) {
+                      token = await generateTrackingToken(kesim.id);
+                      setKesim(prev => prev ? { ...prev, trackingToken: token } : prev);
+                    }
+                    const url = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/takip/${token}`;
+                    await navigator.clipboard.writeText(url);
+                    toast({ title: "Takip linki kopyalandı", description: "Link panoya kopyalandı" });
+                  } catch {
+                    toast({ title: "Hata", description: "Link oluşturulamadı", variant: "destructive" });
+                  }
+                }}
+              >
+                <Link2 className="w-4 h-4" />
+                <span className="hidden sm:inline ml-1">Takip Linki</span>
+              </Button>
+              <Button
+                size="sm"
+                className="shrink-0"
+                onClick={() => saveToApi(kesim)}
+                disabled={saveStatus === "saving"}
+              >
+                {saveStatus === "saving" ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline ml-1">Kaydet</span>
+              </Button>
+            </div>
           </div>
 
           <div className="flex items-center justify-between gap-2">
@@ -3199,6 +3224,16 @@ export default function KesimAlaniPage() {
                 %{Math.round((kesim.animalGroups.reduce((s, g) => s + g.donations.filter(d => d.name.trim() !== "").length, 0) / (kesim.animalGroups.length * 7)) * 100)}
               </div>
               <div className="text-xs text-muted-foreground">Doluluk</div>
+            </Card>
+          )}
+          {kesim.animalGroups.length > 0 && (
+            <Card className="p-3 text-center">
+              <div className="text-2xl font-bold text-emerald-600">
+                {kesim.animalGroups.filter(g => g.kesildi).length}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {kesim.animalGroups.length} hayvan / kesildi
+              </div>
             </Card>
           )}
           {ungroupedDonors.length > 0 && (

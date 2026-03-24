@@ -27,6 +27,7 @@ export interface AnimalGroup {
   colorTag?: ColorTag;
   locked?: boolean;
   notes?: string;
+  kesildi?: boolean;
 }
 
 export interface KesimAlani {
@@ -38,6 +39,7 @@ export interface KesimAlani {
   deletedAt?: string | null;
   projectId?: string | null;
   customTags?: CustomTag[];
+  trackingToken?: string | null;
 }
 
 export interface ProjectStats {

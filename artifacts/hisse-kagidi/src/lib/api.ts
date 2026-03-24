@@ -430,3 +430,38 @@ export async function migrateLocalStorageToApi(): Promise<boolean> {
     return false;
   }
 }
+
+export async function generateTrackingToken(kesimAlaniId: string): Promise<string> {
+  const data = await apiFetch<{ trackingToken: string }>(`/kesim-alanlari/${kesimAlaniId}/generate-tracking-token`, {
+    method: "POST",
+  });
+  return data.trackingToken;
+}
+
+export interface TrackingGroup {
+  id: string;
+  animalNo: number;
+  colorTag: string;
+  kesildi: boolean;
+  filledCount: number;
+  donors: { name: string; description: string; donationType: string }[];
+}
+
+export interface TrackingData {
+  kesimAlaniName: string;
+  projectName: string | null;
+  totalGroups: number;
+  kesildiCount: number;
+  groups: TrackingGroup[];
+}
+
+export async function fetchTrackingData(token: string): Promise<TrackingData> {
+  return apiFetch<TrackingData>(`/tracking/${token}`);
+}
+
+export async function toggleKesildi(token: string, groupId: string, kesildi: boolean): Promise<void> {
+  await apiFetch(`/tracking/${token}/group/${groupId}/kesildi`, {
+    method: "PUT",
+    body: JSON.stringify({ kesildi }),
+  });
+}

@@ -10,6 +10,7 @@ import {
 } from "@workspace/db/schema";
 import { eq, inArray, isNull, isNotNull, and } from "drizzle-orm";
 import { z } from "zod";
+import crypto from "crypto";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -164,6 +165,7 @@ async function getFullKesimAlani(id: string) {
       colorTag: g.colorTag,
       locked: g.locked,
       notes: g.notes,
+      kesildi: g.kesildi,
       donations: links.map(l => donationsById[l.donationId]).filter(Boolean),
     };
   });
@@ -174,6 +176,7 @@ async function getFullKesimAlani(id: string) {
     createdAt: ka.createdAt,
     deletedAt: ka.deletedAt || null,
     projectId: ka.projectId || null,
+    trackingToken: ka.trackingToken || null,
     donations: mappedDonations,
     animalGroups: mappedGroups,
   };
@@ -250,6 +253,7 @@ router.post("/kesim-alanlari", async (req, res) => {
         name,
         createdAt: createdAt || new Date().toISOString(),
         projectId,
+        trackingToken: crypto.randomBytes(16).toString("hex"),
       });
 
       if (donations.length > 0) {
@@ -656,6 +660,7 @@ router.post("/kesim-alanlari/:id/animal-groups", async (req, res) => {
         locked: group.locked || false,
         notes: group.notes || "",
         sortOrder,
+        kesildi: false,
       });
 
       if (group.donations && group.donations.length > 0) {
@@ -747,6 +752,7 @@ router.put("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => {
     if (updates.colorTag !== undefined) dbUpdates.colorTag = updates.colorTag;
     if (updates.locked !== undefined) dbUpdates.locked = updates.locked;
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+    if (updates.kesildi !== undefined) dbUpdates.kesildi = updates.kesildi;
 
     await db.transaction(async (tx) => {
       if (Object.keys(dbUpdates).length > 0) {
@@ -1189,6 +1195,7 @@ async function saveAnimalGroups(tx: Tx, kesimAlaniId: string, groups: AnimalGrou
     locked: g.locked || false,
     notes: g.notes || "",
     sortOrder: i,
+    kesildi: false,
   }));
 
   for (let i = 0; i < groupRows.length; i += BATCH_SIZE) {
@@ -1308,6 +1315,128 @@ router.post("/kesim-alanlari/move-donations", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error("POST /kesim-alanlari/move-donations error:", message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/kesim-alanlari/:id/generate-tracking-token", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const check = await requireActiveKesimAlani(id);
+    if (check.error) { res.status(check.status).json({ error: check.error }); return; }
+
+    const token = crypto.randomBytes(16).toString("hex");
+    await db.update(kesimAlanlariTable).set({ trackingToken: token }).where(eq(kesimAlanlariTable.id, id));
+    res.json({ trackingToken: token });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`POST /kesim-alanlari/${req.params.id}/generate-tracking-token error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/tracking/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const [ka] = await db.select().from(kesimAlanlariTable)
+      .where(eq(kesimAlanlariTable.trackingToken, token));
+    if (!ka || ka.deletedAt) {
+      res.status(404).json({ error: "Takip linki bulunamadı" });
+      return;
+    }
+
+    const groups = await db.select().from(animalGroupsTable)
+      .where(eq(animalGroupsTable.kesimAlaniId, ka.id))
+      .orderBy(animalGroupsTable.sortOrder);
+
+    const groupIds = groups.map(g => g.id);
+    const groupDonationLinks = groupIds.length > 0
+      ? await db.select({
+          groupId: animalGroupDonationsTable.groupId,
+          donationId: animalGroupDonationsTable.donationId,
+          sortOrder: animalGroupDonationsTable.sortOrder,
+        }).from(animalGroupDonationsTable).where(inArray(animalGroupDonationsTable.groupId, groupIds))
+      : [];
+
+    const donationIds = [...new Set(groupDonationLinks.map(l => l.donationId))];
+    const donations = donationIds.length > 0
+      ? await db.select().from(donationsTable).where(inArray(donationsTable.id, donationIds))
+      : [];
+
+    const donationsById: Record<string, { name: string; description: string; donationType: string }> = {};
+    for (const d of donations) {
+      donationsById[d.id] = { name: d.name, description: d.description, donationType: d.donationType };
+    }
+
+    const groupDonationsByGroup: Record<string, typeof groupDonationLinks> = {};
+    for (const link of groupDonationLinks) {
+      if (!groupDonationsByGroup[link.groupId]) groupDonationsByGroup[link.groupId] = [];
+      groupDonationsByGroup[link.groupId].push(link);
+    }
+
+    let projectName: string | null = null;
+    if (ka.projectId) {
+      const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, ka.projectId));
+      if (proj) projectName = proj.name;
+    }
+
+    const mappedGroups = groups.map(g => {
+      const links = (groupDonationsByGroup[g.id] || []).sort((a, b) => a.sortOrder - b.sortOrder);
+      const filledDonations = links
+        .map(l => donationsById[l.donationId])
+        .filter(d => d && d.name.trim());
+      return {
+        id: g.id,
+        animalNo: g.animalNo,
+        colorTag: g.colorTag,
+        kesildi: g.kesildi,
+        filledCount: filledDonations.length,
+        donors: filledDonations.map(d => ({ name: d.name, description: d.description, donationType: d.donationType })),
+      };
+    });
+
+    res.json({
+      kesimAlaniName: ka.name,
+      projectName,
+      totalGroups: groups.length,
+      kesildiCount: groups.filter(g => g.kesildi).length,
+      groups: mappedGroups,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`GET /tracking/${req.params.token} error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.put("/tracking/:token/group/:groupId/kesildi", async (req, res) => {
+  try {
+    const { token, groupId } = req.params;
+    const { kesildi } = req.body;
+    if (typeof kesildi !== "boolean") {
+      res.status(400).json({ error: "kesildi alanı boolean olmalıdır" });
+      return;
+    }
+
+    const [ka] = await db.select().from(kesimAlanlariTable)
+      .where(eq(kesimAlanlariTable.trackingToken, token));
+    if (!ka || ka.deletedAt) {
+      res.status(404).json({ error: "Takip linki bulunamadı" });
+      return;
+    }
+
+    const [group] = await db.select().from(animalGroupsTable)
+      .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
+    if (!group) {
+      res.status(404).json({ error: "Hayvan grubu bulunamadı" });
+      return;
+    }
+
+    await db.update(animalGroupsTable).set({ kesildi }).where(eq(animalGroupsTable.id, groupId));
+    res.json({ success: true, groupId, kesildi });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`PUT /tracking/${req.params.token}/group/${req.params.groupId}/kesildi error:`, message);
     res.status(500).json({ error: message });
   }
 });

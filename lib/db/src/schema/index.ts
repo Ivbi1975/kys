@@ -19,6 +19,7 @@ export const kesimAlanlariTable = pgTable("kesim_alanlari", {
   createdAt: text("created_at").notNull(),
   deletedAt: text("deleted_at"),
   projectId: text("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
+  trackingToken: text("tracking_token"),
 });
 
 export const insertKesimAlaniSchema = createInsertSchema(kesimAlanlariTable);
@@ -55,6 +56,7 @@ export const animalGroupsTable = pgTable("animal_groups", {
   locked: boolean("locked").notNull().default(false),
   notes: text("notes").notNull().default(""),
   sortOrder: integer("sort_order").notNull().default(0),
+  kesildi: boolean("kesildi").notNull().default(false),
 }, (table) => [
   index("idx_animal_groups_kesim_alani_id").on(table.kesimAlaniId),
 ]);

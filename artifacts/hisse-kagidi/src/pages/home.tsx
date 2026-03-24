@@ -797,6 +797,24 @@ export default function Home() {
 
                 <div className="border-t pt-4">
                   <label className="text-sm font-medium mb-2 block">
+                    AI Not Analizi Ayarları
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    AI sınıflandırma prompt'unu ve kategorileri özelleştirin.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => { setSettingsOpen(false); setLocation("/ai-prompt-ayarlari"); }}
+                  >
+                    <Settings className="w-4 h-4 mr-1" />
+                    AI Prompt Ayarları
+                  </Button>
+                </div>
+
+                <div className="border-t pt-4">
+                  <label className="text-sm font-medium mb-2 block">
                     <Tag className="w-4 h-4 inline mr-1" />
                     Etiketler
                   </label>

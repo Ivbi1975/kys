@@ -330,6 +330,7 @@ export default function ProjeDetayPage() {
         (s, g) => s + g.donations.filter(d => d.name.trim() !== "").length,
         0
       );
+      const kesildi = k.animalGroups.filter(g => g.kesildi).length;
       return {
         donors: acc.donors + activeDonors,
         shares: acc.shares + shares,
@@ -337,9 +338,10 @@ export default function ProjeDetayPage() {
         grouped: acc.grouped + k.animalGroups.length,
         totalSlots: acc.totalSlots + totalSlots,
         filledSlots: acc.filledSlots + filledSlots,
+        kesildi: acc.kesildi + kesildi,
       };
     },
-    { donors: 0, shares: 0, animals: 0, grouped: 0, totalSlots: 0, filledSlots: 0 }
+    { donors: 0, shares: 0, animals: 0, grouped: 0, totalSlots: 0, filledSlots: 0, kesildi: 0 }
   );
   const occupancy = totals.totalSlots > 0 ? Math.round((totals.filledSlots / totals.totalSlots) * 100) : 0;
 
@@ -429,7 +431,7 @@ export default function ProjeDetayPage() {
             <PieChart className="w-4 h-4 text-primary" />
             <h3 className="text-sm font-semibold text-foreground">Genel Özet</h3>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             <div className="text-center">
               <div className="text-xl font-bold text-primary">{totals.donors}</div>
               <div className="text-xs text-muted-foreground">Aktif Bağışçı</div>
@@ -449,6 +451,10 @@ export default function ProjeDetayPage() {
             <div className="text-center">
               <div className="text-xl font-bold text-primary">%{occupancy}</div>
               <div className="text-xs text-muted-foreground">Doluluk Oranı</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-emerald-600">{totals.kesildi}/{totals.grouped}</div>
+              <div className="text-xs text-muted-foreground">Kesildi</div>
             </div>
           </div>
         </Card>
