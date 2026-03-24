@@ -1669,6 +1669,10 @@ router.get("/tracking/:token/group/:groupId/photos/:photoId", async (req, res) =
       .where(eq(kesimAlanlariTable.trackingToken, token));
     if (!ka) { res.status(404).json({ error: "Bulunamadı" }); return; }
 
+    const [group] = await db.select().from(animalGroupsTable)
+      .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
+    if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+
     const [photo] = await db.select().from(animalGroupPhotosTable)
       .where(and(eq(animalGroupPhotosTable.id, photoId), eq(animalGroupPhotosTable.animalGroupId, groupId)));
     if (!photo) { res.status(404).json({ error: "Fotoğraf bulunamadı" }); return; }
@@ -1741,6 +1745,10 @@ router.delete("/tracking/:token/group/:groupId/photos/:photoId", async (req, res
       .where(eq(kesimAlanlariTable.trackingToken, token));
     if (!ka) { res.status(404).json({ error: "Bulunamadı" }); return; }
 
+    const [group] = await db.select().from(animalGroupsTable)
+      .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
+    if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+
     await db.delete(animalGroupPhotosTable)
       .where(and(eq(animalGroupPhotosTable.id, photoId), eq(animalGroupPhotosTable.animalGroupId, groupId)));
 
@@ -1754,9 +1762,9 @@ router.delete("/tracking/:token/group/:groupId/photos/:photoId", async (req, res
 router.get("/kesim-alanlari/:id/group/:groupId/photos", async (req, res) => {
   try {
     const { id, groupId } = req.params;
-    const [ka] = await db.select().from(kesimAlanlariTable)
-      .where(eq(kesimAlanlariTable.id, id));
-    if (!ka) { res.status(404).json({ error: "Bulunamadı" }); return; }
+    const [group] = await db.select().from(animalGroupsTable)
+      .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, id)));
+    if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
 
     const photos = await db.select({
       id: animalGroupPhotosTable.id,
@@ -1775,7 +1783,11 @@ router.get("/kesim-alanlari/:id/group/:groupId/photos", async (req, res) => {
 
 router.get("/kesim-alanlari/:id/group/:groupId/photos/:photoId", async (req, res) => {
   try {
-    const { groupId, photoId } = req.params;
+    const { id, groupId, photoId } = req.params;
+    const [group] = await db.select().from(animalGroupsTable)
+      .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, id)));
+    if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+
     const [photo] = await db.select().from(animalGroupPhotosTable)
       .where(and(eq(animalGroupPhotosTable.id, photoId), eq(animalGroupPhotosTable.animalGroupId, groupId)));
     if (!photo) { res.status(404).json({ error: "Fotoğraf bulunamadı" }); return; }
