@@ -969,16 +969,16 @@ router.get("/catisma-tespiti", async (req, res) => {
 
     for (const [key, { displayName, donations }] of Object.entries(groupedByName)) {
       if (donations.length <= 1) continue;
+      const uniqueKA = new Set(donations.map(d => d.kesimAlaniId));
+      if (uniqueKA.size <= 1) continue;
       const entries = buildConflictEntries(donations);
-      const uniqueKesimAlaniIds = new Set(entries.map(e => e.kesimAlaniId));
-      if (uniqueKesimAlaniIds.size <= 1 && donations.length <= 1) continue;
       seenConflictKeys.add(key);
       conflicts.push({
         key,
         matchField: "name",
         displayName,
         entries,
-        kesimAlanCount: uniqueKesimAlaniIds.size,
+        kesimAlanCount: uniqueKA.size,
         totalEntries: entries.length,
         hasNoteWarnings: entries.some(e => e.hasNoteWarning),
       });
@@ -987,15 +987,15 @@ router.get("/catisma-tespiti", async (req, res) => {
     for (const [key, { displayDescription, donations }] of Object.entries(groupedByDescription)) {
       if (donations.length <= 1) continue;
       if (seenConflictKeys.has(key)) continue;
+      const uniqueKA = new Set(donations.map(d => d.kesimAlaniId));
+      if (uniqueKA.size <= 1) continue;
       const entries = buildConflictEntries(donations);
-      const uniqueKesimAlaniIds = new Set(entries.map(e => e.kesimAlaniId));
-      if (uniqueKesimAlaniIds.size <= 1 && donations.length <= 1) continue;
       conflicts.push({
         key: `desc:${key}`,
         matchField: "description",
         displayName: displayDescription,
         entries,
-        kesimAlanCount: uniqueKesimAlaniIds.size,
+        kesimAlanCount: uniqueKA.size,
         totalEntries: entries.length,
         hasNoteWarnings: entries.some(e => e.hasNoteWarning),
       });

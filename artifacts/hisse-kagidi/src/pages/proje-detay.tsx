@@ -320,14 +320,6 @@ export default function ProjeDetayPage() {
     }
   }
 
-  const getConflictSeverity = (c: Conflict) => {
-    if (c.kesimAlanCount > 1 && c.hasNoteWarnings) return "critical";
-    if (c.kesimAlanCount > 1) return "high";
-    if (c.hasNoteWarnings) return "warning";
-    if (c.totalEntries > 2) return "medium";
-    return "low";
-  };
-
   const totals = kesimAlanlari.reduce(
     (acc, k) => {
       const shares = getTotalShares(k.donations);
@@ -572,7 +564,7 @@ export default function ProjeDetayPage() {
                   <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
                   <h3 className="text-lg font-semibold text-foreground mb-1">Çatışma Bulunamadı</h3>
                   <p className="text-muted-foreground text-sm">
-                    Bu projedeki kesim alanlarında tekrarlanan isim tespit edilmedi.
+                    Farklı kesim alanlarında tekrarlanan kayıt tespit edilmedi.
                   </p>
                 </Card>
               ) : (
@@ -598,35 +590,20 @@ export default function ProjeDetayPage() {
 
                   <div className="space-y-3">
                     {filteredConflicts.map(conflict => {
-                      const severity = getConflictSeverity(conflict);
                       const isExpanded = expandedKeys.has(conflict.key);
+                      const entriesByKA: Record<string, typeof conflict.entries> = {};
+                      for (const entry of conflict.entries) {
+                        if (!entriesByKA[entry.kesimAlaniId]) entriesByKA[entry.kesimAlaniId] = [];
+                        entriesByKA[entry.kesimAlaniId].push(entry);
+                      }
+                      const kaColumns = Object.entries(entriesByKA);
                       return (
-                        <Card key={conflict.key} className={`overflow-hidden border-l-4 ${
-                          severity === "critical"
-                            ? "border-l-red-600"
-                            : severity === "high"
-                            ? "border-l-red-500"
-                            : severity === "warning"
-                            ? "border-l-orange-500"
-                            : severity === "medium"
-                            ? "border-l-amber-500"
-                            : "border-l-blue-400"
-                        }`}>
+                        <Card key={conflict.key} className="overflow-hidden border-l-4 border-l-red-500">
                           <div
                             className="p-4 cursor-pointer flex items-center gap-3"
                             onClick={() => toggleExpand(conflict.key)}
                           >
-                            <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                              severity === "critical"
-                                ? "bg-red-600"
-                                : severity === "high"
-                                ? "bg-red-500"
-                                : severity === "warning"
-                                ? "bg-orange-500"
-                                : severity === "medium"
-                                ? "bg-amber-500"
-                                : "bg-blue-400"
-                            }`} />
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-red-500" />
                             <div className="flex-1 min-w-0">
                               <div className="font-semibold text-foreground flex items-center gap-2">
                                 {conflict.displayName}
@@ -637,15 +614,9 @@ export default function ProjeDetayPage() {
                                 )}
                               </div>
                               <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
-                                {conflict.kesimAlanCount > 1 ? (
-                                  <span className="text-red-600 dark:text-red-400 font-medium">
-                                    {conflict.kesimAlanCount} farklı kesim alanında
-                                  </span>
-                                ) : (
-                                  <span className="text-amber-600 dark:text-amber-400 font-medium">
-                                    Aynı kesim alanında
-                                  </span>
-                                )}
+                                <span className="text-red-600 dark:text-red-400 font-medium">
+                                  {conflict.kesimAlanCount} farklı kesim alanında
+                                </span>
                                 · {conflict.totalEntries} kayıt
                                 {conflict.hasNoteWarnings && (
                                   <span className="text-orange-600 dark:text-orange-400 font-medium flex items-center gap-0.5">
@@ -663,73 +634,53 @@ export default function ProjeDetayPage() {
                           </div>
 
                           {isExpanded && (
-                            <div className="border-t bg-muted/20">
-                              {conflict.entries.map((entry, idx) => (
-                                <div
-                                  key={`${entry.donationId}-${entry.animalGroupId ?? "nogroup"}-${idx}`}
-                                  className="p-4 border-b last:border-b-0"
-                                >
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-xs font-medium px-2 py-0.5 rounded bg-primary/10 text-primary">
-                                          {entry.kesimAlaniName}
-                                        </span>
-                                        {entry.animalGroupId && entry.animalGroupNo != null && (
-                                          <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
-                                            Hayvan #{entry.animalGroupNo}
-                                          </span>
-                                        )}
-                                      </div>
-                                      {entry.donationDescription && (
-                                        <p className="text-sm text-foreground mt-1">
-                                          <span className="text-muted-foreground">Vekaleti veren:</span> {entry.donationDescription}
-                                        </p>
-                                      )}
-                                      {entry.donationNotes && (
-                                        <p className={`text-xs mt-1 italic ${entry.hasNoteWarning ? "text-orange-600 dark:text-orange-400 font-medium" : "text-muted-foreground"}`}>
-                                          {entry.hasNoteWarning && <AlertTriangle className="w-3 h-3 inline mr-1" />}
-                                          Not: {entry.donationNotes}
-                                        </p>
-                                      )}
-                                      {entry.siblingsInGroup.length > 0 && (
-                                        <div className="mt-2">
-                                          <p className="text-xs font-medium text-muted-foreground mb-1">
-                                            {entry.animalGroupId ? "Aynı hayvandaki diğer kişiler:" : "Diğer bağışçılar:"}
-                                          </p>
-                                          <div className="space-y-1">
-                                            {entry.siblingsInGroup.slice(0, 5).map(sib => (
-                                              <div key={sib.donationId} className="text-xs bg-background rounded px-2 py-1 border">
-                                                <span className="font-medium">{sib.donationName || "—"}</span>
-                                                {sib.donationDescription && (
-                                                  <span className="text-muted-foreground"> · {sib.donationDescription}</span>
-                                                )}
-                                                {sib.donationNotes && (
-                                                  <span className="text-amber-600 dark:text-amber-400"> · {sib.donationNotes}</span>
-                                                )}
-                                              </div>
-                                            ))}
-                                            {entry.siblingsInGroup.length > 5 && (
-                                              <p className="text-xs text-muted-foreground">
-                                                +{entry.siblingsInGroup.length - 5} kişi daha...
-                                              </p>
-                                            )}
-                                          </div>
-                                        </div>
-                                      )}
+                            <div className="border-t bg-muted/20 p-4">
+                              <div className={`grid gap-4 ${kaColumns.length === 2 ? "grid-cols-2" : kaColumns.length >= 3 ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1"}`}>
+                                {kaColumns.map(([kaId, entries]) => (
+                                  <div key={kaId} className="bg-background rounded-lg border p-3 space-y-2">
+                                    <div className="text-xs font-semibold px-2 py-1 rounded bg-primary/10 text-primary text-center">
+                                      {entries[0].kesimAlaniName}
                                     </div>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="flex-shrink-0"
-                                      onClick={() => openTransferDialog(entry, conflict)}
-                                    >
-                                      <MoveRight className="w-3.5 h-3.5 mr-1" />
-                                      Taşı
-                                    </Button>
+                                    {entries.map((entry, idx) => (
+                                      <div
+                                        key={`${entry.donationId}-${entry.animalGroupId ?? "nogroup"}-${idx}`}
+                                        className="p-2 rounded border bg-muted/30 space-y-1"
+                                      >
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="text-sm font-medium text-foreground truncate">{entry.donationName}</span>
+                                          {entry.animalGroupId && entry.animalGroupNo != null && (
+                                            <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground flex-shrink-0">
+                                              Hayvan #{entry.animalGroupNo}
+                                            </span>
+                                          )}
+                                        </div>
+                                        {entry.donationDescription && (
+                                          <p className="text-xs text-muted-foreground">
+                                            Vekaleti veren: {entry.donationDescription}
+                                          </p>
+                                        )}
+                                        {entry.donationNotes && (
+                                          <p className={`text-xs italic ${entry.hasNoteWarning ? "text-orange-600 dark:text-orange-400 font-medium" : "text-muted-foreground"}`}>
+                                            {entry.hasNoteWarning && <AlertTriangle className="w-3 h-3 inline mr-1" />}
+                                            Not: {entry.donationNotes}
+                                          </p>
+                                        )}
+                                        <div className="pt-1">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-full h-7 text-xs"
+                                            onClick={() => openTransferDialog(entry, conflict)}
+                                          >
+                                            <MoveRight className="w-3 h-3 mr-1" />
+                                            Taşı
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
-                                </div>
-                              ))}
+                                ))}
+                              </div>
                             </div>
                           )}
                         </Card>
