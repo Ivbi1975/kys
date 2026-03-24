@@ -4082,7 +4082,7 @@ export default function KesimAlaniPage() {
                                       </span>
                                     ))}
                                     {d.aiWarnings && d.aiWarnings.trim() && (
-                                      <span className="px-1.5 py-0 rounded-full text-[9px] font-medium bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-0.5" title={d.aiWarnings}>
+                                      <span className="px-1.5 py-0 rounded-full text-[9px] font-medium bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 flex items-center gap-0.5" title={d.aiWarnings}>
                                         <AlertTriangle className="w-2.5 h-2.5" /> uyarı
                                       </span>
                                     )}
