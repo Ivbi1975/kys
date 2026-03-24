@@ -2486,9 +2486,7 @@ export default function KesimAlaniPage() {
           <Card className="p-3 text-center">
             <div className="text-2xl font-bold text-primary">{requiredAnimals}</div>
             <div className="text-xs text-muted-foreground">Gereken Hayvan</div>
-            {requiredAnimals * 7 - totalShares > 0 && (
-              <div className="text-[10px] text-orange-500 mt-0.5">({requiredAnimals * 7 - totalShares} boş slot)</div>
-            )}
+            {(() => { const remaining = requiredAnimals * 7 - totalShares; return remaining > 0 ? <div className="text-[10px] text-orange-500 mt-0.5">({remaining} boş slot)</div> : null; })()}
           </Card>
           <Card className="p-3 text-center">
             <div className="text-2xl font-bold text-primary">
