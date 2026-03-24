@@ -4,7 +4,19 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
 import {
   ArrowLeft,
   Search,
@@ -17,9 +29,9 @@ import {
   Play,
   Square,
   Settings2,
-  ChevronDown,
-  ChevronUp,
   X,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 import type { KesimAlani } from "@/lib/types";
 import type { AiClassificationResult } from "@/lib/api";
@@ -62,6 +74,8 @@ interface AiResult extends AiClassificationResult {
   donationType?: string;
 }
 
+const MAX_HISTORY = 50;
+
 export default function NotDuzenlemePage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
@@ -73,8 +87,18 @@ export default function NotDuzenlemePage() {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
+  const historyRef = useRef<LocalDonation[][]>([]);
+  const historyIndexRef = useRef(-1);
+  const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
+
+  const updateHistoryState = useCallback(() => {
+    setHistoryState({
+      canUndo: historyIndexRef.current > 0,
+      canRedo: historyIndexRef.current < historyRef.current.length - 1,
+    });
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState("");
-  const [replaceQuery, setReplaceQuery] = useState("");
   const [findText, setFindText] = useState("");
   const [replaceText, setReplaceText] = useState("");
   const [showReplaceBar, setShowReplaceBar] = useState(false);
@@ -87,8 +111,54 @@ export default function NotDuzenlemePage() {
   const [aiProgress, setAiProgress] = useState({ done: 0, total: 0 });
   const [aiSaveStatus, setAiSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [batchSize, setBatchSize] = useState(25);
-  const [maxCount, setMaxCount] = useState<"all" | number>("all");
-  const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
+  const [rangeMode, setRangeMode] = useState<"all" | "range">("all");
+  const [rangeStart, setRangeStart] = useState(1);
+  const [rangeEnd, setRangeEnd] = useState(50);
+  const [showAiPanel, setShowAiPanel] = useState(false);
+
+  const pushHistory = useCallback((newDonations: LocalDonation[]) => {
+    const trimmed = historyRef.current.slice(0, historyIndexRef.current + 1);
+    trimmed.push(newDonations);
+    if (trimmed.length > MAX_HISTORY) trimmed.shift();
+    historyRef.current = trimmed;
+    historyIndexRef.current = trimmed.length - 1;
+    updateHistoryState();
+  }, [updateHistoryState]);
+
+  const undo = useCallback(() => {
+    if (historyIndexRef.current <= 0) return;
+    historyIndexRef.current -= 1;
+    setDonations(historyRef.current[historyIndexRef.current]);
+    setDirty(true);
+    updateHistoryState();
+  }, [updateHistoryState]);
+
+  const redo = useCallback(() => {
+    if (historyIndexRef.current >= historyRef.current.length - 1) return;
+    historyIndexRef.current += 1;
+    setDonations(historyRef.current[historyIndexRef.current]);
+    setDirty(true);
+    updateHistoryState();
+  }, [updateHistoryState]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isEditable = target.tagName === "TEXTAREA" || target.tagName === "INPUT" || target.isContentEditable;
+      if (isEditable) return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undo, redo]);
 
   useEffect(() => {
     if (!params.id) return;
@@ -113,6 +183,9 @@ export default function NotDuzenlemePage() {
         }
       }
       setDonations(allDonations);
+      historyRef.current = [allDonations];
+      historyIndexRef.current = 0;
+      updateHistoryState();
       setLoading(false);
     });
   }, [params.id]);
@@ -127,15 +200,31 @@ export default function NotDuzenlemePage() {
     );
   });
 
+  const updateDonationsWithHistory = useCallback((updater: (prev: LocalDonation[]) => LocalDonation[]) => {
+    setDonations(prev => {
+      const next = updater(prev);
+      pushHistory(next);
+      setDirty(true);
+      return next;
+    });
+  }, [pushHistory]);
+
   const handleNoteChange = (id: string, value: string) => {
     setDonations(prev => prev.map(d => d.id === id ? { ...d, notes: value } : d));
     setDirty(true);
   };
 
+  const commitNoteChange = useCallback((id: string) => {
+    setDonations(prev => {
+      pushHistory(prev);
+      return prev;
+    });
+  }, [pushHistory]);
+
   const handleBulkReplace = () => {
     if (!findText.trim()) return;
     let count = 0;
-    setDonations(prev => prev.map(d => {
+    updateDonationsWithHistory(prev => prev.map(d => {
       if (d.notes.includes(findText)) {
         count++;
         return { ...d, notes: d.notes.replaceAll(findText, replaceText) };
@@ -143,7 +232,6 @@ export default function NotDuzenlemePage() {
       return d;
     }));
     if (count > 0) {
-      setDirty(true);
       toast({ title: "Değiştirildi", description: `${count} bağışçıda "${findText}" → "${replaceText}" değiştirildi` });
     } else {
       toast({ title: "Bulunamadı", description: `"${findText}" metni hiçbir notta bulunamadı` });
@@ -161,8 +249,7 @@ export default function NotDuzenlemePage() {
 
   const confirmBulkDeleteNotes = () => {
     const targetIds = new Set(filteredDonations.map(d => d.id));
-    setDonations(prev => prev.map(d => targetIds.has(d.id) ? { ...d, notes: "" } : d));
-    setDirty(true);
+    updateDonationsWithHistory(prev => prev.map(d => targetIds.has(d.id) ? { ...d, notes: "" } : d));
     toast({ title: "Notlar silindi", description: `${targetIds.size} bağışçının notu temizlendi` });
   };
 
@@ -195,6 +282,8 @@ export default function NotDuzenlemePage() {
     }
   };
 
+  const notesWithContent = donations.filter(d => d.notes.trim() !== "");
+
   const startAiClassification = async () => {
     if (!kesim) return;
     aiStopRef.current = false;
@@ -203,7 +292,14 @@ export default function NotDuzenlemePage() {
     setAiResults(new Map());
     setAiSaveStatus("idle");
 
-    const toProcess = maxCount === "all" ? donations : donations.slice(0, maxCount);
+    let toProcess: LocalDonation[];
+    if (rangeMode === "all") {
+      toProcess = donations;
+    } else {
+      const start = Math.max(1, rangeStart) - 1;
+      const end = Math.min(donations.length, rangeEnd);
+      toProcess = donations.slice(start, end);
+    }
     const withNotes = toProcess.filter(d => d.notes.trim() !== "");
 
     if (withNotes.length === 0) {
@@ -220,6 +316,7 @@ export default function NotDuzenlemePage() {
     }
 
     let done = 0;
+    let errorCount = 0;
     for (const batch of batches) {
       if (aiStopRef.current) {
         setAiStopped(true);
@@ -262,9 +359,28 @@ export default function NotDuzenlemePage() {
           await new Promise(res => setTimeout(res, 1000));
         }
       } catch (err) {
-        toast({ title: "AI Hatası", description: err instanceof Error ? err.message : "Sınıflandırma hatası", variant: "destructive" });
-        break;
+        errorCount++;
+        const msg = err instanceof Error ? err.message : "Sınıflandırma hatası";
+        toast({
+          title: "AI Batch Hatası",
+          description: `Batch ${Math.floor(done / batchSize) + 1} hata verdi: ${msg}. Diğer batch'lere devam ediliyor.`,
+          variant: "destructive",
+        });
+        done += batch.length;
+        setAiProgress({ done, total: withNotes.length });
+
+        if (batch !== batches[batches.length - 1] && !aiStopRef.current) {
+          await new Promise(res => setTimeout(res, 1000));
+        }
       }
+    }
+
+    if (errorCount > 0 && !aiStopRef.current) {
+      toast({
+        title: "AI Tamamlandı (Hatalarla)",
+        description: `${errorCount} batch hata verdi, geri kalanı başarıyla işlendi.`,
+        variant: "destructive",
+      });
     }
 
     setAiRunning(false);
@@ -275,15 +391,6 @@ export default function NotDuzenlemePage() {
     setAiStopped(true);
   };
 
-  const toggleExpandResult = (id: string) => {
-    setExpandedResults(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -292,7 +399,6 @@ export default function NotDuzenlemePage() {
     );
   }
 
-  const notesWithContent = donations.filter(d => d.notes.trim() !== "");
   const resultsCount = aiResults.size;
   const warningsCount = Array.from(aiResults.values()).filter(r => r.warnings && r.warnings.trim() !== "").length;
 
@@ -307,6 +413,26 @@ export default function NotDuzenlemePage() {
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-semibold truncate">Not Düzenleme</h1>
             <p className="text-xs text-muted-foreground truncate">{kesim?.name} — {donations.length} bağışçı, {notesWithContent.length} notu olan</p>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={undo}
+              disabled={!historyState.canUndo}
+              title="Geri Al (Ctrl+Z)"
+            >
+              <Undo2 className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={redo}
+              disabled={!historyState.canRedo}
+              title="İleri Al (Ctrl+Y)"
+            >
+              <Redo2 className="w-4 h-4" />
+            </Button>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Button
@@ -327,153 +453,121 @@ export default function NotDuzenlemePage() {
         </div>
       </div>
 
-      <div className="p-4 max-w-5xl mx-auto">
-        <Tabs defaultValue="notes">
-          <TabsList className="mb-4">
-            <TabsTrigger value="notes">
-              Not Düzenleme
-              {notesWithContent.length > 0 && (
-                <Badge variant="secondary" className="ml-2 text-xs">{notesWithContent.length}</Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="ai">
+      <div className="p-4 max-w-6xl mx-auto space-y-4">
+        <Card className="p-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+            <Input
+              placeholder="Notlarda ara..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="flex-1"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowReplaceBar(!showReplaceBar)}
+            >
+              <Replace className="w-4 h-4 mr-1" />
+              Değiştir
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDeleteNotes}
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              Notları Sil
+            </Button>
+          </div>
+
+          {showReplaceBar && (
+            <div className="flex items-center gap-2 pt-1">
+              <Input
+                placeholder="Bul..."
+                value={findText}
+                onChange={e => setFindText(e.target.value)}
+                className="flex-1"
+              />
+              <Input
+                placeholder="Değiştir..."
+                value={replaceText}
+                onChange={e => setReplaceText(e.target.value)}
+                className="flex-1"
+              />
+              <Button size="sm" onClick={handleBulkReplace}>
+                Tümünü Değiştir
+              </Button>
+            </div>
+          )}
+        </Card>
+
+        <Card className="p-3 space-y-3">
+          <div
+            className="flex items-center justify-between cursor-pointer"
+            onClick={() => setShowAiPanel(!showAiPanel)}
+          >
+            <h2 className="text-sm font-semibold flex items-center gap-2">
+              <Brain className="w-4 h-4 text-primary" />
               AI Sınıflandırma
               {resultsCount > 0 && (
-                <Badge variant="secondary" className="ml-2 text-xs">{resultsCount}</Badge>
+                <Badge variant="secondary" className="text-xs">{resultsCount} sonuç</Badge>
               )}
               {warningsCount > 0 && (
-                <Badge variant="destructive" className="ml-1 text-xs">{warningsCount} uyarı</Badge>
+                <Badge variant="destructive" className="text-xs">{warningsCount} uyarı</Badge>
               )}
-            </TabsTrigger>
-          </TabsList>
+            </h2>
+            <Button variant="ghost" size="sm">
+              {showAiPanel ? "Gizle" : "Göster"}
+            </Button>
+          </div>
 
-          <TabsContent value="notes" className="space-y-4">
-            <Card className="p-3 space-y-3">
-              <div className="flex items-center gap-2">
-                <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-                <Input
-                  placeholder="Notlarda ara..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="flex-1"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowReplaceBar(!showReplaceBar)}
-                >
-                  <Replace className="w-4 h-4 mr-1" />
-                  Değiştir
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleBulkDeleteNotes}
-                >
-                  <Trash2 className="w-4 h-4 mr-1" />
-                  Notları Sil
-                </Button>
-              </div>
-
-              {showReplaceBar && (
-                <div className="flex items-center gap-2 pt-1">
-                  <Input
-                    placeholder="Bul..."
-                    value={findText}
-                    onChange={e => setFindText(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Input
-                    placeholder="Değiştir..."
-                    value={replaceText}
-                    onChange={e => setReplaceText(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button size="sm" onClick={handleBulkReplace}>
-                    Tümünü Değiştir
-                  </Button>
-                </div>
-              )}
-            </Card>
-
-            <div className="text-xs text-muted-foreground">
-              {filteredDonations.length} bağışçı gösteriliyor
-              {searchQuery && ` ("${searchQuery}" araması)`}
-            </div>
-
-            <div className="space-y-2">
-              {filteredDonations.map(d => (
-                <Card key={d.id} className="p-3">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium truncate">{d.description || d.name || "(İsimsiz)"}</span>
-                        {d.donationType && (
-                          <Badge variant="outline" className="text-xs shrink-0">{d.donationType}</Badge>
-                        )}
-                        {d.vekalet && (
-                          <span className="text-xs text-muted-foreground shrink-0">No: {d.vekalet}</span>
-                        )}
-                      </div>
-                      <Textarea
-                        value={d.notes}
-                        onChange={e => handleNoteChange(d.id, e.target.value)}
-                        placeholder="Not yok..."
-                        className="text-sm min-h-[60px] resize-none"
-                        rows={2}
-                      />
-                    </div>
-                    {d.notes.trim() !== "" && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive shrink-0 mt-6"
-                        onClick={() => handleNoteChange(d.id, "")}
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                </Card>
-              ))}
-
-              {filteredDonations.length === 0 && (
-                <div className="text-center text-muted-foreground py-12 text-sm">
-                  {searchQuery ? "Arama sonucu bulunamadı" : "Bağışçı yok"}
-                </div>
-              )}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="ai" className="space-y-4">
-            <Card className="p-4 space-y-4">
-              <h2 className="text-sm font-semibold flex items-center gap-2">
-                <Brain className="w-4 h-4 text-primary" />
-                AI Sınıflandırma Ayarları
-              </h2>
-
-              <div className="grid grid-cols-2 gap-4">
+          {showAiPanel && (
+            <div className="space-y-3 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Kaç not işlensin?</label>
+                  <label className="text-xs text-muted-foreground">Aralık</label>
                   <Select
-                    value={maxCount === "all" ? "all" : String(maxCount)}
-                    onValueChange={v => setMaxCount(v === "all" ? "all" : parseInt(v))}
+                    value={rangeMode}
+                    onValueChange={v => setRangeMode(v as "all" | "range")}
                   >
                     <SelectTrigger className="h-8 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Tümü ({notesWithContent.length} not)</SelectItem>
-                      <SelectItem value="10">İlk 10</SelectItem>
-                      <SelectItem value="25">İlk 25</SelectItem>
-                      <SelectItem value="50">İlk 50</SelectItem>
-                      <SelectItem value="100">İlk 100</SelectItem>
+                      <SelectItem value="range">Aralık Seç</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
+                {rangeMode === "range" && (
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Başlangıç - Bitiş</label>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={donations.length}
+                        value={rangeStart}
+                        onChange={e => setRangeStart(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="h-8 text-sm w-20"
+                      />
+                      <span className="text-xs text-muted-foreground">-</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={donations.length}
+                        value={rangeEnd}
+                        onChange={e => setRangeEnd(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="h-8 text-sm w-20"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Her istekte kaç not?</label>
+                  <label className="text-xs text-muted-foreground">Batch boyutu</label>
                   <Select
                     value={String(batchSize)}
                     onValueChange={v => setBatchSize(parseInt(v))}
@@ -484,7 +578,7 @@ export default function NotDuzenlemePage() {
                     <SelectContent>
                       <SelectItem value="5">5 not/istek</SelectItem>
                       <SelectItem value="10">10 not/istek</SelectItem>
-                      <SelectItem value="25">25 not/istek (varsayılan)</SelectItem>
+                      <SelectItem value="25">25 not/istek</SelectItem>
                       <SelectItem value="50">50 not/istek</SelectItem>
                     </SelectContent>
                   </Select>
@@ -493,13 +587,13 @@ export default function NotDuzenlemePage() {
 
               <div className="flex items-center gap-3">
                 {!aiRunning ? (
-                  <Button onClick={startAiClassification} disabled={notesWithContent.length === 0}>
-                    <Play className="w-4 h-4 mr-2" />
+                  <Button size="sm" onClick={startAiClassification} disabled={notesWithContent.length === 0}>
+                    <Play className="w-4 h-4 mr-1" />
                     Başlat
                   </Button>
                 ) : (
-                  <Button variant="destructive" onClick={stopAiClassification}>
-                    <Square className="w-4 h-4 mr-2" />
+                  <Button variant="destructive" size="sm" onClick={stopAiClassification}>
+                    <Square className="w-4 h-4 mr-1" />
                     Durdur
                   </Button>
                 )}
@@ -521,113 +615,150 @@ export default function NotDuzenlemePage() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+        </Card>
 
-              {notesWithContent.length === 0 && (
-                <p className="text-sm text-muted-foreground">Notu olan bağışçı bulunamadı.</p>
-              )}
-            </Card>
+        <div className="text-xs text-muted-foreground">
+          {filteredDonations.length} bağışçı gösteriliyor
+          {searchQuery && ` ("${searchQuery}" araması)`}
+        </div>
 
-            {aiResults.size > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">Sınıflandırma Sonuçları</h3>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{resultsCount} bağışçı analiz edildi</span>
-                    {warningsCount > 0 && (
-                      <Badge variant="destructive" className="text-xs">{warningsCount} uyarı</Badge>
-                    )}
-                    {aiSaveStatus === "saving" && (
-                      <Badge variant="outline" className="text-xs flex items-center gap-1">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Kaydediliyor...
-                      </Badge>
-                    )}
-                    {aiSaveStatus === "saved" && (
-                      <Badge variant="outline" className="text-xs text-green-600 border-green-300 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> Kaydedildi
-                      </Badge>
-                    )}
-                    {aiSaveStatus === "error" && (
-                      <Badge variant="outline" className="text-xs text-red-600 border-red-300 flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" /> Kaydetme hatası
-                      </Badge>
-                    )}
-                  </div>
-                </div>
+        <div className="border rounded-lg overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-10 text-xs">#</TableHead>
+                <TableHead className="text-xs min-w-[150px]">Ad / Açıklama</TableHead>
+                <TableHead className="text-xs w-24">Bağış Türü</TableHead>
+                <TableHead className="text-xs w-24">Vekalet No</TableHead>
+                <TableHead className="text-xs min-w-[200px]">Not</TableHead>
+                <TableHead className="text-xs w-[180px]">AI Sonucu</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredDonations.map((d, idx) => {
+                const aiResult = aiResults.get(d.id);
+                const hasWarning = aiResult?.warnings && aiResult.warnings.trim() !== "";
+                const globalIdx = donations.indexOf(d);
 
-                {donations.filter(d => aiResults.has(d.id)).map(d => {
-                  const result = aiResults.get(d.id)!;
-                  const hasWarning = result.warnings && result.warnings.trim() !== "";
-                  const isExpanded = expandedResults.has(d.id);
-
-                  return (
-                    <Card
-                      key={d.id}
-                      className={`overflow-hidden transition-colors ${hasWarning ? "border-destructive/40 bg-destructive/5" : ""}`}
-                    >
-                      <div
-                        className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50"
-                        onClick={() => toggleExpandResult(d.id)}
-                      >
-                        <div className="shrink-0">
-                          {hasWarning ? (
-                            <AlertTriangle className="w-4 h-4 text-destructive" />
-                          ) : (
-                            <CheckCircle2 className="w-4 h-4 text-green-500" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium truncate">{d.description || d.name || "(İsimsiz)"}</span>
-                            {d.donationType && (
-                              <Badge variant="outline" className="text-xs shrink-0">{d.donationType}</Badge>
-                            )}
-                          </div>
-                          {result.summary && (
-                            <p className="text-xs text-muted-foreground truncate mt-0.5">{result.summary}</p>
-                          )}
-                          {result.categories && result.categories.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {result.categories.map(cat => (
-                                <Badge key={cat} variant="secondary" className="text-xs">{cat.replace(/_/g, " ")}</Badge>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="shrink-0 text-muted-foreground">
-                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </div>
-                      </div>
-
-                      {isExpanded && (
-                        <div className="border-t px-3 pb-3 space-y-2 pt-2">
-                          <div>
-                            <span className="text-xs font-semibold text-muted-foreground">Orijinal Not:</span>
-                            <p className="text-sm mt-1 bg-muted rounded p-2">{d.notes || "(Boş)"}</p>
-                          </div>
-                          {result.requests && result.requests.trim() !== "" && (
-                            <div>
-                              <span className="text-xs font-semibold text-blue-600">Tespit Edilen İstekler:</span>
-                              <p className="text-sm mt-1">{result.requests}</p>
-                            </div>
-                          )}
-                          {hasWarning && (
-                            <div className="bg-destructive/10 rounded p-2 border border-destructive/20">
-                              <span className="text-xs font-semibold text-destructive flex items-center gap-1 mb-1">
-                                <AlertTriangle className="w-3 h-3" />
-                                Uyarı:
-                              </span>
-                              <p className="text-sm text-destructive">{result.warnings}</p>
-                            </div>
-                          )}
-                        </div>
+                return (
+                  <TableRow
+                    key={d.id}
+                    className={hasWarning ? "bg-destructive/5" : ""}
+                  >
+                    <TableCell className="text-xs text-muted-foreground">{globalIdx + 1}</TableCell>
+                    <TableCell>
+                      <span className="text-sm font-medium">{d.description || d.name || "(İsimsiz)"}</span>
+                    </TableCell>
+                    <TableCell>
+                      {d.donationType && (
+                        <Badge variant="outline" className="text-xs">{d.donationType}</Badge>
                       )}
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+                    </TableCell>
+                    <TableCell>
+                      {d.vekalet && (
+                        <span className="text-xs text-muted-foreground">{d.vekalet}</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Textarea
+                          value={d.notes}
+                          onChange={e => handleNoteChange(d.id, e.target.value)}
+                          onBlur={() => commitNoteChange(d.id)}
+                          placeholder="Not yok..."
+                          className="text-xs min-h-[36px] resize-none py-1 px-2"
+                          rows={1}
+                        />
+                        {d.notes.trim() !== "" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive shrink-0 h-6 w-6 p-0"
+                            onClick={() => {
+                              updateDonationsWithHistory(prev =>
+                                prev.map(x => x.id === d.id ? { ...x, notes: "" } : x)
+                              );
+                            }}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {aiRunning && !aiResult && d.notes.trim() !== "" && (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                      )}
+                      {aiResult && (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button className="flex items-center gap-1 text-left hover:bg-muted/50 rounded p-1 -m-1 transition-colors w-full">
+                              {hasWarning ? (
+                                <AlertTriangle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                              ) : (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                              )}
+                              <div className="flex flex-wrap gap-0.5 min-w-0">
+                                {aiResult.categories && aiResult.categories.length > 0 ? (
+                                  aiResult.categories.slice(0, 2).map(cat => (
+                                    <Badge key={cat} variant="secondary" className="text-[10px] px-1 py-0">{cat.replace(/_/g, " ")}</Badge>
+                                  ))
+                                ) : (
+                                  <span className="text-[10px] text-muted-foreground">sonuç var</span>
+                                )}
+                                {aiResult.categories && aiResult.categories.length > 2 && (
+                                  <span className="text-[10px] text-muted-foreground">+{aiResult.categories.length - 2}</span>
+                                )}
+                              </div>
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80 space-y-2" side="left">
+                            <div className="text-sm font-medium">{d.description || d.name}</div>
+                            {aiResult.summary && (
+                              <p className="text-xs text-muted-foreground">{aiResult.summary}</p>
+                            )}
+                            {aiResult.categories && aiResult.categories.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {aiResult.categories.map(cat => (
+                                  <Badge key={cat} variant="secondary" className="text-xs">{cat.replace(/_/g, " ")}</Badge>
+                                ))}
+                              </div>
+                            )}
+                            {aiResult.requests && aiResult.requests.trim() !== "" && (
+                              <div>
+                                <span className="text-xs font-semibold text-blue-600">İstekler:</span>
+                                <p className="text-xs mt-0.5">{aiResult.requests}</p>
+                              </div>
+                            )}
+                            {hasWarning && (
+                              <div className="bg-destructive/10 rounded p-2 border border-destructive/20">
+                                <span className="text-xs font-semibold text-destructive flex items-center gap-1 mb-0.5">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Uyarı:
+                                </span>
+                                <p className="text-xs text-destructive">{aiResult.warnings}</p>
+                              </div>
+                            )}
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+
+              {filteredDonations.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-12 text-sm">
+                    {searchQuery ? "Arama sonucu bulunamadı" : "Bağışçı yok"}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
@@ -638,7 +769,7 @@ export default function NotDuzenlemePage() {
               {searchQuery
                 ? `Filtrelenmiş ${filteredDonations.filter(d => d.notes.trim() !== "").length} bağışçının notu silinecek.`
                 : `${notesWithContent.length} bağışçının tüm notları silinecek.`}
-              Bu işlem geri alınabilir (Kaydet'e basmadan geri alabilirsiniz).
+              Bu işlem geri alınabilir (Geri Al butonuyla veya Ctrl+Z ile geri alabilirsiniz).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
