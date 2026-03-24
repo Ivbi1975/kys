@@ -481,6 +481,14 @@ export default function ProjeDetayPage() {
                 0
               );
               const occ = totalSlots > 0 ? Math.round((filledSlots / totalSlots) * 100) : 0;
+              const kesildiCount = k.animalGroups.filter(g => g.kesildi).length;
+              const totalGroups = k.animalGroups.length;
+              const kesildiPercent = totalGroups > 0 ? Math.round((kesildiCount / totalGroups) * 100) : 0;
+              const lastKesildiAt = k.animalGroups
+                .filter(g => g.kesildiAt)
+                .map(g => g.kesildiAt!)
+                .sort()
+                .pop();
               return (
                 <Card
                   key={k.id}
@@ -537,6 +545,27 @@ export default function ProjeDetayPage() {
                       <div className="text-[10px] text-muted-foreground">Doluluk</div>
                     </div>
                   </div>
+                  {totalGroups > 0 && (
+                    <div className="mt-3 pt-2 border-t">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] text-muted-foreground font-medium">Kesim Durumu</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-emerald-600">{kesildiCount}/{totalGroups}</span>
+                          {lastKesildiAt && (
+                            <span className="text-[9px] text-muted-foreground">
+                              (son: {new Date(lastKesildiAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                          style={{ width: `${kesildiPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </Card>
               );
             })}

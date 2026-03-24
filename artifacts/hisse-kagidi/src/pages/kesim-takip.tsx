@@ -3,13 +3,23 @@ import { useParams } from "wouter";
 import { fetchTrackingData, toggleKesildi } from "@/lib/api";
 import type { TrackingData, TrackingGroup } from "@/lib/api";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, Circle, Loader2, AlertTriangle, Beef } from "lucide-react";
+import { CheckCircle2, Circle, Loader2, AlertTriangle, Beef, Clock } from "lucide-react";
 
 const colorMap: Record<string, string> = {
   green: "#22c55e",
   orange: "#f97316",
   red: "#ef4444",
 };
+
+function formatKesildiTime(isoString: string | null): string {
+  if (!isoString) return "";
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
 
 export default function KesimTakipPage() {
   const params = useParams<{ token: string }>();
@@ -42,13 +52,14 @@ export default function KesimTakipPage() {
     setToggling(prev => new Set(prev).add(group.id));
     try {
       await toggleKesildi(params.token, group.id, !group.kesildi);
+      const newKesildi = !group.kesildi;
       setData(prev => {
         if (!prev) return prev;
         return {
           ...prev,
           kesildiCount: prev.kesildiCount + (group.kesildi ? -1 : 1),
           groups: prev.groups.map(g =>
-            g.id === group.id ? { ...g, kesildi: !g.kesildi } : g
+            g.id === group.id ? { ...g, kesildi: newKesildi, kesildiAt: newKesildi ? new Date().toISOString() : null } : g
           ),
         };
       });
@@ -142,8 +153,14 @@ export default function KesimTakipPage() {
                       <span className="font-semibold text-sm">Hayvan {group.animalNo}</span>
                       <span className="text-xs text-muted-foreground">({group.filledCount}/7 dolu)</span>
                       {group.kesildi && (
-                        <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full font-semibold">
+                        <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
                           Kesildi
+                          {group.kesildiAt && (
+                            <>
+                              <Clock className="w-2.5 h-2.5" />
+                              {formatKesildiTime(group.kesildiAt)}
+                            </>
+                          )}
                         </span>
                       )}
                     </div>

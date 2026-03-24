@@ -3226,16 +3226,27 @@ export default function KesimAlaniPage() {
               <div className="text-xs text-muted-foreground">Doluluk</div>
             </Card>
           )}
-          {kesim.animalGroups.length > 0 && (
-            <Card className="p-3 text-center">
-              <div className="text-2xl font-bold text-emerald-600">
-                {kesim.animalGroups.filter(g => g.kesildi).length}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {kesim.animalGroups.length} hayvan / kesildi
-              </div>
-            </Card>
-          )}
+          {kesim.animalGroups.length > 0 && (() => {
+            const kesildiCount = kesim.animalGroups.filter(g => g.kesildi).length;
+            const lastAt = kesim.animalGroups
+              .filter(g => g.kesildiAt)
+              .map(g => g.kesildiAt!)
+              .sort()
+              .pop();
+            return (
+              <Card className="p-3 text-center">
+                <div className="text-2xl font-bold text-emerald-600">
+                  {kesildiCount}/{kesim.animalGroups.length}
+                </div>
+                <div className="text-xs text-muted-foreground">Kesildi</div>
+                {lastAt && (
+                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                    Son: {new Date(lastAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                )}
+              </Card>
+            );
+          })()}
           {ungroupedDonors.length > 0 && (
             <Card
               className={`p-3 text-center cursor-pointer transition-colors ${filterUngrouped ? "ring-2 ring-orange-500 bg-orange-50 dark:bg-orange-950" : "hover:bg-muted"}`}

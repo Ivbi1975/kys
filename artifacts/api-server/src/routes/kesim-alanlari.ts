@@ -166,6 +166,7 @@ async function getFullKesimAlani(id: string) {
       locked: g.locked,
       notes: g.notes,
       kesildi: g.kesildi,
+      kesildiAt: g.kesildiAt || null,
       donations: links.map(l => donationsById[l.donationId]).filter(Boolean),
     };
   });
@@ -317,6 +318,16 @@ router.put("/kesim-alanlari/:id", async (req, res) => {
       return;
     }
 
+    let kesildiMap: Map<string, { kesildi: boolean; kesildiAt: string | null }> | undefined;
+    if (animalGroups !== undefined) {
+      const existingGroups = await db.select({
+        id: animalGroupsTable.id,
+        kesildi: animalGroupsTable.kesildi,
+        kesildiAt: animalGroupsTable.kesildiAt,
+      }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id));
+      kesildiMap = new Map(existingGroups.map(g => [g.id, { kesildi: g.kesildi, kesildiAt: g.kesildiAt }]));
+    }
+
     await db.transaction(async (tx) => {
       if (name !== undefined) {
         await tx.update(kesimAlanlariTable).set({ name }).where(eq(kesimAlanlariTable.id, id));
@@ -336,7 +347,7 @@ router.put("/kesim-alanlari/:id", async (req, res) => {
         await tx.delete(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id));
         await tx.delete(donationsTable).where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)));
         await saveDonations(tx, id, donations);
-        await saveAnimalGroups(tx, id, animalGroups);
+        await saveAnimalGroups(tx, id, animalGroups, kesildiMap);
       } else if (donations !== undefined) {
         await tx.delete(donationTagsTable).where(
           inArray(donationTagsTable.donationId,
@@ -357,7 +368,7 @@ router.put("/kesim-alanlari/:id", async (req, res) => {
           )
         );
         await tx.delete(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id));
-        await saveAnimalGroups(tx, id, animalGroups);
+        await saveAnimalGroups(tx, id, animalGroups, kesildiMap);
       }
     });
 
@@ -704,6 +715,13 @@ router.put("/kesim-alanlari/:id/animal-groups/bulk", async (req, res) => {
       return;
     }
 
+    const existingGroups = await db.select({
+      id: animalGroupsTable.id,
+      kesildi: animalGroupsTable.kesildi,
+      kesildiAt: animalGroupsTable.kesildiAt,
+    }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId));
+    const kesildiMap = new Map(existingGroups.map(g => [g.id, { kesildi: g.kesildi, kesildiAt: g.kesildiAt }]));
+
     await db.transaction(async (tx) => {
       await tx.delete(animalGroupDonationsTable).where(
         inArray(animalGroupDonationsTable.groupId,
@@ -711,7 +729,7 @@ router.put("/kesim-alanlari/:id/animal-groups/bulk", async (req, res) => {
         )
       );
       await tx.delete(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId));
-      await saveAnimalGroups(tx, kesimAlaniId, animalGroups);
+      await saveAnimalGroups(tx, kesimAlaniId, animalGroups, kesildiMap);
     });
 
     const result = await getFullKesimAlani(kesimAlaniId);
@@ -747,12 +765,15 @@ router.put("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => {
       return;
     }
 
-    const dbUpdates: Record<string, string | number | boolean> = {};
+    const dbUpdates: Record<string, string | number | boolean | null> = {};
     if (updates.animalNo !== undefined) dbUpdates.animalNo = updates.animalNo;
     if (updates.colorTag !== undefined) dbUpdates.colorTag = updates.colorTag;
     if (updates.locked !== undefined) dbUpdates.locked = updates.locked;
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
-    if (updates.kesildi !== undefined) dbUpdates.kesildi = updates.kesildi;
+    if (updates.kesildi !== undefined) {
+      dbUpdates.kesildi = updates.kesildi;
+      dbUpdates.kesildiAt = updates.kesildi ? new Date().toISOString() : null;
+    }
 
     await db.transaction(async (tx) => {
       if (Object.keys(dbUpdates).length > 0) {
@@ -1184,19 +1205,23 @@ async function saveDonations(tx: Tx, kesimAlaniId: string, donations: DonationPa
   }
 }
 
-async function saveAnimalGroups(tx: Tx, kesimAlaniId: string, groups: AnimalGroupPayload[]) {
+async function saveAnimalGroups(tx: Tx, kesimAlaniId: string, groups: AnimalGroupPayload[], kesildiMap?: Map<string, { kesildi: boolean; kesildiAt: string | null }>) {
   if (groups.length === 0) return;
 
-  const groupRows = groups.map((g, i) => ({
-    id: g.id,
-    kesimAlaniId,
-    animalNo: g.animalNo || 0,
-    colorTag: g.colorTag || "",
-    locked: g.locked || false,
-    notes: g.notes || "",
-    sortOrder: i,
-    kesildi: false,
-  }));
+  const groupRows = groups.map((g, i) => {
+    const existing = kesildiMap?.get(g.id);
+    return {
+      id: g.id,
+      kesimAlaniId,
+      animalNo: g.animalNo || 0,
+      colorTag: g.colorTag || "",
+      locked: g.locked || false,
+      notes: g.notes || "",
+      sortOrder: i,
+      kesildi: existing?.kesildi ?? false,
+      kesildiAt: existing?.kesildiAt ?? null,
+    };
+  });
 
   for (let i = 0; i < groupRows.length; i += BATCH_SIZE) {
     await tx.insert(animalGroupsTable).values(groupRows.slice(i, i + BATCH_SIZE));
@@ -1390,6 +1415,7 @@ router.get("/tracking/:token", async (req, res) => {
         animalNo: g.animalNo,
         colorTag: g.colorTag,
         kesildi: g.kesildi,
+        kesildiAt: g.kesildiAt || null,
         filledCount: filledDonations.length,
         donors: filledDonations.map(d => ({ name: d.name, description: d.description, donationType: d.donationType })),
       };
@@ -1432,8 +1458,9 @@ router.put("/tracking/:token/group/:groupId/kesildi", async (req, res) => {
       return;
     }
 
-    await db.update(animalGroupsTable).set({ kesildi }).where(eq(animalGroupsTable.id, groupId));
-    res.json({ success: true, groupId, kesildi });
+    const kesildiAt = kesildi ? new Date().toISOString() : null;
+    await db.update(animalGroupsTable).set({ kesildi, kesildiAt }).where(eq(animalGroupsTable.id, groupId));
+    res.json({ success: true, groupId, kesildi, kesildiAt });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`PUT /tracking/${req.params.token}/group/${req.params.groupId}/kesildi error:`, message);

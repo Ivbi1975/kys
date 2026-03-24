@@ -443,6 +443,7 @@ export interface TrackingGroup {
   animalNo: number;
   colorTag: string;
   kesildi: boolean;
+  kesildiAt: string | null;
   filledCount: number;
   donors: { name: string; description: string; donationType: string }[];
 }

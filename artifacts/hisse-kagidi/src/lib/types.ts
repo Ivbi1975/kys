@@ -28,6 +28,7 @@ export interface AnimalGroup {
   locked?: boolean;
   notes?: string;
   kesildi?: boolean;
+  kesildiAt?: string | null;
 }
 
 export interface KesimAlani {
