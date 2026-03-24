@@ -64,6 +64,7 @@
     "react-hook-form": "^7.55.0",
     "react-icons": "^5.4.0",
     "react-resizable-panels": "^2.1.7",
+    "react-virtuoso": "^4.18.3",
     "recharts": "^2.15.2",
     "sonner": "^2.0.7",
     "tailwind-merge": "catalog:",
@@ -72,11 +73,10 @@
     "vaul": "^1.1.2",
     "vite": "catalog:",
     "wouter": "^3.3.5",
-    "react-virtuoso": "^4.18.3",
-    "xlsx": "^0.18.5",
     "zod": "catalog:"
   },
   "dependencies": {
-    "react-virtuoso": "^4.18.3"
+    "react-virtuoso": "^4.18.3",
+    "xlsx-js-style": "^1.2.0"
   }
 }

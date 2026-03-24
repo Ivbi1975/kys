@@ -6,6 +6,7 @@ export interface PrintPreferences {
   hiddenColumns: string[];
   contentHideRules: Record<string, string[]>;
   template: PrintTemplate;
+  columnFontSizes: Record<string, number>;
 }
 
 export const DEFAULT_PRINT_PREFS: PrintPreferences = {
@@ -14,6 +15,7 @@ export const DEFAULT_PRINT_PREFS: PrintPreferences = {
     "vekaleti-veren": ["Vacip", "VACİB", "vacib", "Vacib"],
   },
   template: "standard",
+  columnFontSizes: {},
 };
 
 export const PRINT_TEMPLATES: { value: PrintTemplate; label: string; description: string }[] = [
@@ -40,20 +42,29 @@ export function loadPrintPreferences(): PrintPreferences {
         ? parsed.hiddenColumns.filter((k: unknown) => typeof k === "string" && VALID_COLUMN_KEYS.includes(k as string))
         : [];
       const contentHideRules: Record<string, string[]> = {};
+      const CONTENT_HIDE_ALLOWED = ["vekaleti-veren", "notlar"];
       if (parsed.contentHideRules && typeof parsed.contentHideRules === "object") {
         for (const [key, val] of Object.entries(parsed.contentHideRules)) {
-          if (VALID_COLUMN_KEYS.includes(key) && Array.isArray(val) && val.every((v) => typeof v === "string")) {
+          if (CONTENT_HIDE_ALLOWED.includes(key) && Array.isArray(val) && val.every((v) => typeof v === "string")) {
             contentHideRules[key] = val as string[];
           }
         }
       }
       const template = VALID_TEMPLATES.includes(parsed.template) ? parsed.template : "standard";
-      return { hiddenColumns, contentHideRules, template };
+      const columnFontSizes: Record<string, number> = {};
+      if (parsed.columnFontSizes && typeof parsed.columnFontSizes === "object") {
+        for (const [key, val] of Object.entries(parsed.columnFontSizes)) {
+          if (VALID_COLUMN_KEYS.includes(key) && typeof val === "number" && val >= 8 && val <= 36) {
+            columnFontSizes[key] = val;
+          }
+        }
+      }
+      return { hiddenColumns, contentHideRules, template, columnFontSizes };
     }
   } catch {
     console.warn("Print preferences could not be loaded, using defaults");
   }
-  return { ...DEFAULT_PRINT_PREFS, contentHideRules: { ...DEFAULT_PRINT_PREFS.contentHideRules } };
+  return { ...DEFAULT_PRINT_PREFS, contentHideRules: { ...DEFAULT_PRINT_PREFS.contentHideRules }, columnFontSizes: {} };
 }
 
 export function resetPrintPreferences(): void {

@@ -103,7 +103,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 
 type SortField = "name" | "description" | "donationType" | "shareCount";
 type SortDir = "asc" | "desc";

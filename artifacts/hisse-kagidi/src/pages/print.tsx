@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, Printer, Settings2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff, FileSpreadsheet, FileText, LayoutTemplate } from "lucide-react";
 import type { KesimAlani, AnimalGroup } from "@/lib/types";
 import { fetchKesimAlani, fetchLogo } from "@/lib/api";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import {
   loadPrintPreferences,
   savePrintPreferences,
@@ -96,8 +96,11 @@ export default function PrintPage() {
     });
   }
 
+  const CONTENT_HIDE_ALLOWED_COLUMNS = ["vekaleti-veren", "notlar"];
+
   function shouldHideContent(columnKey: string, cinsi: string): boolean {
     if (!cinsi) return false;
+    if (!CONTENT_HIDE_ALLOWED_COLUMNS.includes(columnKey)) return false;
     const rules = prefs.contentHideRules[columnKey];
     if (!rules || rules.length === 0) return false;
     const normalized = cinsi.trim().toLowerCase();
@@ -124,7 +127,29 @@ export default function PrintPage() {
     setPrefs({
       ...DEFAULT_PRINT_PREFS,
       contentHideRules: { ...DEFAULT_PRINT_PREFS.contentHideRules },
+      columnFontSizes: {},
     });
+  }
+
+  const DEFAULT_FONT_SIZES: Record<string, number> = {
+    hayvan: 32,
+    sira: 14,
+    vekalet: 11,
+    "vekaleti-veren": 13,
+    "adina-kesilen": 13,
+    cinsi: 12,
+    notlar: 11,
+  };
+
+  function getColumnFontSize(key: string): number {
+    return prefs.columnFontSizes[key] || DEFAULT_FONT_SIZES[key] || 13;
+  }
+
+  function setColumnFontSize(key: string, size: number) {
+    updatePrefs((prev) => ({
+      ...prev,
+      columnFontSizes: { ...prev.columnFontSizes, [key]: size },
+    }));
   }
 
   function setTemplate(t: PrintTemplate) {
@@ -153,8 +178,11 @@ export default function PrintPage() {
   function exportKesimKagidiExcel() {
     if (!kesim || kesim.animalGroups.length === 0) return;
     const wb = XLSX.utils.book_new();
+
+    const titleRow = [kesim.name];
+    const emptyRow: string[] = [];
     const headers = visibleColumns.map(c => c.label);
-    const rows: (string | number)[][] = [];
+    const allRows: (string | number)[][] = [titleRow, emptyRow, headers];
 
     for (const group of processedGroups) {
       for (let idx = 0; idx < group.donations.length; idx++) {
@@ -171,16 +199,32 @@ export default function PrintPage() {
             row.push(hidden ? "" : content);
           }
         }
-        rows.push(row);
+        allRows.push(row);
       }
     }
 
-    const sheetData = [headers, ...rows];
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    const footerRow = [
+      `${kesim.name}`,
+      "",
+      "",
+      `Toplam ${processedGroups.length} hayvan`,
+      "",
+      "",
+      new Date().toLocaleDateString("tr-TR"),
+    ].slice(0, visibleColumns.length);
+    allRows.push(emptyRow);
+    allRows.push(footerRow);
+
+    const ws = XLSX.utils.aoa_to_sheet(allRows);
+
+    if (visibleColumns.length > 1) {
+      if (!ws["!merges"]) ws["!merges"] = [];
+      ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: visibleColumns.length - 1 } });
+    }
 
     const hayvanColIdx = visibleColumns.findIndex(c => c.key === "hayvan");
     if (hayvanColIdx >= 0) {
-      let rowIdx = 1;
+      let rowIdx = 3;
       for (const group of processedGroups) {
         if (group.donations.length > 1) {
           const merge = { s: { r: rowIdx, c: hayvanColIdx }, e: { r: rowIdx + group.donations.length - 1, c: hayvanColIdx } };
@@ -191,13 +235,70 @@ export default function PrintPage() {
       }
     }
 
+    const headerStyle = { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "1E3A5F" } }, alignment: { horizontal: "center", vertical: "center" }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } };
+    const titleStyle = { font: { bold: true, sz: 16, color: { rgb: "1E3A5F" } }, alignment: { horizontal: "center", vertical: "center" } };
+    const hayvanStyle = { font: { bold: true, sz: 24, color: { rgb: "1E3A5F" } }, fill: { fgColor: { rgb: "DBEAFE" } }, alignment: { horizontal: "center", vertical: "center" }, border: { top: { style: "medium" }, bottom: { style: "medium" }, left: { style: "medium" }, right: { style: "medium" } } };
+    const cellBorder = { top: { style: "thin", color: { rgb: "9CA3AF" } }, bottom: { style: "thin", color: { rgb: "9CA3AF" } }, left: { style: "thin", color: { rgb: "9CA3AF" } }, right: { style: "thin", color: { rgb: "9CA3AF" } } };
+    const evenRowFill = { fgColor: { rgb: "F8FAFC" } };
+
+    const titleCell = ws["A1"];
+    if (titleCell) {
+      titleCell.s = titleStyle;
+    }
+
+    for (let c = 0; c < visibleColumns.length; c++) {
+      const cellRef = XLSX.utils.encode_cell({ r: 2, c });
+      if (ws[cellRef]) {
+        ws[cellRef].s = headerStyle;
+      }
+    }
+
+    let dataRowStart = 3;
+    for (const group of processedGroups) {
+      for (let idx = 0; idx < group.donations.length; idx++) {
+        const r = dataRowStart + idx;
+        const isEven = idx % 2 === 1;
+        for (let c = 0; c < visibleColumns.length; c++) {
+          const cellRef = XLSX.utils.encode_cell({ r, c });
+          if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
+          const col = visibleColumns[c];
+          if (col.key === "hayvan" && idx === 0) {
+            ws[cellRef].s = hayvanStyle;
+          } else {
+            const style: Record<string, unknown> = { border: cellBorder, alignment: { vertical: "center" } };
+            if (isEven) style.fill = evenRowFill;
+            if (col.key === "sira") {
+              style.alignment = { horizontal: "center", vertical: "center" };
+              style.font = { bold: true };
+            } else if (col.key === "adina-kesilen") {
+              style.font = { bold: true };
+            } else if (col.key === "cinsi") {
+              style.alignment = { horizontal: "center", vertical: "center" };
+            }
+            ws[cellRef].s = style;
+          }
+        }
+      }
+      dataRowStart += group.donations.length;
+    }
+
     const colWidths = visibleColumns.map(c => {
-      if (c.key === "hayvan" || c.key === "sira") return { wch: 8 };
-      if (c.key === "vekalet") return { wch: 12 };
-      if (c.key === "cinsi") return { wch: 10 };
-      return { wch: 22 };
+      if (c.key === "hayvan") return { wch: 10 };
+      if (c.key === "sira") return { wch: 6 };
+      if (c.key === "vekalet") return { wch: 14 };
+      if (c.key === "cinsi") return { wch: 12 };
+      if (c.key === "notlar") return { wch: 20 };
+      return { wch: 25 };
     });
     ws["!cols"] = colWidths;
+
+    const rowHeights: Record<number, { hpt: number }> = {};
+    rowHeights[0] = { hpt: 30 };
+    rowHeights[2] = { hpt: 22 };
+    ws["!rows"] = [];
+    for (let i = 0; i <= dataRowStart + 2; i++) {
+      ws["!rows"].push(rowHeights[i] || { hpt: 20 });
+    }
 
     XLSX.utils.book_append_sheet(wb, ws, "Kesim Kağıdı");
     XLSX.writeFile(wb, `${kesim.name}_kesim_kagidi.xlsx`);
@@ -226,17 +327,17 @@ export default function PrintPage() {
                   {group.donations.map((d, idx) => (
                     <tr key={d.id}>
                       {!isColumnHidden("hayvan") && idx === 0 && (
-                        <td className="hayvan-cell" rowSpan={7}>
-                          <div className="hayvan-number">{group.animalNo}</div>
+                        <td className="hayvan-cell" rowSpan={7} style={{ fontSize: `${getColumnFontSize("hayvan")}px` }}>
+                          <div className="hayvan-number" style={{ fontSize: `${getColumnFontSize("hayvan")}px` }}>{group.animalNo}</div>
                         </td>
                       )}
                       {visibleColumns.filter((col) => col.key !== "hayvan").map((col) => {
                         if (col.key === "sira") {
-                          return <td key={col.key} className="sira-cell">{shouldHideContent("sira", d.donationType) ? "" : idx + 1}</td>;
+                          return <td key={col.key} className="sira-cell" style={{ fontSize: `${getColumnFontSize("sira")}px` }}>{shouldHideContent("sira", d.donationType) ? "" : idx + 1}</td>;
                         }
                         const content = getCellContent(col.key, d);
                         const hidden = shouldHideContent(col.key, d.donationType);
-                        return <td key={col.key} className={`${col.key}-cell`}>{hidden ? "" : content}</td>;
+                        return <td key={col.key} className={`${col.key}-cell`} style={{ fontSize: `${getColumnFontSize(col.key)}px` }}>{hidden ? "" : content}</td>;
                       })}
                     </tr>
                   ))}
@@ -277,17 +378,17 @@ export default function PrintPage() {
                   {group.donations.map((d, idx) => (
                     <tr key={d.id}>
                       {!isColumnHidden("hayvan") && idx === 0 && (
-                        <td className="hayvan-cell" rowSpan={7}>
-                          <div className="hayvan-number">{group.animalNo}</div>
+                        <td className="hayvan-cell" rowSpan={7} style={{ fontSize: `${getColumnFontSize("hayvan")}px` }}>
+                          <div className="hayvan-number" style={{ fontSize: `${getColumnFontSize("hayvan")}px` }}>{group.animalNo}</div>
                         </td>
                       )}
                       {visibleColumns.filter((col) => col.key !== "hayvan").map((col) => {
                         if (col.key === "sira") {
-                          return <td key={col.key} className="sira-cell">{shouldHideContent("sira", d.donationType) ? "" : idx + 1}</td>;
+                          return <td key={col.key} className="sira-cell" style={{ fontSize: `${getColumnFontSize("sira")}px` }}>{shouldHideContent("sira", d.donationType) ? "" : idx + 1}</td>;
                         }
                         const content = getCellContent(col.key, d);
                         const hidden = shouldHideContent(col.key, d.donationType);
-                        return <td key={col.key} className={`${col.key}-cell`}>{hidden ? "" : content}</td>;
+                        return <td key={col.key} className={`${col.key}-cell`} style={{ fontSize: `${getColumnFontSize(col.key)}px` }}>{hidden ? "" : content}</td>;
                       })}
                     </tr>
                   ))}
@@ -702,6 +803,53 @@ export default function PrintPage() {
                   </div>
                 </Card>
 
+                {(prefs.template === "standard" || prefs.template === "portrait") && (
+                  <Card className="p-4">
+                    <h3 className="text-sm font-semibold mb-3">Sütun Yazı Boyutu</h3>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Her sütunun yazı boyutunu ayrı ayrı ayarlayabilirsiniz.
+                    </p>
+                    <div className="space-y-2">
+                      {visibleColumns.map((col) => (
+                        <div key={col.key} className="flex items-center gap-3">
+                          <span className="text-xs font-medium w-32 truncate">{col.label}</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={() => setColumnFontSize(col.key, Math.max(8, getColumnFontSize(col.key) - 1))}
+                          >
+                            −
+                          </Button>
+                          <span className="text-xs font-mono w-8 text-center">{getColumnFontSize(col.key)}px</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={() => setColumnFontSize(col.key, Math.min(36, getColumnFontSize(col.key) + 1))}
+                          >
+                            +
+                          </Button>
+                          {prefs.columnFontSizes[col.key] && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs text-muted-foreground"
+                              onClick={() => updatePrefs((prev) => {
+                                const next = { ...prev.columnFontSizes };
+                                delete next[col.key];
+                                return { ...prev, columnFontSizes: next };
+                              })}
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
                 <Card className="p-4">
                   <h3 className="text-sm font-semibold mb-3">Koşullu İçerik Gizleme</h3>
                   <p className="text-xs text-muted-foreground mb-3">
@@ -711,7 +859,7 @@ export default function PrintPage() {
                     <p className="text-xs text-muted-foreground italic">Henüz cinsi bilgisi olan bağışçı yok.</p>
                   ) : (
                     <div className="space-y-2">
-                      {COLUMNS.filter((c) => c.key !== "hayvan").map((col) => {
+                      {COLUMNS.filter((c) => !["hayvan", "cinsi", "sira", "vekalet", "adina-kesilen"].includes(c.key)).map((col) => {
                         const isOpen = contentRulesOpen === col.key;
                         const rules = prefs.contentHideRules[col.key] || [];
                         const activeCount = rules.length;
