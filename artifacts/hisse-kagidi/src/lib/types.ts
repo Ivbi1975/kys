@@ -16,6 +16,8 @@ export interface Donation {
   notes: string;
   excluded?: boolean;
   tags?: string[];
+  aiCategories?: string[];
+  aiWarnings?: string;
 }
 
 export interface AnimalGroup {

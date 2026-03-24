@@ -136,7 +136,7 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
 Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
 
 - `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — table definitions with Drizzle-Zod insert schemas: `projectsTable`, `kesimAlanlariTable` (with `projectId` FK to projects), `donationsTable` (with `deletedAt` for soft-delete), `animalGroupsTable`, `animalGroupDonationsTable`, `customTagsTable`, `donationTagsTable`, `appSettingsTable`
+- `src/schema/index.ts` — table definitions with Drizzle-Zod insert schemas: `projectsTable`, `kesimAlanlariTable` (with `projectId` FK to projects), `donationsTable` (with `deletedAt` for soft-delete, `aiCategories` text JSON array, `aiWarnings` text for AI classification persistence), `animalGroupsTable`, `animalGroupDonationsTable`, `customTagsTable`, `donationTagsTable`, `appSettingsTable`
 - `drizzle/` — generated migration files
 - `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
 - Exports: `.` (pool, db, schema), `./schema` (schema only)

@@ -26,6 +26,8 @@ interface DonationExport {
   notes: string;
   excluded: boolean;
   tags: string[];
+  aiCategories?: string[];
+  aiWarnings?: string;
 }
 
 const backupImportSchema = z.object({
@@ -43,6 +45,8 @@ const backupImportSchema = z.object({
       notes: z.string().optional().default(""),
       excluded: z.boolean().optional().default(false),
       tags: z.array(z.string()).optional().default([]),
+      aiCategories: z.array(z.string()).optional(),
+      aiWarnings: z.string().optional(),
     })).optional().default([]),
     animalGroups: z.array(z.object({
       id: z.string().optional(),
@@ -96,6 +100,8 @@ router.post("/backup/export", async (_req, res) => {
         notes: d.notes,
         excluded: d.excluded,
         tags: tagsByDonation[d.id] || [],
+        aiCategories: d.aiCategories ? JSON.parse(d.aiCategories) : undefined,
+        aiWarnings: d.aiWarnings || undefined,
       };
     }
 
@@ -221,7 +227,7 @@ router.post("/backup/import", async (req, res) => {
           for (let i = 0; i < ka.donations.length; i++) {
             const d = ka.donations[i];
             const donationId = d.id || Math.random().toString(36).substring(2, 12);
-            const dValues = {
+            const dValues: Record<string, unknown> = {
               id: donationId,
               kesimAlaniId: kaId,
               name: d.name || "",
@@ -233,6 +239,12 @@ router.post("/backup/import", async (req, res) => {
               excluded: d.excluded || false,
               sortOrder: i,
             };
+            if (d.aiCategories && d.aiCategories.length > 0) {
+              dValues.aiCategories = JSON.stringify(d.aiCategories);
+            }
+            if (d.aiWarnings) {
+              dValues.aiWarnings = d.aiWarnings;
+            }
             if (mode === "merge") {
               await tx.insert(donationsTable).values(dValues).onConflictDoNothing();
             } else {

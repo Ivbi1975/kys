@@ -77,6 +77,7 @@ import {
   LayoutGrid,
   SlidersHorizontal,
   Filter,
+  Brain,
   MoveRight,
   X,
   HelpCircle,
@@ -241,6 +242,8 @@ export default function KesimAlaniPage() {
   const [filterHisseMin, setFilterHisseMin] = useState<number>(0);
   const [filterHisseMax, setFilterHisseMax] = useState<number>(0);
   const [filterTags, setFilterTags] = useState<string[]>([]);
+  const [filterAiCategories, setFilterAiCategories] = useState<string[]>([]);
+  const [filterAiWarnings, setFilterAiWarnings] = useState(false);
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "excluded">("all");
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [tagPopoverDonorId, setTagPopoverDonorId] = useState<string | null>(null);
@@ -2588,6 +2591,13 @@ export default function KesimAlaniPage() {
         const donorTags = d.tags || [];
         if (!filterTags.some(ft => donorTags.includes(ft))) return false;
       }
+      if (filterAiCategories.length > 0) {
+        const cats = d.aiCategories || [];
+        if (!filterAiCategories.some(fc => cats.includes(fc))) return false;
+      }
+      if (filterAiWarnings) {
+        if (!d.aiWarnings || !d.aiWarnings.trim()) return false;
+      }
       return true;
     });
 
@@ -2600,11 +2610,18 @@ export default function KesimAlaniPage() {
       d.donationType.toLowerCase().includes(q) ||
       (d.notes || "").toLowerCase().includes(q)
     );
-  }, [donations, showRemovedFilter, removedFromGroupIds, filterUngrouped, groupedDonorIds, filterStatus, filterCinsi, filterHisseMin, filterHisseMax, filterTags, debouncedSearchQuery]);
+  }, [donations, showRemovedFilter, removedFromGroupIds, filterUngrouped, groupedDonorIds, filterStatus, filterCinsi, filterHisseMin, filterHisseMax, filterTags, filterAiCategories, filterAiWarnings, debouncedSearchQuery]);
 
   const uniqueDonationTypes = useMemo(() =>
     Array.from(new Set(
       donations.map(d => d.donationType.trim()).filter(Boolean)
+    )).sort(),
+    [donations]
+  );
+
+  const availableAiCategories = useMemo(() =>
+    Array.from(new Set(
+      donations.flatMap(d => d.aiCategories || [])
     )).sort(),
     [donations]
   );
@@ -2630,6 +2647,8 @@ export default function KesimAlaniPage() {
     (filterCinsi !== "all" ? 1 : 0) +
     (filterHisseMin > 0 || filterHisseMax > 0 ? 1 : 0) +
     (filterTags.length > 0 ? 1 : 0) +
+    (filterAiCategories.length > 0 ? 1 : 0) +
+    (filterAiWarnings ? 1 : 0) +
     (filterStatus !== "all" ? 1 : 0);
 
   function clearAdvancedFilters() {
@@ -2637,6 +2656,8 @@ export default function KesimAlaniPage() {
     setFilterHisseMin(0);
     setFilterHisseMax(0);
     setFilterTags([]);
+    setFilterAiCategories([]);
+    setFilterAiWarnings(false);
     setFilterStatus("all");
   }
 
@@ -3749,6 +3770,40 @@ export default function KesimAlaniPage() {
                       </div>
                     </div>
                   )}
+                  {availableAiCategories.length > 0 && (
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Brain className="w-3 h-3" /> AI Kategorileri
+                      </label>
+                      <div className="flex gap-1 flex-wrap">
+                        {availableAiCategories.map(cat => {
+                          const isActive = filterAiCategories.includes(cat);
+                          return (
+                            <button
+                              key={cat}
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all border ${isActive ? "bg-violet-600 text-white border-violet-600 ring-2 ring-offset-1 ring-violet-400" : "bg-violet-50 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800 opacity-70 hover:opacity-100"}`}
+                              onClick={() => setFilterAiCategories(
+                                isActive ? filterAiCategories.filter(c => c !== cat) : [...filterAiCategories, cat]
+                              )}
+                            >
+                              {cat}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <label className="flex items-center gap-1.5 cursor-pointer mt-1">
+                        <input
+                          type="checkbox"
+                          checked={filterAiWarnings}
+                          onChange={(e) => setFilterAiWarnings(e.target.checked)}
+                          className="rounded"
+                        />
+                        <span className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-0.5">
+                          <AlertTriangle className="w-3 h-3" /> Uyarılı bağışçılar
+                        </span>
+                      </label>
+                    </div>
+                  )}
                 </div>
                 {(activeFilterCount > 0 || searchQuery.trim() || filterUngrouped || showRemovedFilter) && (
                   <div className="text-xs text-muted-foreground">
@@ -4012,12 +4067,28 @@ export default function KesimAlaniPage() {
                                 autoFocus
                               />
                             ) : (
-                              <span
-                                className="cursor-text block px-1 py-0.5 rounded hover:bg-muted/50 transition-colors"
-                                onClick={() => startEditing(d.id, "notes")}
-                              >
-                                {d.notes || "—"}
-                              </span>
+                              <div className="flex flex-col gap-0.5">
+                                <span
+                                  className="cursor-text block px-1 py-0.5 rounded hover:bg-muted/50 transition-colors"
+                                  onClick={() => startEditing(d.id, "notes")}
+                                >
+                                  {d.notes || "—"}
+                                </span>
+                                {((d.aiCategories && d.aiCategories.length > 0) || (d.aiWarnings && d.aiWarnings.trim())) && (
+                                  <div className="flex gap-0.5 flex-wrap px-1">
+                                    {(d.aiCategories || []).map(cat => (
+                                      <span key={cat} className="px-1.5 py-0 rounded-full text-[9px] font-medium bg-violet-100 dark:bg-violet-900 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
+                                        {cat}
+                                      </span>
+                                    ))}
+                                    {d.aiWarnings && d.aiWarnings.trim() && (
+                                      <span className="px-1.5 py-0 rounded-full text-[9px] font-medium bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-0.5" title={d.aiWarnings}>
+                                        <AlertTriangle className="w-2.5 h-2.5" /> uyarı
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </td>
                           <td className="p-2 text-center">

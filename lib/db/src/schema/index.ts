@@ -37,6 +37,8 @@ export const donationsTable = pgTable("donations", {
   excluded: boolean("excluded").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
   deletedAt: text("deleted_at"),
+  aiCategories: text("ai_categories"),
+  aiWarnings: text("ai_warnings"),
 }, (table) => [
   index("idx_donations_kesim_alani_id").on(table.kesimAlaniId),
 ]);

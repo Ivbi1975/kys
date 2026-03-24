@@ -161,6 +161,40 @@ router.post("/ai-notes/classify", async (req, res) => {
   }
 });
 
+router.put("/ai-notes/save-classifications", async (req, res) => {
+  try {
+    const parsed = z.object({
+      classifications: z.array(z.object({
+        donationId: z.string(),
+        categories: z.array(z.string()),
+        warnings: z.string().optional().default(""),
+      })),
+    }).safeParse(req.body);
+
+    if (!parsed.success) {
+      res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+      return;
+    }
+
+    const { classifications } = parsed.data;
+
+    await Promise.all(classifications.map(c =>
+      db.update(donationsTable)
+        .set({
+          aiCategories: JSON.stringify(c.categories),
+          aiWarnings: c.warnings,
+        })
+        .where(eq(donationsTable.id, c.donationId))
+    ));
+
+    res.json({ success: true, count: classifications.length });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error("PUT /ai-notes/save-classifications error:", message);
+    res.status(500).json({ error: message });
+  }
+});
+
 router.put("/ai-notes/bulk-update", async (req, res) => {
   try {
     const parsed = z.object({

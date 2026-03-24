@@ -44,6 +44,8 @@ interface DonationOutput {
   notes: string;
   excluded: boolean;
   tags: string[];
+  aiCategories: string[];
+  aiWarnings: string;
 }
 
 const donationPayloadSchema = z.object({
@@ -141,6 +143,8 @@ async function getFullKesimAlani(id: string) {
       notes: d.notes,
       excluded: d.excluded,
       tags: tagsByDonation[d.id] || [],
+      aiCategories: d.aiCategories ? JSON.parse(d.aiCategories) : [],
+      aiWarnings: d.aiWarnings || "",
     };
   }
 
@@ -612,6 +616,8 @@ router.get("/kesim-alanlari/:id/donations/deleted", async (req, res) => {
       excluded: d.excluded,
       deletedAt: d.deletedAt,
       tags: tagsByDonation[d.id] || [],
+      aiCategories: d.aiCategories ? JSON.parse(d.aiCategories) : [],
+      aiWarnings: d.aiWarnings || "",
     }));
     res.json(result);
   } catch (err) {

@@ -268,6 +268,13 @@ export async function classifyNotes(donations: AiDonationInput[]): Promise<{ res
   });
 }
 
+export async function saveAiClassifications(classifications: { donationId: string; categories: string[]; warnings: string }[]): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>("/ai-notes/save-classifications", {
+    method: "PUT",
+    body: JSON.stringify({ classifications }),
+  });
+}
+
 export interface ConflictEntry {
   donationId: string;
   donationName: string;

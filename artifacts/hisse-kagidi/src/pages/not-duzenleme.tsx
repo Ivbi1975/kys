@@ -27,6 +27,7 @@ import {
   fetchKesimAlani,
   bulkUpdateNotes,
   classifyNotes,
+  saveAiClassifications,
 } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -239,6 +240,15 @@ export default function NotDuzenlemePage() {
           }
           return next;
         });
+
+        try {
+          await saveAiClassifications(results.map(r => ({
+            donationId: r.donationId,
+            categories: r.categories || [],
+            warnings: r.warnings || "",
+          })));
+        } catch {
+        }
 
         done += batch.length;
         setAiProgress({ done, total: withNotes.length });
