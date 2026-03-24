@@ -275,6 +275,13 @@ export async function saveAiClassifications(classifications: { donationId: strin
   });
 }
 
+export async function moveDonationsToKesimAlani(donationIds: string[], sourceKesimAlaniId: string, targetKesimAlaniId: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>("/kesim-alanlari/move-donations", {
+    method: "POST",
+    body: JSON.stringify({ donationIds, sourceKesimAlaniId, targetKesimAlaniId }),
+  });
+}
+
 export interface ConflictEntry {
   donationId: string;
   donationName: string;

@@ -70,6 +70,7 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - Group merge (checkbox selection + toolbar, handles 7-share overflow into new groups)
 - Manual swap mode (ArrowLeftRight icon, preview dialog before executing)
 - Auto conflict resolver ("Otomatik Çöz" button, optimally consolidates same-vekalet donors by choosing the target group with most existing matches to minimize swaps)
+- Cross-kesim-alanı basket (kese): basket items persist in localStorage per project, visible when navigating between KAs; items from other KAs shown with blue badges; transfer donors to another KA in same project via "Başka KA'ya taşı" dropdown; group-level "Tümünü Sepete Ekle" button in group header (shopping bag icon)
 - Custom tag system: global tag definitions (name + color) managed in Settings, assignable to donors via popover, displayed as colored badges, included in backup/restore, orphaned tags cleaned on deletion
 - Advanced filtering: filter donor list by cinsi (dropdown), hisse range (min/max), status (active/excluded), tags (multi-select) — combinable filters with active count badge and clear button
 - Data persisted in PostgreSQL via API server (migrated from localStorage)

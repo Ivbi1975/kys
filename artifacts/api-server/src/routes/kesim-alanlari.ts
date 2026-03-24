@@ -1230,4 +1230,86 @@ async function saveAnimalGroups(tx: Tx, kesimAlaniId: string, groups: AnimalGrou
   }
 }
 
+router.post("/kesim-alanlari/move-donations", async (req, res) => {
+  try {
+    const parsed = z.object({
+      donationIds: z.array(z.string()).min(1),
+      sourceKesimAlaniId: z.string(),
+      targetKesimAlaniId: z.string(),
+    }).safeParse(req.body);
+
+    if (!parsed.success) {
+      res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+      return;
+    }
+
+    const { donationIds, sourceKesimAlaniId, targetKesimAlaniId } = parsed.data;
+
+    if (sourceKesimAlaniId === targetKesimAlaniId) {
+      res.status(400).json({ error: "Kaynak ve hedef kesim alanı aynı olamaz" });
+      return;
+    }
+
+    const [sourceKA, targetKA] = await Promise.all([
+      db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, sourceKesimAlaniId)).then(r => r[0]),
+      db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, targetKesimAlaniId)).then(r => r[0]),
+    ]);
+
+    if (!sourceKA || sourceKA.deletedAt) {
+      res.status(404).json({ error: "Kaynak kesim alanı bulunamadı" });
+      return;
+    }
+    if (!targetKA || targetKA.deletedAt) {
+      res.status(404).json({ error: "Hedef kesim alanı bulunamadı" });
+      return;
+    }
+
+    if (sourceKA.projectId !== targetKA.projectId) {
+      res.status(400).json({ error: "Kaynak ve hedef kesim alanları aynı projede olmalıdır" });
+      return;
+    }
+
+    const sourceDonations = await db.select({ id: donationsTable.id })
+      .from(donationsTable)
+      .where(and(
+        inArray(donationsTable.id, donationIds),
+        eq(donationsTable.kesimAlaniId, sourceKesimAlaniId),
+        isNull(donationsTable.deletedAt),
+      ));
+    const validIds = sourceDonations.map(d => d.id);
+
+    if (validIds.length === 0) {
+      res.status(400).json({ error: "Aktarılacak geçerli bağışçı bulunamadı" });
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      const groupLinks = await tx.select()
+        .from(animalGroupDonationsTable)
+        .where(inArray(animalGroupDonationsTable.donationId, validIds));
+
+      if (groupLinks.length > 0) {
+        await tx.delete(animalGroupDonationsTable)
+          .where(inArray(animalGroupDonationsTable.donationId, validIds));
+      }
+
+      const existingTarget = await tx.select().from(donationsTable)
+        .where(and(eq(donationsTable.kesimAlaniId, targetKesimAlaniId), isNull(donationsTable.deletedAt)));
+      const maxSort = existingTarget.length;
+
+      for (let i = 0; i < validIds.length; i++) {
+        await tx.update(donationsTable)
+          .set({ kesimAlaniId: targetKesimAlaniId, sortOrder: maxSort + i })
+          .where(eq(donationsTable.id, validIds[i]));
+      }
+    });
+
+    res.json({ success: true, count: validIds.length, skipped: donationIds.length - validIds.length });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error("POST /kesim-alanlari/move-donations error:", message);
+    res.status(500).json({ error: message });
+  }
+});
+
 export default router;

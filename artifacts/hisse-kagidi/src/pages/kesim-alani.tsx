@@ -90,10 +90,11 @@ import {
   Package,
   SearchX,
   RotateCcw,
+  Send,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
 import { Tag } from "lucide-react";
-import { fetchKesimAlani, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation } from "@/lib/api";
+import { fetchKesimAlani, fetchKesimAlanlari, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani } from "@/lib/api";
 import type { DeletedDonation } from "@/lib/api";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
@@ -109,6 +110,36 @@ import * as XLSX from "xlsx-js-style";
 type SortField = "name" | "description" | "donationType" | "shareCount";
 type SortDir = "asc" | "desc";
 type ColumnMapping = "name" | "description" | "donationType" | "shareCount" | "vekalet" | "notes" | "skip";
+
+interface BasketItem {
+  donationId: string;
+  kesimAlaniId: string;
+  kesimAlaniName: string;
+  name: string;
+  description: string;
+}
+
+const BASKET_STORAGE_KEY = "kurban-basket";
+
+function loadBasketFromStorage(projectId: string | null | undefined): BasketItem[] {
+  try {
+    const key = projectId ? `${BASKET_STORAGE_KEY}-${projectId}` : BASKET_STORAGE_KEY;
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch { return []; }
+}
+
+function saveBasketToStorage(items: BasketItem[], projectId: string | null | undefined) {
+  try {
+    const key = projectId ? `${BASKET_STORAGE_KEY}-${projectId}` : BASKET_STORAGE_KEY;
+    if (items.length === 0) {
+      localStorage.removeItem(key);
+    } else {
+      localStorage.setItem(key, JSON.stringify(items));
+    }
+  } catch {}
+}
 
 const COLUMN_OPTIONS: { value: ColumnMapping; label: string }[] = [
   { value: "name", label: "Adına Kesilen" },
@@ -247,8 +278,11 @@ export default function KesimAlaniPage() {
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "excluded">("all");
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [tagPopoverDonorId, setTagPopoverDonorId] = useState<string | null>(null);
-  const [basketItems, setBasketItems] = useState<string[]>([]);
+  const [basketItems, setBasketItems] = useState<BasketItem[]>([]);
   const [basketTransferTarget, setBasketTransferTarget] = useState<number>(-1);
+  const [basketCrossKATarget, setBasketCrossKATarget] = useState<string>("");
+  const [siblingKesimAlanlari, setSiblingKesimAlanlari] = useState<{ id: string; name: string }[]>([]);
+  const [crossKATransferring, setCrossKATransferring] = useState(false);
   const [basketOpen, setBasketOpen] = useState(true);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [, startFilterTransition] = useTransition();
@@ -286,6 +320,17 @@ export default function KesimAlaniPage() {
         if (data) {
           setKesim(data);
           history.initialize(data);
+          const stored = loadBasketFromStorage(data.projectId);
+          setBasketItems(stored);
+          if (data.projectId) {
+            try {
+              const allKA = await fetchKesimAlanlari();
+              const siblings = allKA
+                .filter(ka => ka.projectId === data.projectId && ka.id !== data.id && !ka.deletedAt)
+                .map(ka => ({ id: ka.id, name: ka.name }));
+              setSiblingKesimAlanlari(siblings);
+            } catch {}
+          }
         } else {
           setLocation("/");
         }
@@ -297,6 +342,12 @@ export default function KesimAlaniPage() {
     }
     loadData();
   }, [params.id, setLocation]);
+
+  useEffect(() => {
+    if (kesim) {
+      saveBasketToStorage(basketItems, kesim.projectId);
+    }
+  }, [basketItems, kesim?.projectId]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -2045,22 +2096,58 @@ export default function KesimAlaniPage() {
     setBulkGroupEditValue("");
   }
 
+  const basketItemIds = useMemo(() => new Set(basketItems.map(b => b.donationId)), [basketItems]);
+  const localBasketItems = useMemo(() => basketItems.filter(b => b.kesimAlaniId === kesim?.id), [basketItems, kesim?.id]);
+  const foreignBasketItems = useMemo(() => basketItems.filter(b => b.kesimAlaniId !== kesim?.id), [basketItems, kesim?.id]);
+
+  function makeBasketItem(d: Donation): BasketItem {
+    return {
+      donationId: d.id,
+      kesimAlaniId: kesim!.id,
+      kesimAlaniName: kesim!.name,
+      name: d.name,
+      description: d.description || "",
+    };
+  }
+
   function addToBasket(groupIdx: number, donationIdx: number) {
     if (!kesim) return;
     const d = kesim.animalGroups[groupIdx]?.donations[donationIdx];
     if (!d || !d.name.trim()) return;
     if (isGroupLocked(groupIdx)) return;
-    if (basketItems.includes(d.id)) return;
-    setBasketItems(prev => [...prev, d.id]);
+    if (basketItemIds.has(d.id)) return;
+    setBasketItems(prev => [...prev, makeBasketItem(d)]);
   }
 
   function addDonorToBasket(donationId: string) {
-    if (basketItems.includes(donationId)) return;
-    setBasketItems(prev => [...prev, donationId]);
+    if (!kesim || basketItemIds.has(donationId)) return;
+    const d = kesim.donations.find(dd => dd.id === donationId) || kesim.animalGroups.flatMap(g => g.donations).find(dd => dd.id === donationId);
+    if (!d || !d.name.trim()) return;
+    setBasketItems(prev => [...prev, makeBasketItem(d)]);
+  }
+
+  function addGroupToBasket(groupIdx: number) {
+    if (!kesim) return;
+    const group = kesim.animalGroups[groupIdx];
+    if (!group || isGroupLocked(groupIdx)) return;
+    const filled = group.donations.filter(d => d.name.trim());
+    if (filled.length === 0) return;
+    setBasketItems(prev => {
+      const existingIds = new Set(prev.map(b => b.donationId));
+      const newItems = [...prev];
+      for (const d of filled) {
+        if (!existingIds.has(d.id)) {
+          newItems.push(makeBasketItem(d));
+          existingIds.add(d.id);
+        }
+      }
+      return newItems;
+    });
+    toast({ title: `${filled.length} bağışçı sepete eklendi`, description: `Hayvan ${group.animalNo}` });
   }
 
   function removeFromBasket(donationId: string) {
-    setBasketItems(prev => prev.filter(id => id !== donationId));
+    setBasketItems(prev => prev.filter(b => b.donationId !== donationId));
   }
 
   function clearBasket() {
@@ -2068,7 +2155,7 @@ export default function KesimAlaniPage() {
   }
 
   function transferBasketToGroup(targetGroupIdx: number) {
-    if (!kesim || basketItems.length === 0 || targetGroupIdx < 0 || targetGroupIdx >= kesim.animalGroups.length) return;
+    if (!kesim || localBasketItems.length === 0 || targetGroupIdx < 0 || targetGroupIdx >= kesim.animalGroups.length) return;
     if (isGroupLocked(targetGroupIdx)) return;
     const groups = kesim.animalGroups.map(g => ({
       ...g,
@@ -2079,13 +2166,13 @@ export default function KesimAlaniPage() {
       toast({ title: "Hedef grupta boş slot yok.", variant: "destructive" });
       return;
     }
-    const basketIdSet = new Set(basketItems);
+    const localIds = new Set(localBasketItems.map(b => b.donationId));
     const groupedBasketIds = new Set<string>();
     const lockedBasketIds = new Set<string>();
     const ungroupedBasketDonors: Donation[] = [];
     for (let gi = 0; gi < groups.length; gi++) {
       for (const d of groups[gi].donations) {
-        if (!basketIdSet.has(d.id) || !d.name.trim()) continue;
+        if (!localIds.has(d.id) || !d.name.trim()) continue;
         if (isGroupLocked(gi)) {
           lockedBasketIds.add(d.id);
         } else if (gi !== targetGroupIdx) {
@@ -2095,11 +2182,11 @@ export default function KesimAlaniPage() {
     }
     const sharesMap = computeEffectiveShares(kesim.donations);
     let ungroupedSlots = 0;
-    for (const id of basketItems) {
-      if (groupedBasketIds.has(id) || lockedBasketIds.has(id)) continue;
-      const donor = kesim.donations.find(d => d.id === id);
+    for (const b of localBasketItems) {
+      if (groupedBasketIds.has(b.donationId) || lockedBasketIds.has(b.donationId)) continue;
+      const donor = kesim.donations.find(d => d.id === b.donationId);
       if (donor && !donor.excluded) {
-        const effectiveShares = sharesMap.get(id) || donor.shareCount;
+        const effectiveShares = sharesMap.get(b.donationId) || donor.shareCount;
         ungroupedBasketDonors.push(donor);
         ungroupedSlots += effectiveShares;
       }
@@ -2118,7 +2205,7 @@ export default function KesimAlaniPage() {
       if (isGroupLocked(gi) || gi === targetGroupIdx) continue;
       for (let di = groups[gi].donations.length - 1; di >= 0; di--) {
         const d = groups[gi].donations[di];
-        if (basketIdSet.has(d.id)) {
+        if (localIds.has(d.id)) {
           itemsToMove.push(d);
           groups[gi].donations[di] = {
             id: generateId(), name: "", description: "", donationType: "", shareCount: 1, vekalet: "", notes: "",
@@ -2146,7 +2233,7 @@ export default function KesimAlaniPage() {
     }
     const movedDonorCount = groupedBasketIds.size + ungroupedBasketDonors.length;
     save({ ...kesim, animalGroups: groups }, `Sepetten ${movedDonorCount} bağışçı (${transferredIds.size} slot) Hayvan ${groups[targetGroupIdx].animalNo}'e aktarıldı`, false, 'groups');
-    setBasketItems(prev => prev.filter(id => !transferredIds.has(id) && !groupedBasketIds.has(id)));
+    setBasketItems(prev => prev.filter(b => !transferredIds.has(b.donationId) && !groupedBasketIds.has(b.donationId)));
     setBasketTransferTarget(-1);
     const skipped = lockedBasketIds.size;
     if (skipped > 0) {
@@ -2158,7 +2245,7 @@ export default function KesimAlaniPage() {
   }
 
   function autoDistributeBasket() {
-    if (!kesim || basketItems.length === 0) return;
+    if (!kesim || localBasketItems.length === 0) return;
     const sharesMap = computeEffectiveShares(kesim.donations);
 
     const lockedGroupDonorIds = new Set<string>();
@@ -2170,8 +2257,9 @@ export default function KesimAlaniPage() {
       }
     }
 
-    const movableIds = basketItems.filter(id => !lockedGroupDonorIds.has(id));
-    const skippedCount = basketItems.length - movableIds.length;
+    const localIds = localBasketItems.map(b => b.donationId);
+    const movableIds = localIds.filter(id => !lockedGroupDonorIds.has(id));
+    const skippedCount = localIds.length - movableIds.length;
 
     if (movableIds.length === 0) {
       toast({
@@ -2271,7 +2359,7 @@ export default function KesimAlaniPage() {
 
     const renumbered = groups.map((g, i) => ({ ...g, animalNo: i + 1 }));
     save({ ...kesim, animalGroups: renumbered }, `Sepet otomatik dağıtıldı: ${placed} bağışçı`, false, 'groups');
-    const remaining = basketItems.filter(id => lockedGroupDonorIds.has(id));
+    const remaining = basketItems.filter(b => lockedGroupDonorIds.has(b.donationId) || b.kesimAlaniId !== kesim.id);
     setBasketItems(remaining);
     const desc = skippedCount > 0
       ? `${placed} slot dağıtıldı. ${skippedCount} tanesi kilitli grupta, sepette kaldı.`
@@ -2279,17 +2367,51 @@ export default function KesimAlaniPage() {
     toast({ title: "Otomatik Dağıtım", description: desc });
   }
 
+  async function transferBasketToOtherKA(targetKAId: string) {
+    if (!kesim || basketItems.length === 0 || !targetKAId) return;
+    const itemsToTransfer = basketItems.filter(b => b.kesimAlaniId === kesim.id);
+    if (itemsToTransfer.length === 0) {
+      toast({ title: "Bu kesim alanından sepette bağışçı yok.", variant: "destructive" });
+      return;
+    }
+    setCrossKATransferring(true);
+    try {
+      await moveDonationsToKesimAlani(
+        itemsToTransfer.map(b => b.donationId),
+        kesim.id,
+        targetKAId,
+      );
+      setBasketItems(prev => prev.filter(b => b.kesimAlaniId !== kesim.id));
+      const data = await fetchKesimAlani(kesim.id);
+      if (data) {
+        setKesim(data);
+        history.initialize(data);
+      }
+      const targetName = siblingKesimAlanlari.find(ka => ka.id === targetKAId)?.name || targetKAId;
+      toast({ title: `${itemsToTransfer.length} bağışçı ${targetName} kesim alanına aktarıldı` });
+      setBasketCrossKATarget("");
+    } catch (err) {
+      toast({
+        title: "Aktarım başarısız",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    } finally {
+      setCrossKATransferring(false);
+    }
+  }
+
   function addSelectedToBasket() {
     if (!kesim || selectedIds.size === 0) return;
     setBasketItems(prev => {
-      const existing = new Set(prev);
+      const existingIds = new Set(prev.map(b => b.donationId));
       const newItems = [...prev];
       for (const id of selectedIds) {
-        if (!existing.has(id)) {
+        if (!existingIds.has(id)) {
           const d = kesim.donations.find(dd => dd.id === id);
           if (d && !d.excluded) {
-            newItems.push(id);
-            existing.add(id);
+            newItems.push(makeBasketItem(d));
+            existingIds.add(id);
           }
         }
       }
@@ -2792,10 +2914,10 @@ export default function KesimAlaniPage() {
                     variant="ghost"
                     size="sm"
                     className={`${compact ? "h-4 w-4" : "h-5 w-5"} p-0 ${
-                      basketItems.includes(d.id) ? "bg-emerald-200 dark:bg-emerald-800" : ""
+                      basketItemIds.has(d.id) ? "bg-emerald-200 dark:bg-emerald-800" : ""
                     }`}
-                    onClick={() => basketItems.includes(d.id) ? removeFromBasket(d.id) : addToBasket(groupIdx, dIdx)}
-                    title={basketItems.includes(d.id) ? "Sepetten Çıkar" : "Keseye Koy"}
+                    onClick={() => basketItemIds.has(d.id) ? removeFromBasket(d.id) : addToBasket(groupIdx, dIdx)}
+                    title={basketItemIds.has(d.id) ? "Sepetten Çıkar" : "Keseye Koy"}
                   >
                     <ShoppingBag className={compact ? "w-2.5 h-2.5 text-emerald-600" : "w-3 h-3 text-emerald-600"} />
                   </Button>
@@ -4174,11 +4296,11 @@ export default function KesimAlaniPage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className={`h-7 w-7 p-0 ${basketItems.includes(d.id) ? "bg-emerald-100 dark:bg-emerald-900" : ""}`}
-                                  title={basketItems.includes(d.id) ? "Sepetten Çıkar" : "Sepete Ekle"}
-                                  onClick={() => basketItems.includes(d.id) ? removeFromBasket(d.id) : addDonorToBasket(d.id)}
+                                  className={`h-7 w-7 p-0 ${basketItemIds.has(d.id) ? "bg-emerald-100 dark:bg-emerald-900" : ""}`}
+                                  title={basketItemIds.has(d.id) ? "Sepetten Çıkar" : "Sepete Ekle"}
+                                  onClick={() => basketItemIds.has(d.id) ? removeFromBasket(d.id) : addDonorToBasket(d.id)}
                                 >
-                                  <ShoppingBag className={`w-3 h-3 ${basketItems.includes(d.id) ? "text-emerald-600" : "text-muted-foreground"}`} />
+                                  <ShoppingBag className={`w-3 h-3 ${basketItemIds.has(d.id) ? "text-emerald-600" : "text-muted-foreground"}`} />
                                 </Button>
                               )}
                               {!d.excluded && !groupedDonorIds.has(d.id) && (
@@ -5057,6 +5179,17 @@ export default function KesimAlaniPage() {
                             <Scissors className="w-3.5 h-3.5" />
                           </button>
                           <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addGroupToBasket(groupIdx);
+                            }}
+                            className={`p-0.5 rounded transition-colors ${group.locked || filledCount === 0 ? "opacity-30 cursor-not-allowed" : "text-emerald-500/60 hover:text-emerald-600"}`}
+                            title={group.locked ? "Kilitli grup sepete eklenemez" : filledCount === 0 ? "Grupta bağışçı yok" : `Tümünü Sepete Ekle (${filledCount})`}
+                            disabled={group.locked || filledCount === 0}
+                          >
+                            <ShoppingBag className="w-3.5 h-3.5" />
+                          </button>
+                          <button
                             onClick={(e) => { e.stopPropagation(); toggleGroupLock(groupIdx); }}
                             className={`p-0.5 rounded transition-colors ${group.locked ? "text-amber-500" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
                             title={group.locked ? "Kilidi Aç" : "Kilitle"}
@@ -5243,12 +5376,12 @@ export default function KesimAlaniPage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className={`h-7 w-7 p-0 ${basketItems.includes(d.id) ? "bg-emerald-100 dark:bg-emerald-900" : ""}`}
-                                  title={basketItems.includes(d.id) ? "Sepetten Çıkar" : "Keseye Ekle"}
-                                  onClick={() => basketItems.includes(d.id) ? removeFromBasket(d.id) : addDonorToBasket(d.id)}
+                                  className={`h-7 w-7 p-0 ${basketItemIds.has(d.id) ? "bg-emerald-100 dark:bg-emerald-900" : ""}`}
+                                  title={basketItemIds.has(d.id) ? "Sepetten Çıkar" : "Keseye Ekle"}
+                                  onClick={() => basketItemIds.has(d.id) ? removeFromBasket(d.id) : addDonorToBasket(d.id)}
                                   disabled={d.excluded}
                                 >
-                                  <ShoppingBag className={`w-3 h-3 ${basketItems.includes(d.id) ? "text-emerald-600" : "text-muted-foreground"}`} />
+                                  <ShoppingBag className={`w-3 h-3 ${basketItemIds.has(d.id) ? "text-emerald-600" : "text-muted-foreground"}`} />
                                 </Button>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => deleteDonation(d.id)}>
                                   <Trash2 className="w-3 h-3 text-destructive" />
@@ -5302,11 +5435,11 @@ export default function KesimAlaniPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className={`h-7 w-7 p-0 ${basketItems.includes(entry.donation.id) ? "bg-emerald-100 dark:bg-emerald-900" : ""}`}
-                                title={basketItems.includes(entry.donation.id) ? "Sepetten Çıkar" : "Keseye Ekle"}
-                                onClick={() => basketItems.includes(entry.donation.id) ? removeFromBasket(entry.donation.id) : addToBasket(entry.groupIdx, entry.dIdx)}
+                                className={`h-7 w-7 p-0 ${basketItemIds.has(entry.donation.id) ? "bg-emerald-100 dark:bg-emerald-900" : ""}`}
+                                title={basketItemIds.has(entry.donation.id) ? "Sepetten Çıkar" : "Keseye Ekle"}
+                                onClick={() => basketItemIds.has(entry.donation.id) ? removeFromBasket(entry.donation.id) : addToBasket(entry.groupIdx, entry.dIdx)}
                               >
-                                <ShoppingBag className={`w-3 h-3 ${basketItems.includes(entry.donation.id) ? "text-emerald-600" : "text-muted-foreground"}`} />
+                                <ShoppingBag className={`w-3 h-3 ${basketItemIds.has(entry.donation.id) ? "text-emerald-600" : "text-muted-foreground"}`} />
                               </Button>
                             </td>
                           </tr>
@@ -5661,12 +5794,12 @@ export default function KesimAlaniPage() {
       {basketItems.length > 0 && (() => {
         const sharesMap = computeEffectiveShares(kesim.donations);
         let basketTotalShares = 0;
-        for (const id of basketItems) {
-          const grouped = kesim.animalGroups.flatMap(g => g.donations).find(d => d.id === id);
+        for (const b of localBasketItems) {
+          const grouped = kesim.animalGroups.flatMap(g => g.donations).find(d => d.id === b.donationId);
           if (grouped) {
             basketTotalShares += 1;
           } else {
-            basketTotalShares += sharesMap.get(id) || 1;
+            basketTotalShares += sharesMap.get(b.donationId) || 1;
           }
         }
         const basketAnimals = Math.ceil(basketTotalShares / 7);
@@ -5680,53 +5813,105 @@ export default function KesimAlaniPage() {
               <span className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
                 Sepet: {basketItems.length} bağışçı
               </span>
-              <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 rounded-full font-semibold">
-                {basketTotalShares} hisse
-              </span>
-              <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 rounded-full font-semibold">
-                ~{basketAnimals} hayvan
-              </span>
+              {foreignBasketItems.length > 0 && (
+                <span className="text-xs text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded-full font-semibold">
+                  {foreignBasketItems.length} diğer KA
+                </span>
+              )}
+              {localBasketItems.length > 0 && (
+                <>
+                  <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 rounded-full font-semibold">
+                    {basketTotalShares} hisse
+                  </span>
+                  <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 rounded-full font-semibold">
+                    ~{basketAnimals} hayvan
+                  </span>
+                </>
+              )}
               <ChevronUp className={`w-4 h-4 text-emerald-600 ml-auto transition-transform ${basketOpen ? "" : "rotate-180"}`} />
             </button>
             {basketOpen && (
               <div className="px-4 pb-3 space-y-2">
-                <div className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300 flex-wrap">
-                  {basketItems.slice(0, 6).map(id => {
-                    const d = kesim.animalGroups.flatMap(g => g.donations).find(dd => dd.id === id)
-                      || kesim.donations.find(dd => dd.id === id);
-                    return d ? (
-                      <span key={id} className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900 rounded text-[10px]">
-                        {d.description || d.name}
-                        <button className="ml-1 hover:text-destructive" onClick={() => removeFromBasket(id)}>×</button>
+                {localBasketItems.length > 0 && (
+                  <div className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300 flex-wrap">
+                    <span className="text-[10px] font-semibold mr-1">Bu KA:</span>
+                    {localBasketItems.slice(0, 6).map(b => (
+                      <span key={b.donationId} className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900 rounded text-[10px]">
+                        {b.description || b.name}
+                        <button className="ml-1 hover:text-destructive" onClick={() => removeFromBasket(b.donationId)}>×</button>
                       </span>
-                    ) : null;
-                  })}
-                  {basketItems.length > 6 && <span className="text-[10px]">+{basketItems.length - 6}</span>}
-                </div>
+                    ))}
+                    {localBasketItems.length > 6 && <span className="text-[10px]">+{localBasketItems.length - 6}</span>}
+                  </div>
+                )}
+                {foreignBasketItems.length > 0 && (
+                  <div className="flex items-center gap-1 text-xs text-blue-700 dark:text-blue-300 flex-wrap">
+                    <span className="text-[10px] font-semibold mr-1">Diğer KA:</span>
+                    {foreignBasketItems.slice(0, 4).map(b => (
+                      <span key={b.donationId} className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900 rounded text-[10px]">
+                        {b.description || b.name}
+                        <span className="text-[9px] opacity-70 ml-0.5">({b.kesimAlaniName})</span>
+                        <button className="ml-1 hover:text-destructive" onClick={() => removeFromBasket(b.donationId)}>×</button>
+                      </span>
+                    ))}
+                    {foreignBasketItems.length > 4 && <span className="text-[10px]">+{foreignBasketItems.length - 4}</span>}
+                  </div>
+                )}
                 <div className="flex items-center gap-1 flex-wrap">
-                  <Select value={String(basketTransferTarget)} onValueChange={(v) => setBasketTransferTarget(parseInt(v))}>
-                    <SelectTrigger className="h-7 w-36 text-xs">
-                      <SelectValue placeholder="Hedef grup..." />
-                    </SelectTrigger>
-                    <SelectContent side="top">
-                      {kesim.animalGroups.map((g, i) => {
-                        const empty = g.donations.filter(d => !d.name.trim()).length;
-                        return (
-                          <SelectItem key={g.id} value={String(i)} disabled={g.locked || empty === 0}>
-                            Hayvan {g.animalNo} ({empty} boş)
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <Button variant="default" size="sm" className="h-7 text-xs" onClick={() => transferBasketToGroup(basketTransferTarget)} disabled={basketTransferTarget < 0}>
-                    <Package className="w-3 h-3 mr-1" />
-                    Yerleştir
-                  </Button>
-                  <Button variant="secondary" size="sm" className="h-7 text-xs" onClick={autoDistributeBasket}>
-                    <Wand2 className="w-3 h-3 mr-1" />
-                    Otomatik Dağıt
-                  </Button>
+                  {localBasketItems.length > 0 && (
+                    <>
+                      <Select value={String(basketTransferTarget)} onValueChange={(v) => setBasketTransferTarget(parseInt(v))}>
+                        <SelectTrigger className="h-7 w-36 text-xs">
+                          <SelectValue placeholder="Hedef grup..." />
+                        </SelectTrigger>
+                        <SelectContent side="top">
+                          {kesim.animalGroups.map((g, i) => {
+                            const empty = g.donations.filter(d => !d.name.trim()).length;
+                            return (
+                              <SelectItem key={g.id} value={String(i)} disabled={g.locked || empty === 0}>
+                                Hayvan {g.animalNo} ({empty} boş)
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                      <Button variant="default" size="sm" className="h-7 text-xs" onClick={() => transferBasketToGroup(basketTransferTarget)} disabled={basketTransferTarget < 0}>
+                        <Package className="w-3 h-3 mr-1" />
+                        Yerleştir
+                      </Button>
+                      <Button variant="secondary" size="sm" className="h-7 text-xs" onClick={autoDistributeBasket}>
+                        <Wand2 className="w-3 h-3 mr-1" />
+                        Otomatik Dağıt
+                      </Button>
+                    </>
+                  )}
+                  {siblingKesimAlanlari.length > 0 && localBasketItems.length > 0 && (
+                    <>
+                      <div className="w-px h-5 bg-emerald-300 dark:bg-emerald-700 mx-1" />
+                      <Select value={basketCrossKATarget} onValueChange={setBasketCrossKATarget}>
+                        <SelectTrigger className="h-7 w-40 text-xs">
+                          <SelectValue placeholder="Başka KA'ya taşı..." />
+                        </SelectTrigger>
+                        <SelectContent side="top">
+                          {siblingKesimAlanlari.map(ka => (
+                            <SelectItem key={ka.id} value={ka.id}>
+                              {ka.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => transferBasketToOtherKA(basketCrossKATarget)}
+                        disabled={!basketCrossKATarget || crossKATransferring}
+                      >
+                        {crossKATransferring ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
+                        Aktar
+                      </Button>
+                    </>
+                  )}
                   <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={clearBasket}>
                     Temizle
                   </Button>
