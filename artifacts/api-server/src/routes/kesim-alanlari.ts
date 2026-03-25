@@ -356,8 +356,8 @@ async function getFullKesimAlani(id: string) {
   const ka: KesimAlaniRow = {
     id: rawRow.ka_id,
     name: rawRow.name,
-    createdAt: rawRow.created_at,
-    deletedAt: rawRow.deleted_at,
+    createdAt: new Date(rawRow.created_at),
+    deletedAt: rawRow.deleted_at ? new Date(rawRow.deleted_at) : null,
     projectId: rawRow.project_id,
     trackingToken: rawRow.tracking_token,
     kesimListeId: rawRow.kesim_liste_id,
