@@ -3068,8 +3068,13 @@ router.get("/kesim-alanlari/:id/photos/counts", async (req, res) => {
 
 router.post("/photos/backfill-thumbnails", async (req, res) => {
   try {
+    const expectedKey = process.env["ADMIN_KEY"];
+    if (!expectedKey) {
+      res.status(403).json({ error: "ADMIN_KEY ortam değişkeni ayarlanmamış" });
+      return;
+    }
     const adminKey = req.headers["x-admin-key"] || req.query.key;
-    if (!adminKey || adminKey !== (process.env["ADMIN_KEY"] || "backfill-thumbs")) {
+    if (!adminKey || adminKey !== expectedKey) {
       res.status(403).json({ error: "Yetkisiz erişim" });
       return;
     }
