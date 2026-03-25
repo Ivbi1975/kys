@@ -1643,10 +1643,28 @@ router.get("/catisma-tespiti", async (req, res) => {
       hasNoteWarnings: boolean;
     };
 
+    const ungroupedConflictKAIds = [...new Set(
+      conflictDonations
+        .filter(d => !(groupLinksMap[d.id]?.length))
+        .map(d => d.kesim_alani_id)
+    )];
     const donationsByKA: Record<string, DonationRow[]> = {};
-    for (const d of conflictDonations) {
-      if (!donationsByKA[d.kesim_alani_id]) donationsByKA[d.kesim_alani_id] = [];
-      donationsByKA[d.kesim_alani_id].push(d);
+    if (ungroupedConflictKAIds.length > 0) {
+      const kaSiblingsResult = await db.execute(sql`
+        SELECT d.id, d.name, d.description, d.donation_type, d.share_count,
+               d.vekalet, d.notes, d.phone, d.excluded, d.kesim_alani_id,
+               ka.name AS ka_name
+        FROM donations d
+        JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+        WHERE d.deleted_at IS NULL
+          AND d.kesim_alani_id = ANY(${sql.raw(`ARRAY[${ungroupedConflictKAIds.map(id => `'${id.replace(/'/g, "''")}'`).join(",")}]`)})
+        ORDER BY d.created_at DESC
+      `);
+      for (const row of kaSiblingsResult.rows as DonationRow[]) {
+        if (!donationsByKA[row.kesim_alani_id]) donationsByKA[row.kesim_alani_id] = [];
+        donationsByKA[row.kesim_alani_id].push(row);
+        if (!donationById[row.id]) donationById[row.id] = row;
+      }
     }
 
     function buildConflictEntries(donations: DonationRow[]): ConflictEntry[] {
