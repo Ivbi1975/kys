@@ -3336,12 +3336,12 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     setColumnDragItem(null);
   };
 
-  const columnHeaderLabel = (key: ColumnKey): string => {
+  const columnHeaderLabel = useCallback((key: ColumnKey): string => {
     const col = ALL_GROUP_COLUMNS.find(c => c.key === key);
     return col?.label || "";
-  };
+  }, []);
 
-  const columnHeaderWidth = (key: ColumnKey): string => {
+  const columnHeaderWidth = useCallback((key: ColumnKey): string => {
     switch (key) {
       case "drag": return "w-6";
       case "index": return "w-6";
@@ -3351,7 +3351,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
       case "actions": return "w-8";
       default: return "";
     }
-  };
+  }, []);
 
 
     return {

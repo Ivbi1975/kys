@@ -309,6 +309,29 @@ const GroupDonationRow = memo(function GroupDonationRow({
       {visibleColumns.map(key => renderCell(key))}
     </tr>
   );
+}, (prev, next) => {
+  if (prev.donation !== next.donation) return false;
+  if (prev.dIdx !== next.dIdx) return false;
+  if (prev.groupIdx !== next.groupIdx) return false;
+  if (prev.compact !== next.compact) return false;
+  if (prev.visibleColumns !== next.visibleColumns) return false;
+  if (prev.isSearchMatch !== next.isSearchMatch) return false;
+  if (prev.isGroupLocked !== next.isGroupLocked) return false;
+  const dId = prev.donation.id;
+  if (prev.basketItemIds.has(dId) !== next.basketItemIds.has(dId)) return false;
+  if (prev.selectedGroupDonations.has(dId) !== next.selectedGroupDonations.has(dId)) return false;
+  const prevSwap = prev.swapSelection;
+  const nextSwap = next.swapSelection;
+  const prevIsSwapped = prevSwap?.groupIdx === prev.groupIdx && prevSwap?.donationIdx === prev.dIdx;
+  const nextIsSwapped = nextSwap?.groupIdx === next.groupIdx && nextSwap?.donationIdx === next.dIdx;
+  if (prevIsSwapped !== nextIsSwapped) return false;
+  const prevIsDragSrc = prev.dragItem?.groupIdx === prev.groupIdx && prev.dragItem?.donationIdx === prev.dIdx;
+  const nextIsDragSrc = next.dragItem?.groupIdx === next.groupIdx && next.dragItem?.donationIdx === next.dIdx;
+  if (prevIsDragSrc !== nextIsDragSrc) return false;
+  const prevIsDragTgt = prev.dragOverItem?.groupIdx === prev.groupIdx && prev.dragOverItem?.donationIdx === prev.dIdx;
+  const nextIsDragTgt = next.dragOverItem?.groupIdx === next.groupIdx && next.dragOverItem?.donationIdx === next.dIdx;
+  if (prevIsDragTgt !== nextIsDragTgt) return false;
+  return true;
 });
 
 export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupCardProps) {
@@ -621,14 +644,49 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
   if (prev.totalGroupCount !== next.totalGroupCount) return false;
   if (prev.highlightIncomplete !== next.highlightIncomplete) return false;
   if (prev.groupSearchQuery !== next.groupSearchQuery) return false;
-  if (prev.dragOverGroup !== next.dragOverGroup) return false;
-  if (prev.swapSelection !== next.swapSelection) return false;
-  if (prev.dragItem !== next.dragItem) return false;
-  if (prev.dragOverItem !== next.dragOverItem) return false;
   if (prev.visibleColumns !== next.visibleColumns) return false;
-  if (prev.basketItemIds !== next.basketItemIds) return false;
-  if (prev.selectedGroupDonations !== next.selectedGroupDonations) return false;
-  if (prev.photoCounts !== next.photoCounts) return false;
   if (prev.teams !== next.teams) return false;
+  if (prev.kesimName !== next.kesimName) return false;
+
+  const gIdx = prev.groupIdx;
+  const prevDragOverThis = prev.dragOverGroup === gIdx;
+  const nextDragOverThis = next.dragOverGroup === gIdx;
+  if (prevDragOverThis !== nextDragOverThis) return false;
+
+  const prevSwapThis = prev.swapSelection?.groupIdx === gIdx;
+  const nextSwapThis = next.swapSelection?.groupIdx === gIdx;
+  if (prevSwapThis !== nextSwapThis) return false;
+
+  const prevDragFromThis = prev.dragItem?.groupIdx === gIdx;
+  const nextDragFromThis = next.dragItem?.groupIdx === gIdx;
+  if (prevDragFromThis !== nextDragFromThis) return false;
+
+  const prevDragAny = prev.dragItem !== null;
+  const nextDragAny = next.dragItem !== null;
+  if (prevDragAny !== nextDragAny) return false;
+
+  if (prev.dragItem?.groupIdx === gIdx || next.dragItem?.groupIdx === gIdx) {
+    if (prev.dragItem?.donationIdx !== next.dragItem?.donationIdx) return false;
+  }
+
+  if (prev.dragOverItem?.groupIdx === gIdx || next.dragOverItem?.groupIdx === gIdx) {
+    if (prev.dragOverItem !== next.dragOverItem) return false;
+  }
+
+  const gId = prev.group.id;
+  if ((prev.photoCounts[gId] ?? 0) !== (next.photoCounts[gId] ?? 0)) return false;
+
+  if (prev.basketItemIds !== next.basketItemIds) {
+    for (const d of prev.group.donations) {
+      if (d.name.trim() && prev.basketItemIds.has(d.id) !== next.basketItemIds.has(d.id)) return false;
+    }
+  }
+
+  if (prev.selectedGroupDonations !== next.selectedGroupDonations) {
+    for (const d of prev.group.donations) {
+      if (d.name.trim() && prev.selectedGroupDonations.has(d.id) !== next.selectedGroupDonations.has(d.id)) return false;
+    }
+  }
+
   return true;
 });
