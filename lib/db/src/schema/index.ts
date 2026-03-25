@@ -71,7 +71,7 @@ export const animalGroupsTable = pgTable("animal_groups", {
   sortOrder: integer("sort_order").notNull().default(0),
   kesildi: boolean("kesildi").notNull().default(false),
   kesildiAt: text("kesildi_at"),
-  teamId: text("team_id"),
+  teamId: text("team_id").references(() => teamsTable.id, { onDelete: "set null" }),
 }, (table) => [
   index("idx_animal_groups_kesim_alani_id").on(table.kesimAlaniId),
 ]);
