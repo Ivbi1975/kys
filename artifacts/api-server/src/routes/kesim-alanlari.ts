@@ -295,12 +295,113 @@ async function getFullKesimAlaniList(kaRows: KesimAlaniRow[]) {
 }
 
 async function getFullKesimAlani(id: string) {
-  const [ka] = await db.select().from(kesimAlanlariTable)
-    .where(eq(kesimAlanlariTable.id, id));
-  if (!ka) return null;
+  const result = await db.execute(sql`
+    SELECT
+      ka.id AS ka_id, ka.name, ka.created_at, ka.deleted_at,
+      ka.project_id, ka.tracking_token, ka.kesim_liste_id,
+      COALESCE((
+        SELECT json_agg(d ORDER BY d.sort_order)
+        FROM (
+          SELECT
+            don.id, don.name, don.description, don.donation_type,
+            don.share_count, don.vekalet, don.notes, don.phone,
+            don.excluded, don.sort_order, don.ai_categories, don.ai_warnings,
+            COALESCE((
+              SELECT json_agg(dt.tag_id)
+              FROM donation_tags dt WHERE dt.donation_id = don.id
+            ), '[]'::json) AS tags
+          FROM donations don
+          WHERE don.kesim_alani_id = ka.id AND don.deleted_at IS NULL
+        ) d
+      ), '[]'::json) AS donations,
+      COALESCE((
+        SELECT json_agg(g ORDER BY g.sort_order)
+        FROM (
+          SELECT
+            ag.id, ag.animal_no, ag.color_tag, ag.locked, ag.notes,
+            ag.kesildi, ag.kesildi_at, ag.team_id, ag.sort_order,
+            COALESCE((
+              SELECT json_agg(
+                json_build_object('donationId', agd.donation_id, 'sortOrder', agd.sort_order)
+                ORDER BY agd.sort_order
+              )
+              FROM animal_group_donations agd WHERE agd.group_id = ag.id
+            ), '[]'::json) AS donation_links
+          FROM animal_groups ag
+          WHERE ag.kesim_alani_id = ka.id
+        ) g
+      ), '[]'::json) AS groups,
+      COALESCE((
+        SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color))
+        FROM teams t WHERE t.kesim_alani_id = ka.id
+      ), '[]'::json) AS teams
+    FROM kesim_alanlari ka
+    WHERE ka.id = ${id}
+  `);
 
-  const [result] = await getFullKesimAlaniList([ka]);
-  return result;
+  if (result.rows.length === 0) return null;
+
+  const rawRow = result.rows[0] as any;
+  const ka: KesimAlaniRow = {
+    id: rawRow.ka_id,
+    name: rawRow.name,
+    createdAt: rawRow.created_at,
+    deletedAt: rawRow.deleted_at,
+    projectId: rawRow.project_id,
+    trackingToken: rawRow.tracking_token,
+    kesimListeId: rawRow.kesim_liste_id,
+  };
+
+  const tagsByDonation: Record<string, string[]> = {};
+  const donations: DonationRow[] = [];
+  for (const d of rawRow.donations || []) {
+    tagsByDonation[d.id] = d.tags || [];
+    donations.push({
+      id: d.id,
+      kesimAlaniId: rawRow.ka_id,
+      name: d.name,
+      description: d.description,
+      donationType: d.donation_type,
+      shareCount: d.share_count,
+      vekalet: d.vekalet,
+      notes: d.notes,
+      phone: d.phone || "",
+      excluded: d.excluded,
+      sortOrder: d.sort_order,
+      deletedAt: null,
+      aiCategories: d.ai_categories,
+      aiWarnings: d.ai_warnings,
+    });
+  }
+
+  const groups: AnimalGroupRow[] = [];
+  const groupLinks: { groupId: string; donationId: string; sortOrder: number }[] = [];
+  for (const g of rawRow.groups || []) {
+    groups.push({
+      id: g.id,
+      kesimAlaniId: rawRow.ka_id,
+      animalNo: g.animal_no,
+      colorTag: g.color_tag,
+      locked: g.locked,
+      notes: g.notes,
+      kesildi: g.kesildi,
+      kesildiAt: g.kesildi_at ? new Date(g.kesildi_at) : null,
+      teamId: g.team_id,
+      sortOrder: g.sort_order,
+    });
+    for (const link of g.donation_links || []) {
+      groupLinks.push({ groupId: g.id, donationId: link.donationId, sortOrder: link.sortOrder });
+    }
+  }
+
+  const teams: TeamRow[] = (rawRow.teams || []).map((t: any) => ({
+    id: t.id,
+    kesimAlaniId: rawRow.ka_id,
+    name: t.name,
+    color: t.color,
+  }));
+
+  return assembleKesimAlani(ka, donations, groups, tagsByDonation, groupLinks, teams);
 }
 
 router.get("/kesim-alanlari", async (req, res) => {
@@ -1465,8 +1566,6 @@ router.get("/catisma-tespiti", async (req, res) => {
     const groupDonationLinks = raw.group_donation_links || [];
 
     const kaById = Object.fromEntries(allKAList.map(k => [k.id, k]));
-
-    const tagsByDonation: Record<string, string[]> = {};
 
     const donationsByGroupId: Record<string, string[]> = {};
     for (const link of groupDonationLinks) {
