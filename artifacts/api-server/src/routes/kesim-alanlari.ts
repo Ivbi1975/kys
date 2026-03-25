@@ -13,6 +13,10 @@ import {
   notificationLogsTable,
   appSettingsTable,
   donationTransfersTable,
+  type DonationRow,
+  type AnimalGroupRow,
+  type TeamRow,
+  type KesimAlaniRow,
 } from "@workspace/db/schema";
 import { desc, gt, lt, or, sql, count, ilike, asc } from "drizzle-orm";
 import { eq, inArray, isNull, isNotNull, and } from "drizzle-orm";
@@ -106,45 +110,14 @@ async function requireActiveKesimAlani(id: string) {
   return { existing, error: null, status: 200 as const };
 }
 
-async function getFullKesimAlani(id: string) {
-  const [ka] = await db.select().from(kesimAlanlariTable)
-    .where(eq(kesimAlanlariTable.id, id));
-  if (!ka) return null;
-
-  const [donations, groups] = await Promise.all([
-    db.select().from(donationsTable)
-      .where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)))
-      .orderBy(donationsTable.sortOrder),
-    db.select().from(animalGroupsTable)
-      .where(eq(animalGroupsTable.kesimAlaniId, id))
-      .orderBy(animalGroupsTable.sortOrder),
-  ]);
-
-  const donationIds = donations.map(d => d.id);
-  const groupIds = groups.map(g => g.id);
-
-  const [donationTags, groupDonationLinks] = await Promise.all([
-    donationIds.length > 0
-      ? db.select({
-          donationId: donationTagsTable.donationId,
-          tagId: donationTagsTable.tagId,
-        }).from(donationTagsTable).where(inArray(donationTagsTable.donationId, donationIds))
-      : Promise.resolve([] as { donationId: string; tagId: string }[]),
-    groupIds.length > 0
-      ? db.select({
-          groupId: animalGroupDonationsTable.groupId,
-          donationId: animalGroupDonationsTable.donationId,
-          sortOrder: animalGroupDonationsTable.sortOrder,
-        }).from(animalGroupDonationsTable).where(inArray(animalGroupDonationsTable.groupId, groupIds))
-      : Promise.resolve([] as { groupId: string; donationId: string; sortOrder: number }[]),
-  ]);
-
-  const tagsByDonation: Record<string, string[]> = {};
-  for (const dt of donationTags) {
-    if (!tagsByDonation[dt.donationId]) tagsByDonation[dt.donationId] = [];
-    tagsByDonation[dt.donationId].push(dt.tagId);
-  }
-
+function assembleKesimAlani(
+  ka: KesimAlaniRow,
+  donations: DonationRow[],
+  groups: AnimalGroupRow[],
+  tagsByDonation: Record<string, string[]>,
+  groupDonationLinks: { groupId: string; donationId: string; sortOrder: number }[],
+  teams: TeamRow[],
+) {
   const donationsById: Record<string, DonationOutput> = {};
   for (const d of donations) {
     donationsById[d.id] = {
@@ -170,9 +143,6 @@ async function getFullKesimAlani(id: string) {
   }
 
   const mappedDonations = donations.map(d => donationsById[d.id]);
-
-  const teams = await db.select().from(teamsTable)
-    .where(eq(teamsTable.kesimAlaniId, id));
 
   const mappedGroups = groups.map(g => {
     const links = (groupDonationsByGroup[g.id] || []).sort((a, b) => a.sortOrder - b.sortOrder);
@@ -203,6 +173,100 @@ async function getFullKesimAlani(id: string) {
   };
 }
 
+async function getFullKesimAlaniList(kaRows: KesimAlaniRow[]) {
+  if (kaRows.length === 0) return [];
+  const kaIds = kaRows.map(k => k.id);
+
+  const [allDonations, allGroups, allTeams] = await Promise.all([
+    db.select().from(donationsTable)
+      .where(and(inArray(donationsTable.kesimAlaniId, kaIds), isNull(donationsTable.deletedAt)))
+      .orderBy(donationsTable.sortOrder),
+    db.select().from(animalGroupsTable)
+      .where(inArray(animalGroupsTable.kesimAlaniId, kaIds))
+      .orderBy(animalGroupsTable.sortOrder),
+    db.select().from(teamsTable)
+      .where(inArray(teamsTable.kesimAlaniId, kaIds)),
+  ]);
+
+  const allDonationIds = allDonations.map(d => d.id);
+  const allGroupIds = allGroups.map(g => g.id);
+
+  const [allTags, allGroupDonationLinks] = await Promise.all([
+    allDonationIds.length > 0
+      ? db.select({
+          donationId: donationTagsTable.donationId,
+          tagId: donationTagsTable.tagId,
+        }).from(donationTagsTable).where(inArray(donationTagsTable.donationId, allDonationIds))
+      : Promise.resolve([] as { donationId: string; tagId: string }[]),
+    allGroupIds.length > 0
+      ? db.select({
+          groupId: animalGroupDonationsTable.groupId,
+          donationId: animalGroupDonationsTable.donationId,
+          sortOrder: animalGroupDonationsTable.sortOrder,
+        }).from(animalGroupDonationsTable).where(inArray(animalGroupDonationsTable.groupId, allGroupIds))
+      : Promise.resolve([] as { groupId: string; donationId: string; sortOrder: number }[]),
+  ]);
+
+  const tagsByDonation: Record<string, string[]> = {};
+  for (const dt of allTags) {
+    if (!tagsByDonation[dt.donationId]) tagsByDonation[dt.donationId] = [];
+    tagsByDonation[dt.donationId].push(dt.tagId);
+  }
+
+  const donationsByKA: Record<string, DonationRow[]> = {};
+  for (const d of allDonations) {
+    if (!donationsByKA[d.kesimAlaniId]) donationsByKA[d.kesimAlaniId] = [];
+    donationsByKA[d.kesimAlaniId].push(d);
+  }
+
+  const groupsByKA: Record<string, AnimalGroupRow[]> = {};
+  for (const g of allGroups) {
+    if (!groupsByKA[g.kesimAlaniId]) groupsByKA[g.kesimAlaniId] = [];
+    groupsByKA[g.kesimAlaniId].push(g);
+  }
+
+  const teamsByKA: Record<string, TeamRow[]> = {};
+  for (const t of allTeams) {
+    if (!teamsByKA[t.kesimAlaniId]) teamsByKA[t.kesimAlaniId] = [];
+    teamsByKA[t.kesimAlaniId].push(t);
+  }
+
+  const groupIdsByKA: Record<string, Set<string>> = {};
+  for (const g of allGroups) {
+    if (!groupIdsByKA[g.kesimAlaniId]) groupIdsByKA[g.kesimAlaniId] = new Set();
+    groupIdsByKA[g.kesimAlaniId].add(g.id);
+  }
+
+  const linksByKA: Record<string, { groupId: string; donationId: string; sortOrder: number }[]> = {};
+  for (const link of allGroupDonationLinks) {
+    for (const kaId of kaIds) {
+      if (groupIdsByKA[kaId]?.has(link.groupId)) {
+        if (!linksByKA[kaId]) linksByKA[kaId] = [];
+        linksByKA[kaId].push(link);
+        break;
+      }
+    }
+  }
+
+  return kaRows.map(ka => assembleKesimAlani(
+    ka,
+    donationsByKA[ka.id] || [],
+    groupsByKA[ka.id] || [],
+    tagsByDonation,
+    linksByKA[ka.id] || [],
+    teamsByKA[ka.id] || [],
+  ));
+}
+
+async function getFullKesimAlani(id: string) {
+  const [ka] = await db.select().from(kesimAlanlariTable)
+    .where(eq(kesimAlanlariTable.id, id));
+  if (!ka) return null;
+
+  const [result] = await getFullKesimAlaniList([ka]);
+  return result;
+}
+
 router.get("/kesim-alanlari", async (req, res) => {
   try {
     const includeDeleted = req.query.includeDeleted === "true";
@@ -218,8 +282,8 @@ router.get("/kesim-alanlari", async (req, res) => {
         .orderBy(kesimAlanlariTable.createdAt);
     }
 
-    const results = await Promise.all(rows.map(r => getFullKesimAlani(r.id)));
-    res.json(results.filter(Boolean));
+    const results = await getFullKesimAlaniList(rows);
+    res.json(results);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error("GET /kesim-alanlari error:", message);
@@ -233,8 +297,8 @@ router.get("/kesim-alanlari/deleted", async (_req, res) => {
       .where(isNotNull(kesimAlanlariTable.deletedAt))
       .orderBy(kesimAlanlariTable.createdAt);
 
-    const results = await Promise.all(rows.map(r => getFullKesimAlani(r.id)));
-    res.json(results.filter(Boolean));
+    const results = await getFullKesimAlaniList(rows);
+    res.json(results);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error("GET /kesim-alanlari/deleted error:", message);
