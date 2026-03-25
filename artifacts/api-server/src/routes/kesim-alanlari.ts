@@ -1584,8 +1584,24 @@ router.get("/catisma-tespiti", async (req, res) => {
       for (const link of allLinks) {
         if (!groupLinksMap[link.donation_id]) groupLinksMap[link.donation_id] = [];
         groupLinksMap[link.donation_id].push({ groupId: link.group_id, animalNo: link.animal_no });
-        if (!donationsByGroupId[link.group_id]) donationsByGroupId[link.group_id] = [];
-        donationsByGroupId[link.group_id].push(link.donation_id);
+      }
+
+      const affectedGroupIds = [...new Set(allLinks.map(l => l.group_id))];
+      if (affectedGroupIds.length > 0) {
+        const groupMembersResult = await db.execute(sql`
+          SELECT agd.donation_id, agd.group_id, d.id, d.name, d.description, d.donation_type,
+                 d.share_count, d.vekalet, d.notes, d.phone, d.excluded, d.kesim_alani_id
+          FROM animal_group_donations agd
+          JOIN donations d ON d.id = agd.donation_id AND d.deleted_at IS NULL
+          WHERE agd.group_id = ANY(${sql.raw(`ARRAY[${affectedGroupIds.map(id => `'${id.replace(/'/g, "''")}'`).join(",")}]`)})
+        `);
+        for (const row of groupMembersResult.rows as any[]) {
+          if (!donationById[row.donation_id]) {
+            donationById[row.donation_id] = row as DonationRow;
+          }
+          if (!donationsByGroupId[row.group_id]) donationsByGroupId[row.group_id] = [];
+          donationsByGroupId[row.group_id].push(row.donation_id);
+        }
       }
     }
 
