@@ -127,7 +127,7 @@ import * as XLSX from "xlsx-js-style";
 
   type SortField = "name" | "description" | "donationType" | "shareCount";
 type SortDir = "asc" | "desc";
-type ColumnMapping = "name" | "description" | "donationType" | "shareCount" | "vekalet" | "notes" | "skip";
+export type ColumnMapping = "name" | "description" | "donationType" | "shareCount" | "vekalet" | "notes" | "skip";
 
 interface BasketItem {
   donationId: string;
@@ -856,27 +856,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
       if (d.id !== donationId) return d;
       const existing = d.tags || [];
       const has = existing.includes(tagId);
-      return {
-    generateTrackingToken,
-    fetchKesimAlaniTrackingNotes,
-    fetchNotificationLogs,
-    COLUMN_OPTIONS,
-    findDeleteColumnLabel,
-    checkGroupConflicts,
-    effectiveColumnCount,
-    getGroupPhotoUrlAdmin,
-    fetchNotificationTemplate,
-    updateNotificationTemplate,
-    displayPreviewRows,
-    headerRow,
-    collapseAll,
-    expandAll,
-    handleColumnDragStart,
-    handleColumnDragOver,
-    handleColumnDrop,
-    handleColumnDragEnd,
-    columnHeaderLabel,
-    columnHeaderWidth, ...d, tags: has ? existing.filter(t => t !== tagId) : [...existing, tagId] };
+      return { ...d, tags: has ? existing.filter(t => t !== tagId) : [...existing, tagId] };
     };
     save({
       ...kesim,
@@ -3792,6 +3772,9 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     updateGroupNotes,
     virtuosoTableComponents,
     workspace,
+    COLUMN_OPTIONS,
+    findDeleteColumnLabel,
+    effectiveColumnCount,
     };
   }
   

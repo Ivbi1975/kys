@@ -10,7 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { TableVirtuoso, Virtuoso } from "react-virtuoso";
 import { AnimalGroupCard } from "@/components/AnimalGroupCard";
 import { AlertTriangle, ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, Brain, ChevronDown, ChevronRight, ChevronUp, ChevronsDownUp, ChevronsUpDown, ClipboardPaste, Columns, Columns3, Download, Eye, EyeOff, FileSpreadsheet, FileText, Filter, GripVertical, History, Home, Keyboard, LayoutGrid, Link2, Loader2, Lock, MapIcon, Maximize, Maximize2, Merge, MessageSquarePlus, Minimize, Minimize2, Monitor, Moon, MoveRight, PanelLeftClose, PanelLeftOpen, Plus, Printer, QrCode, Redo2, RotateCcw, Save, Scissors, Search, SearchX, Send, Settings2, ShoppingBag, SlidersHorizontal, Sparkles, Sun, Tag, Trash2, Undo2, Unlock, Upload, UserCog, Wand2, X } from "lucide-react";
-import type { useKesimAlaniState } from "./useKesimAlaniState";
+import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationLogs } from "@/lib/api";
+  import { checkGroupConflicts } from "@/lib/grouping";
+  import { ALL_GROUP_COLUMNS, type ColumnKey } from "@/lib/useWorkspacePreferences";
+  import type { useKesimAlaniState, ColumnMapping } from "./useKesimAlaniState";
 
   type KesimAlaniStateReturn = ReturnType<typeof useKesimAlaniState>;
 
@@ -48,6 +51,7 @@ import type { useKesimAlaniState } from "./useKesimAlaniState";
     cancelSwap,
     cleanEmptyGroups,
     clearAdvancedFilters,
+    COLUMN_OPTIONS,
     collapseAll,
     collapsedGroups,
     colorTagFilter,
@@ -69,6 +73,7 @@ import type { useKesimAlaniState } from "./useKesimAlaniState";
     dragOverItem,
     editDraft,
     editingCell,
+    effectiveColumnCount,
     effectiveShareMap,
     enhancedRemoveFromGroup,
     executeFindDelete,
@@ -84,6 +89,7 @@ import type { useKesimAlaniState } from "./useKesimAlaniState";
     filterHisseMin,
     filterStatus,
     filterTags,
+    findDeleteColumnLabel,
     filterUngrouped,
     filteredDonations,
     filteredGroupItems,
@@ -1506,8 +1512,8 @@ import type { useKesimAlaniState } from "./useKesimAlaniState";
                 style={{ height: `min(calc(100vh - 150px), ${filteredDonations.length * 45 + 50}px)`, minHeight: 200 }}
                 data={filteredDonations}
                 overscan={30}
-                itemKey={(_idx, d) => d.id}
-                components={virtuosoTableComponents}
+                itemKey={(_idx: number, d: Donation) => d.id}
+                components={virtuosoTableComponents as any}
                 fixedHeaderContent={() => (
                   <tr className="border-b bg-muted/50">
                     <th className="p-2 w-8">
@@ -2640,8 +2646,8 @@ import type { useKesimAlaniState } from "./useKesimAlaniState";
                   defaultItemHeight={collapsedGroups.size > 0 ? 60 : 350}
                   initialScrollTop={groupsScrollTopRef.current}
                   onScroll={(e) => {
-                    if (e && typeof e.scrollTop === "number") {
-                      groupsScrollTopRef.current = e.scrollTop;
+                    if (e && typeof (e as any).scrollTop === "number") {
+                      groupsScrollTopRef.current = (e as any).scrollTop;
                     }
                   }}
                   itemContent={(_index, row) => (
