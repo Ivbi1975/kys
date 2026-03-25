@@ -1218,6 +1218,32 @@ export default function KesimAlaniPage() {
         }
       }
 
+      const changedDescs = new Set<string>();
+      for (const id of changedIdSet) {
+        const d = activeDonationMap.get(id) || groupedDonationMap.get(id);
+        if (d) {
+          const key = d.description.trim().toLowerCase();
+          if (key) changedDescs.add(key);
+        }
+      }
+      if (changedDescs.size > 0) {
+        for (const g of kesim.animalGroups) {
+          if (g.locked) continue;
+          for (const d of g.donations) {
+            const key = d.description.trim().toLowerCase();
+            if (key && changedDescs.has(key) && !changedIdSet.has(d.id)) {
+              changedIdSet.add(d.id);
+            }
+          }
+        }
+        for (const [id, d] of activeDonationMap) {
+          const key = d.description.trim().toLowerCase();
+          if (key && changedDescs.has(key) && !changedIdSet.has(id)) {
+            changedIdSet.add(id);
+          }
+        }
+      }
+
       const changedIds = Array.from(changedIdSet);
 
       const useIncremental = !forceFullRegroup && hasExistingGroups && changedIds.length <= 20;
