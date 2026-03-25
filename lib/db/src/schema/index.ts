@@ -25,6 +25,7 @@ export const kesimAlanlariTable = pgTable("kesim_alanlari", {
   name: text("name").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   projectId: text("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
   trackingToken: text("tracking_token"),
   kesimListeId: text("kesim_liste_id"),
@@ -52,6 +53,7 @@ export const donationsTable = pgTable("donations", {
   excluded: boolean("excluded").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   aiCategories: text("ai_categories"),
   aiWarnings: text("ai_warnings"),
 }, (table) => [
@@ -87,6 +89,7 @@ export const animalGroupsTable = pgTable("animal_groups", {
   sortOrder: integer("sort_order").notNull().default(0),
   kesildi: boolean("kesildi").notNull().default(false),
   kesildiAt: timestamp("kesildi_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   teamId: text("team_id").references(() => teamsTable.id, { onDelete: "set null" }),
 }, (table) => [
   index("idx_animal_groups_kesim_alani_id").on(table.kesimAlaniId),
@@ -141,6 +144,7 @@ export const trackingNotesTable = pgTable("tracking_notes", {
   newValue: text("new_value"),
   status: text("status").notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("idx_tracking_notes_kesim_alani_id").on(table.kesimAlaniId),
   index("idx_tracking_notes_animal_group_id").on(table.animalGroupId),

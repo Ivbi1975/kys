@@ -468,6 +468,7 @@ export interface TrackingGroup {
 }
 
 export interface TrackingData {
+  serverTime?: string;
   kesimAlaniName: string;
   projectName: string | null;
   totalGroups: number;
@@ -478,6 +479,19 @@ export interface TrackingData {
 
 export async function fetchTrackingData(token: string): Promise<TrackingData> {
   return apiFetch<TrackingData>(`/tracking/${token}`);
+}
+
+export interface TrackingDelta {
+  serverTime: string;
+  updatedGroups: TrackingGroup[];
+  updatedNotes: TrackingNote[];
+  totalGroups: number;
+  kesildiCount: number;
+  hasChanges: boolean;
+}
+
+export async function fetchTrackingDelta(token: string, since: string): Promise<TrackingDelta> {
+  return apiFetch<TrackingDelta>(`/tracking/${token}/delta?since=${encodeURIComponent(since)}`);
 }
 
 export async function toggleKesildi(token: string, groupId: string, kesildi: boolean): Promise<void> {

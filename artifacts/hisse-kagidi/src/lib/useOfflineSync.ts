@@ -13,6 +13,7 @@ import {
 import {
   fetchTrackingData,
   fetchTrackingNotes,
+  fetchTrackingDelta,
   toggleKesildi,
   createTrackingNote,
 } from "./api";
@@ -37,6 +38,7 @@ export function useOfflineSync(token: string | undefined) {
     lastSyncError: null,
   });
   const syncingRef = useRef(false);
+  const lastSyncTimeRef = useRef<string | null>(null);
 
   useEffect(() => {
     const handleOnline = () => setSyncState((s) => ({ ...s, isOnline: true }));
@@ -55,7 +57,7 @@ export function useOfflineSync(token: string | undefined) {
     setSyncState((s) => ({ ...s, pendingCount: count }));
   }, [token]);
 
-  const loadData = useCallback(async () => {
+  const loadFullData = useCallback(async () => {
     if (!token) return;
     try {
       if (navigator.onLine) {
@@ -66,6 +68,7 @@ export function useOfflineSync(token: string | undefined) {
         setData(result);
         setNotes(trackingNotes);
         setError(null);
+        lastSyncTimeRef.current = result.serverTime || new Date().toISOString();
         await saveTrackingDataOffline(token, result, trackingNotes);
       } else {
         const cached = await getTrackingDataOffline(token);
@@ -91,6 +94,65 @@ export function useOfflineSync(token: string | undefined) {
     }
     await updatePendingCount();
   }, [token, updatePendingCount]);
+
+  const loadDeltaData = useCallback(async () => {
+    if (!token || !navigator.onLine || !lastSyncTimeRef.current || !data) {
+      return loadFullData();
+    }
+    try {
+      const delta = await fetchTrackingDelta(token, lastSyncTimeRef.current);
+      lastSyncTimeRef.current = delta.serverTime;
+
+      if (!delta.hasChanges) return;
+
+      setData((prev) => {
+        if (!prev) return prev;
+        const groupMap = new Map(prev.groups.map(g => [g.id, g]));
+        for (const updatedGroup of delta.updatedGroups) {
+          groupMap.set(updatedGroup.id, updatedGroup);
+        }
+        const mergedGroups = Array.from(groupMap.values());
+        return {
+          ...prev,
+          totalGroups: delta.totalGroups,
+          kesildiCount: delta.kesildiCount,
+          groups: mergedGroups,
+        };
+      });
+
+      if (delta.updatedNotes.length > 0) {
+        setNotes((prev) => {
+          const noteMap = new Map(prev.map(n => [n.id, n]));
+          for (const updatedNote of delta.updatedNotes) {
+            noteMap.set(updatedNote.id, updatedNote);
+          }
+          return Array.from(noteMap.values()).sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        });
+      }
+
+      setError(null);
+
+      if (data) {
+        setData((current) => {
+          if (current) {
+            saveTrackingDataOffline(token, current, notes);
+          }
+          return current;
+        });
+      }
+    } catch {
+      await loadFullData();
+    }
+  }, [token, data, notes, loadFullData]);
+
+  const loadData = useCallback(async () => {
+    if (lastSyncTimeRef.current && data) {
+      return loadDeltaData();
+    }
+    return loadFullData();
+  }, [data, loadFullData, loadDeltaData]);
 
   const syncQueue = useCallback(async () => {
     if (!token || syncingRef.current || !navigator.onLine) return;
@@ -123,20 +185,27 @@ export function useOfflineSync(token: string | undefined) {
       }
       if (allSucceeded) {
         await removeAllQueuedActions(token);
-        loadData();
+        lastSyncTimeRef.current = null;
+        loadFullData();
       }
     } finally {
       syncingRef.current = false;
       setSyncState((s) => ({ ...s, isSyncing: false }));
       await updatePendingCount();
     }
-  }, [token, updatePendingCount, loadData]);
+  }, [token, updatePendingCount, loadFullData]);
 
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 30000);
+    loadFullData();
+    const interval = setInterval(() => {
+      if (lastSyncTimeRef.current && data) {
+        loadDeltaData();
+      } else {
+        loadFullData();
+      }
+    }, 30000);
     return () => clearInterval(interval);
-  }, [loadData]);
+  }, [loadFullData, loadDeltaData, data]);
 
   useEffect(() => {
     if (syncState.isOnline && syncState.pendingCount > 0) {
@@ -239,7 +308,7 @@ export function useOfflineSync(token: string | undefined) {
     loading,
     error,
     syncState,
-    loadData,
+    loadData: loadFullData,
     handleToggle,
     handleCreateNote,
     syncQueue,

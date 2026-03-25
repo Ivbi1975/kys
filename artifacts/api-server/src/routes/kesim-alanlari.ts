@@ -2400,6 +2400,7 @@ router.get("/tracking/:token", async (req, res) => {
     });
 
     res.json({
+      serverTime: new Date().toISOString(),
       kesimAlaniName: ka.name,
       projectName: projectNameResult,
       totalGroups: groups.length,
@@ -2410,6 +2411,109 @@ router.get("/tracking/:token", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`GET /tracking/${req.params.token} error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/tracking/:token/delta", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const sinceParam = req.query.since as string | undefined;
+    if (!sinceParam) {
+      res.status(400).json({ error: "since parametresi gerekli" });
+      return;
+    }
+    const sinceDate = new Date(sinceParam);
+    if (isNaN(sinceDate.getTime())) {
+      res.status(400).json({ error: "Geçersiz since tarihi" });
+      return;
+    }
+
+    const [ka] = await db.select().from(kesimAlanlariTable)
+      .where(eq(kesimAlanlariTable.trackingToken, token));
+    if (!ka || ka.deletedAt) {
+      res.status(404).json({ error: "Takip linki bulunamadı" });
+      return;
+    }
+
+    const serverTime = new Date().toISOString();
+
+    const changedGroups = await db.select().from(animalGroupsTable)
+      .where(and(
+        eq(animalGroupsTable.kesimAlaniId, ka.id),
+        gt(animalGroupsTable.updatedAt, sinceDate)
+      ))
+      .orderBy(animalGroupsTable.sortOrder);
+
+    const changedGroupIds = changedGroups.map(g => g.id);
+    let groupDonationLinks: { groupId: string; donationId: string; sortOrder: number }[] = [];
+    let donationsById: Record<string, { name: string; description: string; donationType: string; vekalet: string; notes: string }> = {};
+
+    if (changedGroupIds.length > 0) {
+      groupDonationLinks = await db.select({
+        groupId: animalGroupDonationsTable.groupId,
+        donationId: animalGroupDonationsTable.donationId,
+        sortOrder: animalGroupDonationsTable.sortOrder,
+      }).from(animalGroupDonationsTable)
+        .where(inArray(animalGroupDonationsTable.groupId, changedGroupIds));
+
+      const donationIds = [...new Set(groupDonationLinks.map(l => l.donationId))];
+      if (donationIds.length > 0) {
+        const donations = await db.select().from(donationsTable)
+          .where(inArray(donationsTable.id, donationIds));
+        for (const d of donations) {
+          donationsById[d.id] = { name: d.name, description: d.description, donationType: d.donationType, vekalet: d.vekalet || "", notes: d.notes || "" };
+        }
+      }
+    }
+
+    const groupDonationsByGroup: Record<string, typeof groupDonationLinks> = {};
+    for (const link of groupDonationLinks) {
+      if (!groupDonationsByGroup[link.groupId]) groupDonationsByGroup[link.groupId] = [];
+      groupDonationsByGroup[link.groupId].push(link);
+    }
+
+    const updatedGroups = changedGroups.map(g => {
+      const links = (groupDonationsByGroup[g.id] || []).sort((a, b) => a.sortOrder - b.sortOrder);
+      const filledDonations = links
+        .map(l => donationsById[l.donationId])
+        .filter(d => d && d.name.trim());
+      return {
+        id: g.id,
+        animalNo: g.animalNo,
+        colorTag: g.colorTag,
+        kesildi: g.kesildi,
+        kesildiAt: g.kesildiAt || null,
+        teamId: g.teamId || null,
+        filledCount: filledDonations.length,
+        donors: filledDonations.map(d => ({ name: d.name, description: d.description, donationType: d.donationType, vekalet: d.vekalet || "", notes: d.notes || "" })),
+      };
+    });
+
+    const changedNotes = await db.select().from(trackingNotesTable)
+      .where(and(
+        eq(trackingNotesTable.kesimAlaniId, ka.id),
+        gt(trackingNotesTable.updatedAt, sinceDate)
+      ))
+      .orderBy(desc(trackingNotesTable.createdAt));
+
+    const [countResult] = await db.select({
+      total: count(),
+      kesildi: sql<number>`count(*) filter (where kesildi = true)`,
+    }).from(animalGroupsTable)
+      .where(eq(animalGroupsTable.kesimAlaniId, ka.id));
+
+    res.json({
+      serverTime,
+      updatedGroups,
+      updatedNotes: changedNotes,
+      totalGroups: Number(countResult.total),
+      kesildiCount: Number(countResult.kesildi),
+      hasChanges: updatedGroups.length > 0 || changedNotes.length > 0,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`GET /tracking/${req.params.token}/delta error:`, message);
     res.status(500).json({ error: message });
   }
 });
