@@ -2497,18 +2497,30 @@ router.get("/tracking/:token/delta", async (req, res) => {
       ))
       .orderBy(desc(trackingNotesTable.createdAt));
 
-    const [countResult] = await db.select({
-      total: count(),
-      kesildi: sql<number>`count(*) filter (where kesildi = true)`,
+    const allGroupRows = await db.select({
+      id: animalGroupsTable.id,
+      kesildi: animalGroupsTable.kesildi,
     }).from(animalGroupsTable)
       .where(eq(animalGroupsTable.kesimAlaniId, ka.id));
+
+    const allGroupIds = allGroupRows.map(g => g.id);
+    const totalGroups = allGroupRows.length;
+    const kesildiCountVal = allGroupRows.filter(g => g.kesildi).length;
+
+    const changedNoteIds = changedNotes.map(n => n.id);
+    const allNoteRows = await db.select({ id: trackingNotesTable.id })
+      .from(trackingNotesTable)
+      .where(eq(trackingNotesTable.kesimAlaniId, ka.id));
+    const allNoteIds = allNoteRows.map(n => n.id);
 
     res.json({
       serverTime,
       updatedGroups,
       updatedNotes: changedNotes,
-      totalGroups: Number(countResult.total),
-      kesildiCount: Number(countResult.kesildi),
+      allGroupIds,
+      allNoteIds,
+      totalGroups,
+      kesildiCount: kesildiCountVal,
       hasChanges: updatedGroups.length > 0 || changedNotes.length > 0,
     });
   } catch (err) {

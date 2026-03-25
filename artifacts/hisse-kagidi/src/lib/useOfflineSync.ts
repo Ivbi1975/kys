@@ -103,13 +103,24 @@ export function useOfflineSync(token: string | undefined) {
       const delta = await fetchTrackingDelta(token, lastSyncTimeRef.current);
       lastSyncTimeRef.current = delta.serverTime;
 
-      if (!delta.hasChanges) return;
+      const clientGroupCount = data?.groups?.length ?? 0;
+      const clientNoteCount = notes?.length ?? 0;
+      const hasDeletions = delta.allGroupIds.length !== clientGroupCount || delta.allNoteIds.length !== clientNoteCount;
+      if (!delta.hasChanges && !hasDeletions) return;
+
+      const serverGroupIdSet = new Set(delta.allGroupIds);
+      const serverNoteIdSet = new Set(delta.allNoteIds);
 
       setData((prev) => {
         if (!prev) return prev;
         const groupMap = new Map(prev.groups.map(g => [g.id, g]));
         for (const updatedGroup of delta.updatedGroups) {
           groupMap.set(updatedGroup.id, updatedGroup);
+        }
+        for (const id of groupMap.keys()) {
+          if (!serverGroupIdSet.has(id)) {
+            groupMap.delete(id);
+          }
         }
         const mergedGroups = Array.from(groupMap.values());
         return {
@@ -120,17 +131,20 @@ export function useOfflineSync(token: string | undefined) {
         };
       });
 
-      if (delta.updatedNotes.length > 0) {
-        setNotes((prev) => {
-          const noteMap = new Map(prev.map(n => [n.id, n]));
-          for (const updatedNote of delta.updatedNotes) {
-            noteMap.set(updatedNote.id, updatedNote);
+      setNotes((prev) => {
+        const noteMap = new Map(prev.map(n => [n.id, n]));
+        for (const updatedNote of delta.updatedNotes) {
+          noteMap.set(updatedNote.id, updatedNote);
+        }
+        for (const id of noteMap.keys()) {
+          if (!serverNoteIdSet.has(id)) {
+            noteMap.delete(id);
           }
-          return Array.from(noteMap.values()).sort(
-            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-        });
-      }
+        }
+        return Array.from(noteMap.values()).sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      });
 
       setError(null);
 

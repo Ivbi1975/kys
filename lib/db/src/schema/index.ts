@@ -9,6 +9,7 @@ export const projectsTable = pgTable("projects", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   archivedAt: timestamp("archived_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("idx_projects_deleted_created").on(table.deletedAt, table.createdAt),
   index("idx_projects_active_created").on(table.createdAt).where(sql`deleted_at IS NULL`),
@@ -71,6 +72,7 @@ export const teamsTable = pgTable("teams", {
   kesimAlaniId: text("kesim_alani_id").notNull().references(() => kesimAlanlariTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   color: text("color").notNull().default("#3b82f6"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("idx_teams_kesim_alani_id").on(table.kesimAlaniId),
 ]);
@@ -106,6 +108,7 @@ export const animalGroupDonationsTable = pgTable("animal_group_donations", {
   groupId: text("group_id").notNull().references(() => animalGroupsTable.id, { onDelete: "cascade" }),
   donationId: text("donation_id").notNull().references(() => donationsTable.id, { onDelete: "cascade" }),
   sortOrder: integer("sort_order").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("idx_agd_group_id").on(table.groupId),
   index("idx_agd_donation_id").on(table.donationId),

@@ -78,6 +78,13 @@
       "when": 1774500600000,
       "tag": "0010_delta_sync_updated_at",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1774500700000,
+      "tag": "0011_delta_sync_extended_updated_at",
+      "breakpoints": true
     }
   ]
 }
