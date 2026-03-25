@@ -111,8 +111,9 @@ import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani
 import type { DeletedDonation, TrackingNote, GroupPhoto, NotificationLog, DonationTransferEntry } from "@/lib/api";
 import PhotoGallery from "@/components/PhotoGallery";
 import { AnimalGroupCard } from "@/components/AnimalGroupCard";
-import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
+import { getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
+import { useGroupingWorker } from "@/lib/useGroupingWorker";
 import { useHistory } from "@/lib/useHistory";
 import { useWorkspacePreferences, ALL_GROUP_COLUMNS, type ColumnKey } from "@/lib/useWorkspacePreferences";
 import { useTheme } from "@/lib/useTheme";
@@ -257,6 +258,7 @@ export default function KesimAlaniPage() {
   const [donorListVisible, setDonorListVisible] = useState(true);
   const [fullscreenMode, setFullscreenMode] = useState(false);
   const workspace = useWorkspacePreferences();
+  const { runGrouping, cancelGrouping } = useGroupingWorker();
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
@@ -1166,7 +1168,6 @@ export default function KesimAlaniPage() {
     setGroupingInProgress(true);
     setGroupingProgress(null);
     try {
-      await new Promise(resolve => setTimeout(resolve, 0));
       const lockedDonationIds = new Set<string>();
       for (const g of kesim.animalGroups) {
         if (g.locked) {
@@ -1178,7 +1179,7 @@ export default function KesimAlaniPage() {
         }
       }
       const donationsToGroup = kesim.donations.filter(d => !lockedDonationIds.has(d.id));
-      const newGroups = await autoGroupDonationsAsync(donationsToGroup, (progress) => {
+      const newGroups = await runGrouping(donationsToGroup, (progress) => {
         setGroupingProgress({ ...progress });
       });
       const lockedGroups = kesim.animalGroups.filter(g => g.locked);
@@ -1204,6 +1205,9 @@ export default function KesimAlaniPage() {
       const found = checkGroupConflicts(finalGroups);
       setConflicts(found);
       if (found.length > 0) setShowConflicts(true);
+    } catch (err) {
+      if (err instanceof Error && err.name === "CancelledError") return;
+      throw err;
     } finally {
       setGroupingInProgress(false);
       setGroupingProgress(null);
@@ -1608,9 +1612,8 @@ export default function KesimAlaniPage() {
     setGroupingInProgress(true);
     setGroupingProgress(null);
     try {
-      await new Promise(resolve => setTimeout(resolve, 0));
       const selectedDonations = kesim.donations.filter(d => selectedIds.has(d.id));
-      const newGroups = await autoGroupDonationsAsync(selectedDonations, (progress) => {
+      const newGroups = await runGrouping(selectedDonations, (progress) => {
         setGroupingProgress({ ...progress });
       });
       const cleanedExistingGroups = kesim.animalGroups.map(g => ({
@@ -1642,6 +1645,9 @@ export default function KesimAlaniPage() {
       setConflicts(found);
       if (found.length > 0) setShowConflicts(true);
       setSelectedIds(new Set());
+    } catch (err) {
+      if (err instanceof Error && err.name === "CancelledError") return;
+      throw err;
     } finally {
       setGroupingInProgress(false);
       setGroupingProgress(null);
@@ -3517,6 +3523,11 @@ export default function KesimAlaniPage() {
                 </>
               )}
             </Button>
+            {groupingInProgress && (
+              <Button variant="destructive" size="icon" onClick={cancelGrouping} title="İptal">
+                <X className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         )}
 
