@@ -23,6 +23,19 @@ interface CheckResult {
   ids: string[];
 }
 
+interface IdRow { id: string }
+interface CountRow { cnt: number }
+interface ShareMismatchRow { id: string; donation_share_count: number; assigned_group_count: number }
+
+function extractIds(rows: Record<string, unknown>[]): string[] {
+  return rows.map(r => String((r as IdRow).id));
+}
+
+function extractCount(rows: Record<string, unknown>[]): number {
+  if (rows.length === 0) return 0;
+  return (rows[0] as CountRow).cnt || 0;
+}
+
 async function runChecks(): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
 
@@ -34,7 +47,7 @@ async function runChecks(): Promise<CheckResult[]> {
   if (orphanDonations.rows.length > 0) {
     results.push({
       issue: { type: "orphan_donations", severity: "error", description: "Kesim alanı silinmiş veya mevcut olmayan bağışçılar", count: orphanDonations.rows.length, repairable: true },
-      ids: orphanDonations.rows.map((r: any) => r.id),
+      ids: extractIds(orphanDonations.rows),
     });
   }
 
@@ -46,12 +59,12 @@ async function runChecks(): Promise<CheckResult[]> {
   if (orphanGroups.rows.length > 0) {
     results.push({
       issue: { type: "orphan_groups", severity: "error", description: "Kesim alanı mevcut olmayan hayvan grupları", count: orphanGroups.rows.length, repairable: true },
-      ids: orphanGroups.rows.map((r: any) => r.id),
+      ids: extractIds(orphanGroups.rows),
     });
   }
 
   const brokenLinks = await db.execute(sql`
-    SELECT agd.id::text FROM animal_group_donations agd
+    SELECT agd.id::text AS id FROM animal_group_donations agd
     LEFT JOIN animal_groups ag ON ag.id = agd.group_id
     LEFT JOIN donations d ON d.id = agd.donation_id
     WHERE ag.id IS NULL OR d.id IS NULL
@@ -59,7 +72,7 @@ async function runChecks(): Promise<CheckResult[]> {
   if (brokenLinks.rows.length > 0) {
     results.push({
       issue: { type: "broken_group_donation_links", severity: "error", description: "Grup veya bağışçısı eksik olan grup-bağışçı bağlantıları", count: brokenLinks.rows.length, repairable: true },
-      ids: brokenLinks.rows.map((r: any) => String(r.id)),
+      ids: extractIds(brokenLinks.rows),
     });
   }
 
@@ -71,7 +84,7 @@ async function runChecks(): Promise<CheckResult[]> {
   if (orphanPhotos.rows.length > 0) {
     results.push({
       issue: { type: "orphan_photos", severity: "warning", description: "Hayvan grubu mevcut olmayan fotoğraflar", count: orphanPhotos.rows.length, repairable: true },
-      ids: orphanPhotos.rows.map((r: any) => r.id),
+      ids: extractIds(orphanPhotos.rows),
     });
   }
 
@@ -83,7 +96,7 @@ async function runChecks(): Promise<CheckResult[]> {
   if (orphanTrackingNotes.rows.length > 0) {
     results.push({
       issue: { type: "orphan_tracking_notes", severity: "warning", description: "Kesim alanı mevcut olmayan takip notları", count: orphanTrackingNotes.rows.length, repairable: true },
-      ids: orphanTrackingNotes.rows.map((r: any) => r.id),
+      ids: extractIds(orphanTrackingNotes.rows),
     });
   }
 
@@ -95,12 +108,12 @@ async function runChecks(): Promise<CheckResult[]> {
   if (orphanTeams.rows.length > 0) {
     results.push({
       issue: { type: "orphan_teams", severity: "warning", description: "Kesim alanı mevcut olmayan ekipler", count: orphanTeams.rows.length, repairable: true },
-      ids: orphanTeams.rows.map((r: any) => r.id),
+      ids: extractIds(orphanTeams.rows),
     });
   }
 
   const brokenTags = await db.execute(sql`
-    SELECT dt.id::text FROM donation_tags dt
+    SELECT dt.id::text AS id FROM donation_tags dt
     LEFT JOIN donations d ON d.id = dt.donation_id
     LEFT JOIN custom_tags ct ON ct.id = dt.tag_id
     WHERE d.id IS NULL OR ct.id IS NULL
@@ -108,30 +121,30 @@ async function runChecks(): Promise<CheckResult[]> {
   if (brokenTags.rows.length > 0) {
     results.push({
       issue: { type: "broken_donation_tags", severity: "warning", description: "Bağışçı veya etiketi eksik olan etiket bağlantıları", count: brokenTags.rows.length, repairable: true },
-      ids: brokenTags.rows.map((r: any) => String(r.id)),
+      ids: extractIds(brokenTags.rows),
     });
   }
 
   const activeDonInDeletedKa = await db.execute(sql`
-    SELECT COUNT(*)::int as cnt FROM donations d
+    SELECT COUNT(*)::int AS cnt FROM donations d
     JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
     WHERE ka.deleted_at IS NOT NULL AND d.deleted_at IS NULL
   `);
-  const cnt = (activeDonInDeletedKa.rows[0] as any)?.cnt || 0;
-  if (cnt > 0) {
+  const activeDonCnt = extractCount(activeDonInDeletedKa.rows);
+  if (activeDonCnt > 0) {
     results.push({
-      issue: { type: "active_donations_in_deleted_ka", severity: "warning", description: "Silinmiş kesim alanındaki aktif bağışçılar (KA kalıcı silinince temizlenir)", count: cnt, repairable: false },
+      issue: { type: "active_donations_in_deleted_ka", severity: "warning", description: "Silinmiş kesim alanındaki aktif bağışçılar (KA kalıcı silinince temizlenir)", count: activeDonCnt, repairable: false },
       ids: [],
     });
   }
 
   const duplicates = await db.execute(sql`
-    SELECT COUNT(*)::int as cnt FROM (
+    SELECT COUNT(*)::int AS cnt FROM (
       SELECT group_id, donation_id FROM animal_group_donations
       GROUP BY group_id, donation_id HAVING COUNT(*) > 1
     ) sub
   `);
-  const dupCnt = (duplicates.rows[0] as any)?.cnt || 0;
+  const dupCnt = extractCount(duplicates.rows);
   if (dupCnt > 0) {
     results.push({
       issue: { type: "duplicate_group_donations", severity: "error", description: "Aynı bağışçı birden fazla kez aynı gruba atanmış", count: dupCnt, repairable: true },
@@ -147,7 +160,47 @@ async function runChecks(): Promise<CheckResult[]> {
   if (kaWithDeletedProject.rows.length > 0) {
     results.push({
       issue: { type: "ka_with_deleted_project", severity: "warning", description: "Silinmiş projeye bağlı kesim alanları", count: kaWithDeletedProject.rows.length, repairable: true },
-      ids: kaWithDeletedProject.rows.map((r: any) => r.id),
+      ids: extractIds(kaWithDeletedProject.rows),
+    });
+  }
+
+  const shareMismatch = await db.execute(sql`
+    SELECT d.id,
+           d.share_count AS donation_share_count,
+           COUNT(agd.id)::int AS assigned_group_count
+    FROM donations d
+    LEFT JOIN animal_group_donations agd ON agd.donation_id = d.id
+    WHERE d.deleted_at IS NULL
+    GROUP BY d.id, d.share_count
+    HAVING d.share_count < COUNT(agd.id)::int
+  `);
+  if (shareMismatch.rows.length > 0) {
+    results.push({
+      issue: {
+        type: "share_count_exceeded",
+        severity: "error",
+        description: "Hisse sayısından fazla gruba atanmış bağışçılar",
+        count: shareMismatch.rows.length,
+        repairable: true,
+      },
+      ids: extractIds(shareMismatch.rows),
+    });
+  }
+
+  const zeroshare = await db.execute(sql`
+    SELECT d.id FROM donations d
+    WHERE d.deleted_at IS NULL AND d.share_count < 1
+  `);
+  if (zeroshare.rows.length > 0) {
+    results.push({
+      issue: {
+        type: "invalid_share_count",
+        severity: "error",
+        description: "Hisse sayısı 0 veya negatif olan bağışçılar",
+        count: zeroshare.rows.length,
+        repairable: true,
+      },
+      ids: extractIds(zeroshare.rows),
     });
   }
 
@@ -194,7 +247,7 @@ router.post("/integrity/repair", async (_req, res) => {
             break;
           case "broken_group_donation_links":
             if (r.ids.length > 0) {
-              await tx.execute(sql`DELETE FROM animal_group_donations WHERE id IN (${sql.join(r.ids.map(id => sql`${parseInt(id)}`), sql`, `)})`);
+              await tx.execute(sql`DELETE FROM animal_group_donations WHERE id IN (${sql.join(r.ids.map(id => sql`${Number(id)}`), sql`, `)})`);
               repairs.push({ type: r.issue.type, action: "Kırık grup-bağışçı bağlantıları silindi", count: r.issue.count });
             }
             break;
@@ -218,7 +271,7 @@ router.post("/integrity/repair", async (_req, res) => {
             break;
           case "broken_donation_tags":
             if (r.ids.length > 0) {
-              await tx.execute(sql`DELETE FROM donation_tags WHERE id IN (${sql.join(r.ids.map(id => sql`${parseInt(id)}`), sql`, `)})`);
+              await tx.execute(sql`DELETE FROM donation_tags WHERE id IN (${sql.join(r.ids.map(id => sql`${Number(id)}`), sql`, `)})`);
               repairs.push({ type: r.issue.type, action: "Kırık etiket bağlantıları silindi", count: r.issue.count });
             }
             break;
@@ -234,6 +287,34 @@ router.post("/integrity/repair", async (_req, res) => {
             if (r.ids.length > 0) {
               await tx.execute(sql`UPDATE kesim_alanlari SET project_id = NULL, updated_at = NOW() WHERE id IN (${sql.join(r.ids.map(id => sql`${id}`), sql`, `)})`);
               repairs.push({ type: r.issue.type, action: "Silinmiş proje bağlantısı kaldırıldı", count: r.issue.count });
+            }
+            break;
+          case "share_count_exceeded": {
+            if (r.ids.length > 0) {
+              for (const donationId of r.ids) {
+                const donRow = await tx.execute(sql`SELECT share_count FROM donations WHERE id = ${donationId}`);
+                const shareCount = (donRow.rows[0] as { share_count: number } | undefined)?.share_count ?? 1;
+                await tx.execute(sql`
+                  DELETE FROM animal_group_donations
+                  WHERE id IN (
+                    SELECT id FROM animal_group_donations
+                    WHERE donation_id = ${donationId}
+                    ORDER BY sort_order DESC
+                    LIMIT (
+                      SELECT GREATEST(0, COUNT(*) - ${shareCount})
+                      FROM animal_group_donations WHERE donation_id = ${donationId}
+                    )
+                  )
+                `);
+              }
+              repairs.push({ type: r.issue.type, action: "Fazla grup atamları kaldırıldı (hisse sayısına göre)", count: r.issue.count });
+            }
+            break;
+          }
+          case "invalid_share_count":
+            if (r.ids.length > 0) {
+              await tx.execute(sql`UPDATE donations SET share_count = 1, updated_at = NOW() WHERE id IN (${sql.join(r.ids.map(id => sql`${id}`), sql`, `)})`);
+              repairs.push({ type: r.issue.type, action: "Geçersiz hisse sayıları 1'e düzeltildi", count: r.issue.count });
             }
             break;
         }
