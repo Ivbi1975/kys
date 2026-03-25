@@ -177,85 +177,121 @@ async function getFullKesimAlaniList(kaRows: KesimAlaniRow[]) {
   if (kaRows.length === 0) return [];
   const kaIds = kaRows.map(k => k.id);
 
-  const [allDonations, allGroups, allTeams] = await Promise.all([
-    db.select().from(donationsTable)
-      .where(and(inArray(donationsTable.kesimAlaniId, kaIds), isNull(donationsTable.deletedAt)))
-      .orderBy(donationsTable.sortOrder),
-    db.select().from(animalGroupsTable)
-      .where(inArray(animalGroupsTable.kesimAlaniId, kaIds))
-      .orderBy(animalGroupsTable.sortOrder),
-    db.select().from(teamsTable)
-      .where(inArray(teamsTable.kesimAlaniId, kaIds)),
-  ]);
+  const result = await db.execute(sql`
+    SELECT
+      ka.id AS ka_id,
+      COALESCE((
+        SELECT json_agg(d ORDER BY d.sort_order)
+        FROM (
+          SELECT
+            don.id, don.name, don.description, don.donation_type,
+            don.share_count, don.vekalet, don.notes, don.phone,
+            don.excluded, don.sort_order, don.ai_categories, don.ai_warnings,
+            COALESCE((
+              SELECT json_agg(dt.tag_id)
+              FROM donation_tags dt WHERE dt.donation_id = don.id
+            ), '[]'::json) AS tags
+          FROM donations don
+          WHERE don.kesim_alani_id = ka.id AND don.deleted_at IS NULL
+        ) d
+      ), '[]'::json) AS donations,
+      COALESCE((
+        SELECT json_agg(g ORDER BY g.sort_order)
+        FROM (
+          SELECT
+            ag.id, ag.animal_no, ag.color_tag, ag.locked, ag.notes,
+            ag.kesildi, ag.kesildi_at, ag.team_id, ag.sort_order,
+            COALESCE((
+              SELECT json_agg(
+                json_build_object('donationId', agd.donation_id, 'sortOrder', agd.sort_order)
+                ORDER BY agd.sort_order
+              )
+              FROM animal_group_donations agd WHERE agd.group_id = ag.id
+            ), '[]'::json) AS donation_links
+          FROM animal_groups ag
+          WHERE ag.kesim_alani_id = ka.id
+        ) g
+      ), '[]'::json) AS groups,
+      COALESCE((
+        SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color))
+        FROM teams t WHERE t.kesim_alani_id = ka.id
+      ), '[]'::json) AS teams
+    FROM kesim_alanlari ka
+    WHERE ka.id IN (${sql.join(kaIds.map(id => sql`${id}`), sql`, `)})
+  `);
 
-  const allDonationIds = allDonations.map(d => d.id);
-  const allGroupIds = allGroups.map(g => g.id);
-
-  const [allTags, allGroupDonationLinks] = await Promise.all([
-    allDonationIds.length > 0
-      ? db.select({
-          donationId: donationTagsTable.donationId,
-          tagId: donationTagsTable.tagId,
-        }).from(donationTagsTable).where(inArray(donationTagsTable.donationId, allDonationIds))
-      : Promise.resolve([] as { donationId: string; tagId: string }[]),
-    allGroupIds.length > 0
-      ? db.select({
-          groupId: animalGroupDonationsTable.groupId,
-          donationId: animalGroupDonationsTable.donationId,
-          sortOrder: animalGroupDonationsTable.sortOrder,
-        }).from(animalGroupDonationsTable).where(inArray(animalGroupDonationsTable.groupId, allGroupIds))
-      : Promise.resolve([] as { groupId: string; donationId: string; sortOrder: number }[]),
-  ]);
-
-  const tagsByDonation: Record<string, string[]> = {};
-  for (const dt of allTags) {
-    if (!tagsByDonation[dt.donationId]) tagsByDonation[dt.donationId] = [];
-    tagsByDonation[dt.donationId].push(dt.tagId);
+  const kaMap = new Map(kaRows.map(k => [k.id, k]));
+  const donationsMap: Record<string, DonationRow[]> = {};
+  for (const row of kaRows) {
+    donationsMap[row.id] = [];
   }
 
-  const donationsByKA: Record<string, DonationRow[]> = {};
-  for (const d of allDonations) {
-    if (!donationsByKA[d.kesimAlaniId]) donationsByKA[d.kesimAlaniId] = [];
-    donationsByKA[d.kesimAlaniId].push(d);
-  }
+  type RawRow = {
+    ka_id: string;
+    donations: { id: string; name: string; description: string; donation_type: string; share_count: number; vekalet: string; notes: string; phone: string; excluded: boolean; sort_order: number; ai_categories: string | null; ai_warnings: string | null; tags: string[] }[];
+    groups: { id: string; animal_no: number; color_tag: string; locked: boolean; notes: string; kesildi: boolean; kesildi_at: string | null; team_id: string | null; sort_order: number; donation_links: { donationId: string; sortOrder: number }[] }[];
+    teams: { id: string; name: string; color: string }[];
+  };
 
-  const groupsByKA: Record<string, AnimalGroupRow[]> = {};
-  for (const g of allGroups) {
-    if (!groupsByKA[g.kesimAlaniId]) groupsByKA[g.kesimAlaniId] = [];
-    groupsByKA[g.kesimAlaniId].push(g);
-  }
+  const assembled = new Map<string, ReturnType<typeof assembleKesimAlani>>();
 
-  const teamsByKA: Record<string, TeamRow[]> = {};
-  for (const t of allTeams) {
-    if (!teamsByKA[t.kesimAlaniId]) teamsByKA[t.kesimAlaniId] = [];
-    teamsByKA[t.kesimAlaniId].push(t);
-  }
+  for (const rawRow of result.rows as RawRow[]) {
+    const ka = kaMap.get(rawRow.ka_id);
+    if (!ka) continue;
 
-  const groupIdsByKA: Record<string, Set<string>> = {};
-  for (const g of allGroups) {
-    if (!groupIdsByKA[g.kesimAlaniId]) groupIdsByKA[g.kesimAlaniId] = new Set();
-    groupIdsByKA[g.kesimAlaniId].add(g.id);
-  }
+    const tagsByDonation: Record<string, string[]> = {};
+    const donations: DonationRow[] = [];
+    for (const d of rawRow.donations || []) {
+      tagsByDonation[d.id] = d.tags || [];
+      donations.push({
+        id: d.id,
+        kesimAlaniId: rawRow.ka_id,
+        name: d.name,
+        description: d.description,
+        donationType: d.donation_type,
+        shareCount: d.share_count,
+        vekalet: d.vekalet,
+        notes: d.notes,
+        phone: d.phone || "",
+        excluded: d.excluded,
+        sortOrder: d.sort_order,
+        deletedAt: null,
+        aiCategories: d.ai_categories,
+        aiWarnings: d.ai_warnings,
+      });
+    }
 
-  const linksByKA: Record<string, { groupId: string; donationId: string; sortOrder: number }[]> = {};
-  for (const link of allGroupDonationLinks) {
-    for (const kaId of kaIds) {
-      if (groupIdsByKA[kaId]?.has(link.groupId)) {
-        if (!linksByKA[kaId]) linksByKA[kaId] = [];
-        linksByKA[kaId].push(link);
-        break;
+    const groups: AnimalGroupRow[] = [];
+    const groupLinks: { groupId: string; donationId: string; sortOrder: number }[] = [];
+    for (const g of rawRow.groups || []) {
+      groups.push({
+        id: g.id,
+        kesimAlaniId: rawRow.ka_id,
+        animalNo: g.animal_no,
+        colorTag: g.color_tag,
+        locked: g.locked,
+        notes: g.notes,
+        kesildi: g.kesildi,
+        kesildiAt: g.kesildi_at ? new Date(g.kesildi_at) : null,
+        teamId: g.team_id,
+        sortOrder: g.sort_order,
+      });
+      for (const link of g.donation_links || []) {
+        groupLinks.push({ groupId: g.id, donationId: link.donationId, sortOrder: link.sortOrder });
       }
     }
+
+    const teams: TeamRow[] = (rawRow.teams || []).map(t => ({
+      id: t.id,
+      kesimAlaniId: rawRow.ka_id,
+      name: t.name,
+      color: t.color,
+    }));
+
+    assembled.set(rawRow.ka_id, assembleKesimAlani(ka, donations, groups, tagsByDonation, groupLinks, teams));
   }
 
-  return kaRows.map(ka => assembleKesimAlani(
-    ka,
-    donationsByKA[ka.id] || [],
-    groupsByKA[ka.id] || [],
-    tagsByDonation,
-    linksByKA[ka.id] || [],
-    teamsByKA[ka.id] || [],
-  ));
+  return kaRows.map(ka => assembled.get(ka.id)!).filter(Boolean);
 }
 
 async function getFullKesimAlani(id: string) {
