@@ -354,19 +354,19 @@ router.put("/ai-notes/save-classifications", async (req, res) => {
 
     const { classifications } = parsed.data;
 
-    for (let i = 0; i < classifications.length; i += TX_BATCH_SIZE) {
-      const chunk = classifications.slice(i, i + TX_BATCH_SIZE);
-      await db.transaction(async (tx) => {
-        for (const c of chunk) {
-          await tx.update(donationsTable)
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < classifications.length; i += TX_BATCH_SIZE) {
+        const chunk = classifications.slice(i, i + TX_BATCH_SIZE);
+        await Promise.all(chunk.map(c =>
+          tx.update(donationsTable)
             .set({
               aiCategories: JSON.stringify(c.categories),
               aiWarnings: c.warnings,
             })
-            .where(eq(donationsTable.id, c.donationId));
-        }
-      });
-    }
+            .where(eq(donationsTable.id, c.donationId))
+        ));
+      }
+    });
 
     res.json({ success: true, count: classifications.length });
   } catch (err) {
@@ -393,16 +393,16 @@ router.put("/ai-notes/bulk-update", async (req, res) => {
 
     const { updates } = parsed.data;
 
-    for (let i = 0; i < updates.length; i += TX_BATCH_SIZE) {
-      const chunk = updates.slice(i, i + TX_BATCH_SIZE);
-      await db.transaction(async (tx) => {
-        for (const u of chunk) {
-          await tx.update(donationsTable)
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < updates.length; i += TX_BATCH_SIZE) {
+        const chunk = updates.slice(i, i + TX_BATCH_SIZE);
+        await Promise.all(chunk.map(u =>
+          tx.update(donationsTable)
             .set({ notes: u.notes })
-            .where(eq(donationsTable.id, u.donationId));
-        }
-      });
-    }
+            .where(eq(donationsTable.id, u.donationId))
+        ));
+      }
+    });
 
     res.json({ success: true, count: updates.length });
   } catch (err) {
