@@ -1483,15 +1483,9 @@ export default function KesimAlaniPage() {
       commitEdit();
       const currentFieldIdx = DONOR_EDITABLE_FIELDS.indexOf(field as any);
       if (currentFieldIdx < 0) return;
-      const donations = searchQuery.trim()
-        ? kesim!.donations.filter(d => {
-            const q = searchQuery.trim().toLowerCase();
-            return d.name.toLowerCase().includes(q) ||
-              d.description.toLowerCase().includes(q) ||
-              d.vekalet.toLowerCase().includes(q) ||
-              d.donationType.toLowerCase().includes(q) ||
-              (d.notes || "").toLowerCase().includes(q);
-          })
+      const matchedTabIds = searchQuery.trim() ? searchIndex.search(searchQuery) : null;
+      const donations = matchedTabIds
+        ? kesim!.donations.filter(d => matchedTabIds.has(d.id))
         : kesim!.donations;
       const donationIdx = donations.findIndex(d => d.id === donationId);
       if (donationIdx < 0) return;
@@ -3057,13 +3051,68 @@ export default function KesimAlaniPage() {
   }, [animalGroups]);
 
   const searchIndex = useMemo(() => {
-    const index = new Map<string, string>();
-    for (const d of donations) {
-      index.set(d.id, [
-        d.name, d.description, d.vekalet, d.donationType, d.notes || ""
-      ].join("\t").toLowerCase());
+    const trigramIndex = new Map<string, Set<string>>();
+    const contentMap = new Map<string, string>();
+
+    function addTrigrams(text: string, id: string) {
+      const padded = `  ${text}  `;
+      for (let i = 0; i <= padded.length - 3; i++) {
+        const tri = padded.substring(i, i + 3);
+        let set = trigramIndex.get(tri);
+        if (!set) {
+          set = new Set();
+          trigramIndex.set(tri, set);
+        }
+        set.add(id);
+      }
     }
-    return index;
+
+    for (const d of donations) {
+      const text = [d.name, d.description, d.vekalet, d.donationType, d.notes || ""].join("\t").toLowerCase();
+      contentMap.set(d.id, text);
+      addTrigrams(text, d.id);
+    }
+
+    return {
+      search(query: string): Set<string> | null {
+        if (!query) return null;
+        const q = query.trim().toLowerCase();
+        if (q.length === 0) return null;
+
+        if (q.length < 3) {
+          const results = new Set<string>();
+          for (const [id, text] of contentMap) {
+            if (text.includes(q)) results.add(id);
+          }
+          return results;
+        }
+
+        const padded = `  ${q}  `;
+        let result: Set<string> | null = null;
+        for (let i = 0; i <= padded.length - 3; i++) {
+          const tri = padded.substring(i, i + 3);
+          const matches = trigramIndex.get(tri);
+          if (!matches || matches.size === 0) return new Set();
+          if (result === null) {
+            result = new Set(matches);
+          } else {
+            for (const id of result) {
+              if (!matches.has(id)) result.delete(id);
+            }
+            if (result.size === 0) return result;
+          }
+        }
+
+        if (result) {
+          for (const id of result) {
+            const text = contentMap.get(id);
+            if (!text || !text.includes(q)) result.delete(id);
+          }
+        }
+
+        return result ?? new Set();
+      }
+    };
   }, [donations]);
 
   const filteredDonations = useMemo(() => {
@@ -3094,11 +3143,9 @@ export default function KesimAlaniPage() {
     });
 
     if (!debouncedSearchQuery.trim()) return advFiltered;
-    const q = debouncedSearchQuery.trim().toLowerCase();
-    return advFiltered.filter(d => {
-      const cached = searchIndex.get(d.id);
-      return cached ? cached.includes(q) : false;
-    });
+    const matchedIds = searchIndex.search(debouncedSearchQuery);
+    if (!matchedIds) return advFiltered;
+    return advFiltered.filter(d => matchedIds.has(d.id));
   }, [donations, showRemovedFilter, removedFromGroupIds, filterUngrouped, groupedDonorIds, filterStatus, filterCinsi, filterHisseMin, filterHisseMax, filterTags, filterAiCategories, filterAiWarnings, debouncedSearchQuery, searchIndex]);
 
   const uniqueDonationTypes = useMemo(() =>
