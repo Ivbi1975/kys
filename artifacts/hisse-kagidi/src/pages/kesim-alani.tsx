@@ -102,6 +102,7 @@ import {
   QrCode,
   Tag,
   Camera,
+  FileText,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag, Team } from "@/lib/types";
 import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani, generateTrackingToken, fetchKesimAlaniTrackingNotes, updateTrackingNoteStatus, fetchGroupPhotosAdmin, getGroupPhotoUrlAdmin, fetchPhotoCountsAdmin, createTeam, updateTeam, deleteTeam, assignTeamAdmin, fetchNotificationLogs, fetchNotificationTemplate, updateNotificationTemplate } from "@/lib/api";
@@ -3338,6 +3339,10 @@ export default function KesimAlaniPage() {
                   <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setLocation(`/print/${kesim.id}`)}>
                     <Printer className="w-3.5 h-3.5 mr-1" />
                     <span className="hidden sm:inline">Yazdır</span>
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setLocation(`/rapor/${kesim.id}`)}>
+                    <FileText className="w-3.5 h-3.5 mr-1" />
+                    <span className="hidden sm:inline">Rapor</span>
                   </Button>
                 </>
               )}

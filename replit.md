@@ -107,6 +107,7 @@ Key files:
 - `src/pages/kesim-alani.tsx` - Main editing page with donor table, animal groups, stats, export
 - `src/pages/print.tsx` - Print-optimized A4 landscape view matching Excel design
 - `src/pages/kesim-takip.tsx` - Public kesim tracking page (no auth), shows animal groups with kesildi toggle, offline mode with IndexedDB + Service Worker
+- `src/pages/kesim-rapor.tsx` - Kesim report page (`/rapor/:id`), print-optimized PDF with stats, timeline, team breakdown, notes; accessible from kesim-alani "Rapor" button
 - `src/lib/offlineStore.ts` - IndexedDB wrapper for offline tracking data cache and change queue
 - `src/lib/useOfflineSync.ts` - React hook for offline-aware data loading, change queuing, and sync
 

@@ -706,3 +706,461 @@
     max-height: auto;
   }
 }
+
+.rapor-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.rapor-page {
+  background: white;
+  color: #1a1a1a;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 40px;
+}
+
+.dark .rapor-page {
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+}
+
+.rapor-header {
+  text-align: center;
+  border-bottom: 3px solid #1e3a5f;
+  padding-bottom: 20px;
+  margin-bottom: 28px;
+}
+
+.rapor-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1e3a5f;
+  margin: 0;
+}
+
+.dark .rapor-title {
+  color: hsl(var(--primary));
+}
+
+.rapor-subtitle {
+  font-size: 16px;
+  color: #64748b;
+  margin: 4px 0 0;
+}
+
+.rapor-date {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 8px 0 0;
+}
+
+.rapor-section {
+  margin-bottom: 28px;
+}
+
+.rapor-section-break-before {
+  page-break-before: auto;
+}
+
+.rapor-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e3a5f;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 6px;
+  margin-bottom: 14px;
+}
+
+.dark .rapor-section-title {
+  color: hsl(var(--primary));
+  border-color: hsl(var(--border));
+}
+
+.rapor-subsection-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  margin: 16px 0 8px;
+}
+
+.dark .rapor-subsection-title {
+  color: hsl(var(--muted-foreground));
+}
+
+.rapor-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 600px) {
+  .rapor-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.rapor-stat-card {
+  text-align: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px 8px;
+}
+
+.dark .rapor-stat-card {
+  border-color: hsl(var(--border));
+}
+
+.rapor-stat-success {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.dark .rapor-stat-success {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.rapor-stat-warning {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.dark .rapor-stat-warning {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.rapor-stat-info {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.dark .rapor-stat-info {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.rapor-stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1;
+}
+
+.dark .rapor-stat-value {
+  color: hsl(var(--foreground));
+}
+
+.rapor-stat-label {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.dark .rapor-stat-label {
+  color: hsl(var(--muted-foreground));
+}
+
+.rapor-progress-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rapor-progress-bar {
+  flex: 1;
+  height: 12px;
+  background: #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.dark .rapor-progress-bar {
+  background: hsl(var(--muted));
+}
+
+.rapor-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  border-radius: 6px;
+  transition: width 0.3s;
+}
+
+.rapor-progress-text {
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.dark .rapor-progress-text {
+  color: hsl(var(--muted-foreground));
+}
+
+.rapor-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.rapor-table-compact {
+  font-size: 11px;
+}
+
+.rapor-table th,
+.rapor-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+.dark .rapor-table th,
+.dark .rapor-table td {
+  border-color: hsl(var(--border));
+}
+
+.rapor-table-header {
+  font-weight: 600;
+  color: #475569;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.dark .rapor-table-header {
+  color: hsl(var(--muted-foreground));
+}
+
+.rapor-table-right {
+  text-align: right;
+}
+
+.rapor-table-label {
+  color: #475569;
+}
+
+.dark .rapor-table-label {
+  color: hsl(var(--muted-foreground));
+}
+
+.rapor-table-value {
+  font-weight: 600;
+  text-align: right;
+}
+
+.rapor-text-strike {
+  text-decoration: line-through;
+  color: #ef4444;
+}
+
+.rapor-team-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.rapor-time-range {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 12px;
+}
+
+.dark .rapor-time-range {
+  color: hsl(var(--muted-foreground));
+}
+
+.rapor-timeline {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 120px;
+  padding-top: 10px;
+}
+
+.rapor-timeline-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+
+.rapor-timeline-bar-container {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.rapor-timeline-bar {
+  width: 70%;
+  max-width: 40px;
+  background: linear-gradient(180deg, #3b82f6, #1d4ed8);
+  border-radius: 3px 3px 0 0;
+  min-height: 4px;
+}
+
+.rapor-timeline-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-top: 2px;
+}
+
+.dark .rapor-timeline-count {
+  color: hsl(var(--foreground));
+}
+
+.rapor-timeline-label {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.dark .rapor-timeline-label {
+  color: hsl(var(--muted-foreground));
+}
+
+.rapor-status {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.rapor-status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.rapor-status-approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.rapor-status-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.rapor-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rapor-note-item {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.dark .rapor-note-item {
+  border-color: hsl(var(--border));
+}
+
+.rapor-note-time {
+  color: #94a3b8;
+  white-space: nowrap;
+  font-size: 11px;
+  min-width: 40px;
+}
+
+.dark .rapor-note-time {
+  color: hsl(var(--muted-foreground));
+}
+
+.rapor-note-content {
+  color: #334155;
+  flex: 1;
+}
+
+.dark .rapor-note-content {
+  color: hsl(var(--foreground));
+}
+
+.rapor-footer {
+  margin-top: 32px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.dark .rapor-footer {
+  border-color: hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .rapor-container {
+    max-width: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .rapor-page {
+    box-shadow: none;
+    border-radius: 0;
+    padding: 15mm 20mm;
+  }
+
+  .rapor-section-break-before {
+    page-break-before: always;
+  }
+
+  .rapor-stat-success {
+    background: #f0fdf4 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .rapor-stat-warning {
+    background: #fffbeb !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .rapor-stat-info {
+    background: #eff6ff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .rapor-progress-fill {
+    background: #22c55e !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .rapor-timeline-bar {
+    background: #3b82f6 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .rapor-team-dot {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .rapor-status {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

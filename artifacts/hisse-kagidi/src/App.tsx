@@ -10,6 +10,7 @@ import NotDuzenlemePage from "@/pages/not-duzenleme";
 import AiPromptAyarlariPage from "@/pages/ai-prompt-ayarlari";
 import ProjeDetayPage from "@/pages/proje-detay";
 import KesimTakipPage from "@/pages/kesim-takip";
+import KesimRaporPage from "@/pages/kesim-rapor";
 import { useTheme } from "@/lib/useTheme";
 import PasswordGate from "@/components/PasswordGate";
 
@@ -22,6 +23,7 @@ function ProtectedRouter() {
         <Route path="/" component={Home} />
         <Route path="/kesim/:id" component={KesimAlaniPage} />
         <Route path="/print/:id" component={PrintPage} />
+        <Route path="/rapor/:id" component={KesimRaporPage} />
         <Route path="/not-duzenleme/:id" component={NotDuzenlemePage} />
         <Route path="/ai-prompt-ayarlari" component={AiPromptAyarlariPage} />
         <Route path="/proje/:id" component={ProjeDetayPage} />
