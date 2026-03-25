@@ -258,7 +258,7 @@ export default function KesimAlaniPage() {
   const [donorListVisible, setDonorListVisible] = useState(true);
   const [fullscreenMode, setFullscreenMode] = useState(false);
   const workspace = useWorkspacePreferences();
-  const { runGrouping, cancelGrouping } = useGroupingWorker();
+  const { runGrouping, runIncrementalGrouping, cancelGrouping } = useGroupingWorker();
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
@@ -1163,14 +1163,17 @@ export default function KesimAlaniPage() {
     setBulkReviewExpanded(new Set());
   }
 
-  async function handleAutoGroup() {
+  async function handleAutoGroup(forceFullRegroup = false) {
     if (!kesim || groupingInProgress) return;
     setGroupingInProgress(true);
     setGroupingProgress(null);
     try {
+      const lockedIndices: number[] = [];
       const lockedDonationIds = new Set<string>();
-      for (const g of kesim.animalGroups) {
+      for (let i = 0; i < kesim.animalGroups.length; i++) {
+        const g = kesim.animalGroups[i];
         if (g.locked) {
+          lockedIndices.push(i);
           for (const d of g.donations) {
             if (d.name.trim() || d.description.trim()) {
               lockedDonationIds.add(d.id);
@@ -1178,13 +1181,39 @@ export default function KesimAlaniPage() {
           }
         }
       }
-      const donationsToGroup = kesim.donations.filter(d => !lockedDonationIds.has(d.id));
-      const newGroups = await runGrouping(donationsToGroup, (progress) => {
-        setGroupingProgress({ ...progress });
-      });
-      const lockedGroups = kesim.animalGroups.filter(g => g.locked);
-      const finalGroups: AnimalGroup[] = [...lockedGroups, ...newGroups];
-      finalGroups.forEach((g, i) => { g.animalNo = i + 1; });
+
+      const hasExistingGroups = kesim.animalGroups.length > 0;
+      const groupedDonationIds = new Set<string>();
+      for (const g of kesim.animalGroups) {
+        for (const d of g.donations) {
+          if (d.name.trim() || d.description.trim()) groupedDonationIds.add(d.id);
+        }
+      }
+      const ungroupedDonationIds = kesim.donations
+        .filter(d => !d.excluded && !groupedDonationIds.has(d.id) && (d.name.trim() || d.description.trim()))
+        .map(d => d.id);
+
+      const useIncremental = !forceFullRegroup && hasExistingGroups && ungroupedDonationIds.length > 0 && ungroupedDonationIds.length <= 20;
+
+      let finalGroups: AnimalGroup[];
+
+      if (useIncremental) {
+        finalGroups = await runIncrementalGrouping(
+          kesim.donations,
+          kesim.animalGroups,
+          ungroupedDonationIds,
+          lockedIndices
+        );
+      } else {
+        const donationsToGroup = kesim.donations.filter(d => !lockedDonationIds.has(d.id));
+        const newGroups = await runGrouping(donationsToGroup, (progress) => {
+          setGroupingProgress({ ...progress });
+        });
+        const lockedGroups = kesim.animalGroups.filter(g => g.locked);
+        finalGroups = [...lockedGroups, ...newGroups];
+        finalGroups.forEach((g, i) => { g.animalNo = i + 1; });
+      }
+
       const existingDonationIds = new Set(kesim.donations.map(d => d.id));
       const newDonations: Donation[] = [];
       for (const g of finalGroups) {
@@ -1195,12 +1224,14 @@ export default function KesimAlaniPage() {
           }
         }
       }
+      const lockedCount = lockedIndices.length;
       const mergedDonations = [...kesim.donations, ...newDonations];
       const updated = { ...kesim, donations: mergedDonations, animalGroups: finalGroups };
+      const modeLabel = useIncremental ? "Artımlı gruplama" : "Otomatik gruplama";
       if (newDonations.length > 0) {
-        save(updated, `Otomatik gruplama yapıldı: ${finalGroups.length} hayvan (${lockedGroups.length} kilitli korundu)`, true);
+        save(updated, `${modeLabel} yapıldı: ${finalGroups.length} hayvan (${lockedCount} kilitli korundu)`, true);
       } else {
-        save(updated, `Otomatik gruplama yapıldı: ${finalGroups.length} hayvan (${lockedGroups.length} kilitli korundu)`, true, 'groups');
+        save(updated, `${modeLabel} yapıldı: ${finalGroups.length} hayvan (${lockedCount} kilitli korundu)`, true, 'groups');
       }
       const found = checkGroupConflicts(finalGroups);
       setConflicts(found);
@@ -3530,7 +3561,7 @@ export default function KesimAlaniPage() {
 
         {!fullscreenMode && kesim.donations.length > 0 && (
           <div className="mb-4 flex gap-2">
-            <Button onClick={handleAutoGroup} className="flex-1" disabled={groupingInProgress}>
+            <Button onClick={() => handleAutoGroup()} className="flex-1" disabled={groupingInProgress}>
               {groupingInProgress ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />

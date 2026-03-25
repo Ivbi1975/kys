@@ -321,7 +321,7 @@ function performIncrementalGroup(
     } else {
       for (const d of group.donations) {
         const current = donationById.get(d.id);
-        if (current && d.name.trim()) {
+        if (current && (d.name.trim() || d.description.trim())) {
           donationsToRegroup.push(current);
         }
       }

@@ -352,6 +352,58 @@ export async function autoGroupDonationsAsync(
   return groups;
 }
 
+export function performIncrementalGroup(
+  donations: Donation[],
+  existingGroups: AnimalGroup[],
+  changedIds: Set<string>,
+  lockedIndices: Set<number>
+): AnimalGroup[] {
+  const donationsToRegroup: Donation[] = [];
+  const preservedGroups: AnimalGroup[] = [];
+  const donationById = new Map<string, Donation>();
+  for (const d of donations) donationById.set(d.id, d);
+
+  for (let i = 0; i < existingGroups.length; i++) {
+    const group = existingGroups[i];
+    const isLocked = lockedIndices.has(i);
+    const hasChanged = group.donations.some(d => changedIds.has(d.id));
+
+    if (isLocked || !hasChanged) {
+      preservedGroups.push({ ...group });
+    } else {
+      for (const d of group.donations) {
+        const current = donationById.get(d.id);
+        if (current && (d.name.trim() || d.description.trim())) {
+          donationsToRegroup.push(current);
+        }
+      }
+    }
+  }
+
+  for (const id of changedIds) {
+    const d = donationById.get(id);
+    if (d && !d.excluded && !donationsToRegroup.some(x => x.id === id)) {
+      const inPreserved = preservedGroups.some(g => g.donations.some(gd => gd.id === id));
+      if (!inPreserved) {
+        donationsToRegroup.push(d);
+      }
+    }
+  }
+
+  const regroupedSegments = mod7GroupDonations(donationsToRegroup);
+  const regrouped: AnimalGroup[] = regroupedSegments.map(segments => ({
+    id: generateId(),
+    animalNo: 0,
+    donations: buildGroupDonations(segments),
+  }));
+
+  const finalGroups = [...preservedGroups, ...regrouped];
+  for (let i = 0; i < finalGroups.length; i++) {
+    finalGroups[i] = { ...finalGroups[i], animalNo: i + 1 };
+  }
+  return finalGroups;
+}
+
 export function getTotalShares(donations: Donation[]): number {
   const activeDonations = donations.filter(d => !d.excluded);
   const effectiveShares = computeEffectiveShares(activeDonations);

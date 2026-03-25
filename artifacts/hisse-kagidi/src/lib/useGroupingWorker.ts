@@ -112,7 +112,7 @@ export function useGroupingWorker() {
       const worker = getWorker();
 
       if (!worker) {
-        return fallbackGrouping(donations);
+        return fallbackIncrementalGrouping(donations, existingGroups, changedDonationIds, lockedGroupIndices);
       }
 
       const id = crypto.randomUUID();
@@ -172,4 +172,19 @@ async function fallbackGrouping(
 ): Promise<AnimalGroup[]> {
   const { autoGroupDonationsAsync } = await import("./grouping");
   return autoGroupDonationsAsync(donations, onProgress);
+}
+
+async function fallbackIncrementalGrouping(
+  donations: Donation[],
+  existingGroups: AnimalGroup[],
+  changedDonationIds: string[],
+  lockedGroupIndices: number[]
+): Promise<AnimalGroup[]> {
+  const { performIncrementalGroup } = await import("./grouping");
+  return performIncrementalGroup(
+    donations,
+    existingGroups,
+    new Set(changedDonationIds),
+    new Set(lockedGroupIndices)
+  );
 }
