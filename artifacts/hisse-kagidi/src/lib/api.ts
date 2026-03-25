@@ -485,8 +485,8 @@ export interface TrackingDelta {
   serverTime: string;
   updatedGroups: TrackingGroup[];
   updatedNotes: TrackingNote[];
-  allGroupIds: string[];
-  allNoteIds: string[];
+  deletedGroupIds: string[];
+  deletedNoteIds: string[];
   totalGroups: number;
   kesildiCount: number;
   hasChanges: boolean;

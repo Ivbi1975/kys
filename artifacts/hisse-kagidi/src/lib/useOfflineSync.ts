@@ -103,13 +103,10 @@ export function useOfflineSync(token: string | undefined) {
       const delta = await fetchTrackingDelta(token, lastSyncTimeRef.current);
       lastSyncTimeRef.current = delta.serverTime;
 
-      const clientGroupCount = data?.groups?.length ?? 0;
-      const clientNoteCount = notes?.length ?? 0;
-      const hasDeletions = delta.allGroupIds.length !== clientGroupCount || delta.allNoteIds.length !== clientNoteCount;
-      if (!delta.hasChanges && !hasDeletions) return;
+      if (!delta.hasChanges) return;
 
-      const serverGroupIdSet = new Set(delta.allGroupIds);
-      const serverNoteIdSet = new Set(delta.allNoteIds);
+      const deletedGroupSet = new Set(delta.deletedGroupIds);
+      const deletedNoteSet = new Set(delta.deletedNoteIds);
 
       setData((prev) => {
         if (!prev) return prev;
@@ -117,10 +114,8 @@ export function useOfflineSync(token: string | undefined) {
         for (const updatedGroup of delta.updatedGroups) {
           groupMap.set(updatedGroup.id, updatedGroup);
         }
-        for (const id of groupMap.keys()) {
-          if (!serverGroupIdSet.has(id)) {
-            groupMap.delete(id);
-          }
+        for (const id of deletedGroupSet) {
+          groupMap.delete(id);
         }
         const mergedGroups = Array.from(groupMap.values());
         return {
@@ -136,10 +131,8 @@ export function useOfflineSync(token: string | undefined) {
         for (const updatedNote of delta.updatedNotes) {
           noteMap.set(updatedNote.id, updatedNote);
         }
-        for (const id of noteMap.keys()) {
-          if (!serverNoteIdSet.has(id)) {
-            noteMap.delete(id);
-          }
+        for (const id of deletedNoteSet) {
+          noteMap.delete(id);
         }
         return Array.from(noteMap.values()).sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()

@@ -92,6 +92,7 @@ export const animalGroupsTable = pgTable("animal_groups", {
   kesildi: boolean("kesildi").notNull().default(false),
   kesildiAt: timestamp("kesildi_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   teamId: text("team_id").references(() => teamsTable.id, { onDelete: "set null" }),
 }, (table) => [
   index("idx_animal_groups_kesim_alani_id").on(table.kesimAlaniId),
@@ -120,6 +121,7 @@ export const customTagsTable = pgTable("custom_tags", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   color: text("color").notNull().default("#3b82f6"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const insertCustomTagSchema = createInsertSchema(customTagsTable);
@@ -130,6 +132,7 @@ export const donationTagsTable = pgTable("donation_tags", {
   id: serial("id").primaryKey(),
   donationId: text("donation_id").notNull().references(() => donationsTable.id, { onDelete: "cascade" }),
   tagId: text("tag_id").notNull().references(() => customTagsTable.id, { onDelete: "cascade" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("idx_dt_donation_id").on(table.donationId),
   index("idx_dt_tag_id").on(table.tagId),
@@ -148,6 +151,7 @@ export const trackingNotesTable = pgTable("tracking_notes", {
   status: text("status").notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 }, (table) => [
   index("idx_tracking_notes_kesim_alani_id").on(table.kesimAlaniId),
   index("idx_tracking_notes_animal_group_id").on(table.animalGroupId),
@@ -163,6 +167,7 @@ export const animalGroupPhotosTable = pgTable("animal_group_photos", {
   data: text("data").notNull(),
   mimeType: text("mime_type").notNull().default("image/jpeg"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("idx_photos_animal_group_id").on(table.animalGroupId),
 ]);
@@ -181,6 +186,7 @@ export const notificationLogsTable = pgTable("notification_logs", {
   message: text("message").notNull().default(""),
   channel: text("channel").notNull().default("browser"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("idx_notification_logs_kesim_alani_id").on(table.kesimAlaniId),
   index("idx_notification_logs_animal_group_id").on(table.animalGroupId),
@@ -203,6 +209,7 @@ export const donationTransfersTable = pgTable("donation_transfers", {
   removedFromSource: boolean("removed_from_source").notNull().default(true),
   shareCount: integer("share_count").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("idx_donation_transfers_project_id").on(table.projectId),
 ]);
@@ -214,6 +221,7 @@ export type DonationTransferRow = typeof donationTransfersTable.$inferSelect;
 export const appSettingsTable = pgTable("app_settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const insertAppSettingSchema = createInsertSchema(appSettingsTable);

@@ -2441,6 +2441,7 @@ router.get("/tracking/:token/delta", async (req, res) => {
     const changedGroups = await db.select().from(animalGroupsTable)
       .where(and(
         eq(animalGroupsTable.kesimAlaniId, ka.id),
+        isNull(animalGroupsTable.deletedAt),
         gt(animalGroupsTable.updatedAt, sinceDate)
       ))
       .orderBy(animalGroupsTable.sortOrder);
@@ -2493,35 +2494,47 @@ router.get("/tracking/:token/delta", async (req, res) => {
     const changedNotes = await db.select().from(trackingNotesTable)
       .where(and(
         eq(trackingNotesTable.kesimAlaniId, ka.id),
+        isNull(trackingNotesTable.deletedAt),
         gt(trackingNotesTable.updatedAt, sinceDate)
       ))
       .orderBy(desc(trackingNotesTable.createdAt));
 
-    const allGroupRows = await db.select({
-      id: animalGroupsTable.id,
-      kesildi: animalGroupsTable.kesildi,
-    }).from(animalGroupsTable)
-      .where(eq(animalGroupsTable.kesimAlaniId, ka.id));
+    const deletedGroups = await db.select({ id: animalGroupsTable.id })
+      .from(animalGroupsTable)
+      .where(and(
+        eq(animalGroupsTable.kesimAlaniId, ka.id),
+        isNotNull(animalGroupsTable.deletedAt),
+        gt(animalGroupsTable.deletedAt, sinceDate)
+      ));
+    const deletedGroupIds = deletedGroups.map(g => g.id);
 
-    const allGroupIds = allGroupRows.map(g => g.id);
-    const totalGroups = allGroupRows.length;
-    const kesildiCountVal = allGroupRows.filter(g => g.kesildi).length;
-
-    const changedNoteIds = changedNotes.map(n => n.id);
-    const allNoteRows = await db.select({ id: trackingNotesTable.id })
+    const deletedNotes = await db.select({ id: trackingNotesTable.id })
       .from(trackingNotesTable)
-      .where(eq(trackingNotesTable.kesimAlaniId, ka.id));
-    const allNoteIds = allNoteRows.map(n => n.id);
+      .where(and(
+        eq(trackingNotesTable.kesimAlaniId, ka.id),
+        isNotNull(trackingNotesTable.deletedAt),
+        gt(trackingNotesTable.deletedAt, sinceDate)
+      ));
+    const deletedNoteIds = deletedNotes.map(n => n.id);
+
+    const [countResult] = await db.select({
+      total: count(),
+      kesildi: sql<number>`count(*) filter (where kesildi = true)`,
+    }).from(animalGroupsTable)
+      .where(and(
+        eq(animalGroupsTable.kesimAlaniId, ka.id),
+        isNull(animalGroupsTable.deletedAt)
+      ));
 
     res.json({
       serverTime,
       updatedGroups,
       updatedNotes: changedNotes,
-      allGroupIds,
-      allNoteIds,
-      totalGroups,
-      kesildiCount: kesildiCountVal,
-      hasChanges: updatedGroups.length > 0 || changedNotes.length > 0,
+      deletedGroupIds,
+      deletedNoteIds,
+      totalGroups: Number(countResult.total),
+      kesildiCount: Number(countResult.kesildi),
+      hasChanges: updatedGroups.length > 0 || changedNotes.length > 0 || deletedGroupIds.length > 0 || deletedNoteIds.length > 0,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
