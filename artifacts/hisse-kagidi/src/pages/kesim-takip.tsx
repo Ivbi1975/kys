@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams } from "wouter";
 import { Virtuoso } from "react-virtuoso";
 import { createTrackingNote, fetchGroupPhotos, getGroupPhotoUrl, uploadGroupPhoto, deleteGroupPhoto, assignTeamTracking, fetchTrackingNotificationLogs } from "@/lib/api";
+import { KesimTakipSkeleton } from "@/components/skeletons/KesimTakipSkeleton";
+import { useMinLoadingTime } from "@/hooks/useMinLoadingTime";
 import type { TrackingData, TrackingGroup, TrackingNote, GroupPhoto, TrackingTeam } from "@/lib/api";
 import { useOfflineSync } from "@/lib/useOfflineSync";
 import { Card } from "@/components/ui/card";
@@ -985,7 +987,7 @@ export default function KesimTakipPage() {
     setData,
     notes,
     setNotes,
-    loading,
+    loading: rawLoading,
     error,
     syncState,
     handleToggle: offlineToggle,
@@ -993,6 +995,7 @@ export default function KesimTakipPage() {
     syncQueue,
   } = useOfflineSync(params.token);
 
+  const loading = useMinLoadingTime(rawLoading);
   const [toggling, setToggling] = useState<Set<string>>(new Set());
   const [overlayIndex, setOverlayIndex] = useState<number | null>(null);
   const [showGlobalNotes, setShowGlobalNotes] = useState(false);
@@ -1071,11 +1074,7 @@ export default function KesimTakipPage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white dark:from-emerald-950 dark:to-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
-      </div>
-    );
+    return <KesimTakipSkeleton />;
   }
 
   if (error || !data) {

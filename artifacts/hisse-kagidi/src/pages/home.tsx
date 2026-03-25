@@ -3,6 +3,8 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { HomeSkeleton } from "@/components/skeletons/HomeSkeleton";
+import { useMinLoadingTime } from "@/hooks/useMinLoadingTime";
 import {
   Dialog,
   DialogContent,
@@ -91,6 +93,7 @@ export default function Home() {
   const [editTagName, setEditTagName] = useState("");
   const [editTagColor, setEditTagColor] = useState("");
   const [loading, setLoading] = useState(true);
+  const showSkeleton = useMinLoadingTime(loading);
   const [migrationDone, setMigrationDone] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string; hasDonations: boolean } | null>(null);
   const [permanentDeleteConfirm, setPermanentDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
@@ -809,15 +812,8 @@ export default function Home() {
 
   const unassignedKesimAlanlari = kesimAlanlari.filter(k => !k.projectId);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <Scissors className="w-12 h-12 text-primary mx-auto mb-4 animate-pulse" />
-          <p className="text-muted-foreground">Yükleniyor...</p>
-        </div>
-      </div>
-    );
+  if (showSkeleton) {
+    return <HomeSkeleton />;
   }
 
   return (
