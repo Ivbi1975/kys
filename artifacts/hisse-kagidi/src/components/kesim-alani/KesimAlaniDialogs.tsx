@@ -1,4 +1,5 @@
-import { Suspense, lazy } from "react";
+import { lazy } from "react";
+  import { LazyLoadBoundary } from "@/components/LazyLoadBoundary";
   import type { KesimAlani, Donation, AnimalGroup, ColorTag } from "@/lib/types";
   import { Button } from "@/components/ui/button";
   import { Input } from "@/components/ui/input";
@@ -1114,14 +1115,14 @@ import { Suspense, lazy } from "react";
     </Dialog>
 
     {qrModalOpen && (
-      <Suspense fallback={null}>
+      <LazyLoadBoundary>
         <QrCodeModal
           open={qrModalOpen}
           onOpenChange={setQrModalOpen}
           url={qrUrl}
           title={kesim?.name}
         />
-      </Suspense>
+      </LazyLoadBoundary>
     )}
 
     <Dialog open={!!photoViewGroup} onOpenChange={(open) => { if (!open) setPhotoViewGroup(null); }}>
@@ -1141,13 +1142,13 @@ import { Suspense, lazy } from "react";
             Bu hayvan grubunda fotoğraf yok.
           </div>
         ) : (
-          <Suspense fallback={<div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 animate-spin" /></div>}>
+          <LazyLoadBoundary fallback={<div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 animate-spin" /></div>}>
             <PhotoGallery
               photos={photoViewPhotos}
               getPhotoUrl={(photoId: string) => kesim ? getGroupPhotoUrlAdmin(kesim.id, photoViewGroup!.id, photoId) : ""}
               readOnly
             />
-          </Suspense>
+          </LazyLoadBoundary>
         )}
       </DialogContent>
     </Dialog>

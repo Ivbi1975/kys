@@ -1,6 +1,7 @@
-import { Suspense, lazy } from "react";
+import { lazy } from "react";
   import { useKesimAlaniState } from "@/components/kesim-alani/useKesimAlaniState";
   import { KesimAlaniContent } from "@/components/kesim-alani/KesimAlaniContent";
+  import { LazyLoadBoundary } from "@/components/LazyLoadBoundary";
 
   const KesimAlaniDialogs = lazy(() =>
     import("@/components/kesim-alani/KesimAlaniDialogs").then(m => ({ default: m.KesimAlaniDialogs }))
@@ -29,9 +30,9 @@ import { Suspense, lazy } from "react";
     return (
       <>
         <KesimAlaniContent {...state} />
-        <Suspense fallback={null}>
+        <LazyLoadBoundary>
           <KesimAlaniDialogs {...state} />
-        </Suspense>
+        </LazyLoadBoundary>
       </>
     );
   }
