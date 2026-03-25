@@ -23,10 +23,20 @@ pool.on("error", (err) => {
   console.error("Unexpected pool error:", err.message);
 });
 
+export async function warmPool() {
+  const warmCount = 2;
+  const clients: pg.PoolClient[] = [];
+  for (let i = 0; i < warmCount; i++) {
+    clients.push(await pool.connect());
+  }
+  for (const c of clients) c.release();
+}
+
 let poolLogInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startPoolMonitoring(intervalMs = 60_000) {
   if (poolLogInterval) return;
+  warmPool().catch((err) => console.error("Pool warm-up failed:", err.message));
   poolLogInterval = setInterval(() => {
     console.log(
       `[DB Pool] total=${pool.totalCount} idle=${pool.idleCount} waiting=${pool.waitingCount}`,
