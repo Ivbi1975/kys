@@ -7,6 +7,7 @@ import settingsRouter from "./settings";
 import backupRouter from "./backup";
 import aiNotesRouter from "./ai-notes";
 import exportRouter from "./export";
+import integrityRouter from "./integrity";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(settingsRouter);
 router.use(backupRouter);
 router.use(aiNotesRouter);
 router.use(exportRouter);
+router.use(integrityRouter);
 
 export default router;

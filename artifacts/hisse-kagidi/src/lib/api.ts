@@ -715,3 +715,32 @@ export async function createDonationTransfers(entries: DonationTransferEntry[]):
 export async function fetchTransferLog(projectId: string): Promise<DonationTransferEntry[]> {
   return apiFetch<DonationTransferEntry[]>(`/projects/${projectId}/transfer-log`);
 }
+
+export interface IntegrityIssue {
+  type: string;
+  severity: "error" | "warning";
+  description: string;
+  count: number;
+  repairable: boolean;
+}
+
+export interface IntegrityReport {
+  checkedAt: string;
+  totalIssues: number;
+  issues: IntegrityIssue[];
+}
+
+export interface IntegrityRepairResult {
+  repairedAt: string;
+  repairs: { type: string; action: string; count: number }[];
+  remainingIssues: number;
+  remainingDetails: IntegrityIssue[];
+}
+
+export async function runIntegrityCheck(): Promise<IntegrityReport> {
+  return apiFetch<IntegrityReport>("/integrity/check");
+}
+
+export async function repairIntegrity(): Promise<IntegrityRepairResult> {
+  return apiFetch<IntegrityRepairResult>("/integrity/repair", { method: "POST" });
+}

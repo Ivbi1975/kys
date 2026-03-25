@@ -58,6 +58,9 @@ import {
   moveKesimAlani,
   generateTrackingToken,
   downloadCsvExport,
+  runIntegrityCheck,
+  repairIntegrity,
+  type IntegrityReport,
 } from "@/lib/api";
 import { useTheme } from "@/lib/useTheme";
 import type { ThemeMode } from "@/lib/useTheme";
@@ -487,6 +490,9 @@ export default function Home() {
 
   const [csvExporting, setCsvExporting] = useState(false);
   const [csvProgress, setCsvProgress] = useState({ received: 0, total: 0 });
+  const [integrityReport, setIntegrityReport] = useState<IntegrityReport | null>(null);
+  const [integrityChecking, setIntegrityChecking] = useState(false);
+  const [integrityRepairing, setIntegrityRepairing] = useState(false);
 
   async function handleExportCsv() {
     setCsvExporting(true);
@@ -1002,6 +1008,83 @@ export default function Home() {
                     <Settings className="w-4 h-4 mr-1" />
                     AI Prompt Ayarları
                   </Button>
+                </div>
+
+                <div className="border-t pt-4">
+                  <label className="text-sm font-medium mb-2 block">
+                    Veri Tutarlılık Kontrolü
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Yetim kayıtları, kırık bağlantıları ve tutarsızlıkları tespit edin.
+                  </p>
+                  <div className="flex gap-2 mb-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      disabled={integrityChecking}
+                      onClick={async () => {
+                        setIntegrityChecking(true);
+                        try {
+                          const report = await runIntegrityCheck();
+                          setIntegrityReport(report);
+                          if (report.totalIssues === 0) {
+                            toast({ title: "Veri tutarlı", description: "Herhangi bir sorun bulunamadı." });
+                          }
+                        } catch (err) {
+                          toast({ title: "Kontrol hatası", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+                        } finally {
+                          setIntegrityChecking(false);
+                        }
+                      }}
+                    >
+                      {integrityChecking ? "Kontrol ediliyor..." : "Kontrol Et"}
+                    </Button>
+                    {integrityReport && integrityReport.issues.some(i => i.repairable && i.count > 0) && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="flex-1"
+                        disabled={integrityRepairing}
+                        onClick={async () => {
+                          setIntegrityRepairing(true);
+                          try {
+                            const result = await repairIntegrity();
+                            toast({
+                              title: "Onarım tamamlandı",
+                              description: `${result.repairs.length} onarım yapıldı, ${result.remainingIssues} sorun kaldı.`,
+                            });
+                            setIntegrityReport({
+                              checkedAt: result.repairedAt,
+                              totalIssues: result.remainingIssues,
+                              issues: result.remainingDetails,
+                            });
+                          } catch (err) {
+                            toast({ title: "Onarım hatası", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+                          } finally {
+                            setIntegrityRepairing(false);
+                          }
+                        }}
+                      >
+                        {integrityRepairing ? "Onarılıyor..." : "Onar"}
+                      </Button>
+                    )}
+                  </div>
+                  {integrityReport && (
+                    <div className="text-xs space-y-1 mt-2">
+                      {integrityReport.totalIssues === 0 ? (
+                        <p className="text-green-600 dark:text-green-400">Sorun bulunamadı.</p>
+                      ) : (
+                        integrityReport.issues.map((issue, i) => (
+                          <div key={i} className={`flex items-start gap-1.5 ${issue.severity === "error" ? "text-red-600 dark:text-red-400" : "text-yellow-600 dark:text-yellow-400"}`}>
+                            <span className="font-medium">{issue.severity === "error" ? "!" : "⚠"}</span>
+                            <span>{issue.description} ({issue.count})</span>
+                          </div>
+                        ))
+                      )}
+                      <p className="text-muted-foreground mt-1">Son kontrol: {new Date(integrityReport.checkedAt).toLocaleString("tr-TR")}</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t pt-4">
