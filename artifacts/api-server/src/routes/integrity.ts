@@ -229,7 +229,26 @@ router.post("/integrity/repair", async (_req, res) => {
     const repairs: { type: string; action: string; count: number }[] = [];
 
     await db.transaction(async (tx) => {
-      for (const r of results) {
+      const repairOrder = [
+        "invalid_share_count",
+        "orphan_donations",
+        "orphan_groups",
+        "broken_group_donation_links",
+        "orphan_photos",
+        "orphan_tracking_notes",
+        "orphan_teams",
+        "broken_donation_tags",
+        "duplicate_group_donations",
+        "ka_with_deleted_project",
+        "share_count_exceeded",
+      ];
+      const sortedResults = [...results].sort((a, b) => {
+        const ai = repairOrder.indexOf(a.issue.type);
+        const bi = repairOrder.indexOf(b.issue.type);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      });
+
+      for (const r of sortedResults) {
         if (!r.issue.repairable) continue;
 
         switch (r.issue.type) {
