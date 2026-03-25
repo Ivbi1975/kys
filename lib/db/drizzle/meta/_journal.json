@@ -43,6 +43,13 @@
       "when": 1774500100000,
       "tag": "0005_composite_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1774500200000,
+      "tag": "0006_partial_indexes_soft_delete",
+      "breakpoints": true
     }
   ]
 }

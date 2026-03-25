@@ -1,4 +1,5 @@
 import { pgTable, text, serial, integer, boolean, timestamp, index, unique } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -9,6 +10,7 @@ export const projectsTable = pgTable("projects", {
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 }, (table) => [
   index("idx_projects_deleted_created").on(table.deletedAt, table.createdAt),
+  index("idx_projects_active_created").on(table.createdAt).where(sql`deleted_at IS NULL`),
 ]);
 
 export const insertProjectSchema = createInsertSchema(projectsTable);
@@ -26,6 +28,8 @@ export const kesimAlanlariTable = pgTable("kesim_alanlari", {
 }, (table) => [
   index("idx_ka_project_deleted").on(table.projectId, table.deletedAt),
   index("idx_ka_deleted_created").on(table.deletedAt, table.createdAt),
+  index("idx_ka_active_created").on(table.createdAt).where(sql`deleted_at IS NULL`),
+  index("idx_ka_active_project").on(table.projectId).where(sql`deleted_at IS NULL`),
 ]);
 
 export const insertKesimAlaniSchema = createInsertSchema(kesimAlanlariTable);
@@ -50,6 +54,7 @@ export const donationsTable = pgTable("donations", {
 }, (table) => [
   index("idx_donations_kesim_alani_id").on(table.kesimAlaniId),
   index("idx_donations_ka_deleted_sort").on(table.kesimAlaniId, table.deletedAt, table.sortOrder),
+  index("idx_donations_active_ka_sort").on(table.kesimAlaniId, table.sortOrder).where(sql`deleted_at IS NULL`),
 ]);
 
 export const insertDonationSchema = createInsertSchema(donationsTable);
