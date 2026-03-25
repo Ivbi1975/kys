@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { appSettingsTable, donationsTable, aiJobsTable } from "@workspace/db/schema";
-import { eq, inArray, lt } from "drizzle-orm";
+import { eq, inArray, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import crypto from "crypto";
@@ -394,6 +394,20 @@ router.put("/ai-notes/bulk-update", async (req, res) => {
     res.status(500).json({ error: message });
   }
 });
+
+(async () => {
+  try {
+    const staleCondition = or(
+      eq(aiJobsTable.status, "pending"),
+      eq(aiJobsTable.status, "processing"),
+    );
+    const updated = await db.update(aiJobsTable)
+      .set({ status: "failed", error: "Sunucu yeniden başlatıldı", updatedAt: new Date() })
+      .where(staleCondition!);
+    console.log("[ai-jobs] Startup: marked stale jobs as failed");
+  } catch {
+  }
+})();
 
 setInterval(async () => {
   try {
