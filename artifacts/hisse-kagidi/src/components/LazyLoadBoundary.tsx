@@ -53,7 +53,13 @@ class LazyErrorBoundary extends Component<LazyLoadBoundaryProps, LazyLoadBoundar
   }
 }
 
-export function LazyLoadBoundary({ children, fallback = null }: LazyLoadBoundaryProps) {
+const defaultFallback = (
+  <div className="flex items-center justify-center p-6">
+    <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+  </div>
+);
+
+export function LazyLoadBoundary({ children, fallback = defaultFallback }: LazyLoadBoundaryProps) {
   return (
     <LazyErrorBoundary>
       <Suspense fallback={fallback}>
