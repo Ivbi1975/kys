@@ -6,6 +6,10 @@ import {
   animalGroupsTable,
 } from "@workspace/db/schema";
 import { eq, isNull, isNotNull, and, sql, inArray } from "drizzle-orm";
+import { cacheGet, cacheSet, cacheInvalidate } from "../lib/cache";
+
+const PROJECTS_CACHE_KEY = "projects:list";
+const PROJECTS_TTL = 30_000;
 
 const router: IRouter = Router();
 
@@ -22,6 +26,7 @@ export async function refreshProjectStats() {
   refreshInProgress = true;
   try {
     await db.execute(sql`REFRESH MATERIALIZED VIEW CONCURRENTLY project_stats_view`);
+    cacheInvalidate(PROJECTS_CACHE_KEY);
   } catch (err) {
     console.error("Failed to refresh project_stats_view:", err);
   } finally {
@@ -35,6 +40,12 @@ export async function refreshProjectStats() {
 
 router.get("/projects", async (_req, res) => {
   try {
+    const cached = cacheGet<unknown[]>(PROJECTS_CACHE_KEY);
+    if (cached) {
+      res.json(cached);
+      return;
+    }
+
     const rows = await db.execute(sql`
       SELECT
         p.*,
@@ -72,6 +83,7 @@ router.get("/projects", async (_req, res) => {
       },
     }));
 
+    cacheSet(PROJECTS_CACHE_KEY, result, PROJECTS_TTL);
     res.json(result);
   } catch (err) {
     console.error("GET /projects error:", err);
@@ -112,6 +124,7 @@ router.put("/projects/:id", async (req, res) => {
     if (!existing) return res.status(404).json({ error: "Project not found" });
 
     await db.update(projectsTable).set({ name: name.trim() }).where(eq(projectsTable.id, id));
+    cacheInvalidate(PROJECTS_CACHE_KEY);
     const [updated] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
     res.json({ ...updated, stats: emptyStats });
   } catch (err) {

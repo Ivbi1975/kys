@@ -3,6 +3,10 @@ import { db } from "@workspace/db";
 import { customTagsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { cacheGet, cacheSet, cacheInvalidate } from "../lib/cache";
+
+const TAGS_CACHE_KEY = "tags:list";
+const TAGS_TTL = 60_000;
 
 const router: IRouter = Router();
 
@@ -19,7 +23,14 @@ const updateTagSchema = z.object({
 
 router.get("/tags", async (_req, res) => {
   try {
+    const cached = cacheGet<unknown[]>(TAGS_CACHE_KEY);
+    if (cached) {
+      res.json(cached);
+      return;
+    }
+
     const tags = await db.select().from(customTagsTable);
+    cacheSet(TAGS_CACHE_KEY, tags, TAGS_TTL);
     res.json(tags);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
@@ -38,6 +49,7 @@ router.post("/tags", async (req, res) => {
   try {
     const { id, name, color } = parsed.data;
     await db.insert(customTagsTable).values({ id, name, color: color || "#3b82f6" });
+    cacheInvalidate(TAGS_CACHE_KEY);
     const [tag] = await db.select().from(customTagsTable).where(eq(customTagsTable.id, id));
     res.status(201).json(tag);
   } catch (err) {
@@ -60,6 +72,7 @@ router.put("/tags/:id", async (req, res) => {
     if (parsed.data.name !== undefined) updates.name = parsed.data.name;
     if (parsed.data.color !== undefined) updates.color = parsed.data.color;
     await db.update(customTagsTable).set(updates).where(eq(customTagsTable.id, id));
+    cacheInvalidate(TAGS_CACHE_KEY);
     const [tag] = await db.select().from(customTagsTable).where(eq(customTagsTable.id, id));
     if (!tag) {
       res.status(404).json({ error: "Bulunamadı" });
@@ -76,6 +89,7 @@ router.put("/tags/:id", async (req, res) => {
 router.delete("/tags/:id", async (req, res) => {
   try {
     await db.delete(customTagsTable).where(eq(customTagsTable.id, req.params.id));
+    cacheInvalidate(TAGS_CACHE_KEY);
     res.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
