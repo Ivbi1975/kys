@@ -105,7 +105,10 @@ Key files:
 - `src/lib/useTheme.ts` - Theme hook supporting light/dark/system modes with system preference detection
 - `src/lib/useWorkspacePreferences.ts` - Workspace layout preferences hook (columnCount, hiddenColumns, compactMode, columnOrder, splitRatio) with localStorage persistence
 - `src/pages/home.tsx` - Home page with project cards (collapsible), kesim alanı list grouped by project, project CRUD, move kesim alanı between projects, settings (logo, backup, theme selector, tag management)
-- `src/pages/kesim-alani.tsx` - Main editing page with donor table, animal groups, stats, export
+- `src/pages/kesim-alani.tsx` - Main editing page entry point (imports hook + content + dialogs components)
+- `src/components/kesim-alani/useKesimAlaniState.tsx` - All state, hooks, handlers, effects for kesim-alani page (~3800 lines)
+- `src/components/kesim-alani/KesimAlaniContent.tsx` - Main content layout: donor table, animal groups, stats, export (~2700 lines)
+- `src/components/kesim-alani/KesimAlaniDialogs.tsx` - All dialog/modal components for kesim-alani (~1400 lines)
 - `src/pages/print.tsx` - Print-optimized A4 landscape view matching Excel design
 - `src/pages/kesim-takip.tsx` - Public kesim tracking page (no auth), shows animal groups with kesildi toggle, offline mode with IndexedDB + Service Worker
 - `src/pages/kesim-rapor.tsx` - Kesim report page (`/rapor/:id`), print-optimized PDF with stats, timeline, team breakdown, notes; accessible from kesim-alani "Rapor" button
