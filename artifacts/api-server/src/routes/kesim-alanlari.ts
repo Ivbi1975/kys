@@ -532,22 +532,19 @@ router.get("/kesim-alanlari/:id/donations", async (req, res) => {
 
     let cursorCondition;
     if (cursor) {
-      const sepIdx = cursor.indexOf("_");
-      if (sepIdx > 0) {
-        const cursorVal = cursor.substring(0, sepIdx);
-        const cursorId = cursor.substring(sepIdx + 1);
-        if (cursorId) {
-          const isNumeric = sortField === "sortOrder" || sortField === "shareCount";
-          const typedVal = isNumeric ? Number(cursorVal) : cursorVal;
-          if (isNumeric && Number.isNaN(typedVal as number)) {
-            // skip invalid numeric cursor
-          } else {
-            cursorCondition = or(
-              cmpOp(col, typedVal),
-              and(eq(col, typedVal), gt(donationsTable.id, cursorId)),
-            );
-          }
+      try {
+        const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+        const cursorId = parsed.id;
+        const cursorVal = parsed.v;
+        if (typeof cursorId === "string" && cursorVal !== undefined) {
+          cursorCondition = or(
+            cmpOp(col, cursorVal),
+            and(eq(col, cursorVal), gt(donationsTable.id, cursorId)),
+          );
         }
+      } catch {
+        res.status(400).json({ error: "Geçersiz cursor" });
+        return;
       }
     }
 
@@ -596,7 +593,7 @@ router.get("/kesim-alanlari/:id/donations", async (req, res) => {
         : sortField === "shareCount" ? lastItem.shareCount
         : sortField === "name" ? lastItem.name
         : lastItem.donationType;
-      nextCursor = `${val}_${lastItem.id}`;
+      nextCursor = Buffer.from(JSON.stringify({ v: val, id: lastItem.id })).toString("base64url");
     }
 
     res.json({ items, nextCursor, hasMore });
