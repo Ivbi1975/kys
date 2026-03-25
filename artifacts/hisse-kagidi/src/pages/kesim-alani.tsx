@@ -1979,6 +1979,7 @@ export default function KesimAlaniPage() {
 
     const donorData = kesim.donations.map((d, i) => ({
       "Sıra": i + 1,
+      "Kesim Listesi ID": kesim.kesimListeId || "",
       "Adına Kesilen": d.name,
       "Vekaleti Veren": d.description,
       "Cinsi": d.donationType,
@@ -1989,7 +1990,7 @@ export default function KesimAlaniPage() {
     }));
     const wsDonors = XLSX.utils.json_to_sheet(donorData);
     wsDonors["!cols"] = [
-      { wch: 6 }, { wch: 22 }, { wch: 22 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 18 }, { wch: 8 },
+      { wch: 6 }, { wch: 16 }, { wch: 22 }, { wch: 22 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 18 }, { wch: 8 },
     ];
     XLSX.utils.book_append_sheet(wb, wsDonors, "Bağışçılar");
 
@@ -1999,6 +2000,7 @@ export default function KesimAlaniPage() {
         for (let i = 0; i < group.donations.length; i++) {
           const d = group.donations[i];
           groupData.push({
+            "Kesim Listesi ID": kesim.kesimListeId || "",
             "Hayvan No": group.animalNo,
             "Sıra": i + 1,
             "Vekalet": d.vekalet,
@@ -2011,7 +2013,7 @@ export default function KesimAlaniPage() {
       }
       const wsGroups = XLSX.utils.json_to_sheet(groupData);
       wsGroups["!cols"] = [
-        { wch: 10 }, { wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 10 }, { wch: 18 },
+        { wch: 16 }, { wch: 10 }, { wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 10 }, { wch: 18 },
       ];
       XLSX.utils.book_append_sheet(wb, wsGroups, "Hayvan Grupları");
     }
@@ -2026,6 +2028,7 @@ export default function KesimAlaniPage() {
       for (let i = 0; i < group.donations.length; i++) {
         const d = group.donations[i];
         data.push({
+          "Kesim Listesi ID": kesim.kesimListeId || "",
           "Hayvan No": group.animalNo,
           "Sıra": i + 1,
           "Vekalet": d.vekalet,
@@ -2038,7 +2041,7 @@ export default function KesimAlaniPage() {
     }
     const ws = XLSX.utils.json_to_sheet(data);
     ws["!cols"] = [
-      { wch: 10 }, { wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 10 }, { wch: 18 },
+      { wch: 16 }, { wch: 10 }, { wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 10 }, { wch: 18 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Kesim Kağıdı");
@@ -3140,9 +3143,27 @@ export default function KesimAlaniPage() {
           <div className="flex items-center gap-2 mb-2">
             <div className="flex-1 min-w-0">
               <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">{kesim.name}</h1>
-              <p className="text-xs md:text-sm text-muted-foreground truncate">
-                {kesim.donations.length} bağışçı • {totalShares} hisse • {requiredAnimals} hayvan
-              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-xs md:text-sm text-muted-foreground truncate">
+                  {kesim.donations.length} bağışçı • {totalShares} hisse • {requiredAnimals} hayvan
+                </p>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground">ID:</span>
+                  <Input
+                    className="h-6 text-xs w-28 px-1.5"
+                    placeholder="Liste ID"
+                    value={kesim.kesimListeId || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const updated = { ...kesim, kesimListeId: val || null };
+                      save(updated, undefined, false);
+                    }}
+                    onBlur={() => {
+                      save(kesim, undefined, true);
+                    }}
+                  />
+                </div>
+              </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Button

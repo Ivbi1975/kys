@@ -307,6 +307,18 @@ export default function NotDuzenlemePage() {
       }
 
       await bulkUpdateNotes(kesim.id, updates);
+      setKesim(prev => {
+        if (!prev) return prev;
+        const noteMap = new Map(updates.map(u => [u.donationId, u.notes]));
+        return {
+          ...prev,
+          donations: prev.donations.map(d => noteMap.has(d.id) ? { ...d, notes: noteMap.get(d.id)! } : d),
+          animalGroups: prev.animalGroups.map(g => ({
+            ...g,
+            donations: g.donations.map(d => noteMap.has(d.id) ? { ...d, notes: noteMap.get(d.id)! } : d),
+          })),
+        };
+      });
       setDirty(false);
       toast({ title: "Kaydedildi", description: `${updates.length} bağışçının notu güncellendi` });
     } catch (err) {

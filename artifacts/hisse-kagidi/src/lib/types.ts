@@ -49,6 +49,7 @@ export interface KesimAlani {
   projectId?: string | null;
   customTags?: CustomTag[];
   trackingToken?: string | null;
+  kesimListeId?: string | null;
   teams?: Team[];
 }
 

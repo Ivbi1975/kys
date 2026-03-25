@@ -84,12 +84,14 @@ const createKesimAlaniSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   createdAt: z.string().optional(),
+  kesimListeId: z.string().optional().nullable(),
   donations: z.array(donationPayloadSchema).optional().default([]),
   animalGroups: z.array(animalGroupPayloadSchema).optional().default([]),
 });
 
 const updateKesimAlaniSchema = z.object({
   name: z.string().min(1).optional(),
+  kesimListeId: z.string().optional().nullable(),
   donations: z.array(donationPayloadSchema).optional(),
   animalGroups: z.array(animalGroupPayloadSchema).optional(),
 });
@@ -193,6 +195,7 @@ async function getFullKesimAlani(id: string) {
     deletedAt: ka.deletedAt || null,
     projectId: ka.projectId || null,
     trackingToken: ka.trackingToken || null,
+    kesimListeId: ka.kesimListeId || null,
     donations: mappedDonations,
     animalGroups: mappedGroups,
     teams: teams.map(t => ({ id: t.id, name: t.name, color: t.color })),
@@ -260,7 +263,7 @@ router.post("/kesim-alanlari", async (req, res) => {
     return;
   }
 
-  const { id, name, createdAt, donations, animalGroups } = parsed.data;
+  const { id, name, createdAt, kesimListeId, donations, animalGroups } = parsed.data;
   const projectId = req.body.projectId || null;
 
   try {
@@ -271,6 +274,7 @@ router.post("/kesim-alanlari", async (req, res) => {
         createdAt: createdAt || new Date().toISOString(),
         projectId,
         trackingToken: crypto.randomBytes(16).toString("hex"),
+        kesimListeId: kesimListeId ?? null,
       });
 
       if (donations.length > 0) {
@@ -325,7 +329,7 @@ router.put("/kesim-alanlari/:id", async (req, res) => {
   }
 
   const { id } = req.params;
-  const { name, donations, animalGroups } = parsed.data;
+  const { name, kesimListeId, donations, animalGroups } = parsed.data;
 
   try {
     const kaCheck = await requireActiveKesimAlani(id);
@@ -346,8 +350,11 @@ router.put("/kesim-alanlari/:id", async (req, res) => {
     }
 
     await db.transaction(async (tx) => {
-      if (name !== undefined) {
-        await tx.update(kesimAlanlariTable).set({ name }).where(eq(kesimAlanlariTable.id, id));
+      const kaUpdates: Record<string, string | null> = {};
+      if (name !== undefined) kaUpdates.name = name;
+      if (kesimListeId !== undefined) kaUpdates.kesimListeId = kesimListeId ?? null;
+      if (Object.keys(kaUpdates).length > 0) {
+        await tx.update(kesimAlanlariTable).set(kaUpdates).where(eq(kesimAlanlariTable.id, id));
       }
 
       if (donations !== undefined && animalGroups !== undefined) {

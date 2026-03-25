@@ -20,6 +20,7 @@ export const kesimAlanlariTable = pgTable("kesim_alanlari", {
   deletedAt: text("deleted_at"),
   projectId: text("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
   trackingToken: text("tracking_token"),
+  kesimListeId: text("kesim_liste_id"),
 });
 
 export const insertKesimAlaniSchema = createInsertSchema(kesimAlanlariTable);

@@ -149,7 +149,15 @@ router.post("/ai-notes/classify", async (req, res) => {
     let results;
     try {
       const parsed = JSON.parse(content);
-      results = Array.isArray(parsed) ? parsed : (parsed.results || parsed.data || []);
+      if (Array.isArray(parsed)) {
+        results = parsed;
+      } else {
+        results = parsed.results || parsed.data || parsed.classifications || parsed.donations || parsed.items || null;
+        if (!results) {
+          const firstArrayValue = Object.values(parsed).find(v => Array.isArray(v));
+          results = firstArrayValue || [];
+        }
+      }
     } catch {
       results = [];
     }

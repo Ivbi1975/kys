@@ -198,13 +198,14 @@ export default function PrintPage() {
 
     const titleRow = [kesim.name];
     const emptyRow: string[] = [];
-    const headers = visibleColumns.map(c => c.label);
-    const allRows: (string | number)[][] = [titleRow, emptyRow, headers];
+    const excelHeaders = ["Kesim Listesi ID", ...visibleColumns.map(c => c.label)];
+    const totalCols = excelHeaders.length;
+    const allRows: (string | number)[][] = [titleRow, emptyRow, excelHeaders];
 
     for (const group of processedGroups) {
       for (let idx = 0; idx < group.donations.length; idx++) {
         const d = group.donations[idx];
-        const row: (string | number)[] = [];
+        const row: (string | number)[] = [kesim.kesimListeId || ""];
         for (const col of visibleColumns) {
           if (col.key === "hayvan") {
             row.push(idx === 0 ? group.animalNo : "");
@@ -221,6 +222,7 @@ export default function PrintPage() {
     }
 
     const footerRow = [
+      "",
       `${kesim.name}`,
       "",
       "",
@@ -228,23 +230,24 @@ export default function PrintPage() {
       "",
       "",
       new Date().toLocaleDateString("tr-TR"),
-    ].slice(0, visibleColumns.length);
+    ].slice(0, totalCols);
     allRows.push(emptyRow);
     allRows.push(footerRow);
 
     const ws = XLSX.utils.aoa_to_sheet(allRows);
 
-    if (visibleColumns.length > 1) {
+    if (totalCols > 1) {
       if (!ws["!merges"]) ws["!merges"] = [];
-      ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: visibleColumns.length - 1 } });
+      ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } });
     }
 
     const hayvanColIdx = visibleColumns.findIndex(c => c.key === "hayvan");
-    if (hayvanColIdx >= 0) {
+    const hayvanExcelIdx = hayvanColIdx >= 0 ? hayvanColIdx + 1 : -1;
+    if (hayvanExcelIdx >= 0) {
       let rowIdx = 3;
       for (const group of processedGroups) {
         if (group.donations.length > 1) {
-          const merge = { s: { r: rowIdx, c: hayvanColIdx }, e: { r: rowIdx + group.donations.length - 1, c: hayvanColIdx } };
+          const merge = { s: { r: rowIdx, c: hayvanExcelIdx }, e: { r: rowIdx + group.donations.length - 1, c: hayvanExcelIdx } };
           if (!ws["!merges"]) ws["!merges"] = [];
           ws["!merges"].push(merge);
         }
@@ -263,7 +266,7 @@ export default function PrintPage() {
       titleCell.s = titleStyle;
     }
 
-    for (let c = 0; c < visibleColumns.length; c++) {
+    for (let c = 0; c < totalCols; c++) {
       const cellRef = XLSX.utils.encode_cell({ r: 2, c });
       if (ws[cellRef]) {
         ws[cellRef].s = headerStyle;
@@ -275,38 +278,44 @@ export default function PrintPage() {
       for (let idx = 0; idx < group.donations.length; idx++) {
         const r = dataRowStart + idx;
         const isEven = idx % 2 === 1;
-        for (let c = 0; c < visibleColumns.length; c++) {
+        for (let c = 0; c < totalCols; c++) {
           const cellRef = XLSX.utils.encode_cell({ r, c });
           if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
-          const col = visibleColumns[c];
-          if (col.key === "hayvan" && idx === 0) {
-            ws[cellRef].s = hayvanStyle;
-          } else {
+          if (c === 0) {
             const style: Record<string, unknown> = { border: cellBorder, alignment: { vertical: "center" } };
             if (isEven) style.fill = evenRowFill;
-            if (col.key === "sira") {
-              style.alignment = { horizontal: "center", vertical: "center" };
-              style.font = { bold: true };
-            } else if (col.key === "adina-kesilen") {
-              style.font = { bold: true };
-            } else if (col.key === "cinsi") {
-              style.alignment = { horizontal: "center", vertical: "center" };
-            }
             ws[cellRef].s = style;
+          } else {
+            const col = visibleColumns[c - 1];
+            if (col.key === "hayvan" && idx === 0) {
+              ws[cellRef].s = hayvanStyle;
+            } else {
+              const style: Record<string, unknown> = { border: cellBorder, alignment: { vertical: "center" } };
+              if (isEven) style.fill = evenRowFill;
+              if (col.key === "sira") {
+                style.alignment = { horizontal: "center", vertical: "center" };
+                style.font = { bold: true };
+              } else if (col.key === "adina-kesilen") {
+                style.font = { bold: true };
+              } else if (col.key === "cinsi") {
+                style.alignment = { horizontal: "center", vertical: "center" };
+              }
+              ws[cellRef].s = style;
+            }
           }
         }
       }
       dataRowStart += group.donations.length;
     }
 
-    const colWidths = visibleColumns.map(c => {
+    const colWidths = [{ wch: 16 }, ...visibleColumns.map(c => {
       if (c.key === "hayvan") return { wch: 10 };
       if (c.key === "sira") return { wch: 6 };
       if (c.key === "vekalet") return { wch: 14 };
       if (c.key === "cinsi") return { wch: 12 };
       if (c.key === "notlar") return { wch: 20 };
       return { wch: 25 };
-    });
+    })];
     ws["!cols"] = colWidths;
 
     const rowHeights: Record<number, { hpt: number }> = {};
