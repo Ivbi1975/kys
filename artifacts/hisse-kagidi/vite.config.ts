@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { VitePWA } from "vite-plugin-pwa";
+import { visualizer } from "rollup-plugin-visualizer";
 
 const rawPort = process.env.PORT;
 
@@ -86,6 +87,16 @@ export default defineConfig({
           await import("@replit/vite-plugin-dev-banner").then((m) =>
             m.devBanner(),
           ),
+        ]
+      : []),
+    ...(process.env.ANALYZE === "true"
+      ? [
+          visualizer({
+            filename: path.resolve(import.meta.dirname, "dist/bundle-report.html"),
+            open: false,
+            gzipSize: true,
+            brotliSize: true,
+          }),
         ]
       : []),
   ],
