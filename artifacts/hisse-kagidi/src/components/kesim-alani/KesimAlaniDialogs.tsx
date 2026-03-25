@@ -10,7 +10,7 @@ import { Suspense, lazy } from "react";
   import { Label } from "@/components/ui/label";
   import { Badge } from "@/components/ui/badge";
   import { ScrollArea } from "@/components/ui/scroll-area";
-  import { AlertTriangle, ArrowLeftRight, ArrowUp, Camera, Check, ChevronUp, Edit3, Eye, EyeOff, Keyboard, Loader2, MessageSquarePlus, Package, Plus, Printer, RotateCcw, Scissors, Send, Settings2, ShoppingBag, Sparkles, Trash2, UserCog, UserPlus, Wand2 } from "lucide-react";
+  import { AlertTriangle, ArrowLeftRight, ArrowUp, Camera, Check, ChevronUp, Edit3, Eye, EyeOff, Keyboard, Loader2, MessageSquarePlus, Package, Plus, Printer, RotateCcw, Scissors, Send, Settings2, ShoppingBag, Sparkles, Trash2, UserCog, UserPlus, Wand2, X } from "lucide-react";
   import { PhotoGallery } from "@/components/PhotoGallery";
   import type { useKesimAlaniState } from "./useKesimAlaniState";
 
@@ -37,12 +37,12 @@ import { Suspense, lazy } from "react";
       basketCrossKATarget, setBasketCrossKATarget, basketTransferTarget, setBasketTransferTarget,
       addToBasket, removeFromBasket, clearBasket, addDonorToBasket, transferBasketToGroup, autoDistributeBasket,
       crossKATransferring, transferBasketToOtherKA, transferForeignToCurrentDonorList,
-      siblingKesimAlanlari, sortedDonorList, totalShares, filterTeam,
+      siblingKesimAlanlari, sortedDonorList, totalShares, filterTeam, setFilterTeam, getGroupPhotoUrlAdmin,
       jumpDialogOpen, setJumpDialogOpen, jumpDialogValue, setJumpDialogValue,
       donorListReportOpen, setDonorListReportOpen, fullscreenMode, showScrollTop,
       qrModalOpen, setQrModalOpen, qrUrl,
       transferToDonorListConfirm, setTransferToDonorListConfirm, transferToDonorListRemoving,
-      updateGroupDonation, addEmptyGroup, groupIdx,
+      updateGroupDonation, addEmptyGroup,
       handleAssignTeam,
     } = props;
 
@@ -1315,7 +1315,7 @@ import { Suspense, lazy } from "react";
             <div className="overflow-y-auto flex-1 p-4 donor-list-print">
               <div className="text-center mb-4">
                 <h3 className="font-bold text-lg">{kesim.name}</h3>
-                <p className="text-xs text-muted-foreground">Bağışçı Listesi — {activeDonors.length} kişi</p>
+                <p className="text-xs text-muted-foreground">Bağışçı Listesi — {sortedDonorList.filter(d => !d.excluded).length} kişi</p>
                 <p className="text-xs text-muted-foreground">{new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}</p>
               </div>
               <table className="w-full text-xs border-collapse">

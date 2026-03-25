@@ -856,7 +856,27 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
       if (d.id !== donationId) return d;
       const existing = d.tags || [];
       const has = existing.includes(tagId);
-      return { ...d, tags: has ? existing.filter(t => t !== tagId) : [...existing, tagId] };
+      return {
+    generateTrackingToken,
+    fetchKesimAlaniTrackingNotes,
+    fetchNotificationLogs,
+    COLUMN_OPTIONS,
+    findDeleteColumnLabel,
+    checkGroupConflicts,
+    effectiveColumnCount,
+    getGroupPhotoUrlAdmin,
+    fetchNotificationTemplate,
+    updateNotificationTemplate,
+    displayPreviewRows,
+    headerRow,
+    collapseAll,
+    expandAll,
+    handleColumnDragStart,
+    handleColumnDragOver,
+    handleColumnDrop,
+    handleColumnDragEnd,
+    columnHeaderLabel,
+    columnHeaderWidth, ...d, tags: has ? existing.filter(t => t !== tagId) : [...existing, tagId] };
     };
     save({
       ...kesim,

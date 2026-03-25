@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { TableVirtuoso, Virtuoso } from "react-virtuoso";
 import { AnimalGroupCard } from "@/components/AnimalGroupCard";
-import { AlertTriangle, ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, Brain, ChevronDown, ChevronRight, ChevronUp, ChevronsDownUp, ChevronsUpDown, ClipboardPaste, Columns, Columns3, Download, Eye, EyeOff, FileSpreadsheet, FileText, Filter, GripVertical, History, Home, Keyboard, LayoutGrid, Link2, Loader2, Lock, MapIcon, Maximize, Maximize2, Merge, MessageSquarePlus, Minimize, Minimize2, Monitor, Moon, MoveRight, PanelLeftClose, PanelLeftOpen, Plus, Printer, QrCode, Redo2, RotateCcw, Save, Scissors, Search, SearchX, Send, Settings2, ShoppingBag, SlidersHorizontal, Sparkles, Sun, Tag, Trash2, Undo2, Unlock, Upload, UserCog, Wand2 } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, Brain, ChevronDown, ChevronRight, ChevronUp, ChevronsDownUp, ChevronsUpDown, ClipboardPaste, Columns, Columns3, Download, Eye, EyeOff, FileSpreadsheet, FileText, Filter, GripVertical, History, Home, Keyboard, LayoutGrid, Link2, Loader2, Lock, MapIcon, Maximize, Maximize2, Merge, MessageSquarePlus, Minimize, Minimize2, Monitor, Moon, MoveRight, PanelLeftClose, PanelLeftOpen, Plus, Printer, QrCode, Redo2, RotateCcw, Save, Scissors, Search, SearchX, Send, Settings2, ShoppingBag, SlidersHorizontal, Sparkles, Sun, Tag, Trash2, Undo2, Unlock, Upload, UserCog, Wand2, X } from "lucide-react";
 import type { useKesimAlaniState } from "./useKesimAlaniState";
 
   type KesimAlaniStateReturn = ReturnType<typeof useKesimAlaniState>;
@@ -100,8 +100,6 @@ import type { useKesimAlaniState } from "./useKesimAlaniState";
     groupFindDeleteConfirm,
     groupFindDeleteOpen,
     groupFindDeleteValue,
-    groupIdx,
-    groupKey,
     groupRows,
     groupSearchMatchIdx,
     groupSearchQuery,
