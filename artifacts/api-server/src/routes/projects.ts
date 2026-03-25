@@ -35,34 +35,41 @@ export async function refreshProjectStats() {
 
 router.get("/projects", async (_req, res) => {
   try {
-    const projects = await db
-      .select()
-      .from(projectsTable)
-      .where(isNull(projectsTable.deletedAt))
-      .orderBy(projectsTable.createdAt);
+    const rows = await db.execute(sql`
+      SELECT
+        p.*,
+        COALESCE(s.donor_count, 0) AS donor_count,
+        COALESCE(s.share_count, 0) AS share_count,
+        COALESCE(s.group_count, 0) AS group_count,
+        COALESCE(s.kesildi_count, 0) AS kesildi_count,
+        s.last_kesildi_at
+      FROM projects p
+      LEFT JOIN project_stats_view s ON s.project_id = p.id
+      WHERE p.deleted_at IS NULL
+      ORDER BY p.created_at
+    `);
 
-    if (projects.length === 0) {
-      res.json([]);
-      return;
-    }
+    type ProjectRow = {
+      id: string; name: string; description: string;
+      created_at: string; deleted_at: string | null;
+      donor_count: number; share_count: number;
+      group_count: number; kesildi_count: number;
+      last_kesildi_at: string | null;
+    };
 
-    const statsRows = await db.execute(sql`SELECT project_id, donor_count, share_count, group_count, kesildi_count, last_kesildi_at FROM project_stats_view`);
-
-    const statsMap: Record<string, typeof emptyStats> = {};
-    for (const row of statsRows.rows) {
-      const r = row as { project_id: string; donor_count: number; share_count: number; group_count: number; kesildi_count: number; last_kesildi_at: string | null };
-      statsMap[r.project_id] = {
-        donorCount: r.donor_count,
-        shareCount: r.share_count,
-        groupCount: r.group_count,
-        kesildiCount: r.kesildi_count,
+    const result = (rows.rows as ProjectRow[]).map(r => ({
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      createdAt: r.created_at,
+      deletedAt: r.deleted_at,
+      stats: {
+        donorCount: Number(r.donor_count),
+        shareCount: Number(r.share_count),
+        groupCount: Number(r.group_count),
+        kesildiCount: Number(r.kesildi_count),
         lastKesildiAt: r.last_kesildi_at,
-      };
-    }
-
-    const result = projects.map((p) => ({
-      ...p,
-      stats: statsMap[p.id] || emptyStats,
+      },
     }));
 
     res.json(result);

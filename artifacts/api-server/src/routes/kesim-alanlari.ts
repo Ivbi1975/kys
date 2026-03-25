@@ -1408,38 +1408,56 @@ router.delete("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => 
 router.get("/catisma-tespiti", async (req, res) => {
   try {
     const projectIdFilter = req.query.projectId as string | undefined;
-    const conditions = [isNull(kesimAlanlariTable.deletedAt)];
-    if (projectIdFilter) {
-      conditions.push(eq(kesimAlanlariTable.projectId, projectIdFilter));
-    }
-    const allKA = await db.select().from(kesimAlanlariTable).where(and(...conditions));
-    const allDonations = allKA.length > 0
-      ? await db.select().from(donationsTable)
-          .where(and(
-            inArray(donationsTable.kesimAlaniId, allKA.map(k => k.id)),
-            isNull(donationsTable.deletedAt)
+    const projectCondition = projectIdFilter
+      ? sql`AND ka.project_id = ${projectIdFilter}`
+      : sql``;
+
+    const dataResult = await db.execute(sql`
+      SELECT
+        json_agg(DISTINCT jsonb_build_object('id', ka.id, 'name', ka.name)) AS ka_list,
+        COALESCE((
+          SELECT json_agg(jsonb_build_object(
+            'id', d.id, 'name', d.name, 'description', d.description,
+            'donationType', d.donation_type, 'shareCount', d.share_count,
+            'vekalet', d.vekalet, 'notes', d.notes, 'phone', d.phone,
+            'excluded', d.excluded, 'kesimAlaniId', d.kesim_alani_id
           ))
-      : [];
-    const allGroups = allKA.length > 0
-      ? await db.select().from(animalGroupsTable)
-          .where(inArray(animalGroupsTable.kesimAlaniId, allKA.map(k => k.id)))
-      : [];
-    const allDonationIds = allDonations.map(d => d.id);
-    const allGroupIds = allGroups.map(g => g.id);
-    const [donationTags, groupDonationLinks] = await Promise.all([
-      allDonationIds.length > 0
-        ? db.select().from(donationTagsTable).where(inArray(donationTagsTable.donationId, allDonationIds))
-        : Promise.resolve([]),
-      allGroupIds.length > 0
-        ? db.select().from(animalGroupDonationsTable).where(inArray(animalGroupDonationsTable.groupId, allGroupIds))
-        : Promise.resolve([]),
-    ]);
+          FROM donations d
+          WHERE d.kesim_alani_id IN (SELECT k2.id FROM kesim_alanlari k2 WHERE k2.deleted_at IS NULL ${projectCondition})
+            AND d.deleted_at IS NULL
+        ), '[]'::json) AS donations,
+        COALESCE((
+          SELECT json_agg(jsonb_build_object('id', ag.id, 'animalNo', ag.animal_no, 'kesimAlaniId', ag.kesim_alani_id))
+          FROM animal_groups ag
+          WHERE ag.kesim_alani_id IN (SELECT k3.id FROM kesim_alanlari k3 WHERE k3.deleted_at IS NULL ${projectCondition})
+        ), '[]'::json) AS groups,
+        COALESCE((
+          SELECT json_agg(jsonb_build_object('groupId', agd.group_id, 'donationId', agd.donation_id))
+          FROM animal_group_donations agd
+          WHERE agd.group_id IN (
+            SELECT ag2.id FROM animal_groups ag2
+            WHERE ag2.kesim_alani_id IN (SELECT k4.id FROM kesim_alanlari k4 WHERE k4.deleted_at IS NULL ${projectCondition})
+          )
+        ), '[]'::json) AS group_donation_links
+      FROM kesim_alanlari ka
+      WHERE ka.deleted_at IS NULL ${projectCondition}
+    `);
+
+    const raw = dataResult.rows[0] as {
+      ka_list: { id: string; name: string }[] | null;
+      donations: { id: string; name: string; description: string; donationType: string; shareCount: number; vekalet: string; notes: string; phone: string; excluded: boolean; kesimAlaniId: string }[];
+      groups: { id: string; animalNo: number; kesimAlaniId: string }[];
+      group_donation_links: { groupId: string; donationId: string }[];
+    };
+
+    const allKAList = raw.ka_list || [];
+    const allDonations = raw.donations || [];
+    const allGroups = raw.groups || [];
+    const groupDonationLinks = raw.group_donation_links || [];
+
+    const kaById = Object.fromEntries(allKAList.map(k => [k.id, k]));
 
     const tagsByDonation: Record<string, string[]> = {};
-    for (const dt of donationTags) {
-      if (!tagsByDonation[dt.donationId]) tagsByDonation[dt.donationId] = [];
-      tagsByDonation[dt.donationId].push(dt.tagId);
-    }
 
     const donationsByGroupId: Record<string, string[]> = {};
     for (const link of groupDonationLinks) {
@@ -1453,7 +1471,6 @@ router.get("/catisma-tespiti", async (req, res) => {
       groupsByDonationId[link.donationId].push(link.groupId);
     }
 
-    const kaById = Object.fromEntries(allKA.map(k => [k.id, k]));
     const donationById = Object.fromEntries(allDonations.map(d => [d.id, d]));
     const groupById = Object.fromEntries(allGroups.map(g => [g.id, g]));
 
