@@ -306,19 +306,23 @@ function performIncrementalGroup(
   changedIds: Set<string>,
   lockedIndices: Set<number>
 ): AnimalGroup[] {
+  if (changedIds.size === 0) {
+    return existingGroups.map((g, i) => ({ ...g, animalNo: i + 1 }));
+  }
+
   const donationsToRegroup: Donation[] = [];
-  const preservedGroups: AnimalGroup[] = [];
   const donationById = new Map<string, Donation>();
   for (const d of donations) donationById.set(d.id, d);
+
+  const affectedIndices: number[] = [];
 
   for (let i = 0; i < existingGroups.length; i++) {
     const group = existingGroups[i];
     const isLocked = lockedIndices.has(i);
     const hasChanged = group.donations.some(d => changedIds.has(d.id));
 
-    if (isLocked || !hasChanged) {
-      preservedGroups.push({ ...group });
-    } else {
+    if (!isLocked && hasChanged) {
+      affectedIndices.push(i);
       for (const d of group.donations) {
         const current = donationById.get(d.id);
         if (current && (d.name.trim() || d.description.trim())) {
@@ -331,8 +335,8 @@ function performIncrementalGroup(
   for (const id of changedIds) {
     const d = donationById.get(id);
     if (d && !d.excluded && !donationsToRegroup.some(x => x.id === id)) {
-      const inPreserved = preservedGroups.some(g => g.donations.some(gd => gd.id === id));
-      if (!inPreserved) {
+      const inExisting = existingGroups.some(g => g.donations.some(gd => gd.id === id));
+      if (!inExisting) {
         donationsToRegroup.push(d);
       }
     }
@@ -345,7 +349,26 @@ function performIncrementalGroup(
     donations: buildGroupDonations(segments),
   }));
 
-  const finalGroups = [...preservedGroups, ...regrouped];
+  const finalGroups: AnimalGroup[] = [];
+  let regroupIdx = 0;
+  const affectedSet = new Set(affectedIndices);
+
+  for (let i = 0; i < existingGroups.length; i++) {
+    if (affectedSet.has(i)) {
+      if (regroupIdx < regrouped.length) {
+        finalGroups.push(regrouped[regroupIdx]);
+        regroupIdx++;
+      }
+    } else {
+      finalGroups.push({ ...existingGroups[i] });
+    }
+  }
+
+  while (regroupIdx < regrouped.length) {
+    finalGroups.push(regrouped[regroupIdx]);
+    regroupIdx++;
+  }
+
   for (let i = 0; i < finalGroups.length; i++) {
     finalGroups[i] = { ...finalGroups[i], animalNo: i + 1 };
   }

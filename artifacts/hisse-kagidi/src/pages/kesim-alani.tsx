@@ -1183,31 +1183,42 @@ export default function KesimAlaniPage() {
       }
 
       const hasExistingGroups = kesim.animalGroups.length > 0;
-      const activeDonationIds = new Set(
-        kesim.donations.filter(d => !d.excluded && (d.name.trim() || d.description.trim())).map(d => d.id)
-      );
-
-      const changedIds: string[] = [];
-
-      const groupedDonationIds = new Set<string>();
-      for (const g of kesim.animalGroups) {
-        for (const d of g.donations) {
-          if (d.name.trim() || d.description.trim()) groupedDonationIds.add(d.id);
+      const activeDonationMap = new Map<string, Donation>();
+      for (const d of kesim.donations) {
+        if (!d.excluded && (d.name.trim() || d.description.trim())) {
+          activeDonationMap.set(d.id, d);
         }
       }
 
-      for (const id of activeDonationIds) {
-        if (!groupedDonationIds.has(id)) changedIds.push(id);
+      const changedIdSet = new Set<string>();
+
+      const groupedDonationMap = new Map<string, Donation>();
+      for (const g of kesim.animalGroups) {
+        for (const d of g.donations) {
+          if (d.name.trim() || d.description.trim()) groupedDonationMap.set(d.id, d);
+        }
+      }
+
+      for (const [id] of activeDonationMap) {
+        if (!groupedDonationMap.has(id)) changedIdSet.add(id);
       }
 
       for (const g of kesim.animalGroups) {
         if (g.locked) continue;
         for (const d of g.donations) {
-          if ((d.name.trim() || d.description.trim()) && (!activeDonationIds.has(d.id))) {
-            changedIds.push(d.id);
+          if (!(d.name.trim() || d.description.trim())) continue;
+          if (!activeDonationMap.has(d.id)) {
+            changedIdSet.add(d.id);
+            continue;
+          }
+          const current = activeDonationMap.get(d.id)!;
+          if (current.name !== d.name || current.description !== d.description || current.shareCount !== d.shareCount || current.excluded !== d.excluded) {
+            changedIdSet.add(d.id);
           }
         }
       }
+
+      const changedIds = Array.from(changedIdSet);
 
       const useIncremental = !forceFullRegroup && hasExistingGroups && changedIds.length > 0 && changedIds.length <= 20;
 
