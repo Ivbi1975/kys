@@ -1,6 +1,10 @@
-import { useKesimAlaniState } from "@/components/kesim-alani/useKesimAlaniState";
+import { Suspense, lazy } from "react";
+  import { useKesimAlaniState } from "@/components/kesim-alani/useKesimAlaniState";
   import { KesimAlaniContent } from "@/components/kesim-alani/KesimAlaniContent";
-  import { KesimAlaniDialogs } from "@/components/kesim-alani/KesimAlaniDialogs";
+
+  const KesimAlaniDialogs = lazy(() =>
+    import("@/components/kesim-alani/KesimAlaniDialogs").then(m => ({ default: m.KesimAlaniDialogs }))
+  );
 
   export default function KesimAlaniPage() {
     const state = useKesimAlaniState();
@@ -25,7 +29,9 @@ import { useKesimAlaniState } from "@/components/kesim-alani/useKesimAlaniState"
     return (
       <>
         <KesimAlaniContent {...state} />
-        <KesimAlaniDialogs {...state} />
+        <Suspense fallback={null}>
+          <KesimAlaniDialogs {...state} />
+        </Suspense>
       </>
     );
   }

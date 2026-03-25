@@ -11,8 +11,8 @@ import { Suspense, lazy } from "react";
   import { Badge } from "@/components/ui/badge";
   import { ScrollArea } from "@/components/ui/scroll-area";
   import { AlertTriangle, ArrowLeftRight, ArrowUp, Camera, Check, ChevronUp, Edit3, Eye, EyeOff, Keyboard, Loader2, MessageSquarePlus, Package, Plus, Printer, RotateCcw, Scissors, Send, Settings2, ShoppingBag, Sparkles, Trash2, UserCog, UserPlus, Wand2, X } from "lucide-react";
-  import PhotoGallery from "@/components/PhotoGallery";
-    import QrCodeModal from "@/components/QrCodeModal";
+  const PhotoGallery = lazy(() => import("@/components/PhotoGallery"));
+  const QrCodeModal = lazy(() => import("@/components/QrCodeModal"));
   import { computeEffectiveShares } from "@/lib/grouping";
     import { updateTrackingNoteStatus, fetchNotificationTemplate, updateNotificationTemplate, getGroupPhotoUrlAdmin } from "@/lib/api";
     import type { useKesimAlaniState } from "./useKesimAlaniState";
@@ -1141,11 +1141,13 @@ import { Suspense, lazy } from "react";
             Bu hayvan grubunda fotoğraf yok.
           </div>
         ) : (
-          <PhotoGallery
-            photos={photoViewPhotos}
-            getPhotoUrl={(photoId: string) => kesim ? getGroupPhotoUrlAdmin(kesim.id, photoViewGroup!.id, photoId) : ""}
-            readOnly
-          />
+          <Suspense fallback={<div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 animate-spin" /></div>}>
+            <PhotoGallery
+              photos={photoViewPhotos}
+              getPhotoUrl={(photoId: string) => kesim ? getGroupPhotoUrlAdmin(kesim.id, photoViewGroup!.id, photoId) : ""}
+              readOnly
+            />
+          </Suspense>
         )}
       </DialogContent>
     </Dialog>
