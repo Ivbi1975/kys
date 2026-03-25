@@ -150,9 +150,12 @@ export function useOfflineSync(token: string | undefined) {
 
       setData((prev) => {
         if (!prev) return prev;
+        const prevGroup = prev.groups.find((g) => g.id === groupId);
+        const wasKesildi = prevGroup?.kesildi ?? false;
+        const delta = wasKesildi === kesildi ? 0 : kesildi ? 1 : -1;
         return {
           ...prev,
-          kesildiCount: prev.kesildiCount + (kesildi ? 1 : -1),
+          kesildiCount: Math.max(0, prev.kesildiCount + delta),
           groups: prev.groups.map((g) =>
             g.id === groupId
               ? { ...g, kesildi, kesildiAt: kesildi ? new Date().toISOString() : null }
