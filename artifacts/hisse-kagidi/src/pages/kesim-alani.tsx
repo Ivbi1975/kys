@@ -3216,14 +3216,15 @@ export default function KesimAlaniPage() {
   }, [kesim?.animalGroups, colorTagFilter, filterTeam, showOnlyIncomplete]);
 
   const scrollToAnimalGroup = useCallback((animalNo: number) => {
+    const colCount = workspace?.prefs?.columnCount ?? 1;
     const idx = filteredGroupItems.findIndex(item => item.group.animalNo === animalNo);
-    if (idx >= 0 && groupsVirtuosoRef.current && filteredGroupItems.length > 20) {
+    if (idx >= 0 && colCount === 1 && groupsVirtuosoRef.current && filteredGroupItems.length > 20) {
       groupsVirtuosoRef.current.scrollToIndex({ index: idx, align: "center", behavior: "smooth" });
     } else {
       const el = document.getElementById(`animal-group-${animalNo}`);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, [filteredGroupItems]);
+  }, [filteredGroupItems, workspace?.prefs?.columnCount]);
 
   const handleSetGroupColorTag = useCallback((groupIdx: number, tag: ColorTag) => {
     setGroupColorTag(groupIdx, tag);
@@ -5690,7 +5691,14 @@ export default function KesimAlaniPage() {
                 />
               );
 
-              if (filteredGroupItems.length > 20) {
+              const colCount = workspace.prefs.columnCount ?? 1;
+              const gridClassName = `grid gap-4 ${
+                colCount === 3 ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" :
+                colCount === 2 ? "grid-cols-1 md:grid-cols-2" :
+                "grid-cols-1"
+              }`;
+
+              if (colCount === 1 && filteredGroupItems.length > 20) {
                 const virtuosoProps = fullscreenMode && scrollContainerRef.current
                   ? { customScrollParent: scrollContainerRef.current }
                   : { useWindowScroll: true as const };
@@ -5711,11 +5719,7 @@ export default function KesimAlaniPage() {
               }
 
               return (
-                <div className={`grid gap-4 ${
-                  workspace.prefs.columnCount === 3 ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" :
-                  workspace.prefs.columnCount === 2 ? "grid-cols-1 md:grid-cols-2" :
-                  "grid-cols-1"
-                }`}>
+                <div className={gridClassName}>
                   {filteredGroupItems.map(renderGroupCard)}
                 </div>
               );
