@@ -35,6 +35,7 @@ export const donationsTable = pgTable("donations", {
   shareCount: integer("share_count").notNull().default(1),
   vekalet: text("vekalet").notNull().default(""),
   notes: text("notes").notNull().default(""),
+  phone: text("phone").notNull().default(""),
   excluded: boolean("excluded").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
   deletedAt: text("deleted_at"),
@@ -144,6 +145,25 @@ export const animalGroupPhotosTable = pgTable("animal_group_photos", {
 export const insertAnimalGroupPhotoSchema = createInsertSchema(animalGroupPhotosTable);
 export type InsertAnimalGroupPhoto = z.infer<typeof insertAnimalGroupPhotoSchema>;
 export type AnimalGroupPhotoRow = typeof animalGroupPhotosTable.$inferSelect;
+
+export const notificationLogsTable = pgTable("notification_logs", {
+  id: text("id").primaryKey(),
+  kesimAlaniId: text("kesim_alani_id").notNull().references(() => kesimAlanlariTable.id, { onDelete: "cascade" }),
+  animalGroupId: text("animal_group_id").references(() => animalGroupsTable.id, { onDelete: "set null" }),
+  animalNo: integer("animal_no"),
+  donorName: text("donor_name").notNull().default(""),
+  phone: text("phone").notNull().default(""),
+  message: text("message").notNull().default(""),
+  channel: text("channel").notNull().default("browser"),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  index("idx_notification_logs_kesim_alani_id").on(table.kesimAlaniId),
+  index("idx_notification_logs_animal_group_id").on(table.animalGroupId),
+]);
+
+export const insertNotificationLogSchema = createInsertSchema(notificationLogsTable);
+export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
+export type NotificationLogRow = typeof notificationLogsTable.$inferSelect;
 
 export const appSettingsTable = pgTable("app_settings", {
   key: text("key").primaryKey(),

@@ -587,3 +587,36 @@ export async function assignTeamTracking(token: string, groupId: string, teamId:
     body: JSON.stringify({ teamId }),
   });
 }
+
+export interface NotificationLog {
+  id: string;
+  kesimAlaniId: string;
+  animalGroupId: string | null;
+  animalNo: number | null;
+  donorName: string;
+  phone: string;
+  message: string;
+  channel: string;
+  createdAt: string;
+}
+
+export async function fetchNotificationLogs(kesimAlaniId: string): Promise<NotificationLog[]> {
+  return apiFetch<NotificationLog[]>(`/kesim-alanlari/${kesimAlaniId}/notification-logs`);
+}
+
+export async function fetchNotificationTemplate(): Promise<string> {
+  const data = await apiFetch<{ template: string }>("/settings/notification-template");
+  return data.template;
+}
+
+export async function updateNotificationTemplate(template: string): Promise<void> {
+  await apiFetch("/settings/notification-template", {
+    method: "PUT",
+    body: JSON.stringify({ template }),
+  });
+}
+
+export async function fetchTrackingNotificationLogs(token: string, since?: string): Promise<NotificationLog[]> {
+  const query = since ? `?since=${encodeURIComponent(since)}` : "";
+  return apiFetch<NotificationLog[]>(`/tracking/${token}/notification-logs${query}`);
+}

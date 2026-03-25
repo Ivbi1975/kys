@@ -104,8 +104,8 @@ import {
   Camera,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag, Team } from "@/lib/types";
-import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani, generateTrackingToken, fetchKesimAlaniTrackingNotes, updateTrackingNoteStatus, fetchGroupPhotosAdmin, getGroupPhotoUrlAdmin, fetchPhotoCountsAdmin, createTeam, updateTeam, deleteTeam, assignTeamAdmin } from "@/lib/api";
-import type { DeletedDonation, TrackingNote, GroupPhoto } from "@/lib/api";
+import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani, generateTrackingToken, fetchKesimAlaniTrackingNotes, updateTrackingNoteStatus, fetchGroupPhotosAdmin, getGroupPhotoUrlAdmin, fetchPhotoCountsAdmin, createTeam, updateTeam, deleteTeam, assignTeamAdmin, fetchNotificationLogs, fetchNotificationTemplate, updateNotificationTemplate } from "@/lib/api";
+import type { DeletedDonation, TrackingNote, GroupPhoto, NotificationLog } from "@/lib/api";
 import PhotoGallery from "@/components/PhotoGallery";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
@@ -207,6 +207,7 @@ export default function KesimAlaniPage() {
     shareCount: 1,
     vekalet: "",
     notes: "",
+    phone: "",
   });
   const [editingCell, setEditingCell] = useState<{
     donationId: string;
@@ -323,6 +324,13 @@ export default function KesimAlaniPage() {
   const [teamColor, setTeamColor] = useState("#3b82f6");
   const [teamSaving, setTeamSaving] = useState(false);
   const [filterTeam, setFilterTeam] = useState<string>("all");
+
+  const [notificationLogsOpen, setNotificationLogsOpen] = useState(false);
+  const [notificationLogs, setNotificationLogs] = useState<NotificationLog[]>([]);
+  const [notificationLogsLoading, setNotificationLogsLoading] = useState(false);
+  const [notificationTemplateOpen, setNotificationTemplateOpen] = useState(false);
+  const [notificationTemplate, setNotificationTemplate] = useState("Hayvan {animalNo} kesildi. Hayırlı olsun!");
+  const [notificationTemplateSaving, setNotificationTemplateSaving] = useState(false);
 
   const [findDeleteOpen, setFindDeleteOpen] = useState(false);
   const [findDeleteColumn, setFindDeleteColumn] = useState<"name" | "description" | "donationType" | "vekalet" | "notes">("description");
@@ -692,9 +700,10 @@ export default function KesimAlaniPage() {
       shareCount: Math.max(1, Math.min(7, newDonation.shareCount)),
       vekalet: newDonation.vekalet.trim(),
       notes: newDonation.notes.trim(),
+      phone: newDonation.phone?.trim() || "",
     };
     save({ ...kesim, donations: [...kesim.donations, donation] }, `Bağışçı eklendi: ${donation.description || donation.name}`);
-    setNewDonation({ name: "", description: "", donationType: "", shareCount: 1, vekalet: "", notes: "" });
+    setNewDonation({ name: "", description: "", donationType: "", shareCount: 1, vekalet: "", notes: "", phone: "" });
     setAddDialogOpen(false);
   }
 
@@ -3234,6 +3243,25 @@ export default function KesimAlaniPage() {
               </Button>
               <Button
                 size="sm"
+                variant="outline"
+                onClick={async () => {
+                  setNotificationLogsOpen(true);
+                  setNotificationLogsLoading(true);
+                  try {
+                    const logs = await fetchNotificationLogs(kesim.id);
+                    setNotificationLogs(logs);
+                  } catch {
+                    toast({ title: "Hata", description: "Bildirim kayıtları yüklenemedi", variant: "destructive" });
+                  } finally {
+                    setNotificationLogsLoading(false);
+                  }
+                }}
+              >
+                <Send className="w-4 h-4" />
+                <span className="hidden sm:inline ml-1">Bildirimler</span>
+              </Button>
+              <Button
+                size="sm"
                 className="shrink-0"
                 onClick={() => saveToApi(kesim)}
                 disabled={saveStatus === "saving"}
@@ -4045,6 +4073,16 @@ export default function KesimAlaniPage() {
                           setNewDonation({
                             ...newDonation,
                             notes: e.target.value,
+                          })
+                        }
+                      />
+                      <Input
+                        placeholder="Telefon (opsiyonel)"
+                        value={newDonation.phone}
+                        onChange={(e) =>
+                          setNewDonation({
+                            ...newDonation,
+                            phone: e.target.value,
                           })
                         }
                       />
@@ -6580,6 +6618,114 @@ export default function KesimAlaniPage() {
               })}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={notificationLogsOpen} onOpenChange={setNotificationLogsOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="w-5 h-5" />
+              Kesim Bildirimleri
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-end mb-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                setNotificationTemplateOpen(true);
+                try {
+                  const tmpl = await fetchNotificationTemplate();
+                  setNotificationTemplate(tmpl);
+                } catch {
+                  toast({ title: "Hata", description: "Şablon yüklenemedi", variant: "destructive" });
+                }
+              }}
+            >
+              <Settings2 className="w-3.5 h-3.5 mr-1" />
+              Şablon Düzenle
+            </Button>
+          </div>
+          {notificationLogsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+          ) : notificationLogs.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              Henüz bildirim kaydı yok. Hayvan kesildi olarak işaretlendiğinde burada görünecek.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {notificationLogs.map(log => (
+                <div key={log.id} className="rounded-lg p-3 text-sm border bg-muted/30 border-border">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <Send className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="text-xs font-semibold">
+                        Hayvan {log.animalNo || "?"} — {log.donorName}
+                      </span>
+                      {log.phone && (
+                        <span className="text-[10px] text-muted-foreground">({log.phone})</span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {new Date(log.createdAt).toLocaleString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  <p className="text-xs whitespace-pre-wrap text-muted-foreground">{log.message}</p>
+                  <div className="mt-1">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 font-medium">
+                      {log.channel === "browser" ? "Tarayıcı" : log.channel}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={notificationTemplateOpen} onOpenChange={setNotificationTemplateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="w-5 h-5" />
+              Bildirim Şablonu
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div className="text-xs text-muted-foreground">
+              Kullanılabilir değişkenler: <code className="bg-muted px-1 rounded">{"{animalNo}"}</code> (hayvan numarası), <code className="bg-muted px-1 rounded">{"{donorName}"}</code> (bağışçı adı)
+            </div>
+            <Input
+              value={notificationTemplate}
+              onChange={(e) => setNotificationTemplate(e.target.value)}
+              placeholder="Bildirim mesaj şablonu..."
+            />
+            <div className="text-xs text-muted-foreground">
+              Önizleme: <span className="italic">{notificationTemplate.replace("{animalNo}", "5").replace("{donorName}", "Ahmet Yılmaz")}</span>
+            </div>
+            <Button
+              className="w-full"
+              onClick={async () => {
+                setNotificationTemplateSaving(true);
+                try {
+                  await updateNotificationTemplate(notificationTemplate);
+                  toast({ title: "Şablon kaydedildi" });
+                  setNotificationTemplateOpen(false);
+                } catch {
+                  toast({ title: "Hata", variant: "destructive" });
+                } finally {
+                  setNotificationTemplateSaving(false);
+                }
+              }}
+              disabled={notificationTemplateSaving || !notificationTemplate.trim()}
+            >
+              {notificationTemplateSaving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+              Kaydet
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

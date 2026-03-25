@@ -14,6 +14,7 @@ export interface Donation {
   shareCount: number;
   vekalet: string;
   notes: string;
+  phone?: string;
   excluded?: boolean;
   tags?: string[];
   aiCategories?: string[];

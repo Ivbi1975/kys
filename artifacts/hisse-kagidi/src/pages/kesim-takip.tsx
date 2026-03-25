@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "wouter";
-import { fetchTrackingData, toggleKesildi, fetchTrackingNotes, createTrackingNote, fetchGroupPhotos, getGroupPhotoUrl, uploadGroupPhoto, deleteGroupPhoto, assignTeamTracking } from "@/lib/api";
+import { fetchTrackingData, toggleKesildi, fetchTrackingNotes, createTrackingNote, fetchGroupPhotos, getGroupPhotoUrl, uploadGroupPhoto, deleteGroupPhoto, assignTeamTracking, fetchTrackingNotificationLogs } from "@/lib/api";
 import type { TrackingData, TrackingGroup, TrackingNote, GroupPhoto, TrackingTeam } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -767,6 +767,17 @@ export default function KesimTakipPage() {
   const [overlayIndex, setOverlayIndex] = useState<number | null>(null);
   const [notes, setNotes] = useState<TrackingNote[]>([]);
   const [showGlobalNotes, setShowGlobalNotes] = useState(false);
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
+    typeof Notification !== "undefined" ? Notification.permission : "denied"
+  );
+  const lastNotifCheckRef = useRef<string>(new Date().toISOString());
+  const seenNotifIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission().then(perm => setNotifPermission(perm));
+    }
+  }, []);
 
   const loadData = useCallback(async () => {
     if (!params.token) return;
@@ -783,6 +794,31 @@ export default function KesimTakipPage() {
     } finally {
       setLoading(false);
     }
+  }, [params.token]);
+
+  useEffect(() => {
+    if (!params.token) return;
+    const pollNotifications = async () => {
+      if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+      try {
+        const logs = await fetchTrackingNotificationLogs(params.token!, lastNotifCheckRef.current);
+        for (const log of logs) {
+          if (!seenNotifIdsRef.current.has(log.id)) {
+            seenNotifIdsRef.current.add(log.id);
+            try {
+              new Notification(`Hayvan ${log.animalNo || "?"} Kesildi`, {
+                body: log.message,
+              });
+            } catch {}
+          }
+        }
+        if (logs.length > 0) {
+          lastNotifCheckRef.current = new Date().toISOString();
+        }
+      } catch {}
+    };
+    const interval = setInterval(pollNotifications, 30000);
+    return () => clearInterval(interval);
   }, [params.token]);
 
   useEffect(() => {
@@ -894,6 +930,22 @@ export default function KesimTakipPage() {
           </div>
           <p className="text-xs text-muted-foreground mt-1 text-right">%{progressPercent} tamamlandı</p>
         </Card>
+
+        {typeof Notification !== "undefined" && notifPermission === "default" && (
+          <Card className="p-3 mb-4 bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-blue-700 dark:text-blue-300">Kesim bildirimlerini almak ister misiniz?</span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-100"
+                onClick={() => Notification.requestPermission().then(perm => setNotifPermission(perm))}
+              >
+                Bildirimleri Aç
+              </Button>
+            </div>
+          </Card>
+        )}
 
         <Card className="p-3 mb-4">
           <button

@@ -10,6 +10,8 @@ import {
   trackingNotesTable,
   animalGroupPhotosTable,
   teamsTable,
+  notificationLogsTable,
+  appSettingsTable,
 } from "@workspace/db/schema";
 import { desc } from "drizzle-orm";
 import { eq, inArray, isNull, isNotNull, and } from "drizzle-orm";
@@ -26,6 +28,7 @@ interface DonationPayload {
   shareCount?: number;
   vekalet?: string;
   notes?: string;
+  phone?: string;
   excluded?: boolean;
   tags?: string[];
 }
@@ -47,6 +50,7 @@ interface DonationOutput {
   shareCount: number;
   vekalet: string;
   notes: string;
+  phone: string;
   excluded: boolean;
   tags: string[];
   aiCategories: string[];
@@ -61,6 +65,7 @@ const donationPayloadSchema = z.object({
   shareCount: z.number().int().min(1).optional().default(1),
   vekalet: z.string().optional().default(""),
   notes: z.string().optional().default(""),
+  phone: z.string().optional().default(""),
   excluded: z.boolean().optional().default(false),
   tags: z.array(z.string()).optional().default([]),
 });
@@ -146,6 +151,7 @@ async function getFullKesimAlani(id: string) {
       shareCount: d.shareCount,
       vekalet: d.vekalet,
       notes: d.notes,
+      phone: d.phone || "",
       excluded: d.excluded,
       tags: tagsByDonation[d.id] || [],
       aiCategories: d.aiCategories ? JSON.parse(d.aiCategories) : [],
@@ -475,6 +481,7 @@ router.post("/kesim-alanlari/:id/donations", async (req, res) => {
         shareCount: donation.shareCount || 1,
         vekalet: donation.vekalet || "",
         notes: donation.notes || "",
+        phone: donation.phone || "",
         excluded: donation.excluded || false,
         sortOrder,
       });
@@ -526,6 +533,7 @@ router.put("/kesim-alanlari/:id/donations/:donationId", async (req, res) => {
     if (updates.shareCount !== undefined) dbUpdates.shareCount = updates.shareCount;
     if (updates.vekalet !== undefined) dbUpdates.vekalet = updates.vekalet;
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+    if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
     if (updates.excluded !== undefined) dbUpdates.excluded = updates.excluded;
 
     await db.transaction(async (tx) => {
@@ -803,6 +811,10 @@ router.put("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => {
         }
       }
     });
+
+    if (updates.kesildi !== undefined) {
+      await createNotificationLogs(kesimAlaniId, groupId, existing.animalNo, updates.kesildi);
+    }
 
     const result = await getFullKesimAlani(kesimAlaniId);
     res.json(result);
@@ -1192,6 +1204,7 @@ async function saveDonations(tx: Tx, kesimAlaniId: string, donations: DonationPa
     shareCount: d.shareCount || 1,
     vekalet: d.vekalet || "",
     notes: d.notes || "",
+    phone: d.phone || "",
     excluded: d.excluded || false,
     sortOrder: i,
   }));
@@ -1449,6 +1462,51 @@ router.get("/tracking/:token", async (req, res) => {
   }
 });
 
+async function createNotificationLogs(kesimAlaniId: string, groupId: string, animalNo: number, kesildi: boolean) {
+  if (!kesildi) return;
+
+  try {
+    const links = await db.select({ donationId: animalGroupDonationsTable.donationId })
+      .from(animalGroupDonationsTable)
+      .where(eq(animalGroupDonationsTable.groupId, groupId));
+
+    if (links.length === 0) return;
+
+    const donationIds = links.map(l => l.donationId);
+    const donations = await db.select({
+      id: donationsTable.id,
+      name: donationsTable.name,
+      phone: donationsTable.phone,
+    }).from(donationsTable)
+      .where(inArray(donationsTable.id, donationIds));
+
+    const [templateSetting] = await db.select().from(appSettingsTable)
+      .where(eq(appSettingsTable.key, "notification_template"));
+    const template = templateSetting?.value || "Hayvan {animalNo} kesildi. Hayırlı olsun!";
+
+    const now = new Date().toISOString();
+    const logRows = donations
+      .filter(d => d.name.trim())
+      .map(d => ({
+        id: crypto.randomUUID(),
+        kesimAlaniId,
+        animalGroupId: groupId,
+        animalNo,
+        donorName: d.name,
+        phone: d.phone || "",
+        message: template.replaceAll("{animalNo}", String(animalNo)).replaceAll("{donorName}", d.name),
+        channel: "browser",
+        createdAt: now,
+      }));
+
+    if (logRows.length > 0) {
+      await db.insert(notificationLogsTable).values(logRows);
+    }
+  } catch (err) {
+    console.error("createNotificationLogs error:", err);
+  }
+}
+
 router.put("/tracking/:token/group/:groupId/kesildi", async (req, res) => {
   try {
     const { token, groupId } = req.params;
@@ -1474,6 +1532,7 @@ router.put("/tracking/:token/group/:groupId/kesildi", async (req, res) => {
 
     const kesildiAt = kesildi ? new Date().toISOString() : null;
     await db.update(animalGroupsTable).set({ kesildi, kesildiAt }).where(eq(animalGroupsTable.id, groupId));
+    await createNotificationLogs(ka.id, groupId, group.animalNo, kesildi);
     res.json({ success: true, groupId, kesildi, kesildiAt });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
@@ -1952,6 +2011,81 @@ router.put("/tracking/:token/group/:groupId/team", async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/kesim-alanlari/:id/notification-logs", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const check = await requireActiveKesimAlani(id);
+    if (check.error) { res.status(check.status).json({ error: check.error }); return; }
+
+    const logs = await db.select().from(notificationLogsTable)
+      .where(eq(notificationLogsTable.kesimAlaniId, id))
+      .orderBy(desc(notificationLogsTable.createdAt));
+
+    res.json(logs);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`GET /kesim-alanlari/${req.params.id}/notification-logs error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/settings/notification-template", async (_req, res) => {
+  try {
+    const [setting] = await db.select().from(appSettingsTable)
+      .where(eq(appSettingsTable.key, "notification_template"));
+    res.json({ template: setting?.value || "Hayvan {animalNo} kesildi. Hayırlı olsun!" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.put("/settings/notification-template", async (req, res) => {
+  try {
+    const { template } = req.body;
+    if (typeof template !== "string" || !template.trim()) {
+      res.status(400).json({ error: "Şablon metni gerekli" });
+      return;
+    }
+    await db.insert(appSettingsTable)
+      .values({ key: "notification_template", value: template.trim() })
+      .onConflictDoUpdate({ target: appSettingsTable.key, set: { value: template.trim() } });
+    res.json({ success: true, template: template.trim() });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/tracking/:token/notification-logs", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const [ka] = await db.select().from(kesimAlanlariTable)
+      .where(eq(kesimAlanlariTable.trackingToken, token));
+    if (!ka || ka.deletedAt) {
+      res.status(404).json({ error: "Takip linki bulunamadı" });
+      return;
+    }
+
+    const since = req.query.since as string | undefined;
+    const conditions = [eq(notificationLogsTable.kesimAlaniId, ka.id)];
+    if (since) {
+      const { gt } = await import("drizzle-orm");
+      conditions.push(gt(notificationLogsTable.createdAt, since));
+    }
+
+    const logs = await db.select().from(notificationLogsTable)
+      .where(and(...conditions))
+      .orderBy(desc(notificationLogsTable.createdAt));
+
+    res.json(logs);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`GET /tracking/${req.params.token}/notification-logs error:`, message);
     res.status(500).json({ error: message });
   }
 });
