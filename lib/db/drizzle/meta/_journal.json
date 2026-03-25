@@ -36,6 +36,13 @@
       "when": 1774500000000,
       "tag": "0004_timestamp_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774500100000,
+      "tag": "0005_composite_indexes",
+      "breakpoints": true
     }
   ]
 }

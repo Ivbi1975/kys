@@ -7,7 +7,9 @@ export const projectsTable = pgTable("projects", {
   name: text("name").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
-});
+}, (table) => [
+  index("idx_projects_deleted_created").on(table.deletedAt, table.createdAt),
+]);
 
 export const insertProjectSchema = createInsertSchema(projectsTable);
 export type InsertProject = z.infer<typeof insertProjectSchema>;
@@ -21,7 +23,10 @@ export const kesimAlanlariTable = pgTable("kesim_alanlari", {
   projectId: text("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
   trackingToken: text("tracking_token"),
   kesimListeId: text("kesim_liste_id"),
-});
+}, (table) => [
+  index("idx_ka_project_deleted").on(table.projectId, table.deletedAt),
+  index("idx_ka_deleted_created").on(table.deletedAt, table.createdAt),
+]);
 
 export const insertKesimAlaniSchema = createInsertSchema(kesimAlanlariTable);
 export type InsertKesimAlani = z.infer<typeof insertKesimAlaniSchema>;
@@ -44,6 +49,7 @@ export const donationsTable = pgTable("donations", {
   aiWarnings: text("ai_warnings"),
 }, (table) => [
   index("idx_donations_kesim_alani_id").on(table.kesimAlaniId),
+  index("idx_donations_ka_deleted_sort").on(table.kesimAlaniId, table.deletedAt, table.sortOrder),
 ]);
 
 export const insertDonationSchema = createInsertSchema(donationsTable);
@@ -76,6 +82,8 @@ export const animalGroupsTable = pgTable("animal_groups", {
   teamId: text("team_id").references(() => teamsTable.id, { onDelete: "set null" }),
 }, (table) => [
   index("idx_animal_groups_kesim_alani_id").on(table.kesimAlaniId),
+  index("idx_ag_ka_sort").on(table.kesimAlaniId, table.sortOrder),
+  index("idx_ag_ka_animal_no").on(table.kesimAlaniId, table.animalNo),
 ]);
 
 export const insertAnimalGroupSchema = createInsertSchema(animalGroupsTable);
@@ -90,6 +98,7 @@ export const animalGroupDonationsTable = pgTable("animal_group_donations", {
 }, (table) => [
   index("idx_agd_group_id").on(table.groupId),
   index("idx_agd_donation_id").on(table.donationId),
+  index("idx_agd_group_sort").on(table.groupId, table.sortOrder),
   unique("uq_agd_group_donation").on(table.groupId, table.donationId),
 ]);
 
