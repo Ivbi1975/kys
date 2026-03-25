@@ -44,3 +44,11 @@ export function cacheInvalidatePrefix(prefix: string): void {
 export function cacheStats() {
   return { hits, misses, size: store.size, hitRate: hits + misses > 0 ? Math.round((hits / (hits + misses)) * 100) : 0 };
 }
+
+setInterval(() => {
+  const total = hits + misses;
+  if (total > 0) {
+    const rate = Math.round((hits / total) * 100);
+    console.log(`[cache] hit-rate=${rate}% hits=${hits} misses=${misses} entries=${store.size}`);
+  }
+}, 60_000);

@@ -23,6 +23,10 @@ import { eq, inArray, isNull, isNotNull, and } from "drizzle-orm";
 import { z } from "zod";
 import crypto from "crypto";
 import { refreshProjectStats } from "./projects";
+import { cacheGet, cacheSet, cacheInvalidatePrefix } from "../lib/cache";
+
+const KA_LIST_CACHE_KEY = "kesim-alanlari:list";
+const KA_LIST_TTL = 15_000;
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -418,6 +422,11 @@ async function getFullKesimAlani(id: string) {
 router.get("/kesim-alanlari", async (req, res) => {
   try {
     const includeDeleted = req.query.includeDeleted === "true";
+    const cacheKey = includeDeleted ? KA_LIST_CACHE_KEY + ":all" : KA_LIST_CACHE_KEY;
+
+    const cached = cacheGet<unknown[]>(cacheKey);
+    if (cached) return res.json(cached);
+
     const whereClause = includeDeleted ? undefined : isNull(kesimAlanlariTable.deletedAt);
 
     let rows;
@@ -431,6 +440,7 @@ router.get("/kesim-alanlari", async (req, res) => {
     }
 
     const results = await getFullKesimAlaniList(rows);
+    cacheSet(cacheKey, results, KA_LIST_TTL);
     res.json(results);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
@@ -500,6 +510,7 @@ router.post("/kesim-alanlari", async (req, res) => {
     });
 
     const result = await getFullKesimAlani(id);
+    cacheInvalidatePrefix(KA_LIST_CACHE_KEY);
     res.status(201).json(result);
     refreshProjectStats();
   } catch (err) {
@@ -527,6 +538,7 @@ router.put("/kesim-alanlari/:id/move", async (req, res) => {
     }
     await db.update(kesimAlanlariTable).set({ projectId: projectId || null }).where(eq(kesimAlanlariTable.id, id));
     const result = await getFullKesimAlani(id);
+    cacheInvalidatePrefix(KA_LIST_CACHE_KEY);
     res.json(result);
     refreshProjectStats();
   } catch (err) {
@@ -570,6 +582,7 @@ router.put("/kesim-alanlari/:id", async (req, res) => {
     });
 
     const result = await getFullKesimAlani(id);
+    cacheInvalidatePrefix(KA_LIST_CACHE_KEY);
     res.json(result);
     refreshProjectStats();
   } catch (err) {
@@ -598,6 +611,7 @@ router.delete("/kesim-alanlari/:id", async (req, res) => {
         .where(eq(kesimAlanlariTable.id, id));
     }
 
+    cacheInvalidatePrefix(KA_LIST_CACHE_KEY);
     res.json({ success: true });
     refreshProjectStats();
   } catch (err) {
@@ -626,6 +640,7 @@ router.post("/kesim-alanlari/:id/restore", async (req, res) => {
       .where(eq(kesimAlanlariTable.id, id));
 
     const result = await getFullKesimAlani(id);
+    cacheInvalidatePrefix(KA_LIST_CACHE_KEY);
     res.json(result);
     refreshProjectStats();
   } catch (err) {
