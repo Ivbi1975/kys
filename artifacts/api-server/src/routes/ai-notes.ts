@@ -342,7 +342,7 @@ router.put("/ai-notes/save-classifications", async (req, res) => {
         donationId: z.string(),
         categories: z.array(z.string()),
         warnings: z.string().optional().default(""),
-      })),
+      })).max(500),
     }).safeParse(req.body);
 
     if (!parsed.success) {
@@ -352,14 +352,16 @@ router.put("/ai-notes/save-classifications", async (req, res) => {
 
     const { classifications } = parsed.data;
 
-    await Promise.all(classifications.map(c =>
-      db.update(donationsTable)
-        .set({
-          aiCategories: JSON.stringify(c.categories),
-          aiWarnings: c.warnings,
-        })
-        .where(eq(donationsTable.id, c.donationId))
-    ));
+    await db.transaction(async (tx) => {
+      for (const c of classifications) {
+        await tx.update(donationsTable)
+          .set({
+            aiCategories: JSON.stringify(c.categories),
+            aiWarnings: c.warnings,
+          })
+          .where(eq(donationsTable.id, c.donationId));
+      }
+    });
 
     res.json({ success: true, count: classifications.length });
   } catch (err) {
@@ -376,7 +378,7 @@ router.put("/ai-notes/bulk-update", async (req, res) => {
       updates: z.array(z.object({
         donationId: z.string(),
         notes: z.string(),
-      })),
+      })).max(500),
     }).safeParse(req.body);
 
     if (!parsed.success) {
@@ -386,11 +388,13 @@ router.put("/ai-notes/bulk-update", async (req, res) => {
 
     const { updates } = parsed.data;
 
-    await Promise.all(updates.map(u =>
-      db.update(donationsTable)
-        .set({ notes: u.notes })
-        .where(eq(donationsTable.id, u.donationId))
-    ));
+    await db.transaction(async (tx) => {
+      for (const u of updates) {
+        await tx.update(donationsTable)
+          .set({ notes: u.notes })
+          .where(eq(donationsTable.id, u.donationId));
+      }
+    });
 
     res.json({ success: true, count: updates.length });
   } catch (err) {
