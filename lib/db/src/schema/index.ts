@@ -209,3 +209,16 @@ export const appSettingsTable = pgTable("app_settings", {
 export const insertAppSettingSchema = createInsertSchema(appSettingsTable);
 export type InsertAppSetting = z.infer<typeof insertAppSettingSchema>;
 export type AppSettingRow = typeof appSettingsTable.$inferSelect;
+
+export const aiJobsTable = pgTable("ai_jobs", {
+  id: text("id").primaryKey(),
+  status: text("status").notNull().default("pending"),
+  totalDonations: integer("total_donations").notNull().default(0),
+  processedDonations: integer("processed_donations").notNull().default(0),
+  result: text("result"),
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type AiJobRow = typeof aiJobsTable.$inferSelect;

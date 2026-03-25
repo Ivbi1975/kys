@@ -1,9 +1,10 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { appSettingsTable, donationsTable } from "@workspace/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { appSettingsTable, donationsTable, aiJobsTable } from "@workspace/db/schema";
+import { eq, inArray, lt } from "drizzle-orm";
 import { z } from "zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
+import crypto from "crypto";
 
 const router: IRouter = Router();
 
@@ -58,8 +59,23 @@ const classifySchema = z.object({
     donationType: z.string().optional().default(""),
     vekalet: z.string().optional().default(""),
     notes: z.string().optional().default(""),
-  })).min(1).max(100),
+  })).min(1).max(500),
 });
+
+function parseAiResults(content: string): unknown[] {
+  try {
+    const parsed = JSON.parse(content);
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+    const results = parsed.results || parsed.data || parsed.classifications || parsed.donations || parsed.items || null;
+    if (results) return results;
+    const firstArrayValue = Object.values(parsed).find(v => Array.isArray(v));
+    return (firstArrayValue as unknown[]) || [];
+  } catch {
+    return [];
+  }
+}
 
 router.get("/ai-notes/settings", async (_req, res) => {
   try {
@@ -146,26 +162,170 @@ router.post("/ai-notes/classify", async (req, res) => {
     });
 
     const content = response.choices[0]?.message?.content || "{}";
-    let results;
-    try {
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed)) {
-        results = parsed;
-      } else {
-        results = parsed.results || parsed.data || parsed.classifications || parsed.donations || parsed.items || null;
-        if (!results) {
-          const firstArrayValue = Object.values(parsed).find(v => Array.isArray(v));
-          results = firstArrayValue || [];
-        }
-      }
-    } catch {
-      results = [];
-    }
+    const results = parseAiResults(content);
 
     res.json({ results });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error("POST /ai-notes/classify error:", message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/ai-notes/classify-async", async (req, res) => {
+  const parsed = classifySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
+  try {
+    const { donations } = parsed.data;
+    const jobId = crypto.randomUUID();
+
+    await db.insert(aiJobsTable).values({
+      id: jobId,
+      status: "pending",
+      totalDonations: donations.length,
+      processedDonations: 0,
+    });
+
+    res.status(202).json({ jobId, status: "pending", totalDonations: donations.length });
+
+    processClassifyJob(jobId, donations).catch(err => {
+      console.error(`[ai-job:${jobId}] Unhandled error:`, err);
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error("POST /ai-notes/classify-async error:", message);
+    res.status(500).json({ error: message });
+  }
+});
+
+const CHUNK_SIZE = 50;
+
+async function processClassifyJob(
+  jobId: string,
+  donations: Array<{ id: string; name: string; donationType: string; vekalet: string; notes: string }>
+) {
+  try {
+    await db.update(aiJobsTable)
+      .set({ status: "processing", updatedAt: new Date() })
+      .where(eq(aiJobsTable.id, jobId));
+
+    const { prompt, categories } = await getAiSettings();
+    const systemPrompt = prompt.replace("{{CATEGORIES}}", categories.join(", "));
+
+    const allResults: unknown[] = [];
+
+    for (let i = 0; i < donations.length; i += CHUNK_SIZE) {
+      const chunk = donations.slice(i, i + CHUNK_SIZE);
+
+      const userContent = chunk.map(d => ({
+        donationId: d.id,
+        isim: d.name,
+        cinsi: d.donationType,
+        vekalet: d.vekalet,
+        not: d.notes,
+      }));
+
+      let retries = 3;
+      let chunkResults: unknown[] = [];
+
+      while (retries > 0) {
+        try {
+          const response = await openai.chat.completions.create({
+            model: "gpt-5-mini",
+            max_completion_tokens: 8192,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: JSON.stringify(userContent) },
+            ],
+            response_format: { type: "json_object" },
+          });
+
+          const content = response.choices[0]?.message?.content || "{}";
+          chunkResults = parseAiResults(content);
+          break;
+        } catch (err) {
+          retries--;
+          if (retries === 0) {
+            console.error(`[ai-job:${jobId}] Chunk ${i / CHUNK_SIZE + 1} failed after 3 retries:`, err);
+            chunkResults = chunk.map(d => ({
+              donationId: d.id,
+              categories: [],
+              requests: "",
+              warnings: "AI işlemi başarısız oldu",
+              summary: "",
+            }));
+          } else {
+            const delay = (4 - retries) * 2000;
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      }
+
+      allResults.push(...chunkResults);
+
+      await db.update(aiJobsTable)
+        .set({
+          processedDonations: Math.min(i + chunk.length, donations.length),
+          updatedAt: new Date(),
+        })
+        .where(eq(aiJobsTable.id, jobId));
+    }
+
+    await db.update(aiJobsTable)
+      .set({
+        status: "completed",
+        processedDonations: donations.length,
+        result: JSON.stringify(allResults),
+        updatedAt: new Date(),
+      })
+      .where(eq(aiJobsTable.id, jobId));
+
+    console.log(`[ai-job:${jobId}] Completed: ${donations.length} donations processed`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`[ai-job:${jobId}] Failed:`, message);
+
+    await db.update(aiJobsTable)
+      .set({ status: "failed", error: message, updatedAt: new Date() })
+      .where(eq(aiJobsTable.id, jobId));
+  }
+}
+
+router.get("/ai-notes/jobs/:jobId", async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const [job] = await db.select().from(aiJobsTable).where(eq(aiJobsTable.id, jobId));
+
+    if (!job) {
+      res.status(404).json({ error: "İş bulunamadı" });
+      return;
+    }
+
+    const response: Record<string, unknown> = {
+      jobId: job.id,
+      status: job.status,
+      totalDonations: job.totalDonations,
+      processedDonations: job.processedDonations,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+    };
+
+    if (job.status === "completed" && job.result) {
+      response.results = JSON.parse(job.result);
+    }
+
+    if (job.status === "failed" && job.error) {
+      response.error = job.error;
+    }
+
+    res.json(response);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error("GET /ai-notes/jobs/:jobId error:", message);
     res.status(500).json({ error: message });
   }
 });
@@ -234,5 +394,13 @@ router.put("/ai-notes/bulk-update", async (req, res) => {
     res.status(500).json({ error: message });
   }
 });
+
+setInterval(async () => {
+  try {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await db.delete(aiJobsTable).where(lt(aiJobsTable.createdAt, cutoff));
+  } catch {
+  }
+}, 60 * 60 * 1000);
 
 export default router;
