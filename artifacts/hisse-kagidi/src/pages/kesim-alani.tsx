@@ -3065,6 +3065,16 @@ export default function KesimAlaniPage() {
     return map;
   }, [donations]);
 
+  const sortedDonorList = useMemo(() => {
+    const active = donations.filter(d => !d.excluded);
+    return [...active].sort((a, b) => {
+      const ka = sortKeyMap.get(a.id);
+      const kb = sortKeyMap.get(b.id);
+      if (!ka || !kb) return 0;
+      return trCollator.compare(ka.descSurname, kb.descSurname);
+    });
+  }, [donations, sortKeyMap]);
+
   const searchIndex = useMemo(() => {
     const trigramIndex = new Map<string, Set<string>>();
     const contentMap = new Map<string, string>();
@@ -6945,13 +6955,7 @@ export default function KesimAlaniPage() {
       )}
 
       {donorListReportOpen && kesim && (() => {
-        const activeDonors = kesim.donations.filter(d => !d.excluded);
-        const sorted = [...activeDonors].sort((a, b) => {
-          const ka = sortKeyMap.get(a.id);
-          const kb = sortKeyMap.get(b.id);
-          if (!ka || !kb) return 0;
-          return trCollator.compare(ka.descSurname, kb.descSurname);
-        });
+        const sorted = sortedDonorList;
         return (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setDonorListReportOpen(false); }}>
             <div className="bg-background rounded-xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl">
