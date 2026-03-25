@@ -122,7 +122,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import * as XLSX from "xlsx-js-style";
+const getXLSX = () => import("xlsx-js-style");
 
 
   type SortField = "name" | "description" | "donationType" | "shareCount";
@@ -1031,8 +1031,9 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
+        const XLSX = await getXLSX();
         const data = evt.target?.result;
         const workbook = XLSX.read(data, { type: "binary" });
         const sheetName = workbook.SheetNames[0];
@@ -2162,8 +2163,9 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     if (newConflicts.length > 0) setShowConflicts(true);
   }
 
-  function exportDonorsExcel() {
+  async function exportDonorsExcel() {
     if (!kesim) return;
+    const XLSX = await getXLSX();
     const wb = XLSX.utils.book_new();
 
     const donorData = kesim.donations.map((d, i) => ({
@@ -2210,8 +2212,9 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     XLSX.writeFile(wb, `${kesim.name}_bagiscilar.xlsx`);
   }
 
-  function exportGroupsExcel() {
+  async function exportGroupsExcel() {
     if (!kesim || kesim.animalGroups.length === 0) return;
+    const XLSX = await getXLSX();
     const data: Record<string, string | number>[] = [];
     for (const group of kesim.animalGroups) {
       for (let i = 0; i < group.donations.length; i++) {
