@@ -1,6 +1,9 @@
 import { lazy } from "react";
   import { LazyLoadBoundary } from "@/components/LazyLoadBoundary";
   import type { KesimAlani, Donation, AnimalGroup, ColorTag } from "@/lib/types";
+  const LazyPersonEditDialog = lazy(() => import("./dialogs/PersonEditDialog"));
+  const LazyTrashDialog = lazy(() => import("./dialogs/TrashDialog"));
+  const LazyNotificationDialogs = lazy(() => import("./dialogs/NotificationDialogs"));
   import { Button } from "@/components/ui/button";
   import { Input } from "@/components/ui/input";
   import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -15,7 +18,7 @@ import { lazy } from "react";
   const PhotoGallery = lazy(() => import("@/components/PhotoGallery"));
   const QrCodeModal = lazy(() => import("@/components/QrCodeModal"));
   import { computeEffectiveShares } from "@/lib/grouping";
-    import { updateTrackingNoteStatus, fetchNotificationTemplate, updateNotificationTemplate, getGroupPhotoUrlAdmin } from "@/lib/api";
+    import { getGroupPhotoUrlAdmin } from "@/lib/api";
     import type { useKesimAlaniState } from "./useKesimAlaniState";
 
   type KesimAlaniStateReturn = ReturnType<typeof useKesimAlaniState>;
@@ -54,176 +57,24 @@ import { lazy } from "react";
 
     return (
       <>
-      <Dialog open={personEditDesc !== null} onOpenChange={(open) => { if (!open) setPersonEditDesc(null); }}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <UserCog className="w-5 h-5" />
-            Kişi Düzenleme: {personEditDesc}
-          </DialogTitle>
-        </DialogHeader>
-        {personEditDesc && kesim && (() => {
-          const key = personEditDesc.trim().toLowerCase();
-          const matchingDonations = kesim.donations.filter(
-            d => d.description.trim().toLowerCase() === key
-          );
-          const allExcluded = matchingDonations.length > 0 && matchingDonations.every(d => d.excluded);
-          const matchingGroupEntries: { groupIdx: number; dIdx: number; donation: Donation; animalNo: number }[] = [];
-          kesim.animalGroups.forEach((group, groupIdx) => {
-            group.donations.forEach((d, dIdx) => {
-              if (d.description.trim().toLowerCase() === key) {
-                matchingGroupEntries.push({ groupIdx, dIdx, donation: d, animalNo: group.animalNo });
-              }
-            });
-          });
-          return (
-            <div className="space-y-4">
-              {matchingDonations.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-semibold">Bağışçı Listesindeki Kayıtlar ({matchingDonations.length})</h3>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => bulkExcludeByDesc(personEditDesc, !allExcluded)}
-                      >
-                        {allExcluded ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
-                        {allExcluded ? "Tümünü Dahil Et" : "Tümünü Hariç Tut"}
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => setPersonBulkDeleteConfirm(personEditDesc)}
-                      >
-                        <Trash2 className="w-3 h-3 mr-1" />
-                        Tümünü Sil
-                      </Button>
-                    </div>
-                  </div>
-                  <table className="w-full text-sm border">
-                    <thead>
-                      <tr className="border-b bg-muted/30">
-                        <th className="p-2 text-left">Vekalet</th>
-                        <th className="p-2 text-left">Vekaleti Veren</th>
-                        <th className="p-2 text-left">Adına Kesilen</th>
-                        <th className="p-2 text-left">Cinsi</th>
-                        <th className="p-2 text-left">Notlar</th>
-                        <th className="p-2 text-center">Durum</th>
-                        <th className="p-2 w-20"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {matchingDonations.map((d) => (
-                        <tr key={d.id} className={`border-b ${d.excluded ? "opacity-40" : ""}`}>
-                          <td className="p-2">
-                            <Input className="h-7 text-sm" value={d.vekalet || ""} onChange={(e) => updateDonationField(d.id, "vekalet", e.target.value)} />
-                          </td>
-                          <td className="p-2">
-                            <Input className="h-7 text-sm" value={d.description} onChange={(e) => updateDonationField(d.id, "description", e.target.value)} />
-                          </td>
-                          <td className="p-2">
-                            <Input className="h-7 text-sm" value={d.name} onChange={(e) => updateDonationField(d.id, "name", e.target.value)} />
-                          </td>
-                          <td className="p-2">
-                            <Input className="h-7 text-sm" value={d.donationType} onChange={(e) => updateDonationField(d.id, "donationType", e.target.value)} />
-                          </td>
-                          <td className="p-2">
-                            <Input className="h-7 text-sm" value={d.notes || ""} onChange={(e) => updateDonationField(d.id, "notes", e.target.value)} />
-                          </td>
-                          <td className="p-2 text-center">
-                            <Button variant="ghost" size="sm" className="h-7" onClick={() => updateDonationField(d.id, "excluded", !d.excluded)}>
-                              {d.excluded ? <Eye className="w-4 h-4 text-green-600" /> : <EyeOff className="w-4 h-4 text-muted-foreground" />}
-                            </Button>
-                          </td>
-                          <td className="p-2">
-                            <div className="flex gap-0.5">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className={`h-7 w-7 p-0 ${basketItemIds.has(d.id) ? "bg-emerald-100 dark:bg-emerald-900" : ""}`}
-                                title={basketItemIds.has(d.id) ? "Sepetten Çıkar" : "Keseye Ekle"}
-                                onClick={() => basketItemIds.has(d.id) ? removeFromBasket(d.id) : addDonorToBasket(d.id)}
-                                disabled={d.excluded}
-                              >
-                                <ShoppingBag className={`w-3 h-3 ${basketItemIds.has(d.id) ? "text-emerald-600" : "text-muted-foreground"}`} />
-                              </Button>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => deleteDonation(d.id)}>
-                                <Trash2 className="w-3 h-3 text-destructive" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {matchingGroupEntries.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold mb-2">Hayvan Gruplarındaki Konumu ({matchingGroupEntries.length} satır)</h3>
-                  <table className="w-full text-sm border">
-                    <thead>
-                      <tr className="border-b bg-muted/30">
-                        <th className="p-2 text-left">Hayvan No</th>
-                        <th className="p-2 text-left">Sıra</th>
-                        <th className="p-2 text-left">Vekalet</th>
-                        <th className="p-2 text-left">Vekaleti Veren</th>
-                        <th className="p-2 text-left">Adına Kesilen</th>
-                        <th className="p-2 text-left">Cinsi</th>
-                        <th className="p-2 text-left">Notlar</th>
-                        <th className="p-2 w-10"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {matchingGroupEntries.map((entry, i) => (
-                        <tr key={i} className="border-b">
-                          <td className="p-2 font-semibold text-primary">{entry.animalNo}</td>
-                          <td className="p-2">{entry.dIdx + 1}</td>
-                          <td className="p-2">
-                            <Input className="h-7 text-sm" value={entry.donation.vekalet || ""} onChange={(e) => updateGroupDonation(entry.groupIdx, entry.dIdx, "vekalet", e.target.value)} />
-                          </td>
-                          <td className="p-2">
-                            <Input className="h-7 text-sm" value={entry.donation.description} onChange={(e) => updateGroupDonation(entry.groupIdx, entry.dIdx, "description", e.target.value)} />
-                          </td>
-                          <td className="p-2">
-                            <Input className="h-7 text-sm" value={entry.donation.name} onChange={(e) => updateGroupDonation(entry.groupIdx, entry.dIdx, "name", e.target.value)} />
-                          </td>
-                          <td className="p-2">
-                            <Input className="h-7 text-sm" value={entry.donation.donationType} onChange={(e) => updateGroupDonation(entry.groupIdx, entry.dIdx, "donationType", e.target.value)} />
-                          </td>
-                          <td className="p-2">
-                            <Input className="h-7 text-sm" value={entry.donation.notes || ""} onChange={(e) => updateGroupDonation(entry.groupIdx, entry.dIdx, "notes", e.target.value)} />
-                          </td>
-                          <td className="p-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={`h-7 w-7 p-0 ${basketItemIds.has(entry.donation.id) ? "bg-emerald-100 dark:bg-emerald-900" : ""}`}
-                              title={basketItemIds.has(entry.donation.id) ? "Sepetten Çıkar" : "Keseye Ekle"}
-                              onClick={() => basketItemIds.has(entry.donation.id) ? removeFromBasket(entry.donation.id) : addToBasket(entry.groupIdx, entry.dIdx)}
-                            >
-                              <ShoppingBag className={`w-3 h-3 ${basketItemIds.has(entry.donation.id) ? "text-emerald-600" : "text-muted-foreground"}`} />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {matchingDonations.length === 0 && matchingGroupEntries.length === 0 && (
-                <p className="text-muted-foreground text-center py-4">Bu kişiye ait kayıt bulunamadı.</p>
-              )}
-            </div>
-          );
-        })()}
-      </DialogContent>
-    </Dialog>
+      {personEditDesc !== null && (
+        <LazyLoadBoundary>
+          <LazyPersonEditDialog
+            kesim={kesim}
+            personEditDesc={personEditDesc}
+            setPersonEditDesc={setPersonEditDesc}
+            updateDonationField={updateDonationField}
+            updateGroupDonation={updateGroupDonation}
+            bulkExcludeByDesc={bulkExcludeByDesc}
+            setPersonBulkDeleteConfirm={setPersonBulkDeleteConfirm}
+            deleteDonation={deleteDonation}
+            basketItemIds={basketItemIds}
+            removeFromBasket={removeFromBasket}
+            addDonorToBasket={addDonorToBasket}
+            addToBasket={addToBasket}
+          />
+        </LazyLoadBoundary>
+      )}
 
     <Dialog open={swapPreviewOpen} onOpenChange={(open) => { if (!open) cancelSwap(); }}>
       <DialogContent>
@@ -789,330 +640,44 @@ import { lazy } from "react";
       </button>
     )}
 
-    {/* Trash Bin Dialog */}
-    <Dialog open={trashOpen} onOpenChange={setTrashOpen}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Trash2 className="w-5 h-5 text-destructive" />
-            Çöp Kutusu — Silinen Bağışçılar
-          </DialogTitle>
-        </DialogHeader>
-        <div className="flex-1 overflow-y-auto mt-2">
-          {trashLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : trashItems.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Trash2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">Çöp kutusu boş</p>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {trashItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm truncate">{item.description || item.name || "—"}</span>
-                      {item.name && item.name !== item.description && (
-                        <span className="text-xs text-muted-foreground truncate">({item.name})</span>
-                      )}
-                      {item.donationType && (
-                        <span className="text-xs bg-muted px-1.5 py-0.5 rounded">{item.donationType}</span>
-                      )}
-                      {item.shareCount > 1 && (
-                        <span className="text-xs text-muted-foreground">{item.shareCount} hisse</span>
-                      )}
-                    </div>
-                    {item.deletedAt && (
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Silindi: {new Date(item.deletedAt).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      onClick={() => restoreDonation(item.id)}
-                      title="Geri Yükle"
-                    >
-                      <RotateCcw className="w-3 h-3 mr-1" />
-                      Geri Yükle
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                      onClick={() => setTrashPermanentConfirm(item.id)}
-                      title="Kalıcı Sil"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+    {(trashOpen || trashPermanentConfirm) && (
+      <LazyLoadBoundary>
+        <LazyTrashDialog
+          trashOpen={trashOpen}
+          setTrashOpen={setTrashOpen}
+          trashItems={trashItems}
+          trashLoading={trashLoading}
+          trashPermanentConfirm={trashPermanentConfirm}
+          setTrashPermanentConfirm={setTrashPermanentConfirm}
+          restoreDonation={restoreDonation}
+          permanentDeleteDonation={permanentDeleteDonation}
+        />
+      </LazyLoadBoundary>
+    )}
 
-    {/* Permanent Delete Confirmation */}
-    <AlertDialog open={!!trashPermanentConfirm} onOpenChange={(open) => { if (!open) setTrashPermanentConfirm(null); }}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Kalıcı olarak sil?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Bu bağışçı kalıcı olarak silinecek ve geri alınamaz. Devam etmek istiyor musunuz?
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Vazgeç</AlertDialogCancel>
-          <AlertDialogAction
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            onClick={() => trashPermanentConfirm && permanentDeleteDonation(trashPermanentConfirm)}
-          >
-            Kalıcı Sil
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-
-    <Dialog open={trackingNotesOpen} onOpenChange={setTrackingNotesOpen}>
-      <DialogContent className="max-w-lg max-h-[80vh] overflow-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <MessageSquarePlus className="w-5 h-5" />
-            Saha Notları ve Düzenleme Talepleri
-          </DialogTitle>
-        </DialogHeader>
-        {trackingNotesLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin" />
-          </div>
-        ) : trackingNotes.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            Henüz saha notu veya düzenleme talebi yok.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {trackingNotes.map(note => {
-              const groupNo = note.animalGroupId && kesim
-                ? kesim.animalGroups.find(g => g.id === note.animalGroupId)?.animalNo
-                : null;
-              return (
-                <div
-                  key={note.id}
-                  className={`rounded-lg p-3 text-sm border ${
-                    note.type === "edit_request"
-                      ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
-                      : "bg-muted/30 border-border"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <div className="flex items-center gap-1.5">
-                      {note.type === "edit_request" ? (
-                        <Edit3 className="w-3.5 h-3.5 text-amber-600" />
-                      ) : (
-                        <MessageSquarePlus className="w-3.5 h-3.5 text-blue-500" />
-                      )}
-                      <span className="text-xs font-semibold">
-                        {note.type === "edit_request" ? "Düzenleme Talebi" : "Not"}
-                        {groupNo != null && ` — Hayvan ${groupNo}`}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground shrink-0">
-                      {new Date(note.createdAt).toLocaleString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </div>
-
-                  {note.type === "edit_request" ? (
-                    <>
-                      <div className="text-xs mb-1">
-                        <span className="font-medium">{
-                          note.fieldName === "name" ? "Adına Kesilen" :
-                          note.fieldName === "description" ? "Vekaleti Veren" :
-                          note.fieldName === "donationType" ? "Cinsi" :
-                          note.fieldName === "vekalet" ? "Vekalet" :
-                          note.fieldName === "notes" ? "Notlar" : note.fieldName
-                        }</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs flex-wrap">
-                        <span className="line-through text-red-400">{note.oldValue || "—"}</span>
-                        <span className="text-muted-foreground">→</span>
-                        <span className="font-medium text-emerald-600">{note.newValue}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-2">
-                        {note.status === "pending" ? (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-6 px-2 text-[10px] text-emerald-600 border-emerald-300 hover:bg-emerald-50"
-                              onClick={async () => {
-                                try {
-                                  await updateTrackingNoteStatus(kesim!.id, note.id, "approved");
-                                  setTrackingNotes(prev => prev.map(n => n.id === note.id ? { ...n, status: "approved" as const } : n));
-                                  toast({ title: "Talep onaylandı" });
-                                } catch {
-                                  toast({ title: "Hata", variant: "destructive" });
-                                }
-                              }}
-                            >
-                              <Check className="w-2.5 h-2.5 mr-0.5" /> Onayla
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-6 px-2 text-[10px] text-red-600 border-red-300 hover:bg-red-50"
-                              onClick={async () => {
-                                try {
-                                  await updateTrackingNoteStatus(kesim!.id, note.id, "rejected");
-                                  setTrackingNotes(prev => prev.map(n => n.id === note.id ? { ...n, status: "rejected" as const } : n));
-                                  toast({ title: "Talep reddedildi" });
-                                } catch {
-                                  toast({ title: "Hata", variant: "destructive" });
-                                }
-                              }}
-                            >
-                              <X className="w-2.5 h-2.5 mr-0.5" /> Reddet
-                            </Button>
-                          </>
-                        ) : (
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                            note.status === "approved"
-                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
-                              : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-                          }`}>
-                            {note.status === "approved" ? "Onaylandı" : "Reddedildi"}
-                          </span>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-xs whitespace-pre-wrap">{note.content}</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-
-    <Dialog open={notificationLogsOpen} onOpenChange={setNotificationLogsOpen}>
-      <DialogContent className="max-w-lg max-h-[80vh] overflow-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Send className="w-5 h-5" />
-            Kesim Bildirimleri
-          </DialogTitle>
-        </DialogHeader>
-        <div className="flex justify-end mb-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={async () => {
-              setNotificationTemplateOpen(true);
-              try {
-                const tmpl = await fetchNotificationTemplate();
-                setNotificationTemplate(tmpl);
-              } catch {
-                toast({ title: "Hata", description: "Şablon yüklenemedi", variant: "destructive" });
-              }
-            }}
-          >
-            <Settings2 className="w-3.5 h-3.5 mr-1" />
-            Şablon Düzenle
-          </Button>
-        </div>
-        {notificationLogsLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin" />
-          </div>
-        ) : notificationLogs.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            Henüz bildirim kaydı yok. Hayvan kesildi olarak işaretlendiğinde burada görünecek.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {notificationLogs.map(log => (
-              <div key={log.id} className="rounded-lg p-3 text-sm border bg-muted/30 border-border">
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <Send className="w-3.5 h-3.5 text-blue-500" />
-                    <span className="text-xs font-semibold">
-                      Hayvan {log.animalNo || "?"} — {log.donorName}
-                    </span>
-                    {log.phone && (
-                      <span className="text-[10px] text-muted-foreground">({log.phone})</span>
-                    )}
-                  </div>
-                  <span className="text-[10px] text-muted-foreground shrink-0">
-                    {new Date(log.createdAt).toLocaleString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                </div>
-                <p className="text-xs whitespace-pre-wrap text-muted-foreground">{log.message}</p>
-                <div className="mt-1">
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 font-medium">
-                    {log.channel === "browser" ? "Tarayıcı" : log.channel}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-
-    <Dialog open={notificationTemplateOpen} onOpenChange={setNotificationTemplateOpen}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Settings2 className="w-5 h-5" />
-            Bildirim Şablonu
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3 pt-2">
-          <div className="text-xs text-muted-foreground">
-            Kullanılabilir değişkenler: <code className="bg-muted px-1 rounded">{"{animalNo}"}</code> (hayvan numarası), <code className="bg-muted px-1 rounded">{"{donorName}"}</code> (bağışçı adı)
-          </div>
-          <Input
-            value={notificationTemplate}
-            onChange={(e) => setNotificationTemplate(e.target.value)}
-            placeholder="Bildirim mesaj şablonu..."
-          />
-          <div className="text-xs text-muted-foreground">
-            Önizleme: <span className="italic">{notificationTemplate.replace("{animalNo}", "5").replace("{donorName}", "Ahmet Yılmaz")}</span>
-          </div>
-          <Button
-            className="w-full"
-            onClick={async () => {
-              setNotificationTemplateSaving(true);
-              try {
-                await updateNotificationTemplate(notificationTemplate);
-                toast({ title: "Şablon kaydedildi" });
-                setNotificationTemplateOpen(false);
-              } catch {
-                toast({ title: "Hata", variant: "destructive" });
-              } finally {
-                setNotificationTemplateSaving(false);
-              }
-            }}
-            disabled={notificationTemplateSaving || !notificationTemplate.trim()}
-          >
-            {notificationTemplateSaving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-            Kaydet
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    {(trackingNotesOpen || notificationLogsOpen || notificationTemplateOpen) && (
+      <LazyLoadBoundary>
+        <LazyNotificationDialogs
+          kesim={kesim}
+          toast={toast}
+          trackingNotesOpen={trackingNotesOpen}
+          setTrackingNotesOpen={setTrackingNotesOpen}
+          trackingNotes={trackingNotes}
+          setTrackingNotes={setTrackingNotes}
+          trackingNotesLoading={trackingNotesLoading}
+          notificationLogsOpen={notificationLogsOpen}
+          setNotificationLogsOpen={setNotificationLogsOpen}
+          notificationLogs={notificationLogs}
+          notificationLogsLoading={notificationLogsLoading}
+          notificationTemplateOpen={notificationTemplateOpen}
+          setNotificationTemplateOpen={setNotificationTemplateOpen}
+          notificationTemplate={notificationTemplate}
+          setNotificationTemplate={setNotificationTemplate}
+          notificationTemplateSaving={notificationTemplateSaving}
+          setNotificationTemplateSaving={setNotificationTemplateSaving}
+        />
+      </LazyLoadBoundary>
+    )}
 
     {qrModalOpen && (
       <LazyLoadBoundary>
