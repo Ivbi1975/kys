@@ -1361,42 +1361,108 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
 
   const [dragOverGroup, setDragOverGroup] = useState<number | null>(null);
 
-  function handleDragStart(groupIdx: number, donationIdx: number, e?: React.DragEvent) {
+  const dragOverRef = useRef<{ groupIdx: number; donationIdx: number } | null>(null);
+  const dragOverGroupRef = useRef<number | null>(null);
+  const dragRafRef = useRef<number>(0);
+  const dragGhostRef = useRef<HTMLDivElement | null>(null);
+  const autoScrollRafRef = useRef<number>(0);
+
+  useEffect(() => {
+    return () => {
+      if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current);
+      if (autoScrollRafRef.current) cancelAnimationFrame(autoScrollRafRef.current);
+      if (dragGhostRef.current) {
+        document.body.removeChild(dragGhostRef.current);
+        dragGhostRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleDragStart = useCallback((groupIdx: number, donationIdx: number, e?: React.DragEvent) => {
     setDragItem({ groupIdx, donationIdx });
     if (e?.dataTransfer) {
       e.dataTransfer.effectAllowed = "move";
       const target = e.currentTarget as HTMLElement;
       target.style.opacity = "0.5";
+
+      const ghost = document.createElement("div");
+      ghost.style.cssText = "position:fixed;top:-1000px;left:-1000px;padding:6px 12px;background:#6366f1;color:#fff;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;pointer-events:none;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);";
       if (kesim) {
         const donation = kesim.animalGroups[groupIdx]?.donations[donationIdx];
         if (donation?.name.trim()) {
-          const shares = effectiveShareMap.get(donation.id) || donation.shareCount;
-          e.dataTransfer.setData("text/plain", `${donation.name} (${shares} hisse)`);
+          ghost.textContent = `${donation.name} (${donation.shareCount} hisse)`;
+          e.dataTransfer.setData("text/plain", `${donation.name} (${donation.shareCount} hisse)`);
+        } else {
+          ghost.textContent = `Sıra ${donationIdx + 1}`;
         }
       }
+      document.body.appendChild(ghost);
+      dragGhostRef.current = ghost;
+      e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, ghost.offsetHeight / 2);
     }
-  }
+  }, [kesim]);
 
-  function handleDragOver(
+  const handleDragOver = useCallback((
     e: React.DragEvent,
     groupIdx: number,
     donationIdx: number
-  ) {
+  ) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
-    setDragOverItem({ groupIdx, donationIdx });
-    setDragOverGroup(groupIdx);
-  }
 
-  function handleDragLeave(e: React.DragEvent, groupIdx: number) {
+    const prev = dragOverRef.current;
+    if (prev && prev.groupIdx === groupIdx && prev.donationIdx === donationIdx) return;
+    dragOverRef.current = { groupIdx, donationIdx };
+    dragOverGroupRef.current = groupIdx;
+
+    if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current);
+    dragRafRef.current = requestAnimationFrame(() => {
+      setDragOverItem({ groupIdx, donationIdx });
+      setDragOverGroup(groupIdx);
+    });
+
+    const container = scrollContainerRef.current;
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      const y = e.clientY;
+      const edgeZone = 60;
+      if (autoScrollRafRef.current) cancelAnimationFrame(autoScrollRafRef.current);
+
+      const doAutoScroll = () => {
+        if (!scrollContainerRef.current) return;
+        const r = scrollContainerRef.current.getBoundingClientRect();
+        const curY = dragOverRef.current ? y : 0;
+        if (curY < r.top + edgeZone) {
+          scrollContainerRef.current.scrollTop -= 8;
+          autoScrollRafRef.current = requestAnimationFrame(doAutoScroll);
+        } else if (curY > r.bottom - edgeZone) {
+          scrollContainerRef.current.scrollTop += 8;
+          autoScrollRafRef.current = requestAnimationFrame(doAutoScroll);
+        }
+      };
+
+      if (y < rect.top + edgeZone || y > rect.bottom - edgeZone) {
+        autoScrollRafRef.current = requestAnimationFrame(doAutoScroll);
+      }
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent, groupIdx: number) => {
     const relatedTarget = e.relatedTarget as HTMLElement;
     const currentTarget = e.currentTarget as HTMLElement;
     if (!currentTarget.contains(relatedTarget)) {
-      if (dragOverGroup === groupIdx) setDragOverGroup(null);
+      if (dragOverGroupRef.current === groupIdx) {
+        dragOverGroupRef.current = null;
+        setDragOverGroup(null);
+      }
     }
-  }
+  }, []);
 
-  function handleDrop(groupIdx: number, donationIdx: number) {
+  const handleDrop = useCallback((groupIdx: number, donationIdx: number) => {
+    if (autoScrollRafRef.current) cancelAnimationFrame(autoScrollRafRef.current);
+    dragOverRef.current = null;
+    dragOverGroupRef.current = null;
+
     if (dragItem && kesim) {
       const srcGroup = kesim.animalGroups[dragItem.groupIdx];
       const tgtGroup = kesim.animalGroups[groupIdx];
@@ -1428,14 +1494,23 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     setDragItem(null);
     setDragOverItem(null);
     setDragOverGroup(null);
-  }
+  }, [dragItem, kesim]);
 
-  function handleDragEnd(e: React.DragEvent) {
+  const handleDragEnd = useCallback((e: React.DragEvent) => {
     (e.currentTarget as HTMLElement).style.opacity = "1";
+    if (autoScrollRafRef.current) cancelAnimationFrame(autoScrollRafRef.current);
+    if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current);
+    dragOverRef.current = null;
+    dragOverGroupRef.current = null;
     setDragItem(null);
     setDragOverItem(null);
     setDragOverGroup(null);
-  }
+
+    if (dragGhostRef.current) {
+      document.body.removeChild(dragGhostRef.current);
+      dragGhostRef.current = null;
+    }
+  }, []);
 
   function startEditing(donationId: string, field: string) {
     if (!kesim) return;
@@ -3264,6 +3339,8 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
 
   const handleDragOverCard = useCallback((e: React.DragEvent, groupIdx: number) => {
     e.preventDefault();
+    if (dragOverGroupRef.current === groupIdx) return;
+    dragOverGroupRef.current = groupIdx;
     setDragOverGroup(groupIdx);
   }, []);
 
