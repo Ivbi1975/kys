@@ -513,23 +513,27 @@ export async function downloadCsvExport(
   }
 
   const totalRows = parseInt(res.headers.get("X-Total-Rows") || "0", 10);
+  const contentLength = parseInt(res.headers.get("Content-Length") || "0", 10);
   const reader = res.body?.getReader();
   if (!reader) throw new Error("Stream desteklenmiyor");
 
   const chunks: Uint8Array[] = [];
-  let received = 0;
-  const decoder = new TextDecoder();
+  let receivedBytes = 0;
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     chunks.push(value);
-    const text = decoder.decode(value, { stream: true });
-    const newLines = (text.match(/\n/g) || []).length;
-    received += newLines;
-    onProgress?.(Math.min(received, totalRows), totalRows);
+    receivedBytes += value.byteLength;
+    if (contentLength > 0) {
+      const estimatedRows = Math.round((receivedBytes / contentLength) * totalRows);
+      onProgress?.(Math.min(estimatedRows, totalRows), totalRows);
+    } else {
+      onProgress?.(Math.min(receivedBytes, totalRows), totalRows);
+    }
   }
 
+  onProgress?.(totalRows, totalRows);
   return new Blob(chunks, { type: "text/csv; charset=utf-8" });
 }
 
