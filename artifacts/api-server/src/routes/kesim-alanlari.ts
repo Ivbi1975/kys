@@ -341,7 +341,18 @@ async function getFullKesimAlani(id: string) {
 
   if (result.rows.length === 0) return null;
 
-  const rawRow = result.rows[0] as any;
+  type SingleRawDonation = { id: string; name: string; description: string; donation_type: string; share_count: number; vekalet: string; notes: string; phone: string; excluded: boolean; sort_order: number; ai_categories: string | null; ai_warnings: string | null; tags: string[] };
+  type SingleRawGroup = { id: string; animal_no: number; color_tag: string; locked: boolean; notes: string; kesildi: boolean; kesildi_at: string | null; team_id: string | null; sort_order: number; donation_links: { donationId: string; sortOrder: number }[] };
+  type SingleRawTeam = { id: string; name: string; color: string };
+  type SingleRawRow = {
+    ka_id: string; name: string; created_at: string; deleted_at: string | null;
+    project_id: string | null; tracking_token: string | null; kesim_liste_id: string | null;
+    donations: SingleRawDonation[];
+    groups: SingleRawGroup[];
+    teams: SingleRawTeam[];
+  };
+
+  const rawRow = result.rows[0] as SingleRawRow;
   const ka: KesimAlaniRow = {
     id: rawRow.ka_id,
     name: rawRow.name,
@@ -394,7 +405,7 @@ async function getFullKesimAlani(id: string) {
     }
   }
 
-  const teams: TeamRow[] = (rawRow.teams || []).map((t: any) => ({
+  const teams: TeamRow[] = (rawRow.teams || []).map((t: SingleRawTeam) => ({
     id: t.id,
     kesimAlaniId: rawRow.ka_id,
     name: t.name,
