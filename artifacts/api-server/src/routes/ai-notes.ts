@@ -335,6 +335,8 @@ router.get("/ai-notes/jobs/:jobId", async (req, res) => {
   }
 });
 
+const TX_BATCH_SIZE = 100;
+
 router.put("/ai-notes/save-classifications", async (req, res) => {
   try {
     const parsed = z.object({
@@ -342,7 +344,7 @@ router.put("/ai-notes/save-classifications", async (req, res) => {
         donationId: z.string(),
         categories: z.array(z.string()),
         warnings: z.string().optional().default(""),
-      })).max(500),
+      })).max(2000),
     }).safeParse(req.body);
 
     if (!parsed.success) {
@@ -352,16 +354,19 @@ router.put("/ai-notes/save-classifications", async (req, res) => {
 
     const { classifications } = parsed.data;
 
-    await db.transaction(async (tx) => {
-      for (const c of classifications) {
-        await tx.update(donationsTable)
-          .set({
-            aiCategories: JSON.stringify(c.categories),
-            aiWarnings: c.warnings,
-          })
-          .where(eq(donationsTable.id, c.donationId));
-      }
-    });
+    for (let i = 0; i < classifications.length; i += TX_BATCH_SIZE) {
+      const chunk = classifications.slice(i, i + TX_BATCH_SIZE);
+      await db.transaction(async (tx) => {
+        for (const c of chunk) {
+          await tx.update(donationsTable)
+            .set({
+              aiCategories: JSON.stringify(c.categories),
+              aiWarnings: c.warnings,
+            })
+            .where(eq(donationsTable.id, c.donationId));
+        }
+      });
+    }
 
     res.json({ success: true, count: classifications.length });
   } catch (err) {
@@ -378,7 +383,7 @@ router.put("/ai-notes/bulk-update", async (req, res) => {
       updates: z.array(z.object({
         donationId: z.string(),
         notes: z.string(),
-      })).max(500),
+      })).max(2000),
     }).safeParse(req.body);
 
     if (!parsed.success) {
@@ -388,13 +393,16 @@ router.put("/ai-notes/bulk-update", async (req, res) => {
 
     const { updates } = parsed.data;
 
-    await db.transaction(async (tx) => {
-      for (const u of updates) {
-        await tx.update(donationsTable)
-          .set({ notes: u.notes })
-          .where(eq(donationsTable.id, u.donationId));
-      }
-    });
+    for (let i = 0; i < updates.length; i += TX_BATCH_SIZE) {
+      const chunk = updates.slice(i, i + TX_BATCH_SIZE);
+      await db.transaction(async (tx) => {
+        for (const u of chunk) {
+          await tx.update(donationsTable)
+            .set({ notes: u.notes })
+            .where(eq(donationsTable.id, u.donationId));
+        }
+      });
+    }
 
     res.json({ success: true, count: updates.length });
   } catch (err) {
