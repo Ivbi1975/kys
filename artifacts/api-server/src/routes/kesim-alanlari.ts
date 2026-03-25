@@ -553,17 +553,6 @@ router.put("/kesim-alanlari/:id", async (req, res) => {
       return;
     }
 
-    let kesildiMap: Map<string, { kesildi: boolean; kesildiAt: Date | null; teamId: string | null }> | undefined;
-    if (animalGroups !== undefined) {
-      const existingGroups = await db.select({
-        id: animalGroupsTable.id,
-        kesildi: animalGroupsTable.kesildi,
-        kesildiAt: animalGroupsTable.kesildiAt,
-        teamId: animalGroupsTable.teamId,
-      }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id));
-      kesildiMap = new Map(existingGroups.map(g => [g.id, { kesildi: g.kesildi, kesildiAt: g.kesildiAt, teamId: g.teamId }]));
-    }
-
     await db.transaction(async (tx) => {
       const kaUpdates: Record<string, string | null> = {};
       if (name !== undefined) kaUpdates.name = name;
@@ -572,42 +561,11 @@ router.put("/kesim-alanlari/:id", async (req, res) => {
         await tx.update(kesimAlanlariTable).set(kaUpdates).where(eq(kesimAlanlariTable.id, id));
       }
 
-      if (donations !== undefined && animalGroups !== undefined) {
-        await tx.delete(donationTagsTable).where(
-          inArray(donationTagsTable.donationId,
-            tx.select({ id: donationsTable.id }).from(donationsTable).where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)))
-          )
-        );
-        await tx.delete(animalGroupDonationsTable).where(
-          inArray(animalGroupDonationsTable.groupId,
-            tx.select({ id: animalGroupsTable.id }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id))
-          )
-        );
-        await tx.delete(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id));
-        await tx.delete(donationsTable).where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)));
-        await saveDonations(tx, id, donations);
-        await saveAnimalGroups(tx, id, animalGroups, kesildiMap);
-      } else if (donations !== undefined) {
-        await tx.delete(donationTagsTable).where(
-          inArray(donationTagsTable.donationId,
-            tx.select({ id: donationsTable.id }).from(donationsTable).where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)))
-          )
-        );
-        await tx.delete(animalGroupDonationsTable).where(
-          inArray(animalGroupDonationsTable.groupId,
-            tx.select({ id: animalGroupsTable.id }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id))
-          )
-        );
-        await tx.delete(donationsTable).where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)));
-        await saveDonations(tx, id, donations);
-      } else if (animalGroups !== undefined) {
-        await tx.delete(animalGroupDonationsTable).where(
-          inArray(animalGroupDonationsTable.groupId,
-            tx.select({ id: animalGroupsTable.id }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id))
-          )
-        );
-        await tx.delete(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id));
-        await saveAnimalGroups(tx, id, animalGroups, kesildiMap);
+      if (donations !== undefined) {
+        await diffUpdateDonations(tx, id, donations);
+      }
+      if (animalGroups !== undefined) {
+        await diffUpdateGroups(tx, id, animalGroups);
       }
     });
 
@@ -1978,6 +1936,288 @@ async function saveAnimalGroups(tx: Tx, kesimAlaniId: string, groups: AnimalGrou
     for (let i = 0; i < junctionRows.length; i += BATCH_SIZE) {
       await tx.insert(animalGroupDonationsTable).values(junctionRows.slice(i, i + BATCH_SIZE)).onConflictDoNothing();
     }
+  }
+}
+
+type ExistingDonation = {
+  id: string; name: string; description: string; donationType: string;
+  shareCount: number; vekalet: string; notes: string; phone: string | null;
+  excluded: boolean; sortOrder: number;
+};
+
+type ExistingGroup = {
+  id: string; animalNo: number; colorTag: string; locked: boolean;
+  notes: string; sortOrder: number; kesildi: boolean;
+  kesildiAt: Date | null; teamId: string | null;
+};
+
+function donationNeedsUpdate(existing: ExistingDonation, incoming: DonationPayload, newSortOrder: number): Record<string, string | number | boolean> | null {
+  const updates: Record<string, string | number | boolean> = {};
+  if ((incoming.name || "") !== existing.name) updates.name = incoming.name || "";
+  if ((incoming.description || "") !== existing.description) updates.description = incoming.description || "";
+  if ((incoming.donationType || "") !== existing.donationType) updates.donationType = incoming.donationType || "";
+  if ((incoming.shareCount || 1) !== existing.shareCount) updates.shareCount = incoming.shareCount || 1;
+  if ((incoming.vekalet || "") !== existing.vekalet) updates.vekalet = incoming.vekalet || "";
+  if ((incoming.notes || "") !== existing.notes) updates.notes = incoming.notes || "";
+  if ((incoming.phone || "") !== (existing.phone || "")) updates.phone = incoming.phone || "";
+  if ((incoming.excluded || false) !== existing.excluded) updates.excluded = incoming.excluded || false;
+  if (newSortOrder !== existing.sortOrder) updates.sortOrder = newSortOrder;
+  return Object.keys(updates).length > 0 ? updates : null;
+}
+
+function groupNeedsUpdate(existing: ExistingGroup, incoming: AnimalGroupPayload, newSortOrder: number): Record<string, string | number | boolean> | null {
+  const updates: Record<string, string | number | boolean> = {};
+  if ((incoming.animalNo || 0) !== existing.animalNo) updates.animalNo = incoming.animalNo || 0;
+  if ((incoming.colorTag || "") !== existing.colorTag) updates.colorTag = incoming.colorTag || "";
+  if ((incoming.locked || false) !== existing.locked) updates.locked = incoming.locked || false;
+  if ((incoming.notes || "") !== existing.notes) updates.notes = incoming.notes || "";
+  if (newSortOrder !== existing.sortOrder) updates.sortOrder = newSortOrder;
+  return Object.keys(updates).length > 0 ? updates : null;
+}
+
+async function diffUpdateDonations(tx: Tx, kesimAlaniId: string, incoming: DonationPayload[]) {
+  const existingRows = await tx.select({
+    id: donationsTable.id,
+    name: donationsTable.name,
+    description: donationsTable.description,
+    donationType: donationsTable.donationType,
+    shareCount: donationsTable.shareCount,
+    vekalet: donationsTable.vekalet,
+    notes: donationsTable.notes,
+    phone: donationsTable.phone,
+    excluded: donationsTable.excluded,
+    sortOrder: donationsTable.sortOrder,
+  }).from(donationsTable).where(and(eq(donationsTable.kesimAlaniId, kesimAlaniId), isNull(donationsTable.deletedAt)));
+
+  const existingMap = new Map(existingRows.map(r => [r.id, r]));
+  const incomingIds = new Set(incoming.map(d => d.id));
+
+  const toInsert: DonationPayload[] = [];
+  const toUpdate: { id: string; updates: Record<string, string | number | boolean> }[] = [];
+  const toDeleteIds: string[] = [];
+
+  for (let i = 0; i < incoming.length; i++) {
+    const d = incoming[i];
+    const existing = existingMap.get(d.id);
+    if (!existing) {
+      toInsert.push(d);
+    } else {
+      const updates = donationNeedsUpdate(existing, d, i);
+      if (updates) {
+        toUpdate.push({ id: d.id, updates });
+      }
+    }
+  }
+
+  for (const existing of existingRows) {
+    if (!incomingIds.has(existing.id)) {
+      toDeleteIds.push(existing.id);
+    }
+  }
+
+  if (toDeleteIds.length > 0) {
+    for (let i = 0; i < toDeleteIds.length; i += BATCH_SIZE) {
+      const batch = toDeleteIds.slice(i, i + BATCH_SIZE);
+      await tx.delete(donationTagsTable).where(inArray(donationTagsTable.donationId, batch));
+      await tx.delete(donationsTable).where(inArray(donationsTable.id, batch));
+    }
+  }
+
+  if (toInsert.length > 0) {
+    const insertIdx = incoming.reduce((acc, d, i) => { acc.set(d.id, i); return acc; }, new Map<string, number>());
+    const insertRows = toInsert.map(d => ({
+      id: d.id,
+      kesimAlaniId,
+      name: d.name || "",
+      description: d.description || "",
+      donationType: d.donationType || "",
+      shareCount: d.shareCount || 1,
+      vekalet: d.vekalet || "",
+      notes: d.notes || "",
+      phone: d.phone || "",
+      excluded: d.excluded || false,
+      sortOrder: insertIdx.get(d.id) ?? 0,
+    }));
+    for (let i = 0; i < insertRows.length; i += BATCH_SIZE) {
+      await tx.insert(donationsTable).values(insertRows.slice(i, i + BATCH_SIZE));
+    }
+  }
+
+  for (const { id, updates } of toUpdate) {
+    await tx.update(donationsTable).set(updates).where(eq(donationsTable.id, id));
+  }
+
+  const existingTags = existingRows.length > 0
+    ? await tx.select({
+        donationId: donationTagsTable.donationId,
+        tagId: donationTagsTable.tagId,
+      }).from(donationTagsTable).where(inArray(donationTagsTable.donationId, [...incomingIds].filter(id => existingMap.has(id))))
+    : [];
+
+  const existingTagSet = new Set(existingTags.map(t => `${t.donationId}:${t.tagId}`));
+  const incomingTagSet = new Set<string>();
+  const newTagRows: { donationId: string; tagId: string }[] = [];
+
+  for (const d of incoming) {
+    if (d.tags) {
+      for (const tagId of d.tags) {
+        const key = `${d.id}:${tagId}`;
+        incomingTagSet.add(key);
+        if (!existingTagSet.has(key)) {
+          newTagRows.push({ donationId: d.id, tagId });
+        }
+      }
+    }
+  }
+
+  const tagsToDelete = existingTags.filter(t => !incomingTagSet.has(`${t.donationId}:${t.tagId}`));
+  if (tagsToDelete.length > 0) {
+    for (const t of tagsToDelete) {
+      await tx.delete(donationTagsTable).where(
+        and(eq(donationTagsTable.donationId, t.donationId), eq(donationTagsTable.tagId, t.tagId))
+      );
+    }
+  }
+
+  if (newTagRows.length > 0) {
+    for (let i = 0; i < newTagRows.length; i += BATCH_SIZE) {
+      await tx.insert(donationTagsTable).values(newTagRows.slice(i, i + BATCH_SIZE)).onConflictDoNothing();
+    }
+  }
+}
+
+async function diffUpdateGroups(tx: Tx, kesimAlaniId: string, incoming: AnimalGroupPayload[]) {
+  const existingRows = await tx.select({
+    id: animalGroupsTable.id,
+    animalNo: animalGroupsTable.animalNo,
+    colorTag: animalGroupsTable.colorTag,
+    locked: animalGroupsTable.locked,
+    notes: animalGroupsTable.notes,
+    sortOrder: animalGroupsTable.sortOrder,
+    kesildi: animalGroupsTable.kesildi,
+    kesildiAt: animalGroupsTable.kesildiAt,
+    teamId: animalGroupsTable.teamId,
+  }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId));
+
+  const existingMap = new Map(existingRows.map(r => [r.id, r]));
+  const incomingIds = new Set(incoming.map(g => g.id));
+
+  const toInsert: AnimalGroupPayload[] = [];
+  const toUpdate: { id: string; updates: Record<string, string | number | boolean> }[] = [];
+  const toDeleteIds: string[] = [];
+
+  for (let i = 0; i < incoming.length; i++) {
+    const g = incoming[i];
+    const existing = existingMap.get(g.id);
+    if (!existing) {
+      toInsert.push(g);
+    } else {
+      const updates = groupNeedsUpdate(existing, g, i);
+      if (updates) {
+        toUpdate.push({ id: g.id, updates });
+      }
+    }
+  }
+
+  for (const existing of existingRows) {
+    if (!incomingIds.has(existing.id)) {
+      toDeleteIds.push(existing.id);
+    }
+  }
+
+  if (toDeleteIds.length > 0) {
+    for (let i = 0; i < toDeleteIds.length; i += BATCH_SIZE) {
+      const batch = toDeleteIds.slice(i, i + BATCH_SIZE);
+      await tx.delete(animalGroupDonationsTable).where(inArray(animalGroupDonationsTable.groupId, batch));
+      await tx.delete(animalGroupsTable).where(inArray(animalGroupsTable.id, batch));
+    }
+  }
+
+  if (toInsert.length > 0) {
+    const insertIdx = incoming.reduce((acc, g, i) => { acc.set(g.id, i); return acc; }, new Map<string, number>());
+    const insertRows = toInsert.map(g => ({
+      id: g.id,
+      kesimAlaniId,
+      animalNo: g.animalNo || 0,
+      colorTag: g.colorTag || "",
+      locked: g.locked || false,
+      notes: g.notes || "",
+      sortOrder: insertIdx.get(g.id) ?? 0,
+      kesildi: false,
+      kesildiAt: null,
+      teamId: null,
+    }));
+    for (let i = 0; i < insertRows.length; i += BATCH_SIZE) {
+      await tx.insert(animalGroupsTable).values(insertRows.slice(i, i + BATCH_SIZE));
+    }
+  }
+
+  for (const { id, updates } of toUpdate) {
+    await tx.update(animalGroupsTable).set(updates).where(eq(animalGroupsTable.id, id));
+  }
+
+  const survivingGroupIds = [...incomingIds];
+  const existingLinks = survivingGroupIds.length > 0
+    ? await tx.select({
+        groupId: animalGroupDonationsTable.groupId,
+        donationId: animalGroupDonationsTable.donationId,
+        sortOrder: animalGroupDonationsTable.sortOrder,
+      }).from(animalGroupDonationsTable).where(inArray(animalGroupDonationsTable.groupId, survivingGroupIds))
+    : [];
+
+  const existingLinkSet = new Map(existingLinks.map(l => [`${l.groupId}:${l.donationId}`, l.sortOrder]));
+  const incomingLinkSet = new Set<string>();
+
+  const allDonationIds = new Set<string>();
+  for (const g of incoming) {
+    if (g.donations) {
+      for (const d of g.donations) allDonationIds.add(d.id);
+    }
+  }
+  const validDonationRows = allDonationIds.size > 0
+    ? await tx.select({ id: donationsTable.id }).from(donationsTable).where(inArray(donationsTable.id, Array.from(allDonationIds)))
+    : [];
+  const validDonationIds = new Set(validDonationRows.map(r => r.id));
+
+  const newLinks: { groupId: string; donationId: string; sortOrder: number }[] = [];
+  const updateLinks: { groupId: string; donationId: string; sortOrder: number }[] = [];
+
+  for (const g of incoming) {
+    if (g.donations && g.donations.length > 0) {
+      for (let j = 0; j < g.donations.length; j++) {
+        const d = g.donations[j];
+        if (!validDonationIds.has(d.id)) continue;
+        const key = `${g.id}:${d.id}`;
+        incomingLinkSet.add(key);
+        const existingSortOrder = existingLinkSet.get(key);
+        if (existingSortOrder === undefined) {
+          newLinks.push({ groupId: g.id, donationId: d.id, sortOrder: j });
+        } else if (existingSortOrder !== j) {
+          updateLinks.push({ groupId: g.id, donationId: d.id, sortOrder: j });
+        }
+      }
+    }
+  }
+
+  const linksToDelete = existingLinks.filter(l => !incomingLinkSet.has(`${l.groupId}:${l.donationId}`));
+  if (linksToDelete.length > 0) {
+    for (const l of linksToDelete) {
+      await tx.delete(animalGroupDonationsTable).where(
+        and(eq(animalGroupDonationsTable.groupId, l.groupId), eq(animalGroupDonationsTable.donationId, l.donationId))
+      );
+    }
+  }
+
+  if (newLinks.length > 0) {
+    for (let i = 0; i < newLinks.length; i += BATCH_SIZE) {
+      await tx.insert(animalGroupDonationsTable).values(newLinks.slice(i, i + BATCH_SIZE)).onConflictDoNothing();
+    }
+  }
+
+  for (const l of updateLinks) {
+    await tx.update(animalGroupDonationsTable)
+      .set({ sortOrder: l.sortOrder })
+      .where(and(eq(animalGroupDonationsTable.groupId, l.groupId), eq(animalGroupDonationsTable.donationId, l.donationId)));
   }
 }
 
