@@ -14,7 +14,7 @@ import {
   appSettingsTable,
   donationTransfersTable,
 } from "@workspace/db/schema";
-import { desc, gt, or, sql, count, ilike, asc } from "drizzle-orm";
+import { desc, gt, lt, or, sql, count, ilike, asc } from "drizzle-orm";
 import { eq, inArray, isNull, isNotNull, and } from "drizzle-orm";
 import { z } from "zod";
 import crypto from "crypto";
@@ -526,19 +526,17 @@ router.get("/kesim-alanlari/:id/donations", async (req, res) => {
 
     const col = DONATION_SORT_FIELDS[sortField];
     const dirFn = sortDir === "desc" ? desc : asc;
-    const cmpOp = sortDir === "desc"
-      ? (a: any, b: any) => sql`${a} < ${b}`
-      : (a: any, b: any) => sql`${a} > ${b}`;
+    const cmpFn = sortDir === "desc" ? lt : gt;
 
     let cursorCondition;
     if (cursor) {
       try {
         const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
-        const cursorId = parsed.id;
-        const cursorVal = parsed.v;
+        const cursorId = parsed.id as string;
+        const cursorVal = parsed.v as string | number;
         if (typeof cursorId === "string" && cursorVal !== undefined) {
           cursorCondition = or(
-            cmpOp(col, cursorVal),
+            cmpFn(col, cursorVal),
             and(eq(col, cursorVal), gt(donationsTable.id, cursorId)),
           );
         }
