@@ -2047,11 +2047,12 @@ async function diffUpdateDonations(tx: Tx, kesimAlaniId: string, incoming: Donat
     await tx.update(donationsTable).set(updates).where(eq(donationsTable.id, id));
   }
 
-  const existingTags = existingRows.length > 0
+  const survivingIds = [...incomingIds].filter(id => existingMap.has(id));
+  const existingTags = survivingIds.length > 0
     ? await tx.select({
         donationId: donationTagsTable.donationId,
         tagId: donationTagsTable.tagId,
-      }).from(donationTagsTable).where(inArray(donationTagsTable.donationId, [...incomingIds].filter(id => existingMap.has(id))))
+      }).from(donationTagsTable).where(inArray(donationTagsTable.donationId, survivingIds))
     : [];
 
   const existingTagSet = new Set(existingTags.map(t => `${t.donationId}:${t.tagId}`));
