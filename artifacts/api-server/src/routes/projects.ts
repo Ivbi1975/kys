@@ -60,9 +60,9 @@ router.get("/projects", async (_req, res) => {
     const result = (rows.rows as ProjectRow[]).map(r => ({
       id: r.id,
       name: r.name,
-      description: r.description,
-      createdAt: r.created_at,
-      deletedAt: r.deleted_at,
+      description: r.description || "",
+      createdAt: new Date(r.created_at),
+      deletedAt: r.deleted_at ? new Date(r.deleted_at) : null,
       stats: {
         donorCount: Number(r.donor_count),
         shareCount: Number(r.share_count),
