@@ -87,6 +87,7 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - Database indexes on foreign keys and unique constraints on join tables
 - API base path uses import.meta.env.BASE_URL for proper artifact routing
 - File size validation for logo uploads (max 5MB)
+- Offline mode for tracking page: Service Worker via vite-plugin-pwa caches assets; IndexedDB stores tracking data and queues offline changes (kesildi toggles, notes); auto-sync when back online; offline banner with pending change counter; NetworkFirst caching strategy for API requests
 
 Data model (Donation):
 - `id`, `name` (adına kesilen), `description` (vekaleti veren), `donationType` (cinsi), `shareCount`, `vekalet` (vekalet no), `notes` (notlar), `excluded?`, `tags?`
@@ -105,7 +106,9 @@ Key files:
 - `src/pages/home.tsx` - Home page with project cards (collapsible), kesim alanı list grouped by project, project CRUD, move kesim alanı between projects, settings (logo, backup, theme selector, tag management)
 - `src/pages/kesim-alani.tsx` - Main editing page with donor table, animal groups, stats, export
 - `src/pages/print.tsx` - Print-optimized A4 landscape view matching Excel design
-- `src/pages/kesim-takip.tsx` - Public kesim tracking page (no auth), shows animal groups with kesildi toggle
+- `src/pages/kesim-takip.tsx` - Public kesim tracking page (no auth), shows animal groups with kesildi toggle, offline mode with IndexedDB + Service Worker
+- `src/lib/offlineStore.ts` - IndexedDB wrapper for offline tracking data cache and change queue
+- `src/lib/useOfflineSync.ts` - React hook for offline-aware data loading, change queuing, and sync
 
 ## TypeScript & Composite Projects
 

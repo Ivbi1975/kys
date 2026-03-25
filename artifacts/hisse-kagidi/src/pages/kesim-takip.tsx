@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "wouter";
-import { fetchTrackingData, toggleKesildi, fetchTrackingNotes, createTrackingNote, fetchGroupPhotos, getGroupPhotoUrl, uploadGroupPhoto, deleteGroupPhoto, assignTeamTracking, fetchTrackingNotificationLogs } from "@/lib/api";
+import { createTrackingNote, fetchGroupPhotos, getGroupPhotoUrl, uploadGroupPhoto, deleteGroupPhoto, assignTeamTracking, fetchTrackingNotificationLogs } from "@/lib/api";
 import type { TrackingData, TrackingGroup, TrackingNote, GroupPhoto, TrackingTeam } from "@/lib/api";
+import { useOfflineSync } from "@/lib/useOfflineSync";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,7 +11,7 @@ import PhotoGallery from "@/components/PhotoGallery";
 import {
   CheckCircle2, Circle, Loader2, AlertTriangle, Beef, Clock, X,
   ChevronLeft, ChevronRight, MessageSquarePlus, Mic, MicOff, Send,
-  StickyNote, Edit3, ChevronDown, ChevronUp, Camera
+  StickyNote, Edit3, ChevronDown, ChevronUp, Camera, WifiOff, RefreshCw
 } from "lucide-react";
 
 const colorMap: Record<string, string> = {
@@ -141,10 +142,12 @@ function NoteInput({
   groupId,
   token,
   onNoteAdded,
+  createNote,
 }: {
   groupId?: string;
   token: string;
   onNoteAdded: (note: TrackingNote) => void;
+  createNote?: (data: Parameters<typeof createTrackingNote>[1]) => Promise<TrackingNote | null>;
 }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -155,12 +158,18 @@ function NoteInput({
     if (!content || sending) return;
     setSending(true);
     try {
-      const note = await createTrackingNote(token, {
+      const noteData = {
         animalGroupId: groupId,
-        type: "note",
+        type: "note" as const,
         content,
-      });
-      onNoteAdded(note);
+      };
+      let note: TrackingNote | null = null;
+      if (createNote) {
+        note = await createNote(noteData);
+      } else {
+        note = await createTrackingNote(token, noteData);
+      }
+      if (note) onNoteAdded(note);
       setText("");
       speech.setTranscript("");
       if (speech.isListening) speech.stopListening();
@@ -372,6 +381,7 @@ function KesimKagidiOverlay({
   onClose,
   onNoteAdded,
   onTeamAssign,
+  createNote,
 }: {
   groups: TrackingGroup[];
   initialIndex: number;
@@ -383,6 +393,7 @@ function KesimKagidiOverlay({
   onClose: () => void;
   onNoteAdded: (note: TrackingNote) => void;
   onTeamAssign: (groupId: string, teamId: string | null) => void;
+  createNote?: (data: Parameters<typeof createTrackingNote>[1]) => Promise<TrackingNote | null>;
 }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const touchStartX = useRef(0);
@@ -667,7 +678,7 @@ function KesimKagidiOverlay({
               </button>
               {showNotes && (
                 <div className="space-y-2">
-                  <NoteInput groupId={group.id} token={token} onNoteAdded={onNoteAdded} />
+                  <NoteInput groupId={group.id} token={token} onNoteAdded={onNoteAdded} createNote={createNote} />
                   <NotesList notes={notes} groupId={group.id} />
                 </div>
               )}
@@ -760,12 +771,21 @@ function KesimKagidiOverlay({
 
 export default function KesimTakipPage() {
   const params = useParams<{ token: string }>();
-  const [data, setData] = useState<TrackingData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data,
+    setData,
+    notes,
+    setNotes,
+    loading,
+    error,
+    syncState,
+    handleToggle: offlineToggle,
+    handleCreateNote,
+    syncQueue,
+  } = useOfflineSync(params.token);
+
   const [toggling, setToggling] = useState<Set<string>>(new Set());
   const [overlayIndex, setOverlayIndex] = useState<number | null>(null);
-  const [notes, setNotes] = useState<TrackingNote[]>([]);
   const [showGlobalNotes, setShowGlobalNotes] = useState(false);
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
     typeof Notification !== "undefined" ? Notification.permission : "denied"
@@ -779,27 +799,11 @@ export default function KesimTakipPage() {
     }
   }, []);
 
-  const loadData = useCallback(async () => {
-    if (!params.token) return;
-    try {
-      const [result, trackingNotes] = await Promise.all([
-        fetchTrackingData(params.token),
-        fetchTrackingNotes(params.token),
-      ]);
-      setData(result);
-      setNotes(trackingNotes);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Veri yüklenemedi");
-    } finally {
-      setLoading(false);
-    }
-  }, [params.token]);
-
   useEffect(() => {
     if (!params.token) return;
     const pollNotifications = async () => {
       if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+      if (!navigator.onLine) return;
       try {
         const logs = await fetchTrackingNotificationLogs(params.token!, lastNotifCheckRef.current);
         for (const log of logs) {
@@ -821,15 +825,9 @@ export default function KesimTakipPage() {
     return () => clearInterval(interval);
   }, [params.token]);
 
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 30000);
-    return () => clearInterval(interval);
-  }, [loadData]);
-
   const handleNoteAdded = useCallback((note: TrackingNote) => {
     setNotes(prev => [note, ...prev]);
-  }, []);
+  }, [setNotes]);
 
   async function handleTeamAssign(groupId: string, teamId: string | null) {
     if (!params.token) return;
@@ -851,18 +849,7 @@ export default function KesimTakipPage() {
     if (!params.token || toggling.has(group.id)) return;
     setToggling(prev => new Set(prev).add(group.id));
     try {
-      await toggleKesildi(params.token, group.id, !group.kesildi);
-      const newKesildi = !group.kesildi;
-      setData(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          kesildiCount: prev.kesildiCount + (group.kesildi ? -1 : 1),
-          groups: prev.groups.map(g =>
-            g.id === group.id ? { ...g, kesildi: newKesildi, kesildiAt: newKesildi ? new Date().toISOString() : null } : g
-          ),
-        };
-      });
+      await offlineToggle(group.id, !group.kesildi);
     } catch {
     } finally {
       setToggling(prev => {
@@ -931,6 +918,52 @@ export default function KesimTakipPage() {
           <p className="text-xs text-muted-foreground mt-1 text-right">%{progressPercent} tamamlandı</p>
         </Card>
 
+        {!syncState.isOnline && (
+          <Card className="p-3 mb-4 bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800">
+            <div className="flex items-center gap-2">
+              <WifiOff className="w-4 h-4 text-amber-600 shrink-0" />
+              <div className="flex-1">
+                <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                  Çevrimdışı — değişiklikler kaydedilecek
+                </span>
+                {syncState.pendingCount > 0 && (
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 block">
+                    {syncState.pendingCount} bekleyen değişiklik
+                  </span>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {syncState.isOnline && syncState.pendingCount > 0 && (
+          <Card className="p-3 mb-4 bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <RefreshCw className={`w-4 h-4 text-blue-600 shrink-0 ${syncState.isSyncing ? "animate-spin" : ""}`} />
+                <span className="text-xs text-blue-700 dark:text-blue-300">
+                  {syncState.isSyncing
+                    ? "Senkronize ediliyor..."
+                    : `${syncState.pendingCount} bekleyen değişiklik`}
+                </span>
+              </div>
+              {!syncState.isSyncing && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-100"
+                  onClick={() => syncQueue()}
+                >
+                  Şimdi Gönder
+                </Button>
+              )}
+            </div>
+            {syncState.lastSyncError && (
+              <p className="text-[10px] text-red-600 mt-1">{syncState.lastSyncError}</p>
+            )}
+          </Card>
+        )}
+
         {typeof Notification !== "undefined" && notifPermission === "default" && (
           <Card className="p-3 mb-4 bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800">
             <div className="flex items-center justify-between gap-2">
@@ -966,7 +999,7 @@ export default function KesimTakipPage() {
           </button>
           {showGlobalNotes && (
             <div className="mt-3 space-y-2">
-              <NoteInput token={params.token!} onNoteAdded={handleNoteAdded} />
+              <NoteInput token={params.token!} onNoteAdded={handleNoteAdded} createNote={handleCreateNote} />
               <NotesList notes={notes} />
             </div>
           )}
@@ -1064,6 +1097,7 @@ export default function KesimTakipPage() {
           onClose={() => setOverlayIndex(null)}
           onNoteAdded={handleNoteAdded}
           onTeamAssign={handleTeamAssign}
+          createNote={handleCreateNote}
         />
       )}
     </div>

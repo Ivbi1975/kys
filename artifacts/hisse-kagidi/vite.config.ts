@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+import { VitePWA } from "vite-plugin-pwa";
 
 const rawPort = process.env.PORT;
 
@@ -32,6 +33,48 @@ export default defineConfig({
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
+    VitePWA({
+      registerType: "autoUpdate",
+      workbox: {
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        navigateFallback: "index.html",
+        navigateFallbackAllowlist: [/^\/takip\//],
+        runtimeCaching: [
+          {
+            urlPattern: /\/api\/tracking\/.+/,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "tracking-api-cache",
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24,
+              },
+              networkTimeoutSeconds: 5,
+            },
+          },
+        ],
+      },
+      manifest: {
+        name: "Kurban Hisse Kağıdı - Kesim Takip",
+        short_name: "Kesim Takip",
+        description: "Kesim takip sayfası - çevrimdışı çalışabilir",
+        theme_color: "#059669",
+        background_color: "#ffffff",
+        display: "standalone",
+        icons: [
+          {
+            src: "pwa-192x192.png",
+            sizes: "192x192",
+            type: "image/png",
+          },
+          {
+            src: "pwa-512x512.png",
+            sizes: "512x512",
+            type: "image/png",
+          },
+        ],
+      },
+    }),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
