@@ -1220,7 +1220,7 @@ export default function KesimAlaniPage() {
 
       const changedIds = Array.from(changedIdSet);
 
-      const useIncremental = !forceFullRegroup && hasExistingGroups && changedIds.length > 0 && changedIds.length <= 20;
+      const useIncremental = !forceFullRegroup && hasExistingGroups && changedIds.length <= 20;
 
       let finalGroups: AnimalGroup[];
 
