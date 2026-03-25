@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from "react";
 import { useParams } from "wouter";
 import { Virtuoso } from "react-virtuoso";
 import { createTrackingNote, fetchGroupPhotos, getGroupPhotoUrl, uploadGroupPhoto, deleteGroupPhoto, assignTeamTracking, fetchTrackingNotificationLogs } from "@/lib/api";
@@ -15,7 +15,7 @@ import {
   CheckCircle2, Circle, Loader2, AlertTriangle, Beef, Clock, X,
   ChevronLeft, ChevronRight, MessageSquarePlus, Mic, MicOff, Send,
   StickyNote, Edit3, ChevronDown, ChevronUp, Camera, WifiOff, RefreshCw,
-  FileText, Printer
+  FileText, Printer, Search
 } from "lucide-react";
 
 const colorMap: Record<string, string> = {
@@ -373,6 +373,88 @@ function NotesList({ notes, groupId }: { notes: TrackingNote[]; groupId?: string
     </div>
   );
 }
+
+type FilterMode = "all" | "pending" | "done";
+
+const GroupCard = memo(function GroupCard({
+  group,
+  index,
+  isToggling,
+  noteCount,
+  teams,
+  onToggle,
+  onSelect,
+}: {
+  group: TrackingGroup;
+  index: number;
+  isToggling: boolean;
+  noteCount: number;
+  teams: TrackingTeam[];
+  onToggle: (group: TrackingGroup) => void;
+  onSelect: (index: number) => void;
+}) {
+  const team = group.teamId ? teams.find(t => t.id === group.teamId) : null;
+  return (
+    <div className="pb-2">
+      <Card
+        className={`p-3 cursor-pointer transition-all active:scale-[0.98] ${
+          group.kesildi
+            ? "bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800"
+            : "hover:bg-muted/50"
+        }`}
+        style={group.colorTag && colorMap[group.colorTag] ? { borderLeft: `4px solid ${colorMap[group.colorTag]}` } : {}}
+        onClick={() => onSelect(index)}
+      >
+        <div className="flex items-center gap-3">
+          <div className="shrink-0" onClick={(e) => { e.stopPropagation(); onToggle(group); }}>
+            {isToggling ? (
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            ) : group.kesildi ? (
+              <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+            ) : (
+              <Circle className="w-6 h-6 text-muted-foreground" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-sm">Hayvan {group.animalNo}</span>
+              <span className="text-xs text-muted-foreground">({group.filledCount}/7 dolu)</span>
+              {noteCount > 0 && (
+                <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
+                  <MessageSquarePlus className="w-2.5 h-2.5" />
+                  {noteCount}
+                </span>
+              )}
+              {team && (
+                <span
+                  className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
+                  style={{ backgroundColor: team.color + "20", color: team.color }}
+                >
+                  {team.name}
+                </span>
+              )}
+              {group.kesildi && (
+                <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
+                  Kesildi
+                  {group.kesildiAt && (
+                    <>
+                      <Clock className="w-2.5 h-2.5" />
+                      {formatKesildiTime(group.kesildiAt)}
+                    </>
+                  )}
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5 truncate">
+              {group.donors.slice(0, 3).map(d => d.description || d.name).join(", ")}
+              {group.donors.length > 3 && ` +${group.donors.length - 3}`}
+            </div>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+});
 
 function SummaryReportOverlay({
   data,
@@ -1000,6 +1082,8 @@ export default function KesimTakipPage() {
   const [overlayIndex, setOverlayIndex] = useState<number | null>(null);
   const [showGlobalNotes, setShowGlobalNotes] = useState(false);
   const [showSummaryReport, setShowSummaryReport] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
     typeof Notification !== "undefined" ? Notification.permission : "denied"
   );
@@ -1090,14 +1174,43 @@ export default function KesimTakipPage() {
   }
 
   const progressPercent = data.totalGroups > 0 ? Math.round((data.kesildiCount / data.totalGroups) * 100) : 0;
-  const filledGroups = data.groups.filter(g => g.filledCount > 0);
-  const noteCountByGroup: Record<string, number> = {};
-  for (const n of notes) {
-    if (n.animalGroupId) {
-      noteCountByGroup[n.animalGroupId] = (noteCountByGroup[n.animalGroupId] || 0) + 1;
+  const filledGroups = useMemo(() => data.groups.filter(g => g.filledCount > 0), [data.groups]);
+  const noteCountByGroup = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const n of notes) {
+      if (n.animalGroupId) {
+        map[n.animalGroupId] = (map[n.animalGroupId] || 0) + 1;
+      }
     }
-  }
-  const editRequestCount = notes.filter(n => n.type === "edit_request" && n.status === "pending").length;
+    return map;
+  }, [notes]);
+  const editRequestCount = useMemo(() => notes.filter(n => n.type === "edit_request" && n.status === "pending").length, [notes]);
+
+  const filteredGroups = useMemo(() => {
+    let groups = filledGroups;
+    if (filterMode === "pending") {
+      groups = groups.filter(g => !g.kesildi);
+    } else if (filterMode === "done") {
+      groups = groups.filter(g => g.kesildi);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      groups = groups.filter(g =>
+        String(g.animalNo).includes(q) ||
+        g.donors.some(d =>
+          d.name.toLowerCase().includes(q) ||
+          d.description.toLowerCase().includes(q) ||
+          d.donationType.toLowerCase().includes(q) ||
+          d.vekalet.toLowerCase().includes(q)
+        )
+      );
+    }
+    return groups;
+  }, [filledGroups, filterMode, searchQuery]);
+
+  const handleSelectGroup = useCallback((idx: number) => {
+    setOverlayIndex(idx);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white dark:from-emerald-950 dark:to-background">
@@ -1219,153 +1332,70 @@ export default function KesimTakipPage() {
           )}
         </Card>
 
-        {filledGroups.length > 30 ? (
-          <Virtuoso
-            useWindowScroll
-            data={filledGroups}
-            defaultItemHeight={68}
-            itemContent={(idx, group) => {
-              const isToggling = toggling.has(group.id);
-              const groupNotes = noteCountByGroup[group.id] || 0;
-              return (
-                <div className="pb-2">
-                  <Card
-                    className={`p-3 cursor-pointer transition-all active:scale-[0.98] ${
-                      group.kesildi
-                        ? "bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800"
-                        : "hover:bg-muted/50"
-                    }`}
-                    style={group.colorTag && colorMap[group.colorTag] ? { borderLeft: `4px solid ${colorMap[group.colorTag]}` } : {}}
-                    onClick={() => setOverlayIndex(idx)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="shrink-0" onClick={(e) => { e.stopPropagation(); handleToggle(group); }}>
-                        {isToggling ? (
-                          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                        ) : group.kesildi ? (
-                          <CheckCircle2 className="w-6 h-6 text-emerald-500" />
-                        ) : (
-                          <Circle className="w-6 h-6 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm">Hayvan {group.animalNo}</span>
-                          <span className="text-xs text-muted-foreground">({group.filledCount}/7 dolu)</span>
-                          {groupNotes > 0 && (
-                            <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
-                              <MessageSquarePlus className="w-2.5 h-2.5" />
-                              {groupNotes}
-                            </span>
-                          )}
-                          {group.teamId && data.teams.find(t => t.id === group.teamId) && (() => {
-                            const team = data.teams.find(t => t.id === group.teamId)!;
-                            return (
-                              <span
-                                className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
-                                style={{ backgroundColor: team.color + "20", color: team.color }}
-                              >
-                                {team.name}
-                              </span>
-                            );
-                          })()}
-                          {group.kesildi && (
-                            <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
-                              Kesildi
-                              {group.kesildiAt && (
-                                <>
-                                  <Clock className="w-2.5 h-2.5" />
-                                  {formatKesildiTime(group.kesildiAt)}
-                                </>
-                              )}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                          {group.donors.slice(0, 3).map(d => d.description || d.name).join(", ")}
-                          {group.donors.length > 3 && ` +${group.donors.length - 3}`}
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                </div>
-              );
-            }}
-          />
-        ) : (
-          <div className="space-y-2">
-            {filledGroups.map((group, idx) => {
-              const isToggling = toggling.has(group.id);
-              const groupNotes = noteCountByGroup[group.id] || 0;
-              return (
-                <Card
-                  key={group.id}
-                  className={`p-3 cursor-pointer transition-all active:scale-[0.98] ${
-                    group.kesildi
-                      ? "bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800"
-                      : "hover:bg-muted/50"
+        {filledGroups.length > 0 && (
+          <div className="mb-3 space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Hayvan no, isim, vekalet ara..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 text-sm"
+              />
+              {searchQuery && (
+                <button className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => setSearchQuery("")}>
+                  <X className="w-4 h-4 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+            <div className="flex gap-1">
+              {([["all", "Tümü"], ["pending", "Bekleyen"], ["done", "Kesildi"]] as const).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                    filterMode === mode
+                      ? "bg-primary text-primary-foreground border-primary font-semibold"
+                      : "bg-background border-border hover:bg-muted"
                   }`}
-                  style={group.colorTag && colorMap[group.colorTag] ? { borderLeft: `4px solid ${colorMap[group.colorTag]}` } : {}}
-                  onClick={() => setOverlayIndex(idx)}
+                  onClick={() => setFilterMode(mode)}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="shrink-0" onClick={(e) => { e.stopPropagation(); handleToggle(group); }}>
-                      {isToggling ? (
-                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                      ) : group.kesildi ? (
-                        <CheckCircle2 className="w-6 h-6 text-emerald-500" />
-                      ) : (
-                        <Circle className="w-6 h-6 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm">Hayvan {group.animalNo}</span>
-                        <span className="text-xs text-muted-foreground">({group.filledCount}/7 dolu)</span>
-                        {groupNotes > 0 && (
-                          <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
-                            <MessageSquarePlus className="w-2.5 h-2.5" />
-                            {groupNotes}
-                          </span>
-                        )}
-                        {group.teamId && data.teams.find(t => t.id === group.teamId) && (() => {
-                          const team = data.teams.find(t => t.id === group.teamId)!;
-                          return (
-                            <span
-                              className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
-                              style={{ backgroundColor: team.color + "20", color: team.color }}
-                            >
-                              {team.name}
-                            </span>
-                          );
-                        })()}
-                        {group.kesildi && (
-                          <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
-                            Kesildi
-                            {group.kesildiAt && (
-                              <>
-                                <Clock className="w-2.5 h-2.5" />
-                                {formatKesildiTime(group.kesildiAt)}
-                              </>
-                            )}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                        {group.donors.slice(0, 3).map(d => d.description || d.name).join(", ")}
-                        {group.donors.length > 3 && ` +${group.donors.length - 3}`}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
+                  {label}
+                </button>
+              ))}
+              {(searchQuery || filterMode !== "all") && (
+                <span className="text-xs text-muted-foreground self-center ml-auto">
+                  {filteredGroups.length} / {filledGroups.length}
+                </span>
+              )}
+            </div>
           </div>
         )}
 
-        {filledGroups.length === 0 && (
+        {filteredGroups.length > 0 ? (
+          <Virtuoso
+            useWindowScroll
+            data={filteredGroups}
+            defaultItemHeight={68}
+            overscan={200}
+            itemContent={(idx, group) => (
+              <GroupCard
+                group={group}
+                index={idx}
+                isToggling={toggling.has(group.id)}
+                noteCount={noteCountByGroup[group.id] || 0}
+                teams={data.teams}
+                onToggle={handleToggle}
+                onSelect={handleSelectGroup}
+              />
+            )}
+          />
+        ) : filledGroups.length === 0 ? (
           <Card className="p-6 text-center">
             <p className="text-muted-foreground">Henüz hayvan grubu oluşturulmamış</p>
+          </Card>
+        ) : (
+          <Card className="p-6 text-center">
+            <p className="text-muted-foreground text-sm">Aramanızla eşleşen hayvan grubu bulunamadı</p>
           </Card>
         )}
 
@@ -1376,7 +1406,7 @@ export default function KesimTakipPage() {
 
       {overlayIndex !== null && (
         <KesimKagidiOverlay
-          groups={filledGroups}
+          groups={filteredGroups}
           initialIndex={overlayIndex}
           toggling={toggling}
           notes={notes}
