@@ -20,6 +20,12 @@ export interface Donation {
   aiWarnings?: string;
 }
 
+export interface Team {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface AnimalGroup {
   id: string;
   animalNo: number;
@@ -29,6 +35,7 @@ export interface AnimalGroup {
   notes?: string;
   kesildi?: boolean;
   kesildiAt?: string | null;
+  teamId?: string | null;
 }
 
 export interface KesimAlani {
@@ -41,6 +48,7 @@ export interface KesimAlani {
   projectId?: string | null;
   customTags?: CustomTag[];
   trackingToken?: string | null;
+  teams?: Team[];
 }
 
 export interface ProjectStats {

@@ -9,6 +9,7 @@ import {
   projectsTable,
   trackingNotesTable,
   animalGroupPhotosTable,
+  teamsTable,
 } from "@workspace/db/schema";
 import { desc } from "drizzle-orm";
 import { eq, inArray, isNull, isNotNull, and } from "drizzle-orm";
@@ -160,6 +161,9 @@ async function getFullKesimAlani(id: string) {
 
   const mappedDonations = donations.map(d => donationsById[d.id]);
 
+  const teams = await db.select().from(teamsTable)
+    .where(eq(teamsTable.kesimAlaniId, id));
+
   const mappedGroups = groups.map(g => {
     const links = (groupDonationsByGroup[g.id] || []).sort((a, b) => a.sortOrder - b.sortOrder);
     return {
@@ -170,6 +174,7 @@ async function getFullKesimAlani(id: string) {
       notes: g.notes,
       kesildi: g.kesildi,
       kesildiAt: g.kesildiAt || null,
+      teamId: g.teamId || null,
       donations: links.map(l => donationsById[l.donationId]).filter(Boolean),
     };
   });
@@ -183,6 +188,7 @@ async function getFullKesimAlani(id: string) {
     trackingToken: ka.trackingToken || null,
     donations: mappedDonations,
     animalGroups: mappedGroups,
+    teams: teams.map(t => ({ id: t.id, name: t.name, color: t.color })),
   };
 }
 
@@ -321,14 +327,15 @@ router.put("/kesim-alanlari/:id", async (req, res) => {
       return;
     }
 
-    let kesildiMap: Map<string, { kesildi: boolean; kesildiAt: string | null }> | undefined;
+    let kesildiMap: Map<string, { kesildi: boolean; kesildiAt: string | null; teamId: string | null }> | undefined;
     if (animalGroups !== undefined) {
       const existingGroups = await db.select({
         id: animalGroupsTable.id,
         kesildi: animalGroupsTable.kesildi,
         kesildiAt: animalGroupsTable.kesildiAt,
+        teamId: animalGroupsTable.teamId,
       }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, id));
-      kesildiMap = new Map(existingGroups.map(g => [g.id, { kesildi: g.kesildi, kesildiAt: g.kesildiAt }]));
+      kesildiMap = new Map(existingGroups.map(g => [g.id, { kesildi: g.kesildi, kesildiAt: g.kesildiAt, teamId: g.teamId }]));
     }
 
     await db.transaction(async (tx) => {
@@ -1208,7 +1215,7 @@ async function saveDonations(tx: Tx, kesimAlaniId: string, donations: DonationPa
   }
 }
 
-async function saveAnimalGroups(tx: Tx, kesimAlaniId: string, groups: AnimalGroupPayload[], kesildiMap?: Map<string, { kesildi: boolean; kesildiAt: string | null }>) {
+async function saveAnimalGroups(tx: Tx, kesimAlaniId: string, groups: AnimalGroupPayload[], kesildiMap?: Map<string, { kesildi: boolean; kesildiAt: string | null; teamId: string | null }>) {
   if (groups.length === 0) return;
 
   const groupRows = groups.map((g, i) => {
@@ -1223,6 +1230,7 @@ async function saveAnimalGroups(tx: Tx, kesimAlaniId: string, groups: AnimalGrou
       sortOrder: i,
       kesildi: existing?.kesildi ?? false,
       kesildiAt: existing?.kesildiAt ?? null,
+      teamId: existing?.teamId ?? null,
     };
   });
 
@@ -1402,11 +1410,12 @@ router.get("/tracking/:token", async (req, res) => {
       groupDonationsByGroup[link.groupId].push(link);
     }
 
-    let projectName: string | null = null;
-    if (ka.projectId) {
-      const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, ka.projectId));
-      if (proj) projectName = proj.name;
-    }
+    const [teamRows, projectNameResult] = await Promise.all([
+      db.select().from(teamsTable).where(eq(teamsTable.kesimAlaniId, ka.id)),
+      ka.projectId
+        ? db.select().from(projectsTable).where(eq(projectsTable.id, ka.projectId)).then(r => r[0]?.name || null)
+        : Promise.resolve(null),
+    ]);
 
     const mappedGroups = groups.map(g => {
       const links = (groupDonationsByGroup[g.id] || []).sort((a, b) => a.sortOrder - b.sortOrder);
@@ -1419,6 +1428,7 @@ router.get("/tracking/:token", async (req, res) => {
         colorTag: g.colorTag,
         kesildi: g.kesildi,
         kesildiAt: g.kesildiAt || null,
+        teamId: g.teamId || null,
         filledCount: filledDonations.length,
         donors: filledDonations.map(d => ({ name: d.name, description: d.description, donationType: d.donationType, vekalet: d.vekalet || "", notes: d.notes || "" })),
       };
@@ -1426,10 +1436,11 @@ router.get("/tracking/:token", async (req, res) => {
 
     res.json({
       kesimAlaniName: ka.name,
-      projectName,
+      projectName: projectNameResult,
       totalGroups: groups.length,
       kesildiCount: groups.filter(g => g.kesildi).length,
       groups: mappedGroups,
+      teams: teamRows.map(t => ({ id: t.id, name: t.name, color: t.color })),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
@@ -1824,6 +1835,121 @@ router.get("/kesim-alanlari/:id/photos/counts", async (req, res) => {
       counts[p.animalGroupId] = (counts[p.animalGroupId] || 0) + 1;
     }
     res.json(counts);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/kesim-alanlari/:id/teams", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const teams = await db.select().from(teamsTable)
+      .where(eq(teamsTable.kesimAlaniId, id));
+    res.json(teams.map(t => ({ id: t.id, name: t.name, color: t.color })));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/kesim-alanlari/:id/teams", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, color } = req.body;
+    if (!name || typeof name !== "string") {
+      res.status(400).json({ error: "Ekip adı gerekli" }); return;
+    }
+    const teamId = crypto.randomUUID();
+    await db.insert(teamsTable).values({
+      id: teamId,
+      kesimAlaniId: id,
+      name: name.trim(),
+      color: color || "#3b82f6",
+    });
+    res.status(201).json({ id: teamId, name: name.trim(), color: color || "#3b82f6" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.put("/kesim-alanlari/:id/teams/:teamId", async (req, res) => {
+  try {
+    const { id, teamId } = req.params;
+    const { name, color } = req.body;
+    const [team] = await db.select().from(teamsTable)
+      .where(and(eq(teamsTable.id, teamId), eq(teamsTable.kesimAlaniId, id)));
+    if (!team) { res.status(404).json({ error: "Ekip bulunamadı" }); return; }
+    const updates: Record<string, string> = {};
+    if (name !== undefined) updates.name = name.trim();
+    if (color !== undefined) updates.color = color;
+    await db.update(teamsTable).set(updates).where(eq(teamsTable.id, teamId));
+    res.json({ id: teamId, name: name !== undefined ? name.trim() : team.name, color: color !== undefined ? color : team.color });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.delete("/kesim-alanlari/:id/teams/:teamId", async (req, res) => {
+  try {
+    const { id, teamId } = req.params;
+    const [team] = await db.select().from(teamsTable)
+      .where(and(eq(teamsTable.id, teamId), eq(teamsTable.kesimAlaniId, id)));
+    if (!team) { res.status(404).json({ error: "Ekip bulunamadı" }); return; }
+    await db.update(animalGroupsTable)
+      .set({ teamId: null })
+      .where(and(eq(animalGroupsTable.kesimAlaniId, id), eq(animalGroupsTable.teamId, teamId)));
+    await db.delete(teamsTable).where(eq(teamsTable.id, teamId));
+    res.json({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.put("/kesim-alanlari/:id/groups/:groupId/team", async (req, res) => {
+  try {
+    const { id, groupId } = req.params;
+    const { teamId } = req.body;
+    const [group] = await db.select().from(animalGroupsTable)
+      .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, id)));
+    if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+    if (teamId) {
+      const [team] = await db.select().from(teamsTable)
+        .where(and(eq(teamsTable.id, teamId), eq(teamsTable.kesimAlaniId, id)));
+      if (!team) { res.status(404).json({ error: "Ekip bulunamadı" }); return; }
+    }
+    await db.update(animalGroupsTable)
+      .set({ teamId: teamId || null })
+      .where(eq(animalGroupsTable.id, groupId));
+    res.json({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.put("/tracking/:token/group/:groupId/team", async (req, res) => {
+  try {
+    const { token, groupId } = req.params;
+    const { teamId } = req.body;
+    const [ka] = await db.select().from(kesimAlanlariTable)
+      .where(eq(kesimAlanlariTable.trackingToken, token));
+    if (!ka) { res.status(404).json({ error: "Bulunamadı" }); return; }
+    const [group] = await db.select().from(animalGroupsTable)
+      .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
+    if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+    if (teamId) {
+      const [team] = await db.select().from(teamsTable)
+        .where(and(eq(teamsTable.id, teamId), eq(teamsTable.kesimAlaniId, ka.id)));
+      if (!team) { res.status(404).json({ error: "Ekip bulunamadı" }); return; }
+    }
+    await db.update(animalGroupsTable)
+      .set({ teamId: teamId || null })
+      .where(eq(animalGroupsTable.id, groupId));
+    res.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     res.status(500).json({ error: message });

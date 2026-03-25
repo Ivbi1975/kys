@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "wouter";
-import { fetchTrackingData, toggleKesildi, fetchTrackingNotes, createTrackingNote, fetchGroupPhotos, getGroupPhotoUrl, uploadGroupPhoto, deleteGroupPhoto } from "@/lib/api";
-import type { TrackingData, TrackingGroup, TrackingNote, GroupPhoto } from "@/lib/api";
+import { fetchTrackingData, toggleKesildi, fetchTrackingNotes, createTrackingNote, fetchGroupPhotos, getGroupPhotoUrl, uploadGroupPhoto, deleteGroupPhoto, assignTeamTracking } from "@/lib/api";
+import type { TrackingData, TrackingGroup, TrackingNote, GroupPhoto, TrackingTeam } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -367,18 +367,22 @@ function KesimKagidiOverlay({
   toggling,
   notes,
   token,
+  teams,
   onToggle,
   onClose,
   onNoteAdded,
+  onTeamAssign,
 }: {
   groups: TrackingGroup[];
   initialIndex: number;
   toggling: Set<string>;
   notes: TrackingNote[];
   token: string;
+  teams: TrackingTeam[];
   onToggle: (group: TrackingGroup) => void;
   onClose: () => void;
   onNoteAdded: (note: TrackingNote) => void;
+  onTeamAssign: (groupId: string, teamId: string | null) => void;
 }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const touchStartX = useRef(0);
@@ -519,6 +523,38 @@ function KesimKagidiOverlay({
                 </span>
               )}
             </div>
+
+            {teams.length > 0 && (
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs text-muted-foreground font-medium">Ekip:</span>
+                <div className="flex gap-1 flex-wrap">
+                  <button
+                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                      !group.teamId ? "bg-primary/10 border-primary font-semibold" : "bg-background border-border hover:bg-muted"
+                    }`}
+                    onClick={() => onTeamAssign(group.id, null)}
+                  >
+                    Yok
+                  </button>
+                  {teams.map(t => (
+                    <button
+                      key={t.id}
+                      className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                        group.teamId === t.id ? "font-semibold" : "hover:opacity-80"
+                      }`}
+                      style={{
+                        backgroundColor: group.teamId === t.id ? t.color + "20" : undefined,
+                        borderColor: group.teamId === t.id ? t.color : undefined,
+                        color: t.color,
+                      }}
+                      onClick={() => onTeamAssign(group.id, t.id)}
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-sm border-collapse">
@@ -759,6 +795,22 @@ export default function KesimTakipPage() {
     setNotes(prev => [note, ...prev]);
   }, []);
 
+  async function handleTeamAssign(groupId: string, teamId: string | null) {
+    if (!params.token) return;
+    try {
+      await assignTeamTracking(params.token, groupId, teamId);
+      setData(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          groups: prev.groups.map(g =>
+            g.id === groupId ? { ...g, teamId } : g
+          ),
+        };
+      });
+    } catch {}
+  }
+
   async function handleToggle(group: TrackingGroup) {
     if (!params.token || toggling.has(group.id)) return;
     setToggling(prev => new Set(prev).add(group.id));
@@ -903,6 +955,17 @@ export default function KesimTakipPage() {
                           {groupNotes}
                         </span>
                       )}
+                      {group.teamId && data.teams.find(t => t.id === group.teamId) && (() => {
+                        const team = data.teams.find(t => t.id === group.teamId)!;
+                        return (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
+                            style={{ backgroundColor: team.color + "20", color: team.color }}
+                          >
+                            {team.name}
+                          </span>
+                        );
+                      })()}
                       {group.kesildi && (
                         <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
                           Kesildi
@@ -944,9 +1007,11 @@ export default function KesimTakipPage() {
           toggling={toggling}
           notes={notes}
           token={params.token!}
+          teams={data.teams || []}
           onToggle={handleToggle}
           onClose={() => setOverlayIndex(null)}
           onNoteAdded={handleNoteAdded}
+          onTeamAssign={handleTeamAssign}
         />
       )}
     </div>

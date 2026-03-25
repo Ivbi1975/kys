@@ -438,12 +438,19 @@ export async function generateTrackingToken(kesimAlaniId: string): Promise<strin
   return data.trackingToken;
 }
 
+export interface TrackingTeam {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface TrackingGroup {
   id: string;
   animalNo: number;
   colorTag: string;
   kesildi: boolean;
   kesildiAt: string | null;
+  teamId: string | null;
   filledCount: number;
   donors: { name: string; description: string; donationType: string; vekalet: string; notes: string }[];
 }
@@ -454,6 +461,7 @@ export interface TrackingData {
   totalGroups: number;
   kesildiCount: number;
   groups: TrackingGroup[];
+  teams: TrackingTeam[];
 }
 
 export async function fetchTrackingData(token: string): Promise<TrackingData> {
@@ -546,4 +554,36 @@ export function getGroupPhotoUrlAdmin(kesimAlaniId: string, groupId: string, pho
 
 export async function fetchPhotoCountsAdmin(kesimAlaniId: string): Promise<Record<string, number>> {
   return apiFetch<Record<string, number>>(`/kesim-alanlari/${kesimAlaniId}/photos/counts`);
+}
+
+export async function createTeam(kesimAlaniId: string, name: string, color: string): Promise<TrackingTeam> {
+  return apiFetch<TrackingTeam>(`/kesim-alanlari/${kesimAlaniId}/teams`, {
+    method: "POST",
+    body: JSON.stringify({ name, color }),
+  });
+}
+
+export async function updateTeam(kesimAlaniId: string, teamId: string, data: { name?: string; color?: string }): Promise<TrackingTeam> {
+  return apiFetch<TrackingTeam>(`/kesim-alanlari/${kesimAlaniId}/teams/${teamId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteTeam(kesimAlaniId: string, teamId: string): Promise<void> {
+  await apiFetch(`/kesim-alanlari/${kesimAlaniId}/teams/${teamId}`, { method: "DELETE" });
+}
+
+export async function assignTeamAdmin(kesimAlaniId: string, groupId: string, teamId: string | null): Promise<void> {
+  await apiFetch(`/kesim-alanlari/${kesimAlaniId}/groups/${groupId}/team`, {
+    method: "PUT",
+    body: JSON.stringify({ teamId }),
+  });
+}
+
+export async function assignTeamTracking(token: string, groupId: string, teamId: string | null): Promise<void> {
+  await apiFetch(`/tracking/${token}/group/${groupId}/team`, {
+    method: "PUT",
+    body: JSON.stringify({ teamId }),
+  });
 }

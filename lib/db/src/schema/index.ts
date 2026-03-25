@@ -48,6 +48,19 @@ export const insertDonationSchema = createInsertSchema(donationsTable);
 export type InsertDonation = z.infer<typeof insertDonationSchema>;
 export type DonationRow = typeof donationsTable.$inferSelect;
 
+export const teamsTable = pgTable("teams", {
+  id: text("id").primaryKey(),
+  kesimAlaniId: text("kesim_alani_id").notNull().references(() => kesimAlanlariTable.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  color: text("color").notNull().default("#3b82f6"),
+}, (table) => [
+  index("idx_teams_kesim_alani_id").on(table.kesimAlaniId),
+]);
+
+export const insertTeamSchema = createInsertSchema(teamsTable);
+export type InsertTeam = z.infer<typeof insertTeamSchema>;
+export type TeamRow = typeof teamsTable.$inferSelect;
+
 export const animalGroupsTable = pgTable("animal_groups", {
   id: text("id").primaryKey(),
   kesimAlaniId: text("kesim_alani_id").notNull().references(() => kesimAlanlariTable.id, { onDelete: "cascade" }),
@@ -58,6 +71,7 @@ export const animalGroupsTable = pgTable("animal_groups", {
   sortOrder: integer("sort_order").notNull().default(0),
   kesildi: boolean("kesildi").notNull().default(false),
   kesildiAt: text("kesildi_at"),
+  teamId: text("team_id"),
 }, (table) => [
   index("idx_animal_groups_kesim_alani_id").on(table.kesimAlaniId),
 ]);

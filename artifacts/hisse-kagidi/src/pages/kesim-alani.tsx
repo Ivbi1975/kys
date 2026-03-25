@@ -103,8 +103,8 @@ import {
   Tag,
   Camera,
 } from "lucide-react";
-import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
-import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani, generateTrackingToken, fetchKesimAlaniTrackingNotes, updateTrackingNoteStatus, fetchGroupPhotosAdmin, getGroupPhotoUrlAdmin, fetchPhotoCountsAdmin } from "@/lib/api";
+import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag, Team } from "@/lib/types";
+import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani, generateTrackingToken, fetchKesimAlaniTrackingNotes, updateTrackingNoteStatus, fetchGroupPhotosAdmin, getGroupPhotoUrlAdmin, fetchPhotoCountsAdmin, createTeam, updateTeam, deleteTeam, assignTeamAdmin } from "@/lib/api";
 import type { DeletedDonation, TrackingNote, GroupPhoto } from "@/lib/api";
 import PhotoGallery from "@/components/PhotoGallery";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
@@ -316,6 +316,13 @@ export default function KesimAlaniPage() {
   const [photoViewGroup, setPhotoViewGroup] = useState<{ id: string; animalNo: number } | null>(null);
   const [photoViewPhotos, setPhotoViewPhotos] = useState<GroupPhoto[]>([]);
   const [photoViewLoading, setPhotoViewLoading] = useState(false);
+
+  const [teamDialogOpen, setTeamDialogOpen] = useState(false);
+  const [teamEditId, setTeamEditId] = useState<string | null>(null);
+  const [teamName, setTeamName] = useState("");
+  const [teamColor, setTeamColor] = useState("#3b82f6");
+  const [teamSaving, setTeamSaving] = useState(false);
+  const [filterTeam, setFilterTeam] = useState<string>("all");
 
   const [findDeleteOpen, setFindDeleteOpen] = useState(false);
   const [findDeleteColumn, setFindDeleteColumn] = useState<"name" | "description" | "donationType" | "vekalet" | "notes">("description");
@@ -2680,6 +2687,64 @@ export default function KesimAlaniPage() {
     setSplitShareDialog(null);
   }
 
+  async function handleSaveTeam() {
+    if (!kesim || !teamName.trim()) return;
+    setTeamSaving(true);
+    try {
+      if (teamEditId) {
+        const updated = await updateTeam(kesim.id, teamEditId, { name: teamName.trim(), color: teamColor });
+        setKesim(prev => prev ? { ...prev, teams: (prev.teams || []).map(t => t.id === teamEditId ? updated : t) } : prev);
+        toast({ title: "Ekip güncellendi" });
+      } else {
+        const created = await createTeam(kesim.id, teamName.trim(), teamColor);
+        setKesim(prev => prev ? { ...prev, teams: [...(prev.teams || []), created] } : prev);
+        toast({ title: "Ekip oluşturuldu" });
+      }
+      setTeamEditId(null);
+      setTeamName("");
+      setTeamColor("#3b82f6");
+    } catch {
+      toast({ title: "Hata", variant: "destructive" });
+    } finally {
+      setTeamSaving(false);
+    }
+  }
+
+  async function handleDeleteTeam(teamId: string) {
+    if (!kesim) return;
+    try {
+      await deleteTeam(kesim.id, teamId);
+      setKesim(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          teams: (prev.teams || []).filter(t => t.id !== teamId),
+          animalGroups: prev.animalGroups.map(g => g.teamId === teamId ? { ...g, teamId: undefined } : g),
+        };
+      });
+      if (filterTeam === teamId) setFilterTeam("all");
+      toast({ title: "Ekip silindi" });
+    } catch {
+      toast({ title: "Hata", variant: "destructive" });
+    }
+  }
+
+  async function handleAssignTeam(groupId: string, teamId: string | null) {
+    if (!kesim) return;
+    try {
+      await assignTeamAdmin(kesim.id, groupId, teamId);
+      setKesim(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          animalGroups: prev.animalGroups.map(g => g.id === groupId ? { ...g, teamId: teamId || undefined } : g),
+        };
+      });
+    } catch {
+      toast({ title: "Hata", variant: "destructive" });
+    }
+  }
+
   function enhancedRemoveFromGroup(groupIdx: number, donationIdx: number) {
     if (!kesim) return;
     if (isGroupLocked(groupIdx)) return;
@@ -3158,6 +3223,14 @@ export default function KesimAlaniPage() {
               >
                 <MessageSquarePlus className="w-4 h-4" />
                 <span className="hidden sm:inline ml-1">Saha Notları</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setTeamDialogOpen(true)}
+              >
+                <UserCog className="w-4 h-4" />
+                <span className="hidden sm:inline ml-1">Ekipler</span>
               </Button>
               <Button
                 size="sm"
@@ -5291,6 +5364,10 @@ export default function KesimAlaniPage() {
                   .map((group, groupIdx) => ({ group, groupIdx }))
                   .filter(({ group }) => {
                     if (colorTagFilter !== "all" && (group.colorTag || "") !== colorTagFilter) return false;
+                    if (filterTeam !== "all") {
+                      if (filterTeam === "none" && group.teamId) return false;
+                      if (filterTeam !== "none" && group.teamId !== filterTeam) return false;
+                    }
                     if (showOnlyIncomplete) {
                       const filled = group.donations.filter(d => d.name.trim() !== "").length;
                       if (filled >= 7) return false;
@@ -5357,6 +5434,17 @@ export default function KesimAlaniPage() {
                               )}
                             </span>
                           )}
+                          {group.teamId && (kesim.teams || []).find(t => t.id === group.teamId) && (() => {
+                            const team = (kesim.teams || []).find(t => t.id === group.teamId)!;
+                            return (
+                              <span
+                                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold"
+                                style={{ backgroundColor: team.color + "20", color: team.color }}
+                              >
+                                {team.name}
+                              </span>
+                            );
+                          })()}
                           <div className="flex items-center gap-0.5 ml-1" onClick={(e) => e.stopPropagation()}>
                             {(["green", "orange", "red", ""] as ColorTag[]).map((c) => (
                               <button
@@ -5429,6 +5517,20 @@ export default function KesimAlaniPage() {
                                 {photoCounts[group.id]}
                               </span>
                             </button>
+                          )}
+                          {(kesim.teams || []).length > 0 && (
+                            <select
+                              value={group.teamId || ""}
+                              onChange={(e) => { e.stopPropagation(); handleAssignTeam(group.id, e.target.value || null); }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="h-5 text-[10px] rounded border bg-background px-1 max-w-[80px]"
+                              title="Ekip Ata"
+                            >
+                              <option value="">Ekip yok</option>
+                              {(kesim.teams || []).map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                              ))}
+                            </select>
                           )}
                           <button
                             onClick={(e) => { e.stopPropagation(); toggleGroupLock(groupIdx); }}
@@ -6511,6 +6613,127 @@ export default function KesimAlaniPage() {
               readOnly
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={teamDialogOpen} onOpenChange={setTeamDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCog className="w-5 h-5" />
+              Ekip Yönetimi
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Ekip adı"
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                className="flex-1"
+              />
+              <input
+                type="color"
+                value={teamColor}
+                onChange={(e) => setTeamColor(e.target.value)}
+                className="w-10 h-10 rounded border cursor-pointer"
+              />
+              <Button
+                size="sm"
+                onClick={handleSaveTeam}
+                disabled={!teamName.trim() || teamSaving}
+                className="shrink-0"
+              >
+                {teamSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : teamEditId ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              </Button>
+              {teamEditId && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => { setTeamEditId(null); setTeamName(""); setTeamColor("#3b82f6"); }}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+            <div className="space-y-2">
+              {(kesim?.teams || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Henüz ekip oluşturulmamış
+                </p>
+              ) : (
+                (kesim?.teams || []).map(t => {
+                  const assignedCount = kesim!.animalGroups.filter(g => g.teamId === t.id).length;
+                  return (
+                    <div key={t.id} className="flex items-center gap-2 p-2 rounded-lg border">
+                      <div
+                        className="w-4 h-4 rounded-full shrink-0"
+                        style={{ backgroundColor: t.color }}
+                      />
+                      <span className="flex-1 text-sm font-medium">{t.name}</span>
+                      <span className="text-[10px] text-muted-foreground">{assignedCount} grup</span>
+                      <button
+                        onClick={() => { setTeamEditId(t.id); setTeamName(t.name); setTeamColor(t.color); }}
+                        className="p-1 hover:bg-muted rounded"
+                        title="Düzenle"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!confirm(`"${t.name}" ekibini silmek istediğinize emin misiniz?`)) return;
+                          handleDeleteTeam(t.id);
+                        }}
+                        className="p-1 hover:bg-red-50 dark:hover:bg-red-950 rounded text-red-500"
+                        title="Sil"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            {(kesim?.teams || []).length > 0 && (
+              <div className="pt-2 border-t">
+                <p className="text-xs text-muted-foreground mb-2">Ekip Filtresi:</p>
+                <div className="flex gap-1 flex-wrap">
+                  <button
+                    className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${
+                      filterTeam === "all" ? "bg-primary/10 border-primary font-semibold" : "hover:bg-muted"
+                    }`}
+                    onClick={() => setFilterTeam("all")}
+                  >
+                    Tümü
+                  </button>
+                  <button
+                    className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${
+                      filterTeam === "none" ? "bg-primary/10 border-primary font-semibold" : "hover:bg-muted"
+                    }`}
+                    onClick={() => setFilterTeam("none")}
+                  >
+                    Ekipsiz
+                  </button>
+                  {(kesim?.teams || []).map(t => (
+                    <button
+                      key={t.id}
+                      className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${
+                        filterTeam === t.id ? "font-semibold" : "hover:opacity-80"
+                      }`}
+                      style={{
+                        backgroundColor: filterTeam === t.id ? t.color + "20" : undefined,
+                        borderColor: filterTeam === t.id ? t.color : undefined,
+                        color: t.color,
+                      }}
+                      onClick={() => setFilterTeam(t.id)}
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
