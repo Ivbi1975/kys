@@ -108,7 +108,7 @@ router.post("/projects", async (req, res) => {
       return res.status(400).json({ error: "Name is required" });
     }
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
-    const now = new Date().toISOString();
+    const now = new Date();
     await db.insert(projectsTable).values({
       id,
       name: name.trim(),
@@ -147,7 +147,7 @@ router.delete("/projects/:id", async (req, res) => {
     const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
     if (!existing) return res.status(404).json({ error: "Project not found" });
 
-    await db.update(projectsTable).set({ deletedAt: new Date().toISOString() }).where(eq(projectsTable.id, id));
+    await db.update(projectsTable).set({ deletedAt: new Date() }).where(eq(projectsTable.id, id));
     await db.update(kesimAlanlariTable).set({ projectId: null }).where(eq(kesimAlanlariTable.projectId, id));
     res.json({ success: true });
   } catch (err) {

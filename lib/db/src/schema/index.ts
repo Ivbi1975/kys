@@ -5,8 +5,8 @@ import { z } from "zod/v4";
 export const projectsTable = pgTable("projects", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  createdAt: text("created_at").notNull(),
-  deletedAt: text("deleted_at"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
 export const insertProjectSchema = createInsertSchema(projectsTable);
@@ -16,8 +16,8 @@ export type ProjectRow = typeof projectsTable.$inferSelect;
 export const kesimAlanlariTable = pgTable("kesim_alanlari", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  createdAt: text("created_at").notNull(),
-  deletedAt: text("deleted_at"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   projectId: text("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
   trackingToken: text("tracking_token"),
   kesimListeId: text("kesim_liste_id"),
@@ -39,7 +39,7 @@ export const donationsTable = pgTable("donations", {
   phone: text("phone").notNull().default(""),
   excluded: boolean("excluded").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
-  deletedAt: text("deleted_at"),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   aiCategories: text("ai_categories"),
   aiWarnings: text("ai_warnings"),
 }, (table) => [
@@ -72,7 +72,7 @@ export const animalGroupsTable = pgTable("animal_groups", {
   notes: text("notes").notNull().default(""),
   sortOrder: integer("sort_order").notNull().default(0),
   kesildi: boolean("kesildi").notNull().default(false),
-  kesildiAt: text("kesildi_at"),
+  kesildiAt: timestamp("kesildi_at", { withTimezone: true }),
   teamId: text("team_id").references(() => teamsTable.id, { onDelete: "set null" }),
 }, (table) => [
   index("idx_animal_groups_kesim_alani_id").on(table.kesimAlaniId),
@@ -123,7 +123,7 @@ export const trackingNotesTable = pgTable("tracking_notes", {
   oldValue: text("old_value"),
   newValue: text("new_value"),
   status: text("status").notNull().default("pending"),
-  createdAt: text("created_at").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 }, (table) => [
   index("idx_tracking_notes_kesim_alani_id").on(table.kesimAlaniId),
   index("idx_tracking_notes_animal_group_id").on(table.animalGroupId),
@@ -138,7 +138,7 @@ export const animalGroupPhotosTable = pgTable("animal_group_photos", {
   animalGroupId: text("animal_group_id").notNull().references(() => animalGroupsTable.id, { onDelete: "cascade" }),
   data: text("data").notNull(),
   mimeType: text("mime_type").notNull().default("image/jpeg"),
-  createdAt: text("created_at").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 }, (table) => [
   index("idx_photos_animal_group_id").on(table.animalGroupId),
 ]);
@@ -156,7 +156,7 @@ export const notificationLogsTable = pgTable("notification_logs", {
   phone: text("phone").notNull().default(""),
   message: text("message").notNull().default(""),
   channel: text("channel").notNull().default("browser"),
-  createdAt: text("created_at").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 }, (table) => [
   index("idx_notification_logs_kesim_alani_id").on(table.kesimAlaniId),
   index("idx_notification_logs_animal_group_id").on(table.animalGroupId),
@@ -178,7 +178,7 @@ export const donationTransfersTable = pgTable("donation_transfers", {
   toKesimAlaniName: text("to_kesim_alani_name").notNull().default(""),
   removedFromSource: boolean("removed_from_source").notNull().default(true),
   shareCount: integer("share_count").notNull().default(1),
-  createdAt: text("created_at").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 }, (table) => [
   index("idx_donation_transfers_project_id").on(table.projectId),
 ]);

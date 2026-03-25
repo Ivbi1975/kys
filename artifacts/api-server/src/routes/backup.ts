@@ -215,7 +215,7 @@ router.post("/backup/import", async (req, res) => {
         const kaValues = {
           id: kaId,
           name: ka.name || "İsimsiz",
-          createdAt: ka.createdAt || new Date().toISOString(),
+          createdAt: ka.createdAt ? new Date(ka.createdAt) : new Date(),
         };
         if (mode === "merge") {
           await tx.insert(kesimAlanlariTable).values(kaValues).onConflictDoNothing();

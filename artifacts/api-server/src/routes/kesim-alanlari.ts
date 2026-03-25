@@ -271,7 +271,7 @@ router.post("/kesim-alanlari", async (req, res) => {
       await tx.insert(kesimAlanlariTable).values({
         id,
         name,
-        createdAt: createdAt || new Date().toISOString(),
+        createdAt: createdAt ? new Date(createdAt) : new Date(),
         projectId,
         trackingToken: crypto.randomBytes(16).toString("hex"),
         kesimListeId: kesimListeId ?? null,
@@ -338,7 +338,7 @@ router.put("/kesim-alanlari/:id", async (req, res) => {
       return;
     }
 
-    let kesildiMap: Map<string, { kesildi: boolean; kesildiAt: string | null; teamId: string | null }> | undefined;
+    let kesildiMap: Map<string, { kesildi: boolean; kesildiAt: Date | null; teamId: string | null }> | undefined;
     if (animalGroups !== undefined) {
       const existingGroups = await db.select({
         id: animalGroupsTable.id,
@@ -420,7 +420,7 @@ router.delete("/kesim-alanlari/:id", async (req, res) => {
       await db.delete(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
     } else {
       await db.update(kesimAlanlariTable)
-        .set({ deletedAt: new Date().toISOString() })
+        .set({ deletedAt: new Date() })
         .where(eq(kesimAlanlariTable.id, id));
     }
 
@@ -586,7 +586,7 @@ router.delete("/kesim-alanlari/:id/donations/:donationId", async (req, res) => {
       await db.delete(donationsTable).where(eq(donationsTable.id, donationId));
     } else {
       await db.update(donationsTable)
-        .set({ deletedAt: new Date().toISOString() })
+        .set({ deletedAt: new Date() })
         .where(eq(donationsTable.id, donationId));
     }
     res.json({ success: true });
@@ -745,8 +745,9 @@ router.put("/kesim-alanlari/:id/animal-groups/bulk", async (req, res) => {
       id: animalGroupsTable.id,
       kesildi: animalGroupsTable.kesildi,
       kesildiAt: animalGroupsTable.kesildiAt,
+      teamId: animalGroupsTable.teamId,
     }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId));
-    const kesildiMap = new Map(existingGroups.map(g => [g.id, { kesildi: g.kesildi, kesildiAt: g.kesildiAt }]));
+    const kesildiMap = new Map(existingGroups.map(g => [g.id, { kesildi: g.kesildi, kesildiAt: g.kesildiAt, teamId: g.teamId }]));
 
     await db.transaction(async (tx) => {
       await tx.delete(animalGroupDonationsTable).where(
@@ -791,14 +792,14 @@ router.put("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => {
       return;
     }
 
-    const dbUpdates: Record<string, string | number | boolean | null> = {};
+    const dbUpdates: Record<string, string | number | boolean | Date | null> = {};
     if (updates.animalNo !== undefined) dbUpdates.animalNo = updates.animalNo;
     if (updates.colorTag !== undefined) dbUpdates.colorTag = updates.colorTag;
     if (updates.locked !== undefined) dbUpdates.locked = updates.locked;
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
     if (updates.kesildi !== undefined) {
       dbUpdates.kesildi = updates.kesildi;
-      dbUpdates.kesildiAt = updates.kesildi ? new Date().toISOString() : null;
+      dbUpdates.kesildiAt = updates.kesildi ? new Date() : null;
     }
 
     await db.transaction(async (tx) => {
@@ -1236,7 +1237,7 @@ async function saveDonations(tx: Tx, kesimAlaniId: string, donations: DonationPa
   }
 }
 
-async function saveAnimalGroups(tx: Tx, kesimAlaniId: string, groups: AnimalGroupPayload[], kesildiMap?: Map<string, { kesildi: boolean; kesildiAt: string | null; teamId: string | null }>) {
+async function saveAnimalGroups(tx: Tx, kesimAlaniId: string, groups: AnimalGroupPayload[], kesildiMap?: Map<string, { kesildi: boolean; kesildiAt: Date | null; teamId: string | null }>) {
   if (groups.length === 0) return;
 
   const groupRows = groups.map((g, i) => {
@@ -1492,7 +1493,7 @@ async function createNotificationLogs(kesimAlaniId: string, groupId: string, ani
       .where(eq(appSettingsTable.key, "notification_template"));
     const template = templateSetting?.value || "Hayvan {animalNo} kesildi. Hayırlı olsun!";
 
-    const now = new Date().toISOString();
+    const now = new Date();
     const logRows = donations
       .filter(d => d.name.trim())
       .map(d => ({
@@ -1538,7 +1539,7 @@ router.put("/tracking/:token/group/:groupId/kesildi", async (req, res) => {
       return;
     }
 
-    const kesildiAt = kesildi ? new Date().toISOString() : null;
+    const kesildiAt = kesildi ? new Date() : null;
     await db.update(animalGroupsTable).set({ kesildi, kesildiAt }).where(eq(animalGroupsTable.id, groupId));
     await createNotificationLogs(ka.id, groupId, group.animalNo, kesildi);
     res.json({ success: true, groupId, kesildi, kesildiAt });
@@ -1644,7 +1645,7 @@ router.post("/tracking/:token/notes", async (req, res) => {
     }
 
     const noteId = crypto.randomUUID();
-    const now = new Date().toISOString();
+    const now = new Date();
 
     await db.insert(trackingNotesTable).values({
       id: noteId,
@@ -1801,15 +1802,16 @@ router.post("/tracking/:token/group/:groupId/photos", async (req, res) => {
     }
 
     const photoId = crypto.randomUUID();
+    const photoCreatedAt = new Date();
     await db.insert(animalGroupPhotosTable).values({
       id: photoId,
       animalGroupId: groupId,
       data: data.startsWith("data:") ? data : `data:${mime};base64,${data}`,
       mimeType: mime,
-      createdAt: new Date().toISOString(),
+      createdAt: photoCreatedAt,
     });
 
-    res.status(201).json({ id: photoId, mimeType: mime, createdAt: new Date().toISOString() });
+    res.status(201).json({ id: photoId, mimeType: mime, createdAt: photoCreatedAt.toISOString() });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     res.status(500).json({ error: message });
