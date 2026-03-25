@@ -261,6 +261,7 @@ export default function KesimAlaniPage() {
   const { runGrouping, runIncrementalGrouping, cancelGrouping } = useGroupingWorker();
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const groupsScrollTopRef = useRef<number>(0);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const [columnDragItem, setColumnDragItem] = useState<ColumnKey | null>(null);
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
@@ -3215,16 +3216,27 @@ export default function KesimAlaniPage() {
       });
   }, [kesim?.animalGroups, colorTagFilter, filterTeam, showOnlyIncomplete]);
 
+  const effectiveColumnCount = workspace?.prefs?.columnCount ?? 1;
+
+  const groupRows = useMemo(() => {
+    const rows: (typeof filteredGroupItems)[] = [];
+    const cols = effectiveColumnCount;
+    for (let i = 0; i < filteredGroupItems.length; i += cols) {
+      rows.push(filteredGroupItems.slice(i, i + cols));
+    }
+    return rows;
+  }, [filteredGroupItems, effectiveColumnCount]);
+
   const scrollToAnimalGroup = useCallback((animalNo: number) => {
-    const colCount = workspace?.prefs?.columnCount ?? 1;
     const idx = filteredGroupItems.findIndex(item => item.group.animalNo === animalNo);
-    if (idx >= 0 && colCount === 1 && groupsVirtuosoRef.current && filteredGroupItems.length > 20) {
-      groupsVirtuosoRef.current.scrollToIndex({ index: idx, align: "center", behavior: "smooth" });
+    if (idx >= 0 && groupsVirtuosoRef.current && filteredGroupItems.length > 20) {
+      const rowIdx = Math.floor(idx / effectiveColumnCount);
+      groupsVirtuosoRef.current.scrollToIndex({ index: rowIdx, align: "center", behavior: "smooth" });
     } else {
       const el = document.getElementById(`animal-group-${animalNo}`);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, [filteredGroupItems, workspace?.prefs?.columnCount]);
+  }, [filteredGroupItems, effectiveColumnCount]);
 
   const handleSetGroupColorTag = useCallback((groupIdx: number, tag: ColorTag) => {
     setGroupColorTag(groupIdx, tag);
@@ -5691,14 +5703,13 @@ export default function KesimAlaniPage() {
                 />
               );
 
-              const colCount = workspace.prefs.columnCount ?? 1;
               const gridClassName = `grid gap-4 ${
-                colCount === 3 ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" :
-                colCount === 2 ? "grid-cols-1 md:grid-cols-2" :
+                effectiveColumnCount === 3 ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" :
+                effectiveColumnCount === 2 ? "grid-cols-1 md:grid-cols-2" :
                 "grid-cols-1"
               }`;
 
-              if (colCount === 1 && filteredGroupItems.length > 20) {
+              if (filteredGroupItems.length > 20) {
                 const virtuosoProps = fullscreenMode && scrollContainerRef.current
                   ? { customScrollParent: scrollContainerRef.current }
                   : { useWindowScroll: true as const };
@@ -5706,12 +5717,19 @@ export default function KesimAlaniPage() {
                   <Virtuoso
                     ref={groupsVirtuosoRef}
                     {...virtuosoProps}
-                    data={filteredGroupItems}
+                    data={groupRows}
                     overscan={5}
                     defaultItemHeight={collapsedGroups.size > 0 ? 60 : 350}
-                    itemContent={(_index, item) => (
-                      <div className="pb-4">
-                        {renderGroupCard(item)}
+                    initialScrollTop={groupsScrollTopRef.current}
+                    scrollerRef={(ref) => {
+                      if (ref && ref instanceof HTMLElement) {
+                        const handler = () => { groupsScrollTopRef.current = ref.scrollTop; };
+                        ref.addEventListener("scroll", handler, { passive: true });
+                      }
+                    }}
+                    itemContent={(_index, row) => (
+                      <div className={`${gridClassName} pb-4`}>
+                        {row.map(renderGroupCard)}
                       </div>
                     )}
                   />
