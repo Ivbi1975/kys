@@ -3068,6 +3068,12 @@ router.get("/kesim-alanlari/:id/photos/counts", async (req, res) => {
 
 router.post("/photos/backfill-thumbnails", async (req, res) => {
   try {
+    const adminKey = req.headers["x-admin-key"] || req.query.key;
+    if (!adminKey || adminKey !== (process.env["ADMIN_KEY"] || "backfill-thumbs")) {
+      res.status(403).json({ error: "Yetkisiz erişim" });
+      return;
+    }
+
     const photos = await db.select({
       id: animalGroupPhotosTable.id,
       data: animalGroupPhotosTable.data,

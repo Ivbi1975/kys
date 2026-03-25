@@ -26,7 +26,9 @@ function LazyImage({ src, alt, className, onClick }: { src: string; alt: string;
       {visible ? (
         <>
           {!loaded && (
-            <div className="absolute inset-0 bg-muted animate-pulse rounded" />
+            <div className="absolute inset-0 bg-gradient-to-br from-muted via-muted/80 to-muted/60 animate-pulse rounded backdrop-blur-sm flex items-center justify-center">
+              <ImageIcon className="w-4 h-4 text-muted-foreground/30 animate-pulse" />
+            </div>
           )}
           <img
             src={src}
@@ -38,7 +40,7 @@ function LazyImage({ src, alt, className, onClick }: { src: string; alt: string;
           />
         </>
       ) : (
-        <div className="w-full h-full bg-muted flex items-center justify-center rounded">
+        <div className="w-full h-full bg-muted/60 backdrop-blur-sm flex items-center justify-center rounded">
           <ImageIcon className="w-4 h-4 text-muted-foreground/40" />
         </div>
       )}

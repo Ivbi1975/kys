@@ -92,6 +92,13 @@
       "when": 1774500800000,
       "tag": "0012_delta_sync_tombstones_cascade",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1774500900000,
+      "tag": "0013_photo_thumbnails",
+      "breakpoints": true
     }
   ]
 }

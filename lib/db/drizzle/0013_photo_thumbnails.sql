@@ -1,0 +1,1 @@
+ALTER TABLE "animal_group_photos" ADD COLUMN IF NOT EXISTS "thumbnail" text;
