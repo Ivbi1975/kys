@@ -1453,7 +1453,12 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     if (!currentTarget.contains(relatedTarget)) {
       if (dragOverGroupRef.current === groupIdx) {
         dragOverGroupRef.current = null;
+        dragOverRef.current = null;
         setDragOverGroup(null);
+      }
+      if (autoScrollRafRef.current) {
+        cancelAnimationFrame(autoScrollRafRef.current);
+        autoScrollRafRef.current = 0;
       }
     }
   }, []);
