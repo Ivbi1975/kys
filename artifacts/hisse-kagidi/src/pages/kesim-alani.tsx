@@ -5721,10 +5721,9 @@ export default function KesimAlaniPage() {
                     overscan={5}
                     defaultItemHeight={collapsedGroups.size > 0 ? 60 : 350}
                     initialScrollTop={groupsScrollTopRef.current}
-                    scrollerRef={(ref) => {
-                      if (ref && ref instanceof HTMLElement) {
-                        const handler = () => { groupsScrollTopRef.current = ref.scrollTop; };
-                        ref.addEventListener("scroll", handler, { passive: true });
+                    onScroll={(e) => {
+                      if (e && typeof e.scrollTop === "number") {
+                        groupsScrollTopRef.current = e.scrollTop;
                       }
                     }}
                     itemContent={(_index, row) => (
