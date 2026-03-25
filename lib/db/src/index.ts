@@ -36,15 +36,16 @@ async function ensureMinConnections() {
 
 let poolLogInterval: ReturnType<typeof setInterval> | null = null;
 
-export function startPoolMonitoring(intervalMs = 60_000) {
+export function startPoolMonitoring(intervalMs = 20_000) {
   if (poolLogInterval) return;
   ensureMinConnections().catch((err) =>
     console.error("Pool warm-up failed:", err.message),
   );
   poolLogInterval = setInterval(() => {
     ensureMinConnections().catch(() => {});
+    const active = pool.totalCount - pool.idleCount;
     console.log(
-      `[DB Pool] total=${pool.totalCount} idle=${pool.idleCount} waiting=${pool.waitingCount}`,
+      `[DB Pool] total=${pool.totalCount} active=${active} idle=${pool.idleCount} waiting=${pool.waitingCount}`,
     );
   }, intervalMs);
   poolLogInterval.unref();
