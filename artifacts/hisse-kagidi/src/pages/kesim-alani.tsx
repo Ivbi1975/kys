@@ -103,15 +103,18 @@ import {
   Tag,
   Camera,
   FileText,
+  Monitor,
+  UserPlus,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag, Team } from "@/lib/types";
-import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani, generateTrackingToken, fetchKesimAlaniTrackingNotes, updateTrackingNoteStatus, fetchGroupPhotosAdmin, getGroupPhotoUrlAdmin, fetchPhotoCountsAdmin, createTeam, updateTeam, deleteTeam, assignTeamAdmin, fetchNotificationLogs, fetchNotificationTemplate, updateNotificationTemplate } from "@/lib/api";
-import type { DeletedDonation, TrackingNote, GroupPhoto, NotificationLog } from "@/lib/api";
+import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani, generateTrackingToken, fetchKesimAlaniTrackingNotes, updateTrackingNoteStatus, fetchGroupPhotosAdmin, getGroupPhotoUrlAdmin, fetchPhotoCountsAdmin, createTeam, updateTeam, deleteTeam, assignTeamAdmin, fetchNotificationLogs, fetchNotificationTemplate, updateNotificationTemplate, createDonationTransfers } from "@/lib/api";
+import type { DeletedDonation, TrackingNote, GroupPhoto, NotificationLog, DonationTransferEntry } from "@/lib/api";
 import PhotoGallery from "@/components/PhotoGallery";
 import { autoGroupDonationsAsync, getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
 import { useHistory } from "@/lib/useHistory";
 import { useWorkspacePreferences, ALL_GROUP_COLUMNS, type ColumnKey } from "@/lib/useWorkspacePreferences";
+import { useTheme } from "@/lib/useTheme";
 import {
   Popover,
   PopoverContent,
@@ -187,6 +190,7 @@ export default function KesimAlaniPage() {
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const [colorTagFilter, setColorTagFilter] = useState<ColorTag | "all">("all");
   const history = useHistory();
+  const { toggle: toggleTheme, mode: themeMode } = useTheme();
 
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [bulkMode, setBulkMode] = useState<"upload" | "paste">("upload");
@@ -334,6 +338,8 @@ export default function KesimAlaniPage() {
   const [notificationTemplateSaving, setNotificationTemplateSaving] = useState(false);
 
   const [donorListReportOpen, setDonorListReportOpen] = useState(false);
+  const [transferToDonorListConfirm, setTransferToDonorListConfirm] = useState(false);
+  const [transferToDonorListRemoving, setTransferToDonorListRemoving] = useState(false);
   const [findDeleteOpen, setFindDeleteOpen] = useState(false);
   const [findDeleteColumn, setFindDeleteColumn] = useState<"name" | "description" | "donationType" | "vekalet" | "notes">("description");
   const [findDeleteValue, setFindDeleteValue] = useState("");
@@ -2505,6 +2511,62 @@ export default function KesimAlaniPage() {
     }
   }
 
+  async function transferForeignToCurrentDonorList(removeFromSource: boolean) {
+    if (!kesim) return;
+    const foreignItems = basketItems.filter(b => b.kesimAlaniId !== kesim.id);
+    if (foreignItems.length === 0) return;
+    setTransferToDonorListRemoving(true);
+    try {
+      const donationIds = foreignItems.map(b => b.donationId);
+      const sourceKAIds = [...new Set(foreignItems.map(b => b.kesimAlaniId))];
+      for (const sourceKAId of sourceKAIds) {
+        const itemsFromSource = foreignItems.filter(b => b.kesimAlaniId === sourceKAId);
+        await moveDonationsToKesimAlani(
+          itemsFromSource.map(b => b.donationId),
+          sourceKAId,
+          kesim.id,
+        );
+      }
+      if (kesim.projectId) {
+        const transferEntries: DonationTransferEntry[] = foreignItems.map(b => ({
+          id: crypto.randomUUID(),
+          projectId: kesim.projectId!,
+          donationId: b.donationId,
+          donorName: b.name,
+          donorDescription: b.description,
+          fromKesimAlaniId: b.kesimAlaniId,
+          fromKesimAlaniName: b.kesimAlaniName,
+          toKesimAlaniId: kesim.id,
+          toKesimAlaniName: kesim.name,
+          removedFromSource: removeFromSource,
+          shareCount: 1,
+          createdAt: new Date().toISOString(),
+        }));
+        try {
+          await createDonationTransfers(transferEntries);
+        } catch {
+          toast({ title: "Uyarı", description: "Aktarım logu kaydedilemedi, ancak bağışçılar başarıyla aktarıldı.", variant: "destructive" });
+        }
+      }
+      setBasketItems(prev => prev.filter(b => !donationIds.includes(b.donationId)));
+      const data = await fetchKesimAlani(kesim.id);
+      if (data) {
+        setKesim(data);
+        history.initialize(data);
+      }
+      toast({ title: `${foreignItems.length} bağışçı bu kesim alanının listesine eklendi` });
+    } catch (err) {
+      toast({
+        title: "Aktarım başarısız",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    } finally {
+      setTransferToDonorListRemoving(false);
+      setTransferToDonorListConfirm(false);
+    }
+  }
+
   function addSelectedToBasket() {
     if (!kesim || selectedIds.size === 0) return;
     setBasketItems(prev => {
@@ -3261,6 +3323,9 @@ export default function KesimAlaniPage() {
               >
                 <Send className="w-4 h-4" />
                 <span className="hidden sm:inline ml-1">Bildirimler</span>
+              </Button>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0" onClick={toggleTheme} title={themeMode === "light" ? "Koyu Mod" : themeMode === "dark" ? "Sistem" : "Açık Mod"}>
+                {themeMode === "light" ? <Sun className="w-4 h-4" /> : themeMode === "dark" ? <Moon className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
               </Button>
               <Button
                 size="sm"
@@ -6269,6 +6334,16 @@ export default function KesimAlaniPage() {
                       </span>
                     ))}
                     {foreignBasketItems.length > 4 && <span className="text-[10px]">+{foreignBasketItems.length - 4}</span>}
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="h-6 text-[10px] ml-1 bg-blue-600 hover:bg-blue-700"
+                      onClick={() => setTransferToDonorListConfirm(true)}
+                      disabled={transferToDonorListRemoving}
+                    >
+                      {transferToDonorListRemoving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <UserPlus className="w-3 h-3 mr-1" />}
+                      Bağışçı Listesine Ekle ({foreignBasketItems.length})
+                    </Button>
                   </div>
                 )}
                 <div className="flex items-center gap-1 flex-wrap">
@@ -6887,6 +6962,34 @@ export default function KesimAlaniPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {transferToDonorListConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setTransferToDonorListConfirm(false); }}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative bg-background rounded-xl shadow-2xl border p-6 w-[400px] max-w-full" onClick={e => e.stopPropagation()}>
+            <h3 className="font-semibold text-base mb-3">Bağışçı Listesine Ekle</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Sepetteki <strong>{basketItems.filter(b => b.kesimAlaniId !== kesim?.id).length}</strong> bağışçıyı bu kesim alanının bağışçı listesine eklemek istiyorsunuz.
+            </p>
+            <p className="text-sm text-muted-foreground mb-4">
+              Bu bağışçılar eski kesim alanlarından <strong>otomatik olarak kaldırılacaktır</strong>.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setTransferToDonorListConfirm(false)} disabled={transferToDonorListRemoving}>
+                İptal
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => transferForeignToCurrentDonorList(true)}
+                disabled={transferToDonorListRemoving}
+              >
+                {transferToDonorListRemoving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <UserPlus className="w-3.5 h-3.5 mr-1" />}
+                Ekle ve Kaynaktan Kaldır
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {donorListReportOpen && kesim && (() => {
         const activeDonors = kesim.donations.filter(d => !d.excluded);

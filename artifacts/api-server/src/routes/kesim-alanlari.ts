@@ -12,6 +12,7 @@ import {
   teamsTable,
   notificationLogsTable,
   appSettingsTable,
+  donationTransfersTable,
 } from "@workspace/db/schema";
 import { desc } from "drizzle-orm";
 import { eq, inArray, isNull, isNotNull, and } from "drizzle-orm";
@@ -2086,6 +2087,53 @@ router.get("/tracking/:token/notification-logs", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`GET /tracking/${req.params.token}/notification-logs error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/donation-transfers", async (req, res) => {
+  try {
+    const bodySchema = z.object({
+      entries: z.array(z.object({
+        id: z.string().min(1),
+        projectId: z.string().min(1),
+        donationId: z.string(),
+        donorName: z.string(),
+        donorDescription: z.string(),
+        fromKesimAlaniId: z.string(),
+        fromKesimAlaniName: z.string(),
+        toKesimAlaniId: z.string(),
+        toKesimAlaniName: z.string(),
+        removedFromSource: z.boolean(),
+        shareCount: z.number().int().min(1),
+        createdAt: z.string(),
+      })).min(1),
+    });
+    const parsed = bodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid entries", details: parsed.error.issues });
+      return;
+    }
+    const { entries } = parsed.data;
+    await db.insert(donationTransfersTable).values(entries);
+    res.json({ success: true, count: entries.length });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error("POST /donation-transfers error:", message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/projects/:projectId/transfer-log", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const logs = await db.select().from(donationTransfersTable)
+      .where(eq(donationTransfersTable.projectId, projectId))
+      .orderBy(desc(donationTransfersTable.createdAt));
+    res.json(logs);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`GET /projects/${req.params.projectId}/transfer-log error:`, message);
     res.status(500).json({ error: message });
   }
 });

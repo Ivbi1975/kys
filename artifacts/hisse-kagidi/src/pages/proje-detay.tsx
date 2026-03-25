@@ -48,6 +48,9 @@ import {
   Link2,
   ExternalLink,
   QrCode,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
 import QrCodeModal from "@/components/QrCodeModal";
 import { useToast } from "@/hooks/use-toast";
@@ -62,15 +65,18 @@ import {
   fetchCatismaTespiti,
   transferDonation,
   generateTrackingToken,
+  fetchTransferLog,
 } from "@/lib/api";
-import type { Conflict, ConflictEntry } from "@/lib/api";
+import type { Conflict, ConflictEntry, DonationTransferEntry } from "@/lib/api";
 import { getTotalShares, getRequiredAnimals } from "@/lib/grouping";
+import { useTheme } from "@/lib/useTheme";
 
 export default function ProjeDetayPage() {
   const { id: projectId } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
+  const { toggle: toggleTheme, mode: themeMode } = useTheme();
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<Project | null>(null);
   const [kesimAlanlari, setKesimAlanlari] = useState<KesimAlani[]>([]);
@@ -100,6 +106,10 @@ export default function ProjeDetayPage() {
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qrUrl, setQrUrl] = useState("");
   const [qrTitle, setQrTitle] = useState("");
+
+  const [transferLog, setTransferLog] = useState<DonationTransferEntry[]>([]);
+  const [transferLogLoading, setTransferLogLoading] = useState(false);
+  const [showTransferLog, setShowTransferLog] = useState(false);
 
   const [transferDialog, setTransferDialog] = useState<{
     entry: ConflictEntry;
@@ -462,6 +472,9 @@ export default function ProjeDetayPage() {
             >
               <Trash2 className="w-4 h-4 text-destructive" />
             </Button>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={toggleTheme} title={themeMode === "light" ? "Koyu Mod" : themeMode === "dark" ? "Sistem" : "Açık Mod"}>
+              {themeMode === "light" ? <Sun className="w-4 h-4" /> : themeMode === "dark" ? <Moon className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
+            </Button>
           </div>
         </div>
 
@@ -804,6 +817,77 @@ export default function ProjeDetayPage() {
                     })}
                   </div>
                 </>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4">
+          <Button
+            variant={showTransferLog ? "default" : "outline"}
+            onClick={async () => {
+              const next = !showTransferLog;
+              setShowTransferLog(next);
+              if (next && projectId) {
+                setTransferLogLoading(true);
+                try {
+                  const logs = await fetchTransferLog(projectId);
+                  setTransferLog(logs);
+                } catch {} finally {
+                  setTransferLogLoading(false);
+                }
+              }
+            }}
+            className="mb-4"
+          >
+            <MoveRight className="w-4 h-4 mr-2" />
+            Aktarımlar Logu
+            {showTransferLog && transferLog.length > 0 && (
+              <span className="ml-2 px-2 py-0.5 rounded-full bg-white/20 text-xs">
+                {transferLog.length}
+              </span>
+            )}
+          </Button>
+
+          {showTransferLog && (
+            <div className="space-y-2">
+              {transferLogLoading ? (
+                <div className="text-center py-8">
+                  <Loader2 className="w-6 h-6 text-primary mx-auto mb-2 animate-spin" />
+                  <p className="text-muted-foreground text-sm">Aktarım kayıtları yükleniyor...</p>
+                </div>
+              ) : transferLog.length === 0 ? (
+                <Card className="p-6 text-center">
+                  <MoveRight className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                  <h3 className="text-base font-semibold text-foreground mb-1">Aktarım Kaydı Yok</h3>
+                  <p className="text-muted-foreground text-sm">
+                    Henüz kesim alanları arasında bağışçı aktarımı yapılmamış.
+                  </p>
+                </Card>
+              ) : (
+                <Card className="divide-y">
+                  {transferLog.map((log) => (
+                    <div key={log.id} className="p-3 flex items-center gap-3 text-sm">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{log.donorName || log.donorDescription}</div>
+                        {log.donorDescription && log.donorName && (
+                          <div className="text-xs text-muted-foreground truncate">{log.donorDescription}</div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
+                        <span className="px-1.5 py-0.5 bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 rounded truncate max-w-[100px]">{log.fromKesimAlaniName}</span>
+                        <MoveRight className="w-3.5 h-3.5" />
+                        <span className="px-1.5 py-0.5 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded truncate max-w-[100px]">{log.toKesimAlaniName}</span>
+                      </div>
+                      <div className="text-[10px] text-muted-foreground shrink-0">
+                        {new Date(log.createdAt).toLocaleDateString("tr-TR")} {new Date(log.createdAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                      {log.removedFromSource && (
+                        <span className="text-[9px] px-1 py-0.5 bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 rounded shrink-0">Kaynaktan kaldırıldı</span>
+                      )}
+                    </div>
+                  ))}
+                </Card>
               )}
             </div>
           )}

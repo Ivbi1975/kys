@@ -165,6 +165,27 @@ export const insertNotificationLogSchema = createInsertSchema(notificationLogsTa
 export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
 export type NotificationLogRow = typeof notificationLogsTable.$inferSelect;
 
+export const donationTransfersTable = pgTable("donation_transfers", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").references(() => projectsTable.id, { onDelete: "cascade" }),
+  donationId: text("donation_id"),
+  donorName: text("donor_name").notNull().default(""),
+  donorDescription: text("donor_description").notNull().default(""),
+  fromKesimAlaniId: text("from_kesim_alani_id"),
+  fromKesimAlaniName: text("from_kesim_alani_name").notNull().default(""),
+  toKesimAlaniId: text("to_kesim_alani_id"),
+  toKesimAlaniName: text("to_kesim_alani_name").notNull().default(""),
+  removedFromSource: boolean("removed_from_source").notNull().default(true),
+  shareCount: integer("share_count").notNull().default(1),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  index("idx_donation_transfers_project_id").on(table.projectId),
+]);
+
+export const insertDonationTransferSchema = createInsertSchema(donationTransfersTable);
+export type InsertDonationTransfer = z.infer<typeof insertDonationTransferSchema>;
+export type DonationTransferRow = typeof donationTransfersTable.$inferSelect;
+
 export const appSettingsTable = pgTable("app_settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),

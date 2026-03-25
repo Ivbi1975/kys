@@ -70,7 +70,8 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - Group merge (checkbox selection + toolbar, handles 7-share overflow into new groups)
 - Manual swap mode (ArrowLeftRight icon, preview dialog before executing)
 - Auto conflict resolver ("Otomatik Çöz" button, optimally consolidates same-vekalet donors by choosing the target group with most existing matches to minimize swaps)
-- Cross-kesim-alanı basket (kese): basket items persist in localStorage per project, visible when navigating between KAs; items from other KAs shown with blue badges; transfer donors to another KA in same project via "Başka KA'ya taşı" dropdown; group-level "Tümünü Sepete Ekle" button in group header (shopping bag icon)
+- Cross-kesim-alanı basket (kese): basket items persist in localStorage per project, visible when navigating between KAs; items from other KAs shown with blue badges; transfer donors to another KA in same project via "Başka KA'ya taşı" dropdown; group-level "Tümünü Sepete Ekle" button in group header (shopping bag icon); "Bağışçı Listesine Ekle" button for foreign basket items — adds donors to current KA's donor list with confirmation dialog, auto-removes from source KA, logs all transfers to DB
+- Donation transfer log: `donation_transfers` DB table tracks all cross-KA donor movements (from/to KA names, donor info, timestamps, removal status); viewable on project detail page via "Aktarımlar Logu" button
 - Custom tag system: global tag definitions (name + color) managed in Settings, assignable to donors via popover, displayed as colored badges, included in backup/restore, orphaned tags cleaned on deletion
 - Advanced filtering: filter donor list by cinsi (dropdown), hisse range (min/max), status (active/excluded), tags (multi-select) — combinable filters with active count badge and clear button
 - Data persisted in PostgreSQL via API server (migrated from localStorage)
@@ -143,7 +144,7 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
 Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
 
 - `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — table definitions with Drizzle-Zod insert schemas: `projectsTable`, `kesimAlanlariTable` (with `projectId` FK to projects, `trackingToken` for public tracking links), `donationsTable` (with `deletedAt` for soft-delete, `aiCategories` text JSON array, `aiWarnings` text for AI classification persistence), `animalGroupsTable` (with `kesildi` boolean for slaughter tracking), `animalGroupDonationsTable`, `customTagsTable`, `donationTagsTable`, `appSettingsTable`
+- `src/schema/index.ts` — table definitions with Drizzle-Zod insert schemas: `projectsTable`, `kesimAlanlariTable` (with `projectId` FK to projects, `trackingToken` for public tracking links), `donationsTable` (with `deletedAt` for soft-delete, `aiCategories` text JSON array, `aiWarnings` text for AI classification persistence), `animalGroupsTable` (with `kesildi` boolean for slaughter tracking), `animalGroupDonationsTable`, `customTagsTable`, `donationTagsTable`, `donationTransfersTable` (cross-KA transfer audit log), `appSettingsTable`
 - `drizzle/` — generated migration files
 - `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
 - Exports: `.` (pool, db, schema), `./schema` (schema only)

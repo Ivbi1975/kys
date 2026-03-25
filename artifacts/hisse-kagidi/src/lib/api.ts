@@ -620,3 +620,29 @@ export async function fetchTrackingNotificationLogs(token: string, since?: strin
   const query = since ? `?since=${encodeURIComponent(since)}` : "";
   return apiFetch<NotificationLog[]>(`/tracking/${token}/notification-logs${query}`);
 }
+
+export interface DonationTransferEntry {
+  id: string;
+  projectId: string;
+  donationId: string;
+  donorName: string;
+  donorDescription: string;
+  fromKesimAlaniId: string;
+  fromKesimAlaniName: string;
+  toKesimAlaniId: string;
+  toKesimAlaniName: string;
+  removedFromSource: boolean;
+  shareCount: number;
+  createdAt: string;
+}
+
+export async function createDonationTransfers(entries: DonationTransferEntry[]): Promise<{ success: boolean; count: number }> {
+  return apiFetch<{ success: boolean; count: number }>("/donation-transfers", {
+    method: "POST",
+    body: JSON.stringify({ entries }),
+  });
+}
+
+export async function fetchTransferLog(projectId: string): Promise<DonationTransferEntry[]> {
+  return apiFetch<DonationTransferEntry[]>(`/projects/${projectId}/transfer-log`);
+}
