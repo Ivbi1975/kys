@@ -315,7 +315,12 @@ router.get("/ai-notes/jobs/:jobId", async (req, res) => {
     };
 
     if (job.status === "completed" && job.result) {
-      response.results = JSON.parse(job.result);
+      try {
+        response.results = JSON.parse(job.result);
+      } catch {
+        response.results = [];
+        response.error = "Sonuç ayrıştırılamadı";
+      }
     }
 
     if (job.status === "failed" && job.error) {
@@ -401,11 +406,12 @@ router.put("/ai-notes/bulk-update", async (req, res) => {
       eq(aiJobsTable.status, "pending"),
       eq(aiJobsTable.status, "processing"),
     );
-    const updated = await db.update(aiJobsTable)
+    await db.update(aiJobsTable)
       .set({ status: "failed", error: "Sunucu yeniden başlatıldı", updatedAt: new Date() })
       .where(staleCondition!);
     console.log("[ai-jobs] Startup: marked stale jobs as failed");
-  } catch {
+  } catch (err) {
+    console.error("[ai-jobs] Startup cleanup error:", err);
   }
 })();
 
@@ -413,7 +419,8 @@ setInterval(async () => {
   try {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
     await db.delete(aiJobsTable).where(lt(aiJobsTable.createdAt, cutoff));
-  } catch {
+  } catch (err) {
+    console.error("[ai-jobs] Cleanup error:", err);
   }
 }, 60 * 60 * 1000);
 
