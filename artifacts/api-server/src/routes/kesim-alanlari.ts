@@ -1408,8 +1408,17 @@ router.delete("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => 
 router.get("/catisma-tespiti", async (req, res) => {
   try {
     const projectIdFilter = req.query.projectId as string | undefined;
-    const projectCondition = projectIdFilter
+    const kaFilter = projectIdFilter
       ? sql`AND ka.project_id = ${projectIdFilter}`
+      : sql``;
+    const k2Filter = projectIdFilter
+      ? sql`AND k2.project_id = ${projectIdFilter}`
+      : sql``;
+    const k3Filter = projectIdFilter
+      ? sql`AND k3.project_id = ${projectIdFilter}`
+      : sql``;
+    const k4Filter = projectIdFilter
+      ? sql`AND k4.project_id = ${projectIdFilter}`
       : sql``;
 
     const dataResult = await db.execute(sql`
@@ -1423,24 +1432,24 @@ router.get("/catisma-tespiti", async (req, res) => {
             'excluded', d.excluded, 'kesimAlaniId', d.kesim_alani_id
           ))
           FROM donations d
-          WHERE d.kesim_alani_id IN (SELECT k2.id FROM kesim_alanlari k2 WHERE k2.deleted_at IS NULL ${projectCondition})
+          WHERE d.kesim_alani_id IN (SELECT k2.id FROM kesim_alanlari k2 WHERE k2.deleted_at IS NULL ${k2Filter})
             AND d.deleted_at IS NULL
         ), '[]'::json) AS donations,
         COALESCE((
           SELECT json_agg(jsonb_build_object('id', ag.id, 'animalNo', ag.animal_no, 'kesimAlaniId', ag.kesim_alani_id))
           FROM animal_groups ag
-          WHERE ag.kesim_alani_id IN (SELECT k3.id FROM kesim_alanlari k3 WHERE k3.deleted_at IS NULL ${projectCondition})
+          WHERE ag.kesim_alani_id IN (SELECT k3.id FROM kesim_alanlari k3 WHERE k3.deleted_at IS NULL ${k3Filter})
         ), '[]'::json) AS groups,
         COALESCE((
           SELECT json_agg(jsonb_build_object('groupId', agd.group_id, 'donationId', agd.donation_id))
           FROM animal_group_donations agd
           WHERE agd.group_id IN (
             SELECT ag2.id FROM animal_groups ag2
-            WHERE ag2.kesim_alani_id IN (SELECT k4.id FROM kesim_alanlari k4 WHERE k4.deleted_at IS NULL ${projectCondition})
+            WHERE ag2.kesim_alani_id IN (SELECT k4.id FROM kesim_alanlari k4 WHERE k4.deleted_at IS NULL ${k4Filter})
           )
         ), '[]'::json) AS group_donation_links
       FROM kesim_alanlari ka
-      WHERE ka.deleted_at IS NULL ${projectCondition}
+      WHERE ka.deleted_at IS NULL ${kaFilter}
     `);
 
     const raw = dataResult.rows[0] as {
