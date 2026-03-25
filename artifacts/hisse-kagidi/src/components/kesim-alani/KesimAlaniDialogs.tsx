@@ -14,7 +14,7 @@ import { lazy } from "react";
   import { Label } from "@/components/ui/label";
   import { Badge } from "@/components/ui/badge";
   import { ScrollArea } from "@/components/ui/scroll-area";
-  import { AlertTriangle, ArrowLeftRight, ArrowUp, Camera, Check, ChevronUp, Edit3, Eye, EyeOff, Keyboard, Loader2, MessageSquarePlus, Package, Plus, Printer, RotateCcw, Scissors, Send, Settings2, ShoppingBag, Sparkles, Trash2, UserCog, UserPlus, Wand2, X } from "lucide-react";
+  import { AlertTriangle, ArrowLeftRight, ArrowUp, Camera, Check, ChevronUp, Edit3, Keyboard, Loader2, Package, Plus, Printer, Scissors, Send, ShoppingBag, Sparkles, Trash2, UserCog, UserPlus, Wand2, X } from "lucide-react";
   const PhotoGallery = lazy(() => import("@/components/PhotoGallery"));
   const QrCodeModal = lazy(() => import("@/components/QrCodeModal"));
   import { computeEffectiveShares } from "@/lib/grouping";
@@ -76,7 +76,7 @@ import { lazy } from "react";
         </LazyLoadBoundary>
       )}
 
-    <Dialog open={swapPreviewOpen} onOpenChange={(open) => { if (!open) cancelSwap(); }}>
+    {swapPreviewOpen && <Dialog open={swapPreviewOpen} onOpenChange={(open) => { if (!open) cancelSwap(); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -140,9 +140,9 @@ import { lazy } from "react";
           );
         })()}
       </DialogContent>
-    </Dialog>
+    </Dialog>}
 
-    <Dialog open={autoResolveOpen} onOpenChange={setAutoResolveOpen}>
+    {autoResolveOpen && <Dialog open={autoResolveOpen} onOpenChange={setAutoResolveOpen}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -192,9 +192,9 @@ import { lazy } from "react";
           )}
         </div>
       </DialogContent>
-    </Dialog>
+    </Dialog>}
 
-    <Dialog open={shortcutHelpOpen} onOpenChange={setShortcutHelpOpen}>
+    {shortcutHelpOpen && <Dialog open={shortcutHelpOpen} onOpenChange={setShortcutHelpOpen}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -225,8 +225,8 @@ import { lazy } from "react";
           ))}
         </div>
       </DialogContent>
-    </Dialog>
-    <Dialog open={splitShareDialog !== null} onOpenChange={(open) => { if (!open) setSplitShareDialog(null); }}>
+    </Dialog>}
+    {splitShareDialog !== null && <Dialog open={splitShareDialog !== null} onOpenChange={(open) => { if (!open) setSplitShareDialog(null); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -262,9 +262,9 @@ import { lazy } from "react";
           );
         })()}
       </DialogContent>
-    </Dialog>
+    </Dialog>}
 
-    <Dialog open={splitGroupDialog !== null} onOpenChange={(open) => { if (!open) setSplitGroupDialog(null); }}>
+    {splitGroupDialog !== null && <Dialog open={splitGroupDialog !== null} onOpenChange={(open) => { if (!open) setSplitGroupDialog(null); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -312,9 +312,9 @@ import { lazy } from "react";
           );
         })()}
       </DialogContent>
-    </Dialog>
+    </Dialog>}
 
-    <Dialog open={smartPlacePopover !== null} onOpenChange={(open) => { if (!open) setSmartPlacePopover(null); }}>
+    {smartPlacePopover !== null && <Dialog open={smartPlacePopover !== null} onOpenChange={(open) => { if (!open) setSmartPlacePopover(null); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -381,9 +381,9 @@ import { lazy } from "react";
           );
         })()}
       </DialogContent>
-    </Dialog>
+    </Dialog>}
 
-    <AlertDialog open={!!personBulkDeleteConfirm} onOpenChange={(open) => { if (!open) setPersonBulkDeleteConfirm(null); }}>
+    {!!personBulkDeleteConfirm && <AlertDialog open={!!personBulkDeleteConfirm} onOpenChange={(open) => { if (!open) setPersonBulkDeleteConfirm(null); }}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Toplu Silme Onayı</AlertDialogTitle>
@@ -406,7 +406,7 @@ import { lazy } from "react";
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
-    </AlertDialog>
+    </AlertDialog>}
 
     {/* Sticky bottom basket panel */}
     {basketItems.length > 0 && (() => {
@@ -690,7 +690,7 @@ import { lazy } from "react";
       </LazyLoadBoundary>
     )}
 
-    <Dialog open={!!photoViewGroup} onOpenChange={(open) => { if (!open) setPhotoViewGroup(null); }}>
+    {!!photoViewGroup && <Dialog open={!!photoViewGroup} onOpenChange={(open) => { if (!open) setPhotoViewGroup(null); }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -716,9 +716,9 @@ import { lazy } from "react";
           </LazyLoadBoundary>
         )}
       </DialogContent>
-    </Dialog>
+    </Dialog>}
 
-    <Dialog open={teamDialogOpen} onOpenChange={setTeamDialogOpen}>
+    {teamDialogOpen && <Dialog open={teamDialogOpen} onOpenChange={setTeamDialogOpen}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -837,7 +837,7 @@ import { lazy } from "react";
           )}
         </div>
       </DialogContent>
-    </Dialog>
+    </Dialog>}
 
     {transferToDonorListConfirm && (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setTransferToDonorListConfirm(false); }}>
