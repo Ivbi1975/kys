@@ -107,6 +107,7 @@ export default function NotDuzenlemePage() {
   }, []);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [hideEmptyNotes, setHideEmptyNotes] = useState(false);
   const [findText, setFindText] = useState("");
   const [replaceText, setReplaceText] = useState("");
   const [showReplaceBar, setShowReplaceBar] = useState(false);
@@ -225,6 +226,7 @@ export default function NotDuzenlemePage() {
   }, [params.id]);
 
   const filteredDonations = donations.filter(d => {
+    if (hideEmptyNotes && (!d.notes || d.notes.trim() === "")) return false;
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -860,9 +862,20 @@ export default function NotDuzenlemePage() {
           </Button>
         )}
 
-        <div className="text-xs text-muted-foreground">
-          {filteredDonations.length} bağışçı gösteriliyor
-          {searchQuery && ` ("${searchQuery}" araması)`}
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-muted-foreground">
+            {filteredDonations.length}/{donations.length} bağışçı gösteriliyor
+            {searchQuery && ` ("${searchQuery}" araması)`}
+            {hideEmptyNotes && " (notu olmayanlar gizli)"}
+          </div>
+          <Button
+            variant={hideEmptyNotes ? "default" : "outline"}
+            size="sm"
+            onClick={() => setHideEmptyNotes(prev => !prev)}
+            className="text-xs h-7"
+          >
+            {hideEmptyNotes ? "Tümünü Göster" : "Notu Olmayanları Gizle"}
+          </Button>
         </div>
 
         <div className="border rounded-lg overflow-hidden">
