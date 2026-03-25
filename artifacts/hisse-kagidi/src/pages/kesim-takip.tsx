@@ -565,6 +565,15 @@ function KesimKagidiOverlay({
   const [photos, setPhotos] = useState<GroupPhoto[]>([]);
   const [photosLoading, setPhotosLoading] = useState(false);
   const photosLoadedFor = useRef<string | null>(null);
+  const editFormRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (editDonorIdx !== null && editFormRef.current) {
+      setTimeout(() => {
+        editFormRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 100);
+    }
+  }, [editDonorIdx]);
 
   const group = groups[currentIndex];
   if (!group) return null;
@@ -683,12 +692,47 @@ function KesimKagidiOverlay({
                 <span className="text-2xl font-bold text-primary">#{group.animalNo}</span>
                 <span className="text-sm text-muted-foreground">({group.filledCount}/7 dolu)</span>
               </div>
-              {group.kesildi && group.kesildiAt && (
-                <span className="text-xs bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 px-2 py-1 rounded-full font-semibold flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  {formatKesildiTime(group.kesildiAt)}
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                <button
+                  className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors ${showNotes ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-muted-foreground"}`}
+                  onClick={() => setShowNotes(!showNotes)}
+                  title="Notlar"
+                  aria-label={`Notlar${groupNoteCount > 0 ? ` (${groupNoteCount})` : ""}`}
+                  aria-pressed={showNotes}
+                >
+                  <MessageSquarePlus className="w-4 h-4" />
+                  {groupNoteCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold">{groupNoteCount}</span>
+                  )}
+                </button>
+                <button
+                  className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors ${showPhotos ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-muted-foreground"}`}
+                  onClick={() => {
+                    setShowPhotos(!showPhotos);
+                    if (!showPhotos && photosLoadedFor.current !== group.id) {
+                      setPhotosLoading(true);
+                      fetchGroupPhotos(token, group.id)
+                        .then(p => { setPhotos(p); photosLoadedFor.current = group.id; })
+                        .catch(() => setPhotos([]))
+                        .finally(() => setPhotosLoading(false));
+                    }
+                  }}
+                  title="Fotoğraflar"
+                  aria-label={`Fotoğraflar${photos.length > 0 && photosLoadedFor.current === group.id ? ` (${photos.length})` : ""}`}
+                  aria-pressed={showPhotos}
+                >
+                  <Camera className="w-4 h-4" />
+                  {photos.length > 0 && photosLoadedFor.current === group.id && (
+                    <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold">{photos.length}</span>
+                  )}
+                </button>
+                {group.kesildi && group.kesildiAt && (
+                  <span className="text-xs bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 px-2 py-1 rounded-full font-semibold flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {formatKesildiTime(group.kesildiAt)}
+                  </span>
+                )}
+              </div>
             </div>
 
             {teams.length > 0 && (
@@ -811,7 +855,7 @@ function KesimKagidiOverlay({
             </div>
 
             {editDonorIdx !== null && rows[editDonorIdx]?.donor && (
-              <div className="mt-3">
+              <div className="mt-3" ref={editFormRef}>
                 <EditRequestForm
                   donor={rows[editDonorIdx].donor!}
                   donorIndex={editDonorIdx}
@@ -823,66 +867,49 @@ function KesimKagidiOverlay({
               </div>
             )}
 
-            <div className="mt-3">
-              <button
-                className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground mb-2"
-                onClick={() => setShowNotes(!showNotes)}
-              >
-                <MessageSquarePlus className="w-3.5 h-3.5" />
-                Notlar {groupNoteCount > 0 && `(${groupNoteCount})`}
-                {showNotes ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              </button>
-              {showNotes && (
-                <div className="space-y-2">
-                  <NoteInput groupId={group.id} token={token} onNoteAdded={onNoteAdded} createNote={createNote} />
-                  <NotesList notes={notes} groupId={group.id} />
+            {showNotes && (
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold text-muted-foreground">Notlar</span>
+                  <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setShowNotes(false)} aria-label="Notları kapat">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-              )}
-            </div>
+                <NoteInput groupId={group.id} token={token} onNoteAdded={onNoteAdded} createNote={createNote} />
+                <NotesList notes={notes} groupId={group.id} />
+              </div>
+            )}
 
-            <div className="mt-3">
-              <button
-                className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground mb-2"
-                onClick={() => {
-                  setShowPhotos(!showPhotos);
-                  if (!showPhotos && photosLoadedFor.current !== group.id) {
-                    setPhotosLoading(true);
-                    fetchGroupPhotos(token, group.id)
-                      .then(p => { setPhotos(p); photosLoadedFor.current = group.id; })
-                      .catch(() => setPhotos([]))
-                      .finally(() => setPhotosLoading(false));
-                  }
-                }}
-              >
-                <Camera className="w-3.5 h-3.5" />
-                Fotoğraflar {photos.length > 0 && photosLoadedFor.current === group.id && `(${photos.length})`}
-                {showPhotos ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              </button>
-              {showPhotos && (
-                <div className="mt-1">
-                  {photosLoading ? (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      Yükleniyor...
-                    </div>
-                  ) : (
-                    <PhotoGallery
-                      photos={photos}
-                      getPhotoUrl={(photoId) => getGroupPhotoUrl(token, group.id, photoId)}
-                      onUpload={async (data, mimeType) => {
-                        const photo = await uploadGroupPhoto(token, group.id, data, mimeType);
-                        setPhotos(prev => [...prev, photo]);
-                        return photo;
-                      }}
-                      onDelete={async (photoId) => {
-                        await deleteGroupPhoto(token, group.id, photoId);
-                        setPhotos(prev => prev.filter(p => p.id !== photoId));
-                      }}
-                    />
-                  )}
+            {showPhotos && (
+              <div className="mt-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold text-muted-foreground">Fotoğraflar</span>
+                  <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setShowPhotos(false)} aria-label="Fotoğrafları kapat">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-              )}
-            </div>
+                {photosLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Yükleniyor...
+                  </div>
+                ) : (
+                  <PhotoGallery
+                    photos={photos}
+                    getPhotoUrl={(photoId) => getGroupPhotoUrl(token, group.id, photoId)}
+                    onUpload={async (data, mimeType) => {
+                      const photo = await uploadGroupPhoto(token, group.id, data, mimeType);
+                      setPhotos(prev => [...prev, photo]);
+                      return photo;
+                    }}
+                    onDelete={async (photoId) => {
+                      await deleteGroupPhoto(token, group.id, photoId);
+                      setPhotos(prev => prev.filter(p => p.id !== photoId));
+                    }}
+                  />
+                )}
+              </div>
+            )}
           </div>
 
           <div className="sticky bottom-0 p-4 bg-background border-t">
@@ -907,16 +934,41 @@ function KesimKagidiOverlay({
           </div>
         </Card>
 
-        <div className="flex justify-center gap-1 mt-2 px-4 flex-wrap">
-          {groups.map((_, idx) => (
-            <button
-              key={idx}
-              className={`w-2 h-2 rounded-full transition-all ${
-                idx === currentIndex ? "bg-white scale-125" : "bg-white/40"
-              }`}
-              onClick={() => { setCurrentIndex(idx); setEditDonorIdx(null); }}
-            />
-          ))}
+        <div className="mt-2 px-2 max-h-[25vh] overflow-auto">
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-1">
+            {groups.map((g, idx) => {
+              const rawNames = g.donors.slice(0, 7).map(d => d?.name || "");
+              const donorNames = [...rawNames, ...Array(Math.max(0, 7 - rawNames.length)).fill("")];
+              const filledSlots = donorNames.filter((n: string) => n).length;
+              return (
+                <button
+                  key={g.id}
+                  className={`text-left rounded-lg p-1.5 transition-all text-[10px] leading-tight ${
+                    idx === currentIndex
+                      ? "bg-white text-gray-900 shadow-lg ring-2 ring-white/50"
+                      : "bg-white/10 text-white/80 hover:bg-white/20"
+                  }`}
+                  onClick={() => { setCurrentIndex(idx); setEditDonorIdx(null); }}
+                  aria-label={`Hayvan #${g.animalNo}, ${filledSlots}/7 dolu`}
+                  aria-current={idx === currentIndex ? "true" : undefined}
+                >
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="font-bold text-xs">#{g.animalNo}</span>
+                    <span className={`text-[9px] ${idx === currentIndex ? "text-gray-500" : "text-white/50"}`}>
+                      {filledSlots}/7
+                    </span>
+                  </div>
+                  <div className="space-y-px">
+                    {donorNames.map((name, i) => (
+                      <div key={i} className={`truncate ${name ? "" : (idx === currentIndex ? "text-gray-300" : "text-white/30")}`}>
+                        {name || "—"}
+                      </div>
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <p className="text-white/60 text-[10px] text-center mt-1">Sola/sağa kaydırarak gezinin • Aşağı kaydırarak kapatın</p>
