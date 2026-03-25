@@ -492,6 +492,22 @@ function buildDonationFilters(kesimAlaniId: string, query: Record<string, unknow
   return and(...conditions)!;
 }
 
+const DONATION_SORT_FIELDS = {
+  sortOrder: donationsTable.sortOrder,
+  name: donationsTable.name,
+  shareCount: donationsTable.shareCount,
+  donationType: donationsTable.donationType,
+} as const;
+type DonationSortField = keyof typeof DONATION_SORT_FIELDS;
+
+function parseSortParams(query: Record<string, unknown>) {
+  const rawField = typeof query.sortField === "string" ? query.sortField : "sortOrder";
+  const sortField: DonationSortField = rawField in DONATION_SORT_FIELDS
+    ? (rawField as DonationSortField) : "sortOrder";
+  const sortDir = query.sortDir === "desc" ? "desc" as const : "asc" as const;
+  return { sortField, sortDir };
+}
+
 router.get("/kesim-alanlari/:id/donations", async (req, res) => {
   try {
     const { id: kesimAlaniId } = req.params;
@@ -504,20 +520,33 @@ router.get("/kesim-alanlari/:id/donations", async (req, res) => {
     const rawLimit = Number(req.query.limit) || 100;
     const limit = Math.min(Math.max(rawLimit, 1), 500);
     const cursor = typeof req.query.cursor === "string" ? req.query.cursor : null;
+    const { sortField, sortDir } = parseSortParams(req.query as Record<string, unknown>);
 
     const where = buildDonationFilters(kesimAlaniId, req.query as Record<string, unknown>);
+
+    const col = DONATION_SORT_FIELDS[sortField];
+    const dirFn = sortDir === "desc" ? desc : asc;
+    const cmpOp = sortDir === "desc"
+      ? (a: any, b: any) => sql`${a} < ${b}`
+      : (a: any, b: any) => sql`${a} > ${b}`;
 
     let cursorCondition;
     if (cursor) {
       const sepIdx = cursor.indexOf("_");
       if (sepIdx > 0) {
-        const cursorSort = Number(cursor.substring(0, sepIdx));
+        const cursorVal = cursor.substring(0, sepIdx);
         const cursorId = cursor.substring(sepIdx + 1);
-        if (!Number.isNaN(cursorSort) && cursorId) {
-          cursorCondition = or(
-            gt(donationsTable.sortOrder, cursorSort),
-            and(eq(donationsTable.sortOrder, cursorSort), gt(donationsTable.id, cursorId)),
-          );
+        if (cursorId) {
+          const isNumeric = sortField === "sortOrder" || sortField === "shareCount";
+          const typedVal = isNumeric ? Number(cursorVal) : cursorVal;
+          if (isNumeric && Number.isNaN(typedVal as number)) {
+            // skip invalid numeric cursor
+          } else {
+            cursorCondition = or(
+              cmpOp(col, typedVal),
+              and(eq(col, typedVal), gt(donationsTable.id, cursorId)),
+            );
+          }
         }
       }
     }
@@ -526,7 +555,7 @@ router.get("/kesim-alanlari/:id/donations", async (req, res) => {
 
     const rows = await db.select().from(donationsTable)
       .where(finalWhere!)
-      .orderBy(asc(donationsTable.sortOrder), asc(donationsTable.id))
+      .orderBy(dirFn(col), asc(donationsTable.id))
       .limit(limit + 1);
 
     const hasMore = rows.length > limit;
@@ -561,7 +590,14 @@ router.get("/kesim-alanlari/:id/donations", async (req, res) => {
     }));
 
     const lastItem = pageRows[pageRows.length - 1];
-    const nextCursor = hasMore && lastItem ? `${lastItem.sortOrder}_${lastItem.id}` : null;
+    let nextCursor: string | null = null;
+    if (hasMore && lastItem) {
+      const val = sortField === "sortOrder" ? lastItem.sortOrder
+        : sortField === "shareCount" ? lastItem.shareCount
+        : sortField === "name" ? lastItem.name
+        : lastItem.donationType;
+      nextCursor = `${val}_${lastItem.id}`;
+    }
 
     res.json({ items, nextCursor, hasMore });
   } catch (err) {
