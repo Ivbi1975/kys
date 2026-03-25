@@ -34,6 +34,8 @@ function StatCardSkeleton() {
   );
 }
 
+const ROW_WIDTHS = [85, 70, 90, 65, 80, 75, 60, 88];
+
 function TableSkeleton({ rows }: { rows: number }) {
   return (
     <div className="border rounded-lg overflow-hidden">
@@ -47,7 +49,7 @@ function TableSkeleton({ rows }: { rows: number }) {
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="px-4 py-3 flex gap-4 border-t">
           <Skeleton className="h-4 w-8" />
-          <Skeleton className="h-4 flex-1" style={{ width: `${60 + Math.random() * 30}%` }} />
+          <Skeleton className="h-4 flex-1" style={{ width: `${ROW_WIDTHS[i % ROW_WIDTHS.length]}%` }} />
           <Skeleton className="h-4 w-24" />
           <Skeleton className="h-4 w-20" />
           <Skeleton className="h-4 w-16" />
