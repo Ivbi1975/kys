@@ -3,12 +3,35 @@ import { db } from "@workspace/db";
 import {
   projectsTable,
   kesimAlanlariTable,
-  donationsTable,
   animalGroupsTable,
 } from "@workspace/db/schema";
 import { eq, isNull, isNotNull, and, sql, inArray } from "drizzle-orm";
 
 const router: IRouter = Router();
+
+const emptyStats = { donorCount: 0, shareCount: 0, groupCount: 0, kesildiCount: 0, lastKesildiAt: null };
+
+let refreshInProgress = false;
+let refreshQueued = false;
+
+export async function refreshProjectStats() {
+  if (refreshInProgress) {
+    refreshQueued = true;
+    return;
+  }
+  refreshInProgress = true;
+  try {
+    await db.execute(sql`REFRESH MATERIALIZED VIEW CONCURRENTLY project_stats_view`);
+  } catch (err) {
+    console.error("Failed to refresh project_stats_view:", err);
+  } finally {
+    refreshInProgress = false;
+    if (refreshQueued) {
+      refreshQueued = false;
+      refreshProjectStats();
+    }
+  }
+}
 
 router.get("/projects", async (_req, res) => {
   try {
@@ -18,80 +41,28 @@ router.get("/projects", async (_req, res) => {
       .where(isNull(projectsTable.deletedAt))
       .orderBy(projectsTable.createdAt);
 
-    const projectIds = projects.map((p) => p.id);
+    if (projects.length === 0) {
+      res.json([]);
+      return;
+    }
 
-    const statsMap: Record<string, { donorCount: number; shareCount: number; groupCount: number }> = {};
+    const statsRows = await db.execute(sql`SELECT project_id, donor_count, share_count, group_count, kesildi_count, last_kesildi_at FROM project_stats_view`);
 
-    if (projectIds.length > 0) {
-      const kesimRows = await db
-        .select({
-          projectId: kesimAlanlariTable.projectId,
-          kesimId: kesimAlanlariTable.id,
-        })
-        .from(kesimAlanlariTable)
-        .where(
-          and(
-            isNull(kesimAlanlariTable.deletedAt),
-            isNotNull(kesimAlanlariTable.projectId)
-          )
-        );
-
-      const projectKesimIds: Record<string, string[]> = {};
-      for (const row of kesimRows) {
-        if (row.projectId) {
-          if (!projectKesimIds[row.projectId]) projectKesimIds[row.projectId] = [];
-          projectKesimIds[row.projectId].push(row.kesimId);
-        }
-      }
-
-      for (const pid of projectIds) {
-        const kesimIds = projectKesimIds[pid] || [];
-        if (kesimIds.length === 0) {
-          statsMap[pid] = { donorCount: 0, shareCount: 0, groupCount: 0, kesildiCount: 0, lastKesildiAt: null };
-          continue;
-        }
-
-        const kesimIdList = sql`ARRAY[${sql.join(kesimIds.map(id => sql`${id}`), sql`, `)}]`;
-        const [donorStats, groupStats, kesildiStats] = await Promise.all([
-          db
-            .select({
-              count: sql<number>`count(*)::int`,
-              shares: sql<number>`coalesce(sum(${donationsTable.shareCount}), 0)::int`,
-            })
-            .from(donationsTable)
-            .where(
-              and(
-                sql`${donationsTable.kesimAlaniId} = ANY(${kesimIdList})`,
-                isNull(donationsTable.deletedAt),
-                eq(donationsTable.excluded, false)
-              )
-            ),
-          db
-            .select({ count: sql<number>`count(*)::int` })
-            .from(animalGroupsTable)
-            .where(sql`${animalGroupsTable.kesimAlaniId} = ANY(${kesimIdList})`),
-          db
-            .select({
-              kesildiCount: sql<number>`count(*) filter (where ${animalGroupsTable.kesildi} = true)::int`,
-              lastKesildiAt: sql<string | null>`max(${animalGroupsTable.kesildiAt})`,
-            })
-            .from(animalGroupsTable)
-            .where(sql`${animalGroupsTable.kesimAlaniId} = ANY(${kesimIdList})`),
-        ]);
-
-        statsMap[pid] = {
-          donorCount: donorStats[0]?.count ?? 0,
-          shareCount: donorStats[0]?.shares ?? 0,
-          groupCount: groupStats[0]?.count ?? 0,
-          kesildiCount: kesildiStats[0]?.kesildiCount ?? 0,
-          lastKesildiAt: kesildiStats[0]?.lastKesildiAt ?? null,
-        };
-      }
+    const statsMap: Record<string, typeof emptyStats> = {};
+    for (const row of statsRows.rows) {
+      const r = row as { project_id: string; donor_count: number; share_count: number; group_count: number; kesildi_count: number; last_kesildi_at: string | null };
+      statsMap[r.project_id] = {
+        donorCount: r.donor_count,
+        shareCount: r.share_count,
+        groupCount: r.group_count,
+        kesildiCount: r.kesildi_count,
+        lastKesildiAt: r.last_kesildi_at,
+      };
     }
 
     const result = projects.map((p) => ({
       ...p,
-      stats: statsMap[p.id] || { donorCount: 0, shareCount: 0, groupCount: 0, kesildiCount: 0, lastKesildiAt: null },
+      stats: statsMap[p.id] || emptyStats,
     }));
 
     res.json(result);
@@ -114,8 +85,9 @@ router.post("/projects", async (req, res) => {
       name: name.trim(),
       createdAt: now,
     });
+    await refreshProjectStats();
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-    res.status(201).json({ ...project, stats: { donorCount: 0, shareCount: 0, groupCount: 0, kesildiCount: 0, lastKesildiAt: null } });
+    res.status(201).json({ ...project, stats: emptyStats });
   } catch (err) {
     console.error("POST /projects error:", err);
     res.status(500).json({ error: "Failed to create project" });
@@ -134,7 +106,7 @@ router.put("/projects/:id", async (req, res) => {
 
     await db.update(projectsTable).set({ name: name.trim() }).where(eq(projectsTable.id, id));
     const [updated] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-    res.json({ ...updated, stats: { donorCount: 0, shareCount: 0, groupCount: 0, kesildiCount: 0, lastKesildiAt: null } });
+    res.json({ ...updated, stats: emptyStats });
   } catch (err) {
     console.error("PUT /projects/:id error:", err);
     res.status(500).json({ error: "Failed to update project" });
@@ -149,6 +121,7 @@ router.delete("/projects/:id", async (req, res) => {
 
     await db.update(projectsTable).set({ deletedAt: new Date() }).where(eq(projectsTable.id, id));
     await db.update(kesimAlanlariTable).set({ projectId: null }).where(eq(kesimAlanlariTable.projectId, id));
+    await refreshProjectStats();
     res.json({ success: true });
   } catch (err) {
     console.error("DELETE /projects/:id error:", err);
@@ -163,8 +136,9 @@ router.post("/projects/:id/restore", async (req, res) => {
     if (!existing) return res.status(404).json({ error: "Project not found" });
 
     await db.update(projectsTable).set({ deletedAt: null }).where(eq(projectsTable.id, id));
+    await refreshProjectStats();
     const [restored] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-    res.json({ ...restored, stats: { donorCount: 0, shareCount: 0, groupCount: 0, kesildiCount: 0, lastKesildiAt: null } });
+    res.json({ ...restored, stats: emptyStats });
   } catch (err) {
     console.error("POST /projects/:id/restore error:", err);
     res.status(500).json({ error: "Failed to restore project" });

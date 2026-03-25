@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
+import { refreshProjectStats } from "./projects";
 import {
   kesimAlanlariTable,
   donationsTable,
@@ -313,6 +314,7 @@ router.post("/backup/import", async (req, res) => {
     });
 
     res.json({ success: true, count: data.kesimAlanlari.length });
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error("POST /backup/import error:", message);

@@ -18,6 +18,7 @@ import { desc } from "drizzle-orm";
 import { eq, inArray, isNull, isNotNull, and } from "drizzle-orm";
 import { z } from "zod";
 import crypto from "crypto";
+import { refreshProjectStats } from "./projects";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -288,6 +289,7 @@ router.post("/kesim-alanlari", async (req, res) => {
 
     const result = await getFullKesimAlani(id);
     res.status(201).json(result);
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error("POST /kesim-alanlari error:", message);
@@ -314,6 +316,7 @@ router.put("/kesim-alanlari/:id/move", async (req, res) => {
     await db.update(kesimAlanlariTable).set({ projectId: projectId || null }).where(eq(kesimAlanlariTable.id, id));
     const result = await getFullKesimAlani(id);
     res.json(result);
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`PUT /kesim-alanlari/${req.params.id}/move error:`, message);
@@ -398,6 +401,7 @@ router.put("/kesim-alanlari/:id", async (req, res) => {
 
     const result = await getFullKesimAlani(id);
     res.json(result);
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`PUT /kesim-alanlari/${id} error:`, message);
@@ -425,6 +429,7 @@ router.delete("/kesim-alanlari/:id", async (req, res) => {
     }
 
     res.json({ success: true });
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`DELETE /kesim-alanlari/${req.params.id} error:`, message);
@@ -452,6 +457,7 @@ router.post("/kesim-alanlari/:id/restore", async (req, res) => {
 
     const result = await getFullKesimAlani(id);
     res.json(result);
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`POST /kesim-alanlari/${req.params.id}/restore error:`, message);
@@ -503,6 +509,7 @@ router.post("/kesim-alanlari/:id/donations", async (req, res) => {
 
     const result = await getFullKesimAlani(kesimAlaniId);
     res.status(201).json(result);
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`POST /kesim-alanlari/${kesimAlaniId}/donations error:`, message);
@@ -561,6 +568,7 @@ router.put("/kesim-alanlari/:id/donations/:donationId", async (req, res) => {
 
     const result = await getFullKesimAlani(kesimAlaniId);
     res.json(result);
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`PUT /kesim-alanlari/${kesimAlaniId}/donations/${donationId} error:`, message);
@@ -590,6 +598,7 @@ router.delete("/kesim-alanlari/:id/donations/:donationId", async (req, res) => {
         .where(eq(donationsTable.id, donationId));
     }
     res.json({ success: true });
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`DELETE donation ${req.params.donationId} error:`, message);
@@ -614,6 +623,7 @@ router.post("/kesim-alanlari/:id/donations/:donationId/restore", async (req, res
       .where(eq(donationsTable.id, donationId));
     const result = await getFullKesimAlani(kesimAlaniId);
     res.json(result);
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`POST restore donation ${req.params.donationId} error:`, message);
@@ -713,6 +723,7 @@ router.post("/kesim-alanlari/:id/animal-groups", async (req, res) => {
 
     const result = await getFullKesimAlani(kesimAlaniId);
     res.status(201).json(result);
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`POST /kesim-alanlari/${kesimAlaniId}/animal-groups error:`, message);
@@ -761,6 +772,7 @@ router.put("/kesim-alanlari/:id/animal-groups/bulk", async (req, res) => {
 
     const result = await getFullKesimAlani(kesimAlaniId);
     res.json(result);
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`PUT /kesim-alanlari/${kesimAlaniId}/animal-groups/bulk error:`, message);
@@ -827,6 +839,7 @@ router.put("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => {
 
     const result = await getFullKesimAlani(kesimAlaniId);
     res.json(result);
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`PUT /kesim-alanlari/${kesimAlaniId}/animal-groups/${groupId} error:`, message);
@@ -849,6 +862,7 @@ router.delete("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => 
     }
     await db.delete(animalGroupsTable).where(eq(animalGroupsTable.id, groupId));
     res.json({ success: true });
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`DELETE animal-group ${req.params.groupId} error:`, message);
@@ -1192,6 +1206,7 @@ router.post("/catisma-tespiti/transfer", async (req, res) => {
     ]);
 
     res.json({ success: true, source: updatedSource, target: updatedTarget });
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error("POST /catisma-tespiti/transfer error:", message);
@@ -1370,6 +1385,7 @@ router.post("/kesim-alanlari/move-donations", async (req, res) => {
     });
 
     res.json({ success: true, count: validIds.length, skipped: donationIds.length - validIds.length });
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error("POST /kesim-alanlari/move-donations error:", message);
@@ -1543,6 +1559,7 @@ router.put("/tracking/:token/group/:groupId/kesildi", async (req, res) => {
     await db.update(animalGroupsTable).set({ kesildi, kesildiAt }).where(eq(animalGroupsTable.id, groupId));
     await createNotificationLogs(ka.id, groupId, group.animalNo, kesildi);
     res.json({ success: true, groupId, kesildi, kesildiAt });
+    refreshProjectStats();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`PUT /tracking/${req.params.token}/group/${req.params.groupId}/kesildi error:`, message);
