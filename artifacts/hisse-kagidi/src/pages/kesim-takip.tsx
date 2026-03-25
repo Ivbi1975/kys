@@ -897,7 +897,7 @@ function KesimKagidiOverlay({
                 ) : (
                   <PhotoGallery
                     photos={photos}
-                    getPhotoUrl={(photoId) => getGroupPhotoUrl(token, group.id, photoId)}
+                    getPhotoUrl={(photoId, size) => getGroupPhotoUrl(token, group.id, photoId, size)}
                     onUpload={async (data, mimeType) => {
                       const photo = await uploadGroupPhoto(token, group.id, data, mimeType);
                       setPhotos(prev => [...prev, photo]);

@@ -16,7 +16,7 @@ function LazyImage({ src, alt, className, onClick }: { src: string; alt: string;
         setVisible(true);
         obs.disconnect();
       }
-    }, { rootMargin: "100px" });
+    }, { rootMargin: "200px" });
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
@@ -25,16 +25,20 @@ function LazyImage({ src, alt, className, onClick }: { src: string; alt: string;
     <div ref={ref} className={className} onClick={onClick}>
       {visible ? (
         <>
-          {!loaded && <div className="absolute inset-0 bg-muted animate-pulse" />}
+          {!loaded && (
+            <div className="absolute inset-0 bg-muted animate-pulse rounded" />
+          )}
           <img
             src={src}
             alt={alt}
-            className="w-full h-full object-cover"
+            className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
             onLoad={() => setLoaded(true)}
+            loading="lazy"
+            decoding="async"
           />
         </>
       ) : (
-        <div className="w-full h-full bg-muted flex items-center justify-center">
+        <div className="w-full h-full bg-muted flex items-center justify-center rounded">
           <ImageIcon className="w-4 h-4 text-muted-foreground/40" />
         </div>
       )}
@@ -75,7 +79,7 @@ function compressImage(file: File, maxWidth = 1200): Promise<{ data: string; mim
 
 interface PhotoGalleryProps {
   photos: GroupPhoto[];
-  getPhotoUrl: (photoId: string) => string;
+  getPhotoUrl: (photoId: string, size?: "thumb") => string;
   onUpload?: (data: string, mimeType: string) => Promise<GroupPhoto>;
   onDelete?: (photoId: string) => Promise<void>;
   readOnly?: boolean;
@@ -125,7 +129,7 @@ export default function PhotoGallery({ photos, getPhotoUrl, onUpload, onDelete, 
         {photos.map((photo) => (
           <div key={photo.id} className="relative group w-16 h-16 rounded-lg overflow-hidden border bg-muted cursor-pointer">
             <LazyImage
-              src={getPhotoUrl(photo.id)}
+              src={getPhotoUrl(photo.id, "thumb")}
               alt=""
               className="w-full h-full relative"
               onClick={() => setLightboxId(photo.id)}
@@ -186,7 +190,7 @@ export default function PhotoGallery({ photos, getPhotoUrl, onUpload, onDelete, 
           </Button>
 
           <div className="flex items-center gap-2 absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
-            {photos.map((p, i) => (
+            {photos.map((p) => (
               <button
                 key={p.id}
                 className={`w-12 h-12 rounded-md overflow-hidden border-2 transition-all ${
@@ -194,7 +198,7 @@ export default function PhotoGallery({ photos, getPhotoUrl, onUpload, onDelete, 
                 }`}
                 onClick={(e) => { e.stopPropagation(); setLightboxId(p.id); }}
               >
-                <img src={getPhotoUrl(p.id)} alt="" className="w-full h-full object-cover" />
+                <img src={getPhotoUrl(p.id, "thumb")} alt="" className="w-full h-full object-cover" />
               </button>
             ))}
           </div>

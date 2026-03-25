@@ -710,7 +710,7 @@ import { lazy } from "react";
           <LazyLoadBoundary fallback={<div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 animate-spin" /></div>}>
             <PhotoGallery
               photos={photoViewPhotos}
-              getPhotoUrl={(photoId: string) => kesim ? getGroupPhotoUrlAdmin(kesim.id, photoViewGroup!.id, photoId) : ""}
+              getPhotoUrl={(photoId: string, size?: "thumb") => kesim ? getGroupPhotoUrlAdmin(kesim.id, photoViewGroup!.id, photoId, size) : ""}
               readOnly
             />
           </LazyLoadBoundary>

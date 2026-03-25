@@ -596,8 +596,9 @@ export async function fetchGroupPhotos(token: string, groupId: string): Promise<
   return apiFetch<GroupPhoto[]>(`/tracking/${token}/group/${groupId}/photos`);
 }
 
-export function getGroupPhotoUrl(token: string, groupId: string, photoId: string): string {
-  return `${API_BASE}/tracking/${token}/group/${groupId}/photos/${photoId}`;
+export function getGroupPhotoUrl(token: string, groupId: string, photoId: string, size?: "thumb"): string {
+  const base = `${API_BASE}/tracking/${token}/group/${groupId}/photos/${photoId}`;
+  return size ? `${base}?size=${size}` : base;
 }
 
 export async function uploadGroupPhoto(token: string, groupId: string, data: string, mimeType: string): Promise<GroupPhoto> {
@@ -617,8 +618,9 @@ export async function fetchGroupPhotosAdmin(kesimAlaniId: string, groupId: strin
   return apiFetch<GroupPhoto[]>(`/kesim-alanlari/${kesimAlaniId}/group/${groupId}/photos`);
 }
 
-export function getGroupPhotoUrlAdmin(kesimAlaniId: string, groupId: string, photoId: string): string {
-  return `${API_BASE}/kesim-alanlari/${kesimAlaniId}/group/${groupId}/photos/${photoId}`;
+export function getGroupPhotoUrlAdmin(kesimAlaniId: string, groupId: string, photoId: string, size?: "thumb"): string {
+  const base = `${API_BASE}/kesim-alanlari/${kesimAlaniId}/group/${groupId}/photos/${photoId}`;
+  return size ? `${base}?size=${size}` : base;
 }
 
 export async function fetchPhotoCountsAdmin(kesimAlaniId: string): Promise<Record<string, number>> {

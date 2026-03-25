@@ -24,6 +24,7 @@ import { z } from "zod";
 import crypto from "crypto";
 import { refreshProjectStats } from "./projects";
 import { cacheGet, cacheSet, cacheInvalidatePrefix } from "../lib/cache";
+import { generateThumbnail } from "../lib/thumbnail";
 
 const KA_LIST_CACHE_KEY = "kesim-alanlari:list";
 const KA_LIST_TTL = 15_000;
@@ -2873,6 +2874,7 @@ router.get("/tracking/:token/group/:groupId/photos", async (req, res) => {
 router.get("/tracking/:token/group/:groupId/photos/:photoId", async (req, res) => {
   try {
     const { token, groupId, photoId } = req.params;
+    const size = req.query.size as string | undefined;
     const [ka] = await db.select().from(kesimAlanlariTable)
       .where(eq(kesimAlanlariTable.trackingToken, token));
     if (!ka) { res.status(404).json({ error: "Bulunamadı" }); return; }
@@ -2881,15 +2883,22 @@ router.get("/tracking/:token/group/:groupId/photos/:photoId", async (req, res) =
       .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
     if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
 
-    const [photo] = await db.select().from(animalGroupPhotosTable)
+    const [photo] = await db.select({
+      id: animalGroupPhotosTable.id,
+      thumbnail: animalGroupPhotosTable.thumbnail,
+      data: animalGroupPhotosTable.data,
+      mimeType: animalGroupPhotosTable.mimeType,
+    }).from(animalGroupPhotosTable)
       .where(and(eq(animalGroupPhotosTable.id, photoId), eq(animalGroupPhotosTable.animalGroupId, groupId)));
     if (!photo) { res.status(404).json({ error: "Fotoğraf bulunamadı" }); return; }
 
-    const base64Data = photo.data.replace(/^data:[^;]+;base64,/, "");
+    const sourceData = (size === "thumb" && photo.thumbnail) ? photo.thumbnail : photo.data;
+    const base64Data = sourceData.replace(/^data:[^;]+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
-    res.setHeader("Content-Type", photo.mimeType);
+    const contentType = (size === "thumb" && photo.thumbnail) ? "image/jpeg" : photo.mimeType;
+    res.setHeader("Content-Type", contentType);
     res.setHeader("Content-Length", buffer.length);
-    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Cache-Control", "public, max-age=86400, immutable");
     res.send(buffer);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
@@ -2932,10 +2941,20 @@ router.post("/tracking/:token/group/:groupId/photos", async (req, res) => {
 
     const photoId = crypto.randomUUID();
     const photoCreatedAt = new Date();
+    const fullData = data.startsWith("data:") ? data : `data:${mime};base64,${data}`;
+
+    let thumbnail: string | null = null;
+    try {
+      thumbnail = await generateThumbnail(fullData);
+    } catch (e) {
+      console.warn("Thumbnail generation failed, storing without thumbnail:", e);
+    }
+
     await db.insert(animalGroupPhotosTable).values({
       id: photoId,
       animalGroupId: groupId,
-      data: data.startsWith("data:") ? data : `data:${mime};base64,${data}`,
+      data: fullData,
+      thumbnail,
       mimeType: mime,
       createdAt: photoCreatedAt,
     });
@@ -2993,19 +3012,27 @@ router.get("/kesim-alanlari/:id/group/:groupId/photos", async (req, res) => {
 router.get("/kesim-alanlari/:id/group/:groupId/photos/:photoId", async (req, res) => {
   try {
     const { id, groupId, photoId } = req.params;
+    const size = req.query.size as string | undefined;
     const [group] = await db.select().from(animalGroupsTable)
       .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, id)));
     if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
 
-    const [photo] = await db.select().from(animalGroupPhotosTable)
+    const [photo] = await db.select({
+      id: animalGroupPhotosTable.id,
+      thumbnail: animalGroupPhotosTable.thumbnail,
+      data: animalGroupPhotosTable.data,
+      mimeType: animalGroupPhotosTable.mimeType,
+    }).from(animalGroupPhotosTable)
       .where(and(eq(animalGroupPhotosTable.id, photoId), eq(animalGroupPhotosTable.animalGroupId, groupId)));
     if (!photo) { res.status(404).json({ error: "Fotoğraf bulunamadı" }); return; }
 
-    const base64Data = photo.data.replace(/^data:[^;]+;base64,/, "");
+    const sourceData = (size === "thumb" && photo.thumbnail) ? photo.thumbnail : photo.data;
+    const base64Data = sourceData.replace(/^data:[^;]+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
-    res.setHeader("Content-Type", photo.mimeType);
+    const contentType = (size === "thumb" && photo.thumbnail) ? "image/jpeg" : photo.mimeType;
+    res.setHeader("Content-Type", contentType);
     res.setHeader("Content-Length", buffer.length);
-    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Cache-Control", "public, max-age=86400, immutable");
     res.send(buffer);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
@@ -3033,6 +3060,35 @@ router.get("/kesim-alanlari/:id/photos/counts", async (req, res) => {
       counts[p.animalGroupId] = (counts[p.animalGroupId] || 0) + 1;
     }
     res.json(counts);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/photos/backfill-thumbnails", async (req, res) => {
+  try {
+    const photos = await db.select({
+      id: animalGroupPhotosTable.id,
+      data: animalGroupPhotosTable.data,
+    }).from(animalGroupPhotosTable)
+      .where(isNull(animalGroupPhotosTable.thumbnail));
+
+    let generated = 0;
+    let failed = 0;
+    for (const photo of photos) {
+      try {
+        const thumb = await generateThumbnail(photo.data);
+        await db.update(animalGroupPhotosTable)
+          .set({ thumbnail: thumb })
+          .where(eq(animalGroupPhotosTable.id, photo.id));
+        generated++;
+      } catch {
+        failed++;
+      }
+    }
+
+    res.json({ total: photos.length, generated, failed });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     res.status(500).json({ error: message });

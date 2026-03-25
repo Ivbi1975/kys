@@ -165,6 +165,7 @@ export const animalGroupPhotosTable = pgTable("animal_group_photos", {
   id: text("id").primaryKey(),
   animalGroupId: text("animal_group_id").notNull().references(() => animalGroupsTable.id, { onDelete: "cascade" }),
   data: text("data").notNull(),
+  thumbnail: text("thumbnail"),
   mimeType: text("mime_type").notNull().default("image/jpeg"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
