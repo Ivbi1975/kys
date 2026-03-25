@@ -1,7 +1,46 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Camera, X, Loader2, Trash2, Plus, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { GroupPhoto } from "@/lib/api";
+
+function LazyImage({ src, alt, className, onClick }: { src: string; alt: string; className?: string; onClick?: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setVisible(true);
+        obs.disconnect();
+      }
+    }, { rootMargin: "100px" });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className={className} onClick={onClick}>
+      {visible ? (
+        <>
+          {!loaded && <div className="absolute inset-0 bg-muted animate-pulse" />}
+          <img
+            src={src}
+            alt={alt}
+            className="w-full h-full object-cover"
+            onLoad={() => setLoaded(true)}
+          />
+        </>
+      ) : (
+        <div className="w-full h-full bg-muted flex items-center justify-center">
+          <ImageIcon className="w-4 h-4 text-muted-foreground/40" />
+        </div>
+      )}
+    </div>
+  );
+}
 
 const MAX_PHOTOS = 5;
 
@@ -85,12 +124,11 @@ export default function PhotoGallery({ photos, getPhotoUrl, onUpload, onDelete, 
       <div className="flex flex-wrap gap-2">
         {photos.map((photo) => (
           <div key={photo.id} className="relative group w-16 h-16 rounded-lg overflow-hidden border bg-muted cursor-pointer">
-            <img
+            <LazyImage
               src={getPhotoUrl(photo.id)}
               alt=""
-              className="w-full h-full object-cover"
+              className="w-full h-full relative"
               onClick={() => setLightboxId(photo.id)}
-              loading="lazy"
             />
             {!readOnly && onDelete && (
               <button

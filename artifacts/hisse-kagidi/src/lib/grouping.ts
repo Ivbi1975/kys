@@ -1,5 +1,7 @@
 import type { Donation, AnimalGroup } from "./types";
 
+export const trCollator = new Intl.Collator("tr");
+
 function generateId(): string {
   return crypto.randomUUID();
 }
@@ -71,7 +73,7 @@ function buildGroupDonations(segments: GroupedSegment[]): Donation[] {
   filled.sort((a, b) => {
     const surnameA = getSurname(a.description || a.name);
     const surnameB = getSurname(b.description || b.name);
-    return surnameA.localeCompare(surnameB, "tr");
+    return trCollator.compare(surnameA, surnameB);
   });
   const sorted = [...filled, ...empty];
 
@@ -404,7 +406,7 @@ export function checkGroupConflicts(groups: AnimalGroup[]): ConflictInfo[] {
   }
   conflicts.sort((a, b) => {
     if (a.isExpected !== b.isExpected) return a.isExpected ? 1 : -1;
-    return a.description.localeCompare(b.description, "tr");
+    return trCollator.compare(a.description, b.description);
   });
   return conflicts;
 }

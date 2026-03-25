@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams } from "wouter";
+import { Virtuoso } from "react-virtuoso";
 import { createTrackingNote, fetchGroupPhotos, getGroupPhotoUrl, uploadGroupPhoto, deleteGroupPhoto, assignTeamTracking, fetchTrackingNotificationLogs } from "@/lib/api";
 import type { TrackingData, TrackingGroup, TrackingNote, GroupPhoto, TrackingTeam } from "@/lib/api";
 import { useOfflineSync } from "@/lib/useOfflineSync";
@@ -1219,74 +1220,149 @@ export default function KesimTakipPage() {
           )}
         </Card>
 
-        <div className="space-y-2">
-          {filledGroups.map((group, idx) => {
-            const isToggling = toggling.has(group.id);
-            const groupNotes = noteCountByGroup[group.id] || 0;
-            return (
-              <Card
-                key={group.id}
-                className={`p-3 cursor-pointer transition-all active:scale-[0.98] ${
-                  group.kesildi
-                    ? "bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800"
-                    : "hover:bg-muted/50"
-                }`}
-                style={group.colorTag && colorMap[group.colorTag] ? { borderLeft: `4px solid ${colorMap[group.colorTag]}` } : {}}
-                onClick={() => setOverlayIndex(idx)}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="shrink-0" onClick={(e) => { e.stopPropagation(); handleToggle(group); }}>
-                    {isToggling ? (
-                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                    ) : group.kesildi ? (
-                      <CheckCircle2 className="w-6 h-6 text-emerald-500" />
-                    ) : (
-                      <Circle className="w-6 h-6 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm">Hayvan {group.animalNo}</span>
-                      <span className="text-xs text-muted-foreground">({group.filledCount}/7 dolu)</span>
-                      {groupNotes > 0 && (
-                        <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
-                          <MessageSquarePlus className="w-2.5 h-2.5" />
-                          {groupNotes}
-                        </span>
-                      )}
-                      {group.teamId && data.teams.find(t => t.id === group.teamId) && (() => {
-                        const team = data.teams.find(t => t.id === group.teamId)!;
-                        return (
-                          <span
-                            className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
-                            style={{ backgroundColor: team.color + "20", color: team.color }}
-                          >
-                            {team.name}
-                          </span>
-                        );
-                      })()}
-                      {group.kesildi && (
-                        <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
-                          Kesildi
-                          {group.kesildiAt && (
-                            <>
-                              <Clock className="w-2.5 h-2.5" />
-                              {formatKesildiTime(group.kesildiAt)}
-                            </>
+        {filledGroups.length > 30 ? (
+          <Virtuoso
+            useWindowScroll
+            data={filledGroups}
+            defaultItemHeight={68}
+            itemContent={(idx, group) => {
+              const isToggling = toggling.has(group.id);
+              const groupNotes = noteCountByGroup[group.id] || 0;
+              return (
+                <div className="pb-2">
+                  <Card
+                    className={`p-3 cursor-pointer transition-all active:scale-[0.98] ${
+                      group.kesildi
+                        ? "bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800"
+                        : "hover:bg-muted/50"
+                    }`}
+                    style={group.colorTag && colorMap[group.colorTag] ? { borderLeft: `4px solid ${colorMap[group.colorTag]}` } : {}}
+                    onClick={() => setOverlayIndex(idx)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="shrink-0" onClick={(e) => { e.stopPropagation(); handleToggle(group); }}>
+                        {isToggling ? (
+                          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                        ) : group.kesildi ? (
+                          <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                        ) : (
+                          <Circle className="w-6 h-6 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm">Hayvan {group.animalNo}</span>
+                          <span className="text-xs text-muted-foreground">({group.filledCount}/7 dolu)</span>
+                          {groupNotes > 0 && (
+                            <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
+                              <MessageSquarePlus className="w-2.5 h-2.5" />
+                              {groupNotes}
+                            </span>
                           )}
-                        </span>
+                          {group.teamId && data.teams.find(t => t.id === group.teamId) && (() => {
+                            const team = data.teams.find(t => t.id === group.teamId)!;
+                            return (
+                              <span
+                                className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
+                                style={{ backgroundColor: team.color + "20", color: team.color }}
+                              >
+                                {team.name}
+                              </span>
+                            );
+                          })()}
+                          {group.kesildi && (
+                            <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
+                              Kesildi
+                              {group.kesildiAt && (
+                                <>
+                                  <Clock className="w-2.5 h-2.5" />
+                                  {formatKesildiTime(group.kesildiAt)}
+                                </>
+                              )}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {group.donors.slice(0, 3).map(d => d.description || d.name).join(", ")}
+                          {group.donors.length > 3 && ` +${group.donors.length - 3}`}
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              );
+            }}
+          />
+        ) : (
+          <div className="space-y-2">
+            {filledGroups.map((group, idx) => {
+              const isToggling = toggling.has(group.id);
+              const groupNotes = noteCountByGroup[group.id] || 0;
+              return (
+                <Card
+                  key={group.id}
+                  className={`p-3 cursor-pointer transition-all active:scale-[0.98] ${
+                    group.kesildi
+                      ? "bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800"
+                      : "hover:bg-muted/50"
+                  }`}
+                  style={group.colorTag && colorMap[group.colorTag] ? { borderLeft: `4px solid ${colorMap[group.colorTag]}` } : {}}
+                  onClick={() => setOverlayIndex(idx)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="shrink-0" onClick={(e) => { e.stopPropagation(); handleToggle(group); }}>
+                      {isToggling ? (
+                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                      ) : group.kesildi ? (
+                        <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                      ) : (
+                        <Circle className="w-6 h-6 text-muted-foreground" />
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                      {group.donors.slice(0, 3).map(d => d.description || d.name).join(", ")}
-                      {group.donors.length > 3 && ` +${group.donors.length - 3}`}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm">Hayvan {group.animalNo}</span>
+                        <span className="text-xs text-muted-foreground">({group.filledCount}/7 dolu)</span>
+                        {groupNotes > 0 && (
+                          <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
+                            <MessageSquarePlus className="w-2.5 h-2.5" />
+                            {groupNotes}
+                          </span>
+                        )}
+                        {group.teamId && data.teams.find(t => t.id === group.teamId) && (() => {
+                          const team = data.teams.find(t => t.id === group.teamId)!;
+                          return (
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
+                              style={{ backgroundColor: team.color + "20", color: team.color }}
+                            >
+                              {team.name}
+                            </span>
+                          );
+                        })()}
+                        {group.kesildi && (
+                          <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
+                            Kesildi
+                            {group.kesildiAt && (
+                              <>
+                                <Clock className="w-2.5 h-2.5" />
+                                {formatKesildiTime(group.kesildiAt)}
+                              </>
+                            )}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                        {group.donors.slice(0, 3).map(d => d.description || d.name).join(", ")}
+                        {group.donors.length > 3 && ` +${group.donors.length - 3}`}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
         {filledGroups.length === 0 && (
           <Card className="p-6 text-center">

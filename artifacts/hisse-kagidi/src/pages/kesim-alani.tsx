@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef, createElement, useMemo, forwardRef, useTransition } from "react";
-import { TableVirtuoso } from "react-virtuoso";
-import QrCodeModal from "@/components/QrCodeModal";
+import React, { useState, useEffect, useCallback, useRef, createElement, useMemo, forwardRef, useTransition, Suspense } from "react";
+import { TableVirtuoso, Virtuoso } from "react-virtuoso";
+const QrCodeModal = React.lazy(() => import("@/components/QrCodeModal"));
 import { useParams, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -111,7 +111,7 @@ import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani
 import type { DeletedDonation, TrackingNote, GroupPhoto, NotificationLog, DonationTransferEntry } from "@/lib/api";
 import PhotoGallery from "@/components/PhotoGallery";
 import { AnimalGroupCard } from "@/components/AnimalGroupCard";
-import { getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
+import { getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares, trCollator } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
 import { useGroupingWorker } from "@/lib/useGroupingWorker";
 import { useHistory } from "@/lib/useHistory";
@@ -1230,16 +1230,16 @@ export default function KesimAlaniPage() {
         const bStr = String(bVal).trim();
         const aSurname = aStr.split(/\s+/).pop() || aStr;
         const bSurname = bStr.split(/\s+/).pop() || bStr;
-        const surnameCmp = aSurname.localeCompare(bSurname, "tr");
+        const surnameCmp = trCollator.compare(aSurname, bSurname);
         if (surnameCmp !== 0) {
           return newDir === "asc" ? surnameCmp : -surnameCmp;
         }
-        const fullCmp = aStr.localeCompare(bStr, "tr");
+        const fullCmp = trCollator.compare(aStr, bStr);
         return newDir === "asc" ? fullCmp : -fullCmp;
       }
       return newDir === "asc"
-        ? String(aVal).localeCompare(String(bVal), "tr")
-        : String(bVal).localeCompare(String(aVal), "tr");
+        ? trCollator.compare(String(aVal), String(bVal))
+        : trCollator.compare(String(bVal), String(aVal));
     });
     save({ ...kesim, donations: sorted }, `Sıralama değiştirildi`, true);
   }
@@ -2972,6 +2972,16 @@ export default function KesimAlaniPage() {
     return compositions;
   }, [animalGroups]);
 
+  const searchIndex = useMemo(() => {
+    const index = new Map<string, string>();
+    for (const d of donations) {
+      index.set(d.id, [
+        d.name, d.description, d.vekalet, d.donationType, d.notes || ""
+      ].join("\t").toLowerCase());
+    }
+    return index;
+  }, [donations]);
+
   const filteredDonations = useMemo(() => {
     const preFiltered = showRemovedFilter
       ? donations.filter(d => removedFromGroupIds.has(d.id))
@@ -3001,14 +3011,11 @@ export default function KesimAlaniPage() {
 
     if (!debouncedSearchQuery.trim()) return advFiltered;
     const q = debouncedSearchQuery.trim().toLowerCase();
-    return advFiltered.filter(d =>
-      d.name.toLowerCase().includes(q) ||
-      d.description.toLowerCase().includes(q) ||
-      d.vekalet.toLowerCase().includes(q) ||
-      d.donationType.toLowerCase().includes(q) ||
-      (d.notes || "").toLowerCase().includes(q)
-    );
-  }, [donations, showRemovedFilter, removedFromGroupIds, filterUngrouped, groupedDonorIds, filterStatus, filterCinsi, filterHisseMin, filterHisseMax, filterTags, filterAiCategories, filterAiWarnings, debouncedSearchQuery]);
+    return advFiltered.filter(d => {
+      const cached = searchIndex.get(d.id);
+      return cached ? cached.includes(q) : false;
+    });
+  }, [donations, showRemovedFilter, removedFromGroupIds, filterUngrouped, groupedDonorIds, filterStatus, filterCinsi, filterHisseMin, filterHisseMax, filterTags, filterAiCategories, filterAiWarnings, debouncedSearchQuery, searchIndex]);
 
   const uniqueDonationTypes = useMemo(() =>
     Array.from(new Set(
@@ -3070,7 +3077,22 @@ export default function KesimAlaniPage() {
     });
   }, []);
 
-  if (!kesim) return null;
+  if (!kesim) return (
+    <div className="min-h-screen bg-background p-4 space-y-4 animate-pulse">
+      <div className="h-8 bg-muted rounded w-1/3" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="h-20 bg-muted rounded" />
+        ))}
+      </div>
+      <div className="h-10 bg-muted rounded w-full" />
+      <div className="space-y-2">
+        {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+          <div key={i} className="h-10 bg-muted rounded" />
+        ))}
+      </div>
+    </div>
+  );
 
   const totalShares = getTotalShares(kesim.donations);
   const requiredAnimals = getRequiredAnimals(kesim.donations);
@@ -5429,79 +5451,99 @@ export default function KesimAlaniPage() {
                   Bağışçı listesini doldurup "Otomatik Grupla" butonuna tıklayın
                 </p>
               </Card>
-            ) : (
-              <div className={`grid gap-4 ${
-                workspace.prefs.columnCount === 3 ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" :
-                workspace.prefs.columnCount === 2 ? "grid-cols-1 md:grid-cols-2" :
-                "grid-cols-1"
-              }`}>
-                {kesim.animalGroups
-                  .map((group, groupIdx) => ({ group, groupIdx }))
-                  .filter(({ group }) => {
-                    if (colorTagFilter !== "all" && (group.colorTag || "") !== colorTagFilter) return false;
-                    if (filterTeam !== "all") {
-                      if (filterTeam === "none" && group.teamId) return false;
-                      if (filterTeam !== "none" && group.teamId !== filterTeam) return false;
-                    }
-                    if (showOnlyIncomplete) {
-                      const filled = group.donations.filter(d => d.name.trim() !== "").length;
-                      if (filled >= 7) return false;
-                    }
-                    return true;
-                  })
-                  .map(({ group, groupIdx }) => (
-                    <AnimalGroupCard
-                      key={group.id}
-                      group={group}
-                      groupIdx={groupIdx}
-                      kesimName={kesim.name}
-                      kesimId={kesim.id}
-                      isCollapsed={collapsedGroups.has(group.id)}
-                      isSelected={selectedGroupIds.has(group.id)}
-                      compact={workspace.prefs.compactMode}
-                      visibleColumns={workspace.visibleColumns}
-                      totalGroupCount={kesim.animalGroups.length}
-                      photoCounts={photoCounts}
-                      teams={kesim.teams || []}
-                      basketItemIds={basketItemIds}
-                      selectedGroupDonations={selectedGroupDonations}
-                      swapSelection={swapSelection}
-                      highlightIncomplete={highlightIncomplete}
-                      dragItem={dragItem}
-                      dragOverGroup={dragOverGroup}
-                      dragOverItem={dragOverItem}
-                      groupSearchQuery={groupSearchQuery}
-                      onToggleCollapse={toggleGroupCollapse}
-                      onToggleSelect={toggleGroupSelect}
-                      onSetColorTag={handleSetGroupColorTag}
-                      onMoveUp={moveGroupUp}
-                      onMoveDown={moveGroupDown}
-                      onSplit={openSplitGroupDialog}
-                      onAddGroupToBasket={addGroupToBasket}
-                      onToggleLock={toggleGroupLock}
-                      onDelete={deleteAnimalGroup}
-                      onAssignTeam={handleAssignTeam}
-                      onViewPhotos={handleViewPhotos}
-                      onUpdateGroupDonation={updateGroupDonation}
-                      onHandleGroupCellTab={handleGroupCellTab}
-                      onToggleBasketItem={handleToggleBasketItem}
-                      onSwapSelect={handleSwapSelect}
-                      onRemoveFromGroup={enhancedRemoveFromGroup}
-                      onUpdateGroupNotes={updateGroupNotes}
-                      onDragStart={handleDragStart}
-                      onDragOver={handleDragOver}
-                      onDrop={handleDrop}
-                      onDragEnd={handleDragEnd}
-                      onDragOverCard={handleDragOverCard}
-                      onDragLeaveCard={handleDragLeave}
-                      onToggleGroupDonationSelect={toggleGroupDonationSelect}
-                      onSelectAllGroupDonations={handleSelectAllGroupDonations}
-                      columnHeaderLabel={columnHeaderLabel}
-                      columnHeaderWidth={columnHeaderWidth}
-                    />
-                  ))}
-              </div>
-            )}
+            ) : (() => {
+              const filteredGroupItems = kesim.animalGroups
+                .map((group, groupIdx) => ({ group, groupIdx }))
+                .filter(({ group }) => {
+                  if (colorTagFilter !== "all" && (group.colorTag || "") !== colorTagFilter) return false;
+                  if (filterTeam !== "all") {
+                    if (filterTeam === "none" && group.teamId) return false;
+                    if (filterTeam !== "none" && group.teamId !== filterTeam) return false;
+                  }
+                  if (showOnlyIncomplete) {
+                    const filled = group.donations.filter(d => d.name.trim() !== "").length;
+                    if (filled >= 7) return false;
+                  }
+                  return true;
+                });
+
+              const renderGroupCard = ({ group, groupIdx }: { group: typeof kesim.animalGroups[0]; groupIdx: number }) => (
+                <AnimalGroupCard
+                  key={group.id}
+                  group={group}
+                  groupIdx={groupIdx}
+                  kesimName={kesim.name}
+                  kesimId={kesim.id}
+                  isCollapsed={collapsedGroups.has(group.id)}
+                  isSelected={selectedGroupIds.has(group.id)}
+                  compact={workspace.prefs.compactMode}
+                  visibleColumns={workspace.visibleColumns}
+                  totalGroupCount={kesim.animalGroups.length}
+                  photoCounts={photoCounts}
+                  teams={kesim.teams || []}
+                  basketItemIds={basketItemIds}
+                  selectedGroupDonations={selectedGroupDonations}
+                  swapSelection={swapSelection}
+                  highlightIncomplete={highlightIncomplete}
+                  dragItem={dragItem}
+                  dragOverGroup={dragOverGroup}
+                  dragOverItem={dragOverItem}
+                  groupSearchQuery={groupSearchQuery}
+                  onToggleCollapse={toggleGroupCollapse}
+                  onToggleSelect={toggleGroupSelect}
+                  onSetColorTag={handleSetGroupColorTag}
+                  onMoveUp={moveGroupUp}
+                  onMoveDown={moveGroupDown}
+                  onSplit={openSplitGroupDialog}
+                  onAddGroupToBasket={addGroupToBasket}
+                  onToggleLock={toggleGroupLock}
+                  onDelete={deleteAnimalGroup}
+                  onAssignTeam={handleAssignTeam}
+                  onViewPhotos={handleViewPhotos}
+                  onUpdateGroupDonation={updateGroupDonation}
+                  onHandleGroupCellTab={handleGroupCellTab}
+                  onToggleBasketItem={handleToggleBasketItem}
+                  onSwapSelect={handleSwapSelect}
+                  onRemoveFromGroup={enhancedRemoveFromGroup}
+                  onUpdateGroupNotes={updateGroupNotes}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  onDragEnd={handleDragEnd}
+                  onDragOverCard={handleDragOverCard}
+                  onDragLeaveCard={handleDragLeave}
+                  onToggleGroupDonationSelect={toggleGroupDonationSelect}
+                  onSelectAllGroupDonations={handleSelectAllGroupDonations}
+                  columnHeaderLabel={columnHeaderLabel}
+                  columnHeaderWidth={columnHeaderWidth}
+                />
+              );
+
+              if (filteredGroupItems.length > 50) {
+                return (
+                  <Virtuoso
+                    useWindowScroll
+                    data={filteredGroupItems}
+                    overscan={200}
+                    itemContent={(_index, item) => (
+                      <div className="pb-4">
+                        {renderGroupCard(item)}
+                      </div>
+                    )}
+                  />
+                );
+              }
+
+              return (
+                <div className={`grid gap-4 ${
+                  workspace.prefs.columnCount === 3 ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" :
+                  workspace.prefs.columnCount === 2 ? "grid-cols-1 md:grid-cols-2" :
+                  "grid-cols-1"
+                }`}>
+                  {filteredGroupItems.map(renderGroupCard)}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -6564,12 +6606,16 @@ export default function KesimAlaniPage() {
         </DialogContent>
       </Dialog>
 
-      <QrCodeModal
-        open={qrModalOpen}
-        onOpenChange={setQrModalOpen}
-        url={qrUrl}
-        title={kesim?.name}
-      />
+      {qrModalOpen && (
+        <Suspense fallback={null}>
+          <QrCodeModal
+            open={qrModalOpen}
+            onOpenChange={setQrModalOpen}
+            url={qrUrl}
+            title={kesim?.name}
+          />
+        </Suspense>
+      )}
 
       <Dialog open={!!photoViewGroup} onOpenChange={(open) => { if (!open) setPhotoViewGroup(null); }}>
         <DialogContent className="max-w-md">
@@ -6749,9 +6795,9 @@ export default function KesimAlaniPage() {
       {donorListReportOpen && kesim && (() => {
         const activeDonors = kesim.donations.filter(d => !d.excluded);
         const sorted = [...activeDonors].sort((a, b) => {
-          const surnameA = (a.description || "").trim().split(/\s+/).pop()?.toLocaleLowerCase("tr") || "";
-          const surnameB = (b.description || "").trim().split(/\s+/).pop()?.toLocaleLowerCase("tr") || "";
-          return surnameA.localeCompare(surnameB, "tr");
+          const surnameA = (a.description || "").trim().split(/\s+/).pop() || "";
+          const surnameB = (b.description || "").trim().split(/\s+/).pop() || "";
+          return trCollator.compare(surnameA, surnameB);
         });
         return (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setDonorListReportOpen(false); }}>

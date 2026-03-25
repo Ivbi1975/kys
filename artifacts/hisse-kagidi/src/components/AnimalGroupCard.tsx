@@ -612,4 +612,23 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
       )}
     </Card>
   );
+}, (prev, next) => {
+  if (prev.group !== next.group) return false;
+  if (prev.groupIdx !== next.groupIdx) return false;
+  if (prev.isCollapsed !== next.isCollapsed) return false;
+  if (prev.isSelected !== next.isSelected) return false;
+  if (prev.compact !== next.compact) return false;
+  if (prev.totalGroupCount !== next.totalGroupCount) return false;
+  if (prev.highlightIncomplete !== next.highlightIncomplete) return false;
+  if (prev.groupSearchQuery !== next.groupSearchQuery) return false;
+  if (prev.dragOverGroup !== next.dragOverGroup) return false;
+  if (prev.swapSelection !== next.swapSelection) return false;
+  if (prev.dragItem !== next.dragItem) return false;
+  if (prev.dragOverItem !== next.dragOverItem) return false;
+  if (prev.visibleColumns !== next.visibleColumns) return false;
+  if (prev.basketItemIds !== next.basketItemIds) return false;
+  if (prev.selectedGroupDonations !== next.selectedGroupDonations) return false;
+  if (prev.photoCounts !== next.photoCounts) return false;
+  if (prev.teams !== next.teams) return false;
+  return true;
 });

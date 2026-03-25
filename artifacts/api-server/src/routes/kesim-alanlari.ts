@@ -1493,80 +1493,108 @@ router.delete("/kesim-alanlari/:id/animal-groups/:groupId", async (req, res) => 
 router.get("/catisma-tespiti", async (req, res) => {
   try {
     const projectIdFilter = req.query.projectId as string | undefined;
-    const kaFilter = projectIdFilter
+    const projectClause = projectIdFilter
       ? sql`AND ka.project_id = ${projectIdFilter}`
       : sql``;
-    const k2Filter = projectIdFilter
-      ? sql`AND k2.project_id = ${projectIdFilter}`
-      : sql``;
-    const k3Filter = projectIdFilter
-      ? sql`AND k3.project_id = ${projectIdFilter}`
-      : sql``;
-    const k4Filter = projectIdFilter
-      ? sql`AND k4.project_id = ${projectIdFilter}`
-      : sql``;
 
-    const dataResult = await db.execute(sql`
-      SELECT
-        json_agg(DISTINCT jsonb_build_object('id', ka.id, 'name', ka.name)) AS ka_list,
-        COALESCE((
-          SELECT json_agg(jsonb_build_object(
-            'id', d.id, 'name', d.name, 'description', d.description,
-            'donationType', d.donation_type, 'shareCount', d.share_count,
-            'vekalet', d.vekalet, 'notes', d.notes, 'phone', d.phone,
-            'excluded', d.excluded, 'kesimAlaniId', d.kesim_alani_id
-          ))
-          FROM donations d
-          WHERE d.kesim_alani_id IN (SELECT k2.id FROM kesim_alanlari k2 WHERE k2.deleted_at IS NULL ${k2Filter})
-            AND d.deleted_at IS NULL
-        ), '[]'::json) AS donations,
-        COALESCE((
-          SELECT json_agg(jsonb_build_object('id', ag.id, 'animalNo', ag.animal_no, 'kesimAlaniId', ag.kesim_alani_id))
-          FROM animal_groups ag
-          WHERE ag.kesim_alani_id IN (SELECT k3.id FROM kesim_alanlari k3 WHERE k3.deleted_at IS NULL ${k3Filter})
-        ), '[]'::json) AS groups,
-        COALESCE((
-          SELECT json_agg(jsonb_build_object('groupId', agd.group_id, 'donationId', agd.donation_id))
-          FROM animal_group_donations agd
-          WHERE agd.group_id IN (
-            SELECT ag2.id FROM animal_groups ag2
-            WHERE ag2.kesim_alani_id IN (SELECT k4.id FROM kesim_alanlari k4 WHERE k4.deleted_at IS NULL ${k4Filter})
-          )
-        ), '[]'::json) AS group_donation_links
-      FROM kesim_alanlari ka
-      WHERE ka.deleted_at IS NULL ${kaFilter}
+    const conflictKeysResult = await db.execute(sql`
+      WITH active_ka AS (
+        SELECT id, name FROM kesim_alanlari WHERE deleted_at IS NULL ${projectClause}
+      ),
+      active_donations AS (
+        SELECT id, LOWER(TRIM(name)) AS norm_name, LOWER(TRIM(description)) AS norm_desc, kesim_alani_id
+        FROM donations
+        WHERE deleted_at IS NULL AND kesim_alani_id IN (SELECT id FROM active_ka)
+      ),
+      name_conflicts AS (
+        SELECT norm_name AS conflict_key, 'name' AS match_field
+        FROM active_donations
+        WHERE norm_name <> ''
+        GROUP BY norm_name
+        HAVING COUNT(DISTINCT kesim_alani_id) > 1
+      ),
+      desc_conflicts AS (
+        SELECT norm_desc AS conflict_key, 'description' AS match_field
+        FROM active_donations
+        WHERE norm_desc <> ''
+          AND norm_desc NOT IN (SELECT conflict_key FROM name_conflicts)
+        GROUP BY norm_desc
+        HAVING COUNT(DISTINCT kesim_alani_id) > 1
+      )
+      SELECT conflict_key, match_field FROM name_conflicts
+      UNION ALL
+      SELECT conflict_key, match_field FROM desc_conflicts
     `);
 
-    const raw = dataResult.rows[0] as {
-      ka_list: { id: string; name: string }[] | null;
-      donations: { id: string; name: string; description: string; donationType: string; shareCount: number; vekalet: string; notes: string; phone: string; excluded: boolean; kesimAlaniId: string }[];
-      groups: { id: string; animalNo: number; kesimAlaniId: string }[];
-      group_donation_links: { groupId: string; donationId: string }[];
+    const conflictKeys = conflictKeysResult.rows as { conflict_key: string; match_field: "name" | "description" }[];
+
+    if (conflictKeys.length === 0) {
+      res.json({ conflicts: [], totalConflicts: 0 });
+      return;
+    }
+
+    const nameKeys = conflictKeys.filter(c => c.match_field === "name").map(c => c.conflict_key);
+    const descKeys = conflictKeys.filter(c => c.match_field === "description").map(c => c.conflict_key);
+
+    const donationsResult = await db.execute(sql`
+      SELECT d.id, d.name, d.description, d.donation_type, d.share_count,
+             d.vekalet, d.notes, d.phone, d.excluded, d.kesim_alani_id,
+             ka.name AS ka_name
+      FROM donations d
+      JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id AND ka.deleted_at IS NULL ${projectClause}
+      WHERE d.deleted_at IS NULL
+        AND (
+          (${nameKeys.length > 0 ? sql`LOWER(TRIM(d.name)) = ANY(${sql.raw(`ARRAY[${nameKeys.map(k => `'${k.replace(/'/g, "''")}'`).join(",")}]`)})` : sql`FALSE`})
+          OR
+          (${descKeys.length > 0 ? sql`LOWER(TRIM(d.description)) = ANY(${sql.raw(`ARRAY[${descKeys.map(k => `'${k.replace(/'/g, "''")}'`).join(",")}]`)})` : sql`FALSE`})
+        )
+    `);
+
+    type DonationRow = {
+      id: string; name: string; description: string; donation_type: string;
+      share_count: number; vekalet: string; notes: string; phone: string;
+      excluded: boolean; kesim_alani_id: string; ka_name: string;
     };
+    const conflictDonations = donationsResult.rows as DonationRow[];
 
-    const allKAList = raw.ka_list || [];
-    const allDonations = raw.donations || [];
-    const allGroups = raw.groups || [];
-    const groupDonationLinks = raw.group_donation_links || [];
+    const donationIds = conflictDonations.map(d => d.id);
 
-    const kaById = Object.fromEntries(allKAList.map(k => [k.id, k]));
+    let groupLinksMap: Record<string, { groupId: string; animalNo: number }[]> = {};
+    let donationsByGroupId: Record<string, string[]> = {};
+    let donationById: Record<string, DonationRow> = {};
 
-    const donationsByGroupId: Record<string, string[]> = {};
-    for (const link of groupDonationLinks) {
-      if (!donationsByGroupId[link.groupId]) donationsByGroupId[link.groupId] = [];
-      donationsByGroupId[link.groupId].push(link.donationId);
+    for (const d of conflictDonations) {
+      donationById[d.id] = d;
     }
 
-    const groupsByDonationId: Record<string, string[]> = {};
-    for (const link of groupDonationLinks) {
-      if (!groupsByDonationId[link.donationId]) groupsByDonationId[link.donationId] = [];
-      groupsByDonationId[link.donationId].push(link.groupId);
+    if (donationIds.length > 0) {
+      const BATCH = 5000;
+      const allLinks: { donation_id: string; group_id: string; animal_no: number }[] = [];
+      for (let i = 0; i < donationIds.length; i += BATCH) {
+        const batch = donationIds.slice(i, i + BATCH);
+        const linksResult = await db.execute(sql`
+          SELECT agd.donation_id, agd.group_id, ag.animal_no
+          FROM animal_group_donations agd
+          JOIN animal_groups ag ON ag.id = agd.group_id
+          WHERE agd.donation_id = ANY(${sql.raw(`ARRAY[${batch.map(id => `'${id.replace(/'/g, "''")}'`).join(",")}]`)})
+        `);
+        allLinks.push(...(linksResult.rows as typeof allLinks));
+      }
+
+      for (const link of allLinks) {
+        if (!groupLinksMap[link.donation_id]) groupLinksMap[link.donation_id] = [];
+        groupLinksMap[link.donation_id].push({ groupId: link.group_id, animalNo: link.animal_no });
+        if (!donationsByGroupId[link.group_id]) donationsByGroupId[link.group_id] = [];
+        donationsByGroupId[link.group_id].push(link.donation_id);
+      }
     }
 
-    const donationById = Object.fromEntries(allDonations.map(d => [d.id, d]));
-    const groupById = Object.fromEntries(allGroups.map(g => [g.id, g]));
-
-    const normalizeStr = (s: string) => (s || "").trim().toLowerCase();
+    const NOTE_WARNING_KEYWORDS = ["iade", "iptal", "hata", "yanlış", "sorun", "problem", "dikkat", "uyarı", "eksik", "hatalı", "değiştirilecek"];
+    const hasNoteWarning = (notes: string) => {
+      if (!notes) return false;
+      const lower = notes.toLowerCase();
+      return NOTE_WARNING_KEYWORDS.some(kw => lower.includes(kw));
+    };
 
     type ConflictEntry = {
       donationId: string;
@@ -1599,62 +1627,47 @@ router.get("/catisma-tespiti", async (req, res) => {
       hasNoteWarnings: boolean;
     };
 
-    const NOTE_WARNING_KEYWORDS = ["iade", "iptal", "hata", "yanlış", "sorun", "problem", "dikkat", "uyarı", "eksik", "hatalı", "değiştirilecek"];
-    const hasNoteWarning = (notes: string) => {
-      if (!notes) return false;
-      const lower = notes.toLowerCase();
-      return NOTE_WARNING_KEYWORDS.some(kw => lower.includes(kw));
-    };
-
-    const groupedByName: Record<string, { displayName: string; donations: typeof allDonations }> = {};
-    const groupedByDescription: Record<string, { displayDescription: string; donations: typeof allDonations }> = {};
-
-    for (const d of allDonations) {
-      const nameKey = normalizeStr(d.name);
-      if (nameKey) {
-        if (!groupedByName[nameKey]) groupedByName[nameKey] = { displayName: d.name, donations: [] };
-        groupedByName[nameKey].donations.push(d);
-      }
-      const descKey = normalizeStr(d.description);
-      if (descKey) {
-        if (!groupedByDescription[descKey]) groupedByDescription[descKey] = { displayDescription: d.description, donations: [] };
-        groupedByDescription[descKey].donations.push(d);
-      }
+    const donationsByKA: Record<string, DonationRow[]> = {};
+    for (const d of conflictDonations) {
+      if (!donationsByKA[d.kesim_alani_id]) donationsByKA[d.kesim_alani_id] = [];
+      donationsByKA[d.kesim_alani_id].push(d);
     }
 
-    function buildConflictEntries(donations: typeof allDonations): ConflictEntry[] {
+    function buildConflictEntries(donations: DonationRow[]): ConflictEntry[] {
       const entries: ConflictEntry[] = [];
       for (const d of donations) {
-        const groupIds = groupsByDonationId[d.id] || [];
-        if (groupIds.length === 0) {
-          const siblings = allDonations
-            .filter(od => od.kesimAlaniId === d.kesimAlaniId && od.id !== d.id)
-            .slice(0, 5)
-            .map(od => ({
+        const groups = groupLinksMap[d.id] || [];
+        if (groups.length === 0) {
+          const kaSiblings = donationsByKA[d.kesim_alani_id] || [];
+          const siblings = [];
+          for (const od of kaSiblings) {
+            if (od.id === d.id) continue;
+            siblings.push({
               donationId: od.id,
               donationName: od.name,
               donationDescription: od.description,
               donationNotes: od.notes,
-              donationType: od.donationType,
-              shareCount: od.shareCount,
+              donationType: od.donation_type,
+              shareCount: od.share_count,
               vekalet: od.vekalet,
-            }));
+            });
+            if (siblings.length >= 5) break;
+          }
           entries.push({
             donationId: d.id,
             donationName: d.name,
             donationDescription: d.description,
             donationNotes: d.notes,
-            kesimAlaniId: d.kesimAlaniId,
-            kesimAlaniName: kaById[d.kesimAlaniId]?.name || d.kesimAlaniId,
+            kesimAlaniId: d.kesim_alani_id,
+            kesimAlaniName: d.ka_name || d.kesim_alani_id,
             animalGroupId: null,
             animalGroupNo: null,
             hasNoteWarning: hasNoteWarning(d.notes),
             siblingsInGroup: siblings,
           });
         } else {
-          for (const groupId of groupIds) {
-            const group = groupById[groupId];
-            const siblingDonationIds = donationsByGroupId[groupId] || [];
+          for (const g of groups) {
+            const siblingDonationIds = donationsByGroupId[g.groupId] || [];
             const siblings = siblingDonationIds
               .filter(sid => sid !== d.id)
               .map(sid => donationById[sid])
@@ -1664,8 +1677,8 @@ router.get("/catisma-tespiti", async (req, res) => {
                 donationName: od.name,
                 donationDescription: od.description,
                 donationNotes: od.notes,
-                donationType: od.donationType,
-                shareCount: od.shareCount,
+                donationType: od.donation_type,
+                shareCount: od.share_count,
                 vekalet: od.vekalet,
               }));
             entries.push({
@@ -1673,10 +1686,10 @@ router.get("/catisma-tespiti", async (req, res) => {
               donationName: d.name,
               donationDescription: d.description,
               donationNotes: d.notes,
-              kesimAlaniId: d.kesimAlaniId,
-              kesimAlaniName: kaById[d.kesimAlaniId]?.name || d.kesimAlaniId,
-              animalGroupId: groupId,
-              animalGroupNo: group?.animalNo ?? null,
+              kesimAlaniId: d.kesim_alani_id,
+              kesimAlaniName: d.ka_name || d.kesim_alani_id,
+              animalGroupId: g.groupId,
+              animalGroupNo: g.animalNo,
               hasNoteWarning: hasNoteWarning(d.notes),
               siblingsInGroup: siblings,
             });
@@ -1686,15 +1699,27 @@ router.get("/catisma-tespiti", async (req, res) => {
       return entries;
     }
 
-    const seenConflictKeys = new Set<string>();
+    const groupedByName: Record<string, { displayName: string; donations: DonationRow[] }> = {};
+    const groupedByDesc: Record<string, { displayName: string; donations: DonationRow[] }> = {};
+
+    for (const d of conflictDonations) {
+      const nk = (d.name || "").trim().toLowerCase();
+      if (nk && nameKeys.includes(nk)) {
+        if (!groupedByName[nk]) groupedByName[nk] = { displayName: d.name, donations: [] };
+        groupedByName[nk].donations.push(d);
+      }
+      const dk = (d.description || "").trim().toLowerCase();
+      if (dk && descKeys.includes(dk)) {
+        if (!groupedByDesc[dk]) groupedByDesc[dk] = { displayName: d.description, donations: [] };
+        groupedByDesc[dk].donations.push(d);
+      }
+    }
+
     const conflicts: Conflict[] = [];
 
     for (const [key, { displayName, donations }] of Object.entries(groupedByName)) {
-      if (donations.length <= 1) continue;
-      const uniqueKA = new Set(donations.map(d => d.kesimAlaniId));
-      if (uniqueKA.size <= 1) continue;
+      const uniqueKA = new Set(donations.map(d => d.kesim_alani_id));
       const entries = buildConflictEntries(donations);
-      seenConflictKeys.add(key);
       conflicts.push({
         key,
         matchField: "name",
@@ -1706,16 +1731,13 @@ router.get("/catisma-tespiti", async (req, res) => {
       });
     }
 
-    for (const [key, { displayDescription, donations }] of Object.entries(groupedByDescription)) {
-      if (donations.length <= 1) continue;
-      if (seenConflictKeys.has(key)) continue;
-      const uniqueKA = new Set(donations.map(d => d.kesimAlaniId));
-      if (uniqueKA.size <= 1) continue;
+    for (const [key, { displayName, donations }] of Object.entries(groupedByDesc)) {
+      const uniqueKA = new Set(donations.map(d => d.kesim_alani_id));
       const entries = buildConflictEntries(donations);
       conflicts.push({
         key: `desc:${key}`,
         matchField: "description",
-        displayName: displayDescription,
+        displayName,
         entries,
         kesimAlanCount: uniqueKA.size,
         totalEntries: entries.length,

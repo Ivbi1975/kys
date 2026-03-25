@@ -102,7 +102,68 @@ export function useGroupingWorker() {
 
   const isRunning = useCallback(() => activeIdRef.current !== null, []);
 
-  return { runGrouping, cancelGrouping, isRunning };
+  const runIncrementalGrouping = useCallback(
+    (
+      donations: Donation[],
+      existingGroups: AnimalGroup[],
+      changedDonationIds: string[],
+      lockedGroupIndices: number[]
+    ): Promise<AnimalGroup[]> => {
+      const worker = getWorker();
+
+      if (!worker) {
+        return fallbackGrouping(donations);
+      }
+
+      const id = crypto.randomUUID();
+      activeIdRef.current = id;
+
+      return new Promise<AnimalGroup[]>((resolve, reject) => {
+        function handler(e: MessageEvent<WorkerResponse>) {
+          const msg = e.data;
+          if (msg.id !== id) return;
+
+          if (msg.type === "progress") return;
+
+          cleanup();
+
+          if (msg.type === "result") {
+            if (msg.cancelled) {
+              reject(new CancelledError());
+            } else {
+              resolve(msg.groups);
+            }
+          } else if (msg.type === "error") {
+            reject(new Error(msg.message));
+          }
+        }
+
+        function cleanup() {
+          worker!.removeEventListener("message", handler);
+          activeIdRef.current = null;
+          cleanupRef.current = null;
+        }
+
+        cleanupRef.current = () => {
+          cleanup();
+          reject(new CancelledError());
+        };
+
+        worker.addEventListener("message", handler);
+        worker.postMessage({
+          type: "incrementalGroup",
+          id,
+          donations,
+          existingGroups,
+          changedDonationIds,
+          lockedGroupIndices,
+        });
+      });
+    },
+    []
+  );
+
+  return { runGrouping, runIncrementalGrouping, cancelGrouping, isRunning };
 }
 
 async function fallbackGrouping(

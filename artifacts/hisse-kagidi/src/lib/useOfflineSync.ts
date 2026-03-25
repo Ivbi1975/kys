@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   saveTrackingDataOffline,
   getTrackingDataOffline,
@@ -39,6 +39,11 @@ export function useOfflineSync(token: string | undefined) {
   });
   const syncingRef = useRef(false);
   const lastSyncTimeRef = useRef<string | null>(null);
+  const dataRef = useRef<TrackingData | null>(null);
+  const notesRef = useRef<TrackingNote[]>([]);
+  dataRef.current = data;
+  notesRef.current = notes;
+  const saveCacheTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const handleOnline = () => setSyncState((s) => ({ ...s, isOnline: true }));
@@ -95,8 +100,17 @@ export function useOfflineSync(token: string | undefined) {
     await updatePendingCount();
   }, [token, updatePendingCount]);
 
+  const debouncedSaveCache = useCallback((t: string) => {
+    if (saveCacheTimerRef.current) clearTimeout(saveCacheTimerRef.current);
+    saveCacheTimerRef.current = setTimeout(() => {
+      const d = dataRef.current;
+      const n = notesRef.current;
+      if (d) saveTrackingDataOffline(t, d, n);
+    }, 1000);
+  }, []);
+
   const loadDeltaData = useCallback(async () => {
-    if (!token || !navigator.onLine || !lastSyncTimeRef.current || !data) {
+    if (!token || !navigator.onLine || !lastSyncTimeRef.current || !dataRef.current) {
       return loadFullData();
     }
     try {
@@ -140,26 +154,18 @@ export function useOfflineSync(token: string | undefined) {
       });
 
       setError(null);
-
-      if (data) {
-        setData((current) => {
-          if (current) {
-            saveTrackingDataOffline(token, current, notes);
-          }
-          return current;
-        });
-      }
+      debouncedSaveCache(token);
     } catch {
       await loadFullData();
     }
-  }, [token, data, notes, loadFullData]);
+  }, [token, loadFullData, debouncedSaveCache]);
 
   const loadData = useCallback(async () => {
-    if (lastSyncTimeRef.current && data) {
+    if (lastSyncTimeRef.current && dataRef.current) {
       return loadDeltaData();
     }
     return loadFullData();
-  }, [data, loadFullData, loadDeltaData]);
+  }, [loadFullData, loadDeltaData]);
 
   const syncQueue = useCallback(async () => {
     if (!token || syncingRef.current || !navigator.onLine) return;
@@ -205,14 +211,17 @@ export function useOfflineSync(token: string | undefined) {
   useEffect(() => {
     loadFullData();
     const interval = setInterval(() => {
-      if (lastSyncTimeRef.current && data) {
+      if (lastSyncTimeRef.current && dataRef.current) {
         loadDeltaData();
       } else {
         loadFullData();
       }
     }, 30000);
-    return () => clearInterval(interval);
-  }, [loadFullData, loadDeltaData, data]);
+    return () => {
+      clearInterval(interval);
+      if (saveCacheTimerRef.current) clearTimeout(saveCacheTimerRef.current);
+    };
+  }, [loadFullData, loadDeltaData]);
 
   useEffect(() => {
     if (syncState.isOnline && syncState.pendingCount > 0) {
