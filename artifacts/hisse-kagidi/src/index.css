@@ -1163,4 +1163,38 @@
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+
+  .donor-list-print {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 99999 !important;
+    background: white !important;
+    color: black !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 20px !important;
+    border-radius: 0 !important;
+  }
+
+  .donor-list-print table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  .donor-list-print th,
+  .donor-list-print td {
+    border-bottom: 0.5px solid #ddd !important;
+    color: black !important;
+  }
+
+  .donor-list-print tr:nth-child(even) {
+    background: #f9fafb !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .donor-list-print h3,
+  .donor-list-print p {
+    color: black !important;
+  }
 }
