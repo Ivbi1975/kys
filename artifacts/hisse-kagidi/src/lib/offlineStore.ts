@@ -142,9 +142,13 @@ export async function applyOfflineToggleToCache(
   const record = await db.get("trackingData", token);
   if (!record) return;
 
+  const prevGroup = record.data.groups.find((g) => g.id === groupId);
+  const wasKesildi = prevGroup?.kesildi ?? false;
+  const delta = wasKesildi === kesildi ? 0 : kesildi ? 1 : -1;
+
   record.data = {
     ...record.data,
-    kesildiCount: record.data.kesildiCount + (kesildi ? 1 : -1),
+    kesildiCount: Math.max(0, record.data.kesildiCount + delta),
     groups: record.data.groups.map((g) =>
       g.id === groupId
         ? { ...g, kesildi, kesildiAt: kesildi ? new Date().toISOString() : null }

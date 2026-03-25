@@ -86,13 +86,14 @@ export function useOfflineSync(token: string | undefined) {
       }
       if (allSucceeded) {
         await removeAllQueuedActions(token);
+        loadData();
       }
     } finally {
       syncingRef.current = false;
       setSyncState((s) => ({ ...s, isSyncing: false }));
       await updatePendingCount();
     }
-  }, [token, updatePendingCount]);
+  }, [token, updatePendingCount, loadData]);
 
   useEffect(() => {
     if (syncState.isOnline && syncState.pendingCount > 0) {
