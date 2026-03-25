@@ -55,6 +55,43 @@ export function useOfflineSync(token: string | undefined) {
     setSyncState((s) => ({ ...s, pendingCount: count }));
   }, [token]);
 
+  const loadData = useCallback(async () => {
+    if (!token) return;
+    try {
+      if (navigator.onLine) {
+        const [result, trackingNotes] = await Promise.all([
+          fetchTrackingData(token),
+          fetchTrackingNotes(token),
+        ]);
+        setData(result);
+        setNotes(trackingNotes);
+        setError(null);
+        await saveTrackingDataOffline(token, result, trackingNotes);
+      } else {
+        const cached = await getTrackingDataOffline(token);
+        if (cached) {
+          setData(cached.data);
+          setNotes(cached.notes);
+          setError(null);
+        } else {
+          setError("Çevrimdışısınız ve önbellekte veri bulunamadı");
+        }
+      }
+    } catch (err) {
+      const cached = await getTrackingDataOffline(token);
+      if (cached) {
+        setData(cached.data);
+        setNotes(cached.notes);
+        setError(null);
+      } else {
+        setError(err instanceof Error ? err.message : "Veri yüklenemedi");
+      }
+    } finally {
+      setLoading(false);
+    }
+    await updatePendingCount();
+  }, [token, updatePendingCount]);
+
   const syncQueue = useCallback(async () => {
     if (!token || syncingRef.current || !navigator.onLine) return;
     syncingRef.current = true;
@@ -96,53 +133,16 @@ export function useOfflineSync(token: string | undefined) {
   }, [token, updatePendingCount, loadData]);
 
   useEffect(() => {
-    if (syncState.isOnline && syncState.pendingCount > 0) {
-      syncQueue();
-    }
-  }, [syncState.isOnline, syncState.pendingCount, syncQueue]);
-
-  const loadData = useCallback(async () => {
-    if (!token) return;
-    try {
-      if (navigator.onLine) {
-        const [result, trackingNotes] = await Promise.all([
-          fetchTrackingData(token),
-          fetchTrackingNotes(token),
-        ]);
-        setData(result);
-        setNotes(trackingNotes);
-        setError(null);
-        await saveTrackingDataOffline(token, result, trackingNotes);
-      } else {
-        const cached = await getTrackingDataOffline(token);
-        if (cached) {
-          setData(cached.data);
-          setNotes(cached.notes);
-          setError(null);
-        } else {
-          setError("Çevrimdışısınız ve önbellekte veri bulunamadı");
-        }
-      }
-    } catch (err) {
-      const cached = await getTrackingDataOffline(token);
-      if (cached) {
-        setData(cached.data);
-        setNotes(cached.notes);
-        setError(null);
-      } else {
-        setError(err instanceof Error ? err.message : "Veri yüklenemedi");
-      }
-    } finally {
-      setLoading(false);
-    }
-    await updatePendingCount();
-  }, [token, updatePendingCount]);
-
-  useEffect(() => {
     loadData();
     const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
   }, [loadData]);
+
+  useEffect(() => {
+    if (syncState.isOnline && syncState.pendingCount > 0) {
+      syncQueue();
+    }
+  }, [syncState.isOnline, syncState.pendingCount, syncQueue]);
 
   const handleToggle = useCallback(
     async (groupId: string, kesildi: boolean) => {
