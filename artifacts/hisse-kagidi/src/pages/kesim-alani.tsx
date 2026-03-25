@@ -107,7 +107,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag, Team } from "@/lib/types";
-import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani, generateTrackingToken, fetchKesimAlaniTrackingNotes, updateTrackingNoteStatus, fetchGroupPhotosAdmin, getGroupPhotoUrlAdmin, fetchPhotoCountsAdmin, createTeam, updateTeam, deleteTeam, assignTeamAdmin, fetchNotificationLogs, fetchNotificationTemplate, updateNotificationTemplate, createDonationTransfers } from "@/lib/api";
+import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani, generateTrackingToken, fetchKesimAlaniTrackingNotes, updateTrackingNoteStatus, fetchGroupPhotosAdmin, getGroupPhotoUrlAdmin, fetchPhotoCountsAdmin, createTeam, updateTeam, deleteTeam, assignTeamAdmin, fetchNotificationLogs, fetchNotificationTemplate, updateNotificationTemplate, createDonationTransfers, downloadCsvExport } from "@/lib/api";
 import type { DeletedDonation, TrackingNote, GroupPhoto, NotificationLog, DonationTransferEntry } from "@/lib/api";
 import PhotoGallery from "@/components/PhotoGallery";
 import { AnimalGroupCard } from "@/components/AnimalGroupCard";
@@ -339,6 +339,30 @@ export default function KesimAlaniPage() {
   const [notificationTemplateSaving, setNotificationTemplateSaving] = useState(false);
 
   const [donorListReportOpen, setDonorListReportOpen] = useState(false);
+  const [csvExporting, setCsvExporting] = useState(false);
+
+  async function handleExportKaCsv() {
+    if (!kesim) return;
+    setCsvExporting(true);
+    try {
+      const blob = await downloadCsvExport(kesim.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${kesim.name.replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ ]/g, "").replace(/\s+/g, "_")}_bagiscilar.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "CSV indirildi" });
+    } catch (err) {
+      toast({
+        title: "CSV export hatası",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    } finally {
+      setCsvExporting(false);
+    }
+  }
   const [transferToDonorListConfirm, setTransferToDonorListConfirm] = useState(false);
   const [transferToDonorListRemoving, setTransferToDonorListRemoving] = useState(false);
   const [findDeleteOpen, setFindDeleteOpen] = useState(false);
@@ -3333,6 +3357,10 @@ export default function KesimAlaniPage() {
                   <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setLocation(`/print/${kesim.id}`)}>
                     <Printer className="w-3.5 h-3.5 mr-1" />
                     <span className="hidden sm:inline">Yazdır</span>
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={handleExportKaCsv} disabled={csvExporting}>
+                    <Download className="w-3.5 h-3.5 mr-1" />
+                    <span className="hidden sm:inline">{csvExporting ? "..." : "CSV"}</span>
                   </Button>
                 </>
               )}

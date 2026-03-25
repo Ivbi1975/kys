@@ -6,6 +6,7 @@ import tagsRouter from "./tags";
 import settingsRouter from "./settings";
 import backupRouter from "./backup";
 import aiNotesRouter from "./ai-notes";
+import exportRouter from "./export";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(tagsRouter);
 router.use(settingsRouter);
 router.use(backupRouter);
 router.use(aiNotesRouter);
+router.use(exportRouter);
 
 export default router;

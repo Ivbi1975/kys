@@ -57,6 +57,7 @@ import {
   unarchiveProject,
   moveKesimAlani,
   generateTrackingToken,
+  downloadCsvExport,
 } from "@/lib/api";
 import { useTheme } from "@/lib/useTheme";
 import type { ThemeMode } from "@/lib/useTheme";
@@ -484,6 +485,34 @@ export default function Home() {
     }
   }
 
+  const [csvExporting, setCsvExporting] = useState(false);
+  const [csvProgress, setCsvProgress] = useState({ received: 0, total: 0 });
+
+  async function handleExportCsv() {
+    setCsvExporting(true);
+    setCsvProgress({ received: 0, total: 0 });
+    try {
+      const blob = await downloadCsvExport(undefined, (received, total) => {
+        setCsvProgress({ received, total });
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `bagisci_listesi_${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "CSV indirildi" });
+    } catch (err) {
+      toast({
+        title: "CSV export hatası",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    } finally {
+      setCsvExporting(false);
+    }
+  }
+
   const [importModeOpen, setImportModeOpen] = useState(false);
   const [pendingImportJson, setPendingImportJson] = useState<string | null>(null);
 
@@ -900,6 +929,37 @@ export default function Home() {
                     className="hidden"
                     onChange={handleImportBackup}
                   />
+                </div>
+
+                <div className="border-t pt-4">
+                  <label className="text-sm font-medium mb-2 block">
+                    CSV Dışa Aktarma
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Tüm bağışçıları CSV olarak indirin (Excel'de açılabilir).
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={handleExportCsv}
+                    disabled={csvExporting}
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    {csvExporting
+                      ? csvProgress.total > 0
+                        ? `İndiriliyor... ${csvProgress.received}/${csvProgress.total}`
+                        : "Hazırlanıyor..."
+                      : "CSV İndir"}
+                  </Button>
+                  {csvExporting && csvProgress.total > 0 && (
+                    <div className="mt-2 w-full bg-muted rounded-full h-2">
+                      <div
+                        className="bg-primary h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, (csvProgress.received / csvProgress.total) * 100)}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t pt-4">

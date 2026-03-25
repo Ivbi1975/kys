@@ -496,6 +496,43 @@ export async function fetchTrackingDelta(token: string, since: string): Promise<
   return apiFetch<TrackingDelta>(`/tracking/${token}/delta?since=${encodeURIComponent(since)}`);
 }
 
+export async function fetchExportCount(kaId?: string): Promise<{ total: number }> {
+  const qs = kaId ? `?kaId=${encodeURIComponent(kaId)}` : "";
+  return apiFetch<{ total: number }>(`/export/count${qs}`);
+}
+
+export async function downloadCsvExport(
+  kaId?: string,
+  onProgress?: (received: number, total: number) => void,
+): Promise<Blob> {
+  const qs = kaId ? `?kaId=${encodeURIComponent(kaId)}` : "";
+  const res = await fetch(`${API_BASE}/export/csv${qs}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Export hatası" }));
+    throw new Error(err.error || "Export hatası");
+  }
+
+  const totalRows = parseInt(res.headers.get("X-Total-Rows") || "0", 10);
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("Stream desteklenmiyor");
+
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  const decoder = new TextDecoder();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    const text = decoder.decode(value, { stream: true });
+    const newLines = (text.match(/\n/g) || []).length;
+    received += newLines;
+    onProgress?.(Math.min(received, totalRows), totalRows);
+  }
+
+  return new Blob(chunks, { type: "text/csv; charset=utf-8" });
+}
+
 export async function toggleKesildi(token: string, groupId: string, kesildi: boolean): Promise<void> {
   await apiFetch(`/tracking/${token}/group/${groupId}/kesildi`, {
     method: "PUT",
