@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ChevronRight, ChevronDown, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, RotateCcw, Clock, Calendar, FolderOpen, FolderPlus, MoveRight, Link2, ExternalLink, QrCode } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronDown, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, RotateCcw, Clock, Calendar, FolderOpen, FolderPlus, MoveRight, Link2, ExternalLink, QrCode, Archive } from "lucide-react";
 import QrCodeModal from "@/components/QrCodeModal";
 import type { KesimAlani, CustomTag, Project } from "@/lib/types";
 import {
@@ -53,6 +53,8 @@ import {
   deleteProject,
   restoreProject,
   fetchDeletedProjects,
+  fetchArchivedProjects,
+  unarchiveProject,
   moveKesimAlani,
   generateTrackingToken,
 } from "@/lib/api";
@@ -67,6 +69,8 @@ export default function Home() {
   const [deletedKesimAlanlari, setDeletedKesimAlanlari] = useState<KesimAlani[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [deletedProjects, setDeletedProjects] = useState<Project[]>([]);
+  const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -121,12 +125,14 @@ export default function Home() {
         setLogoPreview(logo);
         setProjects(projs);
         try {
-          const [deleted, deletedProjs] = await Promise.all([
+          const [deleted, deletedProjs, archivedProjs] = await Promise.all([
             fetchDeletedKesimAlanlari(),
             fetchDeletedProjects(),
+            fetchArchivedProjects(),
           ]);
           setDeletedKesimAlanlari(deleted);
           setDeletedProjects(deletedProjs);
+          setArchivedProjects(archivedProjs);
         } catch (delErr) {
           console.warn("Silinen öğeler yüklenemedi:", delErr instanceof Error ? delErr.message : delErr);
         }
@@ -300,6 +306,23 @@ export default function Home() {
     } catch (err) {
       toast({
         title: "Geri yükleme hatası",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleUnarchiveProject(id: string) {
+    try {
+      const restored = await unarchiveProject(id);
+      setArchivedProjects(prev => prev.filter(p => p.id !== id));
+      setProjects(prev => [...prev, restored]);
+      const freshKesimAlanlari = await fetchKesimAlanlari();
+      setKesimAlanlari(freshKesimAlanlari);
+      toast({ title: "Proje arşivden çıkarıldı", description: restored.name });
+    } catch (err) {
+      toast({
+        title: "Arşivden çıkarma hatası",
         description: err instanceof Error ? err.message : "Bilinmeyen hata",
         variant: "destructive",
       });
@@ -1228,6 +1251,41 @@ export default function Home() {
               </div>
             )}
           </>
+        )}
+
+        {archivedProjects.length > 0 && (
+          <div className="mt-6">
+            <button
+              type="button"
+              className="text-sm font-semibold text-muted-foreground flex items-center gap-2 mb-3 hover:text-foreground transition-colors"
+              onClick={() => setArchiveOpen(!archiveOpen)}
+            >
+              {archiveOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              <Archive className="w-4 h-4" />
+              Arşiv ({archivedProjects.length})
+            </button>
+            {archiveOpen && (
+              <div className="space-y-2">
+                {archivedProjects.map(p => (
+                  <Card key={`arch-${p.id}`} className="p-3">
+                    <div className="flex items-center gap-3">
+                      <FolderOpen className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{p.name} <span className="text-xs text-muted-foreground">(Arşivlenmiş Proje)</span></p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Arşivlenme: {p.archivedAt ? formatDateTime(p.archivedAt) : "—"}
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleUnarchiveProject(p.id)}>
+                        <RotateCcw className="w-3 h-3 mr-1" />
+                        Arşivden Çıkar
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {(deletedKesimAlanlari.length > 0 || deletedProjects.length > 0) && (

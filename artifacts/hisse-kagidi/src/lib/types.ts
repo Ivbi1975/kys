@@ -66,5 +66,6 @@ export interface Project {
   name: string;
   createdAt: string;
   deletedAt?: string | null;
+  archivedAt?: string | null;
   stats: ProjectStats;
 }

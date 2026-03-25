@@ -4,9 +4,15 @@ import {
   projectsTable,
   kesimAlanlariTable,
   animalGroupsTable,
+  donationsTable,
+  animalGroupDonationsTable,
+  animalGroupPhotosTable,
+  trackingNotesTable,
+  notificationLogsTable,
+  teamsTable,
 } from "@workspace/db/schema";
 import { eq, isNull, isNotNull, and, sql, inArray } from "drizzle-orm";
-import { cacheGet, cacheSet, cacheInvalidate } from "../lib/cache";
+import { cacheGet, cacheSet, cacheInvalidate, cacheInvalidatePrefix } from "../lib/cache";
 
 const PROJECTS_CACHE_KEY = "projects:list";
 const PROJECTS_TTL = 30_000;
@@ -56,13 +62,14 @@ router.get("/projects", async (_req, res) => {
         s.last_kesildi_at
       FROM projects p
       LEFT JOIN project_stats_view s ON s.project_id = p.id
-      WHERE p.deleted_at IS NULL
+      WHERE p.deleted_at IS NULL AND p.archived_at IS NULL
       ORDER BY p.created_at
     `);
 
     type ProjectRow = {
       id: string; name: string; description: string;
       created_at: string; deleted_at: string | null;
+      archived_at: string | null;
       donor_count: number; share_count: number;
       group_count: number; kesildi_count: number;
       last_kesildi_at: string | null;
@@ -74,6 +81,7 @@ router.get("/projects", async (_req, res) => {
       description: r.description || "",
       createdAt: new Date(r.created_at),
       deletedAt: r.deleted_at ? new Date(r.deleted_at) : null,
+      archivedAt: r.archived_at ? new Date(r.archived_at) : null,
       stats: {
         donorCount: Number(r.donor_count),
         shareCount: Number(r.share_count),
@@ -175,6 +183,127 @@ router.get("/projects/deleted", async (_req, res) => {
   } catch (err) {
     console.error("GET /projects/deleted error:", err);
     res.status(500).json({ error: "Failed to fetch deleted projects" });
+  }
+});
+
+router.get("/projects/archived", async (_req, res) => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT
+        p.*,
+        COALESCE(s.donor_count, 0) AS donor_count,
+        COALESCE(s.share_count, 0) AS share_count,
+        COALESCE(s.group_count, 0) AS group_count,
+        COALESCE(s.kesildi_count, 0) AS kesildi_count,
+        s.last_kesildi_at
+      FROM projects p
+      LEFT JOIN project_stats_view s ON s.project_id = p.id
+      WHERE p.archived_at IS NOT NULL AND p.deleted_at IS NULL
+      ORDER BY p.archived_at DESC
+    `);
+
+    type ProjectRow = {
+      id: string; name: string; description: string;
+      created_at: string; deleted_at: string | null;
+      archived_at: string | null;
+      donor_count: number; share_count: number;
+      group_count: number; kesildi_count: number;
+      last_kesildi_at: string | null;
+    };
+
+    const result = (rows.rows as ProjectRow[]).map(r => ({
+      id: r.id,
+      name: r.name,
+      description: r.description || "",
+      createdAt: new Date(r.created_at),
+      deletedAt: r.deleted_at ? new Date(r.deleted_at) : null,
+      archivedAt: r.archived_at ? new Date(r.archived_at) : null,
+      stats: {
+        donorCount: Number(r.donor_count),
+        shareCount: Number(r.share_count),
+        groupCount: Number(r.group_count),
+        kesildiCount: Number(r.kesildi_count),
+        lastKesildiAt: r.last_kesildi_at,
+      },
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error("GET /projects/archived error:", err);
+    res.status(500).json({ error: "Failed to fetch archived projects" });
+  }
+});
+
+router.post("/projects/:id/archive", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
+    if (!project) return res.status(404).json({ error: "Proje bulunamadı" });
+    if (project.deletedAt) return res.status(400).json({ error: "Silinmiş proje arşivlenemez" });
+    if (project.archivedAt) return res.status(400).json({ error: "Proje zaten arşivlenmiş" });
+
+    const now = new Date();
+
+    await db.transaction(async (tx) => {
+      await tx.update(projectsTable)
+        .set({ archivedAt: now })
+        .where(eq(projectsTable.id, id));
+
+      const kesimAlanlari = await tx.select({ id: kesimAlanlariTable.id })
+        .from(kesimAlanlariTable)
+        .where(and(
+          eq(kesimAlanlariTable.projectId, id),
+          isNull(kesimAlanlariTable.deletedAt)
+        ));
+
+      if (kesimAlanlari.length > 0) {
+        const kaIds = kesimAlanlari.map(k => k.id);
+        await tx.update(kesimAlanlariTable)
+          .set({ deletedAt: now })
+          .where(inArray(kesimAlanlariTable.id, kaIds));
+      }
+    });
+
+    await refreshProjectStats();
+    cacheInvalidatePrefix("kesim-alanlari");
+
+    res.json({ success: true, archivedAt: now });
+  } catch (err) {
+    console.error("POST /projects/:id/archive error:", err);
+    res.status(500).json({ error: "Arşivleme başarısız" });
+  }
+});
+
+router.post("/projects/:id/unarchive", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
+    if (!project) return res.status(404).json({ error: "Proje bulunamadı" });
+    if (!project.archivedAt) return res.status(400).json({ error: "Proje arşivde değil" });
+
+    await db.transaction(async (tx) => {
+      const archivedAt = project.archivedAt!;
+
+      await tx.update(projectsTable)
+        .set({ archivedAt: null })
+        .where(eq(projectsTable.id, id));
+
+      await tx.update(kesimAlanlariTable)
+        .set({ deletedAt: null })
+        .where(and(
+          eq(kesimAlanlariTable.projectId, id),
+          eq(kesimAlanlariTable.deletedAt, archivedAt)
+        ));
+    });
+
+    await refreshProjectStats();
+    cacheInvalidatePrefix("kesim-alanlari");
+
+    const [restored] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
+    res.json({ ...restored, archivedAt: null, stats: emptyStats });
+  } catch (err) {
+    console.error("POST /projects/:id/unarchive error:", err);
+    res.status(500).json({ error: "Arşivden geri yükleme başarısız" });
   }
 });
 

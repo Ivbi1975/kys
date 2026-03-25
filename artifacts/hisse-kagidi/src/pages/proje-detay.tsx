@@ -51,6 +51,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  Archive,
 } from "lucide-react";
 import QrCodeModal from "@/components/QrCodeModal";
 import { useToast } from "@/hooks/use-toast";
@@ -62,6 +63,7 @@ import {
   fetchProjects,
   updateProject,
   deleteProject,
+  archiveProject,
   fetchCatismaTespiti,
   transferDonation,
   generateTrackingToken,
@@ -89,6 +91,8 @@ export default function ProjeDetayPage() {
   const [editProjectName, setEditProjectName] = useState("");
 
   const [deleteProjectConfirm, setDeleteProjectConfirm] = useState(false);
+  const [archiveConfirm, setArchiveConfirm] = useState(false);
+  const [archiving, setArchiving] = useState(false);
 
   const [deleteConfirm, setDeleteConfirm] = useState<{
     id: string;
@@ -462,6 +466,15 @@ export default function ProjeDetayPage() {
               }}
             >
               <Pencil className="w-4 h-4 text-muted-foreground" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              title="Arşivle"
+              onClick={() => setArchiveConfirm(true)}
+            >
+              <Archive className="w-4 h-4 text-amber-600" />
             </Button>
             <Button
               variant="ghost"
@@ -1107,6 +1120,42 @@ export default function ProjeDetayPage() {
             <AlertDialogCancel>İptal</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteProject} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={archiveConfirm} onOpenChange={(open) => { if (!open) setArchiveConfirm(false); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Projeyi Arşivle</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>&quot;{project.name}&quot;</strong> projesi arşivlenecek.
+              Projedeki tüm kesim alanları arşive taşınacak ve aktif listeden kaldırılacak.
+              Arşivden geri yükleme her zaman mümkündür.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={archiving}>İptal</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={archiving}
+              onClick={async () => {
+                setArchiving(true);
+                try {
+                  await archiveProject(projectId);
+                  toast({ title: "Proje arşivlendi" });
+                  setLocation("/");
+                } catch (err) {
+                  toast({ title: "Arşivleme başarısız", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+                } finally {
+                  setArchiving(false);
+                  setArchiveConfirm(false);
+                }
+              }}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+            >
+              {archiving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Archive className="w-4 h-4 mr-2" />}
+              Arşivle
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

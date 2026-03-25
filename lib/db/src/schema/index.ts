@@ -8,9 +8,12 @@ export const projectsTable = pgTable("projects", {
   name: text("name").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
 }, (table) => [
   index("idx_projects_deleted_created").on(table.deletedAt, table.createdAt),
   index("idx_projects_active_created").on(table.createdAt).where(sql`deleted_at IS NULL`),
+  index("idx_projects_active_not_archived").on(table.createdAt).where(sql`deleted_at IS NULL AND archived_at IS NULL`),
+  index("idx_projects_archived").on(table.archivedAt).where(sql`archived_at IS NOT NULL`),
 ]);
 
 export const insertProjectSchema = createInsertSchema(projectsTable);

@@ -54,6 +54,18 @@ export async function fetchDeletedProjects(): Promise<Project[]> {
   return apiFetch<Project[]>("/projects/deleted");
 }
 
+export async function fetchArchivedProjects(): Promise<Project[]> {
+  return apiFetch<Project[]>("/projects/archived");
+}
+
+export async function archiveProject(id: string): Promise<{ success: boolean; archivedAt: string }> {
+  return apiFetch<{ success: boolean; archivedAt: string }>(`/projects/${id}/archive`, { method: "POST" });
+}
+
+export async function unarchiveProject(id: string): Promise<Project> {
+  return apiFetch<Project>(`/projects/${id}/unarchive`, { method: "POST" });
+}
+
 export async function moveKesimAlani(kesimAlaniId: string, projectId: string | null): Promise<KesimAlani> {
   return apiFetch<KesimAlani>(`/kesim-alanlari/${kesimAlaniId}/move`, {
     method: "PUT",
