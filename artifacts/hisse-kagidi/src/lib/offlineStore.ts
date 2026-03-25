@@ -87,12 +87,44 @@ export async function queueOfflineAction(
 
 export async function getQueuedActions(token: string): Promise<OfflineAction[]> {
   const db = await getDB();
-  return db.getAllFromIndex("offlineQueue", "by-token", token);
+  const actions = await db.getAllFromIndex("offlineQueue", "by-token", token);
+  actions.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+  const deduped: OfflineAction[] = [];
+  const lastToggleByGroup = new Map<string, number>();
+
+  for (let i = 0; i < actions.length; i++) {
+    const action = actions[i];
+    if (action.type === "toggle_kesildi") {
+      const groupId = action.payload.groupId as string;
+      const existing = lastToggleByGroup.get(groupId);
+      if (existing !== undefined) {
+        deduped[existing] = action;
+      } else {
+        lastToggleByGroup.set(groupId, deduped.length);
+        deduped.push(action);
+      }
+    } else {
+      deduped.push(action);
+    }
+  }
+
+  return deduped;
 }
 
 export async function removeQueuedAction(id: string): Promise<void> {
   const db = await getDB();
   await db.delete("offlineQueue", id);
+}
+
+export async function removeAllQueuedActions(token: string): Promise<void> {
+  const db = await getDB();
+  const actions = await db.getAllFromIndex("offlineQueue", "by-token", token);
+  const tx = db.transaction("offlineQueue", "readwrite");
+  for (const action of actions) {
+    tx.store.delete(action.id);
+  }
+  await tx.done;
 }
 
 export async function getQueuedCount(token: string): Promise<number> {

@@ -5,6 +5,7 @@ import {
   queueOfflineAction,
   getQueuedActions,
   removeQueuedAction,
+  removeAllQueuedActions,
   getQueuedCount,
   applyOfflineToggleToCache,
   applyOfflineNoteToCache,
@@ -59,6 +60,7 @@ export function useOfflineSync(token: string | undefined) {
     syncingRef.current = true;
     setSyncState((s) => ({ ...s, isSyncing: true, lastSyncError: null }));
 
+    let allSucceeded = true;
     try {
       const actions = await getQueuedActions(token);
       for (const action of actions) {
@@ -74,12 +76,16 @@ export function useOfflineSync(token: string | undefined) {
           }
           await removeQueuedAction(action.id);
         } catch (err) {
+          allSucceeded = false;
           setSyncState((s) => ({
             ...s,
             lastSyncError: err instanceof Error ? err.message : "Senkronizasyon hatası",
           }));
           break;
         }
+      }
+      if (allSucceeded) {
+        await removeAllQueuedActions(token);
       }
     } finally {
       syncingRef.current = false;
