@@ -664,6 +664,8 @@ router.get("/kesim-alanlari/:id/groups", async (req, res) => {
     const rawLimit = Number(req.query.limit) || 50;
     const limit = Math.min(Math.max(rawLimit, 1), 200);
     const cursor = typeof req.query.cursor === "string" ? req.query.cursor : null;
+    const rawOffset = Number(req.query.offset);
+    const offset = !cursor && Number.isFinite(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
     const { sortField, sortDir } = parseGroupSortParams(req.query as Record<string, unknown>);
 
     const where = buildGroupFilters(kesimAlaniId, req.query as Record<string, unknown>);
@@ -692,10 +694,12 @@ router.get("/kesim-alanlari/:id/groups", async (req, res) => {
 
     const finalWhere = cursorCondition ? and(where, cursorCondition) : where;
 
-    const rows = await db.select().from(animalGroupsTable)
+    const query = db.select().from(animalGroupsTable)
       .where(finalWhere!)
       .orderBy(dirFn(col), asc(animalGroupsTable.id))
       .limit(limit + 1);
+
+    const rows = offset > 0 ? await query.offset(offset) : await query;
 
     const hasMore = rows.length > limit;
     const pageRows = hasMore ? rows.slice(0, limit) : rows;
@@ -842,7 +846,12 @@ router.get("/kesim-alanlari/:id/groups/:groupId", async (req, res) => {
 });
 
 const bulkLockSchema = z.object({
-  groupIds: z.array(z.string()).min(1).max(500),
+  groupIds: z.array(z.string()).max(500).optional(),
+  filter: z.object({
+    locked: z.enum(["true", "false"]).optional(),
+    kesildi: z.enum(["true", "false"]).optional(),
+    teamId: z.string().optional(),
+  }).optional(),
   locked: z.boolean(),
 });
 
@@ -854,7 +863,12 @@ router.post("/kesim-alanlari/:id/groups/bulk-lock", async (req, res) => {
   }
 
   const { id: kesimAlaniId } = req.params;
-  const { groupIds, locked } = parsed.data;
+  const { groupIds, filter, locked } = parsed.data;
+
+  if (!groupIds?.length && !filter) {
+    res.status(400).json({ error: "groupIds veya filter gerekli" });
+    return;
+  }
 
   try {
     const kaCheck = await requireActiveKesimAlani(kesimAlaniId);
@@ -863,14 +877,22 @@ router.post("/kesim-alanlari/:id/groups/bulk-lock", async (req, res) => {
       return;
     }
 
-    await db.update(animalGroupsTable)
-      .set({ locked })
-      .where(and(
+    let whereCondition;
+    if (groupIds?.length) {
+      whereCondition = and(
         eq(animalGroupsTable.kesimAlaniId, kesimAlaniId),
         inArray(animalGroupsTable.id, groupIds),
-      ));
+      );
+    } else {
+      whereCondition = buildGroupFilters(kesimAlaniId, (filter || {}) as Record<string, unknown>);
+    }
 
-    res.json({ updated: groupIds.length, locked });
+    const result = await db.update(animalGroupsTable)
+      .set({ locked })
+      .where(whereCondition!);
+
+    const updatedCount = result.rowCount ?? 0;
+    res.json({ updated: updatedCount, locked });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`POST /kesim-alanlari/${kesimAlaniId}/groups/bulk-lock error:`, message);
