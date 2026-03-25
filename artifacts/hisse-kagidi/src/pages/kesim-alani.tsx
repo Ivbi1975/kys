@@ -1303,27 +1303,25 @@ export default function KesimAlaniPage() {
     const newDir = sortField === field && sortDir === "asc" ? "desc" : "asc";
     setSortField(field);
     setSortDir(newDir);
+    const dir = newDir === "asc" ? 1 : -1;
     const sorted = [...kesim.donations].sort((a, b) => {
-      const aVal = a[field];
-      const bVal = b[field];
-      if (typeof aVal === "number" && typeof bVal === "number") {
-        return newDir === "asc" ? aVal - bVal : bVal - aVal;
+      const ka = sortKeyMap.get(a.id);
+      const kb = sortKeyMap.get(b.id);
+      if (!ka || !kb) return 0;
+      if (field === "shareCount") {
+        return dir * (ka.shareCount - kb.shareCount);
       }
       if (field === "description") {
-        const aStr = String(aVal).trim();
-        const bStr = String(bVal).trim();
-        const aSurname = aStr.split(/\s+/).pop() || aStr;
-        const bSurname = bStr.split(/\s+/).pop() || bStr;
-        const surnameCmp = trCollator.compare(aSurname, bSurname);
-        if (surnameCmp !== 0) {
-          return newDir === "asc" ? surnameCmp : -surnameCmp;
-        }
-        const fullCmp = trCollator.compare(aStr, bStr);
-        return newDir === "asc" ? fullCmp : -fullCmp;
+        const surnameCmp = trCollator.compare(ka.descSurname, kb.descSurname);
+        if (surnameCmp !== 0) return dir * surnameCmp;
+        return dir * trCollator.compare(ka.description, kb.description);
       }
-      return newDir === "asc"
-        ? trCollator.compare(String(aVal), String(bVal))
-        : trCollator.compare(String(bVal), String(aVal));
+      if (field === "name") {
+        const surnameCmp = trCollator.compare(ka.nameSurname, kb.nameSurname);
+        if (surnameCmp !== 0) return dir * surnameCmp;
+        return dir * trCollator.compare(ka.name, kb.name);
+      }
+      return dir * trCollator.compare(ka[field], kb[field]);
     });
     save({ ...kesim, donations: sorted }, `Sıralama değiştirildi`, true);
   }
@@ -3049,6 +3047,23 @@ export default function KesimAlaniPage() {
     }
     return compositions;
   }, [animalGroups]);
+
+  const sortKeyMap = useMemo(() => {
+    const map = new Map<string, { nameSurname: string; descSurname: string; name: string; description: string; donationType: string; shareCount: number }>();
+    for (const d of donations) {
+      const nameStr = (d.name || "").trim();
+      const descStr = (d.description || "").trim();
+      map.set(d.id, {
+        nameSurname: nameStr.split(/\s+/).pop() || nameStr,
+        descSurname: descStr.split(/\s+/).pop() || descStr,
+        name: nameStr,
+        description: descStr,
+        donationType: (d.donationType || "").trim(),
+        shareCount: d.shareCount,
+      });
+    }
+    return map;
+  }, [donations]);
 
   const searchIndex = useMemo(() => {
     const trigramIndex = new Map<string, Set<string>>();
@@ -6932,9 +6947,10 @@ export default function KesimAlaniPage() {
       {donorListReportOpen && kesim && (() => {
         const activeDonors = kesim.donations.filter(d => !d.excluded);
         const sorted = [...activeDonors].sort((a, b) => {
-          const surnameA = (a.description || "").trim().split(/\s+/).pop() || "";
-          const surnameB = (b.description || "").trim().split(/\s+/).pop() || "";
-          return trCollator.compare(surnameA, surnameB);
+          const ka = sortKeyMap.get(a.id);
+          const kb = sortKeyMap.get(b.id);
+          if (!ka || !kb) return 0;
+          return trCollator.compare(ka.descSurname, kb.descSurname);
         });
         return (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setDonorListReportOpen(false); }}>

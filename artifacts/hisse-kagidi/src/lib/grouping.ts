@@ -70,12 +70,12 @@ function buildGroupDonations(segments: GroupedSegment[]): Donation[] {
 
   const filled = groupDonations.filter(d => d.name.trim() || d.description.trim());
   const empty = groupDonations.filter(d => !d.name.trim() && !d.description.trim());
-  filled.sort((a, b) => {
-    const surnameA = getSurname(a.description || a.name);
-    const surnameB = getSurname(b.description || b.name);
-    return trCollator.compare(surnameA, surnameB);
-  });
-  const sorted = [...filled, ...empty];
+  const filledKeys = filled.map(d => ({
+    d,
+    surname: getSurname(d.description || d.name),
+  }));
+  filledKeys.sort((a, b) => trCollator.compare(a.surname, b.surname));
+  const sorted: Donation[] = [...filledKeys.map(k => k.d), ...empty];
 
   while (sorted.length < 7) {
     sorted.push(createEmptyDonation());
