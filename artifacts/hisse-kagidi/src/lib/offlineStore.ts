@@ -171,3 +171,47 @@ export async function applyOfflineNoteToCache(
   record.updatedAt = new Date().toISOString();
   await db.put("trackingData", record);
 }
+
+export async function mergeDeltaToCache(
+  token: string,
+  delta: {
+    updatedGroups: TrackingData["groups"];
+    updatedNotes: TrackingNote[];
+    deletedGroupIds: string[];
+    deletedNoteIds: string[];
+    totalGroups: number;
+    kesildiCount: number;
+  }
+): Promise<void> {
+  const db = await getDB();
+  const record = await db.get("trackingData", token);
+  if (!record) return;
+
+  const groupMap = new Map(record.data.groups.map(g => [g.id, g]));
+  for (const g of delta.updatedGroups) {
+    groupMap.set(g.id, g);
+  }
+  for (const id of delta.deletedGroupIds) {
+    groupMap.delete(id);
+  }
+
+  const noteMap = new Map(record.notes.map(n => [n.id, n]));
+  for (const n of delta.updatedNotes) {
+    noteMap.set(n.id, n);
+  }
+  for (const id of delta.deletedNoteIds) {
+    noteMap.delete(id);
+  }
+
+  record.data = {
+    ...record.data,
+    totalGroups: delta.totalGroups,
+    kesildiCount: delta.kesildiCount,
+    groups: Array.from(groupMap.values()),
+  };
+  record.notes = Array.from(noteMap.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  record.updatedAt = new Date().toISOString();
+  await db.put("trackingData", record);
+}

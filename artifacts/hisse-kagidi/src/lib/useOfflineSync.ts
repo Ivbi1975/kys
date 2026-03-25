@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   saveTrackingDataOffline,
   getTrackingDataOffline,
@@ -9,6 +9,7 @@ import {
   getQueuedCount,
   applyOfflineToggleToCache,
   applyOfflineNoteToCache,
+  mergeDeltaToCache,
 } from "./offlineStore";
 import {
   fetchTrackingData,
@@ -18,6 +19,49 @@ import {
   createTrackingNote,
 } from "./api";
 import type { TrackingData, TrackingNote } from "./api";
+
+const POLL_NORMAL_MS = 30_000;
+const POLL_BATTERY_SAVER_MS = 120_000;
+const BATTERY_LOW_THRESHOLD = 0.15;
+
+interface BatteryManager extends EventTarget {
+  charging: boolean;
+  level: number;
+  addEventListener(type: "levelchange" | "chargingchange", listener: () => void): void;
+  removeEventListener(type: "levelchange" | "chargingchange", listener: () => void): void;
+}
+
+function useBatterySaver() {
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    let battery: BatteryManager | null = null;
+
+    const update = () => {
+      if (!battery) return;
+      setIsSaving(!battery.charging && battery.level <= BATTERY_LOW_THRESHOLD);
+    };
+
+    const nav = navigator as Navigator & { getBattery?: () => Promise<BatteryManager> };
+    if (nav.getBattery) {
+      nav.getBattery().then(b => {
+        battery = b;
+        update();
+        b.addEventListener("levelchange", update);
+        b.addEventListener("chargingchange", update);
+      }).catch(() => {});
+    }
+
+    return () => {
+      if (battery) {
+        battery.removeEventListener("levelchange", update);
+        battery.removeEventListener("chargingchange", update);
+      }
+    };
+  }, []);
+
+  return isSaving;
+}
 
 export interface OfflineSyncState {
   isOnline: boolean;
@@ -37,13 +81,13 @@ export function useOfflineSync(token: string | undefined) {
     isSyncing: false,
     lastSyncError: null,
   });
+  const batterySaver = useBatterySaver();
   const syncingRef = useRef(false);
   const lastSyncTimeRef = useRef<string | null>(null);
   const dataRef = useRef<TrackingData | null>(null);
   const notesRef = useRef<TrackingNote[]>([]);
   dataRef.current = data;
   notesRef.current = notes;
-  const saveCacheTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const handleOnline = () => setSyncState((s) => ({ ...s, isOnline: true }));
@@ -100,15 +144,6 @@ export function useOfflineSync(token: string | undefined) {
     await updatePendingCount();
   }, [token, updatePendingCount]);
 
-  const debouncedSaveCache = useCallback((t: string) => {
-    if (saveCacheTimerRef.current) clearTimeout(saveCacheTimerRef.current);
-    saveCacheTimerRef.current = setTimeout(() => {
-      const d = dataRef.current;
-      const n = notesRef.current;
-      if (d) saveTrackingDataOffline(t, d, n);
-    }, 1000);
-  }, []);
-
   const loadDeltaData = useCallback(async () => {
     if (!token || !navigator.onLine || !lastSyncTimeRef.current || !dataRef.current) {
       return loadFullData();
@@ -154,11 +189,11 @@ export function useOfflineSync(token: string | undefined) {
       });
 
       setError(null);
-      debouncedSaveCache(token);
+      mergeDeltaToCache(token, delta).catch(() => {});
     } catch {
       await loadFullData();
     }
-  }, [token, loadFullData, debouncedSaveCache]);
+  }, [token, loadFullData]);
 
   const loadData = useCallback(async () => {
     if (lastSyncTimeRef.current && dataRef.current) {
@@ -210,18 +245,16 @@ export function useOfflineSync(token: string | undefined) {
 
   useEffect(() => {
     loadFullData();
+    const pollMs = batterySaver ? POLL_BATTERY_SAVER_MS : POLL_NORMAL_MS;
     const interval = setInterval(() => {
       if (lastSyncTimeRef.current && dataRef.current) {
         loadDeltaData();
       } else {
         loadFullData();
       }
-    }, 30000);
-    return () => {
-      clearInterval(interval);
-      if (saveCacheTimerRef.current) clearTimeout(saveCacheTimerRef.current);
-    };
-  }, [loadFullData, loadDeltaData]);
+    }, pollMs);
+    return () => clearInterval(interval);
+  }, [loadFullData, loadDeltaData, batterySaver]);
 
   useEffect(() => {
     if (syncState.isOnline && syncState.pendingCount > 0) {
