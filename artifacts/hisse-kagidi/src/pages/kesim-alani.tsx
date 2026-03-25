@@ -1183,17 +1183,33 @@ export default function KesimAlaniPage() {
       }
 
       const hasExistingGroups = kesim.animalGroups.length > 0;
+      const activeDonationIds = new Set(
+        kesim.donations.filter(d => !d.excluded && (d.name.trim() || d.description.trim())).map(d => d.id)
+      );
+
+      const changedIds: string[] = [];
+
       const groupedDonationIds = new Set<string>();
       for (const g of kesim.animalGroups) {
         for (const d of g.donations) {
           if (d.name.trim() || d.description.trim()) groupedDonationIds.add(d.id);
         }
       }
-      const ungroupedDonationIds = kesim.donations
-        .filter(d => !d.excluded && !groupedDonationIds.has(d.id) && (d.name.trim() || d.description.trim()))
-        .map(d => d.id);
 
-      const useIncremental = !forceFullRegroup && hasExistingGroups && ungroupedDonationIds.length > 0 && ungroupedDonationIds.length <= 20;
+      for (const id of activeDonationIds) {
+        if (!groupedDonationIds.has(id)) changedIds.push(id);
+      }
+
+      for (const g of kesim.animalGroups) {
+        if (g.locked) continue;
+        for (const d of g.donations) {
+          if ((d.name.trim() || d.description.trim()) && (!activeDonationIds.has(d.id))) {
+            changedIds.push(d.id);
+          }
+        }
+      }
+
+      const useIncremental = !forceFullRegroup && hasExistingGroups && changedIds.length > 0 && changedIds.length <= 20;
 
       let finalGroups: AnimalGroup[];
 
@@ -1201,7 +1217,7 @@ export default function KesimAlaniPage() {
         finalGroups = await runIncrementalGrouping(
           kesim.donations,
           kesim.animalGroups,
-          ungroupedDonationIds,
+          changedIds,
           lockedIndices
         );
       } else {
@@ -3572,10 +3588,16 @@ export default function KesimAlaniPage() {
               ) : (
                 <>
                   <Wand2 className="w-4 h-4 mr-2" />
-                  Otomatik Grupla ({requiredAnimals} Hayvan)
+                  {kesim.animalGroups.length > 0 ? "Artımlı Grupla" : "Otomatik Grupla"} ({requiredAnimals} Hayvan)
                 </>
               )}
             </Button>
+            {!groupingInProgress && kesim.animalGroups.length > 0 && (
+              <Button variant="outline" onClick={() => handleAutoGroup(true)} disabled={groupingInProgress} title="Tüm grupları sıfırdan yeniden oluştur">
+                <RotateCcw className="w-4 h-4 mr-1" />
+                Tam Grupla
+              </Button>
+            )}
             {groupingInProgress && (
               <Button variant="destructive" size="icon" onClick={cancelGrouping} title="İptal">
                 <X className="w-4 h-4" />
