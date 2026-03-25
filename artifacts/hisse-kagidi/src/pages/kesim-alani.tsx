@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, createElement, useMemo, forwardRef, useTransition, Suspense } from "react";
-import { TableVirtuoso, Virtuoso } from "react-virtuoso";
+import { TableVirtuoso, Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 const QrCodeModal = React.lazy(() => import("@/components/QrCodeModal"));
 import { useParams, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -386,6 +386,7 @@ export default function KesimAlaniPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const jumpInputRef = useRef<HTMLInputElement>(null);
   const groupsHeaderRef = useRef<HTMLDivElement>(null);
+  const groupsVirtuosoRef = useRef<VirtuosoHandle>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -585,8 +586,7 @@ export default function KesimAlaniPage() {
                 key: `animal-${animalNo}-${idx}`,
                 className: "underline font-semibold hover:text-red-300 cursor-pointer",
                 onClick: () => {
-                  const el = document.getElementById(`animal-group-${animalNo}`);
-                  if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                  scrollToAnimalGroup(animalNo);
                 },
               },
               String(animalNo)
@@ -2195,8 +2195,7 @@ export default function KesimAlaniPage() {
           return next;
         });
         setTimeout(() => {
-          const el = document.getElementById(`animal-group-${match.animalNo}`);
-          if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+          scrollToAnimalGroup(match.animalNo);
         }, 100);
       }
     }
@@ -3197,6 +3196,34 @@ export default function KesimAlaniPage() {
       />
     ),
   }), [selectedIds]);
+
+  const filteredGroupItems = useMemo(() => {
+    if (!kesim) return [];
+    return kesim.animalGroups
+      .map((group, groupIdx) => ({ group, groupIdx }))
+      .filter(({ group }) => {
+        if (colorTagFilter !== "all" && (group.colorTag || "") !== colorTagFilter) return false;
+        if (filterTeam !== "all") {
+          if (filterTeam === "none" && group.teamId) return false;
+          if (filterTeam !== "none" && group.teamId !== filterTeam) return false;
+        }
+        if (showOnlyIncomplete) {
+          const filled = group.donations.filter(d => d.name.trim() !== "").length;
+          if (filled >= 7) return false;
+        }
+        return true;
+      });
+  }, [kesim?.animalGroups, colorTagFilter, filterTeam, showOnlyIncomplete]);
+
+  const scrollToAnimalGroup = useCallback((animalNo: number) => {
+    const idx = filteredGroupItems.findIndex(item => item.group.animalNo === animalNo);
+    if (idx >= 0 && groupsVirtuosoRef.current && filteredGroupItems.length > 20) {
+      groupsVirtuosoRef.current.scrollToIndex({ index: idx, align: "center", behavior: "smooth" });
+    } else {
+      const el = document.getElementById(`animal-group-${animalNo}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [filteredGroupItems]);
 
   const handleSetGroupColorTag = useCallback((groupIdx: number, tag: ColorTag) => {
     setGroupColorTag(groupIdx, tag);
@@ -5377,8 +5404,7 @@ export default function KesimAlaniPage() {
                         style={{ backgroundColor: bg }}
                         title={`Hayvan ${group.animalNo}: ${filled}/7 dolu`}
                         onClick={() => {
-                          const el = document.getElementById(`animal-group-${group.animalNo}`);
-                          if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                          scrollToAnimalGroup(group.animalNo);
                         }}
                       >
                         {group.animalNo}
@@ -5537,8 +5563,7 @@ export default function KesimAlaniPage() {
                                       className="underline font-semibold hover:text-amber-900 cursor-pointer"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        const el = document.getElementById(`animal-group-${no}`);
-                                        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                                        scrollToAnimalGroup(no);
                                       }}
                                     >
                                       {no}
@@ -5571,8 +5596,7 @@ export default function KesimAlaniPage() {
                                           className="underline font-semibold hover:text-amber-700 cursor-pointer"
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            const el = document.getElementById(`animal-group-${no}`);
-                                            if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                                            scrollToAnimalGroup(no);
                                           }}
                                         >
                                           {no}
@@ -5614,21 +5638,6 @@ export default function KesimAlaniPage() {
                 </p>
               </Card>
             ) : (() => {
-              const filteredGroupItems = kesim.animalGroups
-                .map((group, groupIdx) => ({ group, groupIdx }))
-                .filter(({ group }) => {
-                  if (colorTagFilter !== "all" && (group.colorTag || "") !== colorTagFilter) return false;
-                  if (filterTeam !== "all") {
-                    if (filterTeam === "none" && group.teamId) return false;
-                    if (filterTeam !== "none" && group.teamId !== filterTeam) return false;
-                  }
-                  if (showOnlyIncomplete) {
-                    const filled = group.donations.filter(d => d.name.trim() !== "").length;
-                    if (filled >= 7) return false;
-                  }
-                  return true;
-                });
-
               const renderGroupCard = ({ group, groupIdx }: { group: typeof kesim.animalGroups[0]; groupIdx: number }) => (
                 <AnimalGroupCard
                   key={group.id}
@@ -5681,12 +5690,17 @@ export default function KesimAlaniPage() {
                 />
               );
 
-              if (filteredGroupItems.length > 50) {
+              if (filteredGroupItems.length > 20) {
+                const virtuosoProps = fullscreenMode && scrollContainerRef.current
+                  ? { customScrollParent: scrollContainerRef.current }
+                  : { useWindowScroll: true as const };
                 return (
                   <Virtuoso
-                    useWindowScroll
+                    ref={groupsVirtuosoRef}
+                    {...virtuosoProps}
                     data={filteredGroupItems}
-                    overscan={200}
+                    overscan={5}
+                    defaultItemHeight={collapsedGroups.size > 0 ? 60 : 350}
                     itemContent={(_index, item) => (
                       <div className="pb-4">
                         {renderGroupCard(item)}
@@ -6388,9 +6402,10 @@ export default function KesimAlaniPage() {
               onChange={(e) => setJumpDialogValue(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && jumpDialogValue.trim()) {
-                  const el = document.getElementById(`animal-group-${jumpDialogValue.trim()}`);
-                  if (el) {
-                    el.scrollIntoView({ behavior: "smooth", block: "center" });
+                  const targetNo = parseInt(jumpDialogValue.trim(), 10);
+                  const exists = kesim && kesim.animalGroups.some(g => g.animalNo === targetNo);
+                  if (exists) {
+                    scrollToAnimalGroup(targetNo);
                     setJumpDialogOpen(false);
                   } else {
                     toast({ title: `Hayvan No ${jumpDialogValue} bulunamadı`, variant: "destructive" });
@@ -6408,9 +6423,10 @@ export default function KesimAlaniPage() {
               <Button
                 onClick={() => {
                   if (!jumpDialogValue.trim()) return;
-                  const el = document.getElementById(`animal-group-${jumpDialogValue.trim()}`);
-                  if (el) {
-                    el.scrollIntoView({ behavior: "smooth", block: "center" });
+                  const targetNo = parseInt(jumpDialogValue.trim(), 10);
+                  const exists = kesim && kesim.animalGroups.some(g => g.animalNo === targetNo);
+                  if (exists) {
+                    scrollToAnimalGroup(targetNo);
                     setJumpDialogOpen(false);
                   } else {
                     toast({ title: `Hayvan No ${jumpDialogValue} bulunamadı`, variant: "destructive" });
