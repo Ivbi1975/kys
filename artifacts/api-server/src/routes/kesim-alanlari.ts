@@ -14,7 +14,7 @@ import {
   appSettingsTable,
   donationTransfersTable,
 } from "@workspace/db/schema";
-import { desc } from "drizzle-orm";
+import { desc, gt, or, sql, count, ilike, asc } from "drizzle-orm";
 import { eq, inArray, isNull, isNotNull, and } from "drizzle-orm";
 import { z } from "zod";
 import crypto from "crypto";
@@ -461,6 +461,131 @@ router.post("/kesim-alanlari/:id/restore", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`POST /kesim-alanlari/${req.params.id}/restore error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+function buildDonationFilters(kesimAlaniId: string, query: Record<string, unknown>) {
+  const conditions = [
+    eq(donationsTable.kesimAlaniId, kesimAlaniId),
+    isNull(donationsTable.deletedAt),
+  ];
+
+  const search = typeof query.search === "string" ? query.search.trim() : "";
+  if (search) {
+    const pattern = `%${search}%`;
+    conditions.push(
+      or(
+        ilike(donationsTable.name, pattern),
+        ilike(donationsTable.description, pattern),
+        ilike(donationsTable.phone, pattern),
+      )!,
+    );
+  }
+
+  if (query.excluded === "true") conditions.push(eq(donationsTable.excluded, true));
+  if (query.excluded === "false") conditions.push(eq(donationsTable.excluded, false));
+
+  const donationType = typeof query.donationType === "string" ? query.donationType.trim() : "";
+  if (donationType) conditions.push(eq(donationsTable.donationType, donationType));
+
+  return and(...conditions)!;
+}
+
+router.get("/kesim-alanlari/:id/donations", async (req, res) => {
+  try {
+    const { id: kesimAlaniId } = req.params;
+    const [ka] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, kesimAlaniId));
+    if (!ka) {
+      res.status(404).json({ error: "Kesim alanı bulunamadı" });
+      return;
+    }
+
+    const rawLimit = Number(req.query.limit) || 100;
+    const limit = Math.min(Math.max(rawLimit, 1), 500);
+    const cursor = typeof req.query.cursor === "string" ? req.query.cursor : null;
+
+    const where = buildDonationFilters(kesimAlaniId, req.query as Record<string, unknown>);
+
+    let cursorCondition;
+    if (cursor) {
+      const sepIdx = cursor.indexOf("_");
+      if (sepIdx > 0) {
+        const cursorSort = Number(cursor.substring(0, sepIdx));
+        const cursorId = cursor.substring(sepIdx + 1);
+        if (!Number.isNaN(cursorSort) && cursorId) {
+          cursorCondition = or(
+            gt(donationsTable.sortOrder, cursorSort),
+            and(eq(donationsTable.sortOrder, cursorSort), gt(donationsTable.id, cursorId)),
+          );
+        }
+      }
+    }
+
+    const finalWhere = cursorCondition ? and(where, cursorCondition) : where;
+
+    const rows = await db.select().from(donationsTable)
+      .where(finalWhere!)
+      .orderBy(asc(donationsTable.sortOrder), asc(donationsTable.id))
+      .limit(limit + 1);
+
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+
+    const donationIds = pageRows.map(d => d.id);
+    const donationTags = donationIds.length > 0
+      ? await db.select({ donationId: donationTagsTable.donationId, tagId: donationTagsTable.tagId })
+          .from(donationTagsTable).where(inArray(donationTagsTable.donationId, donationIds))
+      : [];
+
+    const tagsByDonation: Record<string, string[]> = {};
+    for (const dt of donationTags) {
+      if (!tagsByDonation[dt.donationId]) tagsByDonation[dt.donationId] = [];
+      tagsByDonation[dt.donationId].push(dt.tagId);
+    }
+
+    const items = pageRows.map(d => ({
+      id: d.id,
+      name: d.name,
+      description: d.description,
+      donationType: d.donationType,
+      shareCount: d.shareCount,
+      vekalet: d.vekalet,
+      notes: d.notes,
+      phone: d.phone || "",
+      excluded: d.excluded,
+      sortOrder: d.sortOrder,
+      tags: tagsByDonation[d.id] || [],
+      aiCategories: d.aiCategories ? JSON.parse(d.aiCategories) : [],
+      aiWarnings: d.aiWarnings || "",
+    }));
+
+    const lastItem = pageRows[pageRows.length - 1];
+    const nextCursor = hasMore && lastItem ? `${lastItem.sortOrder}_${lastItem.id}` : null;
+
+    res.json({ items, nextCursor, hasMore });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`GET /kesim-alanlari/${req.params.id}/donations error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/kesim-alanlari/:id/donations/count", async (req, res) => {
+  try {
+    const { id: kesimAlaniId } = req.params;
+    const [ka] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, kesimAlaniId));
+    if (!ka) {
+      res.status(404).json({ error: "Kesim alanı bulunamadı" });
+      return;
+    }
+
+    const where = buildDonationFilters(kesimAlaniId, req.query as Record<string, unknown>);
+    const [result] = await db.select({ total: count() }).from(donationsTable).where(where);
+    res.json({ count: result.total });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`GET /kesim-alanlari/${req.params.id}/donations/count error:`, message);
     res.status(500).json({ error: message });
   }
 });
