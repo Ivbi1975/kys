@@ -3002,6 +3002,41 @@ export default function KesimAlaniPage() {
     ),
   }), [selectedIds]);
 
+  const handleSetGroupColorTag = useCallback((groupIdx: number, tag: ColorTag) => {
+    setGroupColorTag(groupIdx, tag);
+  }, [kesim, saveSingleGroupField]);
+
+  const handleViewPhotos = useCallback((groupId: string, animalNo: number) => {
+    if (!kesim) return;
+    setPhotoViewGroup({ id: groupId, animalNo });
+    setPhotoViewLoading(true);
+    fetchGroupPhotosAdmin(kesim.id, groupId)
+      .then(setPhotoViewPhotos)
+      .catch(() => setPhotoViewPhotos([]))
+      .finally(() => setPhotoViewLoading(false));
+  }, [kesim?.id]);
+
+  const handleToggleBasketItem = useCallback((groupIdx: number, dIdx: number, donationId: string, isInBasket: boolean) => {
+    if (isInBasket) {
+      removeFromBasket(donationId);
+    } else {
+      addToBasket(groupIdx, dIdx);
+    }
+  }, [kesim, basketItemIds]);
+
+  const handleDragOverCard = useCallback((e: React.DragEvent, groupIdx: number) => {
+    e.preventDefault();
+    setDragOverGroup(groupIdx);
+  }, []);
+
+  const handleSelectAllGroupDonations = useCallback((filledDonations: Donation[], allSelected: boolean) => {
+    setSelectedGroupDonations(prev => {
+      const next = new Set(prev);
+      filledDonations.forEach(d => allSelected ? next.delete(d.id) : next.add(d.id));
+      return next;
+    });
+  }, []);
+
   if (!kesim) return null;
 
   const totalShares = getTotalShares(kesim.donations);
@@ -3063,41 +3098,6 @@ export default function KesimAlaniPage() {
   const handleColumnDragEnd = () => {
     setColumnDragItem(null);
   };
-
-  const handleSetGroupColorTag = useCallback((groupIdx: number, tag: ColorTag) => {
-    setGroupColorTag(groupIdx, tag);
-  }, [kesim, saveSingleGroupField]);
-
-  const handleViewPhotos = useCallback((groupId: string, animalNo: number) => {
-    if (!kesim) return;
-    setPhotoViewGroup({ id: groupId, animalNo });
-    setPhotoViewLoading(true);
-    fetchGroupPhotosAdmin(kesim.id, groupId)
-      .then(setPhotoViewPhotos)
-      .catch(() => setPhotoViewPhotos([]))
-      .finally(() => setPhotoViewLoading(false));
-  }, [kesim?.id]);
-
-  const handleToggleBasketItem = useCallback((groupIdx: number, dIdx: number, donationId: string, isInBasket: boolean) => {
-    if (isInBasket) {
-      removeFromBasket(donationId);
-    } else {
-      addToBasket(groupIdx, dIdx);
-    }
-  }, [kesim, basketItemIds]);
-
-  const handleDragOverCard = useCallback((e: React.DragEvent, groupIdx: number) => {
-    e.preventDefault();
-    setDragOverGroup(groupIdx);
-  }, []);
-
-  const handleSelectAllGroupDonations = useCallback((filledDonations: Donation[], allSelected: boolean) => {
-    setSelectedGroupDonations(prev => {
-      const next = new Set(prev);
-      filledDonations.forEach(d => allSelected ? next.delete(d.id) : next.add(d.id));
-      return next;
-    });
-  }, []);
 
   const columnHeaderLabel = (key: ColumnKey): string => {
     const col = ALL_GROUP_COLUMNS.find(c => c.key === key);
