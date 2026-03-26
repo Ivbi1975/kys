@@ -8,9 +8,11 @@ import backupRouter from "./backup";
 import aiNotesRouter from "./ai-notes";
 import exportRouter from "./export";
 import integrityRouter from "./integrity";
+import authRouter from "./auth";
 
 const router: IRouter = Router();
 
+router.use(authRouter);
 router.use(healthRouter);
 router.use(projectsRouter);
 router.use(kesimAlanlariRouter);

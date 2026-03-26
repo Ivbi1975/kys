@@ -1,6 +1,8 @@
 import { useState } from "react";
 
-const CORRECT_PASSWORD = "Muratabi12.";
+const API_BASE = import.meta.env.BASE_URL
+  ? `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/").replace(/\/$/, "")
+  : "/api";
 
 const DORTLUKLER = [
   "Hâtırası gönüllerde yaşar, ismi dillerde,\nMurat Abi namı gezer her bir mecliste,\nKadrini bilmeyen kalır daim müşkilde,\nHürmet etmeyen kalır kahvesiz elde.",
@@ -39,10 +41,11 @@ export default function PasswordGate({ children }: { children: React.ReactNode }
   const [password1, setPassword1] = useState("");
   const [password2, setPassword2] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [showPassword1, setShowPassword1] = useState(false);
   const [showPassword2, setShowPassword2] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -51,14 +54,34 @@ export default function PasswordGate({ children }: { children: React.ReactNode }
       return;
     }
 
-    if (password1 !== CORRECT_PASSWORD || password2 !== CORRECT_PASSWORD) {
-      setError("Şifre hatalı. Lütfen tekrar deneyin.");
+    if (password1 !== password2) {
+      setError("Şifreler eşleşmiyor.");
       return;
     }
 
-    sessionStorage.setItem("app_unlocked", "true");
-    sessionStorage.setItem("app_api_key", password1);
-    setUnlocked(true);
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: password1 }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "Bağlantı hatası." }));
+        setError(data.error || "Şifre hatalı. Lütfen tekrar deneyin.");
+        return;
+      }
+
+      const data = await res.json();
+      sessionStorage.setItem("app_unlocked", "true");
+      sessionStorage.setItem("app_api_key", data.apiKey);
+      setUnlocked(true);
+    } catch {
+      setError("Sunucuya bağlanılamadı. Lütfen tekrar deneyin.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (unlocked) {
@@ -135,9 +158,10 @@ export default function PasswordGate({ children }: { children: React.ReactNode }
 
         <button
           type="submit"
-          className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+          disabled={loading}
+          className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold rounded-lg transition-colors shadow-md"
         >
-          Giriş Yap
+          {loading ? "Doğrulanıyor..." : "Giriş Yap"}
         </button>
       </form>
 

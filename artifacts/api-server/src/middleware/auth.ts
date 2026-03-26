@@ -9,6 +9,7 @@ const PUBLIC_PATH_PREFIXES = [
   "/tracking/",
   "/healthz",
   "/cache-stats",
+  "/auth/login",
 ];
 
 const PHOTO_SERVE_PATTERN = /^\/kesim-alanlari\/[^/]+\/group\/[^/]+\/photos\/[^/]+$/;
