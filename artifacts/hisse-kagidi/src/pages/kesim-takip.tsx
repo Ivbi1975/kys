@@ -248,6 +248,7 @@ function EditRequestForm({
   token,
   onNoteAdded,
   onClose,
+  initialField,
 }: {
   donor: TrackingGroup["donors"][0];
   donorIndex: number;
@@ -255,8 +256,9 @@ function EditRequestForm({
   token: string;
   onNoteAdded: (note: TrackingNote) => void;
   onClose: () => void;
+  initialField?: DonorFieldKey;
 }) {
-  const [field, setField] = useState<DonorFieldKey>("name");
+  const [field, setField] = useState<DonorFieldKey>(initialField || "name");
   const [newValue, setNewValue] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -647,11 +649,13 @@ function KesimKagidiOverlay({
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [showNotes, setShowNotes] = useState(false);
   const [editDonorIdx, setEditDonorIdx] = useState<number | null>(null);
+  const [editField, setEditField] = useState<DonorFieldKey>("name");
   const [showPhotos, setShowPhotos] = useState(false);
   const [photos, setPhotos] = useState<GroupPhoto[]>([]);
   const [photosLoading, setPhotosLoading] = useState(false);
   const photosLoadedFor = useRef<string | null>(null);
   const editFormRef = useRef<HTMLDivElement>(null);
+  const [showGrid, setShowGrid] = useState(false);
 
   useEffect(() => {
     if (editDonorIdx !== null && editFormRef.current) {
@@ -716,6 +720,12 @@ function KesimKagidiOverlay({
     setSwipeOffset(0);
   };
 
+  const handleCellDoubleClick = (donorIdx: number, field: DonorFieldKey) => {
+    if (rows[donorIdx]?.empty) return;
+    setEditDonorIdx(donorIdx);
+    setEditField(field);
+  };
+
   const rows = [];
   for (let i = 0; i < 7; i++) {
     const donor = group.donors[i];
@@ -734,14 +744,36 @@ function KesimKagidiOverlay({
   const isToggling = toggling.has(group.id);
   const groupNoteCount = notes.filter(n => n.animalGroupId === group.id).length;
 
+  const cellHighlightClass = (donorIdx: number, field: DonorFieldKey) =>
+    editDonorIdx === donorIdx && editField === field
+      ? "bg-amber-100 dark:bg-amber-900/40 border-2 border-amber-400 dark:border-amber-600 rounded"
+      : "";
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
+      <button
+        className="absolute left-1 top-1/2 -translate-y-1/2 z-[60] bg-white/20 hover:bg-white/40 text-white rounded-full w-10 h-10 flex items-center justify-center backdrop-blur-sm transition-colors disabled:opacity-30"
+        onClick={goPrev}
+        disabled={currentIndex === 0}
+        aria-label="Önceki hayvan"
+      >
+        <ChevronLeft className="w-6 h-6" />
+      </button>
+      <button
+        className="absolute right-1 top-1/2 -translate-y-1/2 z-[60] bg-white/20 hover:bg-white/40 text-white rounded-full w-10 h-10 flex items-center justify-center backdrop-blur-sm transition-colors disabled:opacity-30"
+        onClick={goNext}
+        disabled={currentIndex === groups.length - 1}
+        aria-label="Sonraki hayvan"
+      >
+        <ChevronRight className="w-6 h-6" />
+      </button>
+
       <div
         ref={containerRef}
-        className="relative w-full max-w-2xl mx-2 max-h-[95vh] flex flex-col"
+        className="relative w-full max-w-2xl mx-12 max-h-[95vh] flex flex-col"
         style={{ transform: `translateX(${swipeOffset}px)`, transition: isDragging.current ? "none" : "transform 0.2s ease-out" }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -752,16 +784,10 @@ function KesimKagidiOverlay({
         onMouseLeave={() => { if (isDragging.current) handleTouchEnd(); }}
       >
         <div className="flex items-center justify-between px-1 mb-2">
-          <Button variant="ghost" size="sm" onClick={goPrev} disabled={currentIndex === 0} className="text-white hover:bg-white/20 h-8 w-8 p-0">
-            <ChevronLeft className="w-5 h-5" />
-          </Button>
           <span className="text-white text-sm font-semibold">
             Hayvan {currentIndex + 1} / {groups.length}
           </span>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={goNext} disabled={currentIndex === groups.length - 1} className="text-white hover:bg-white/20 h-8 w-8 p-0">
-              <ChevronRight className="w-5 h-5" />
-            </Button>
             <Button variant="ghost" size="sm" onClick={onClose} className="text-white hover:bg-white/20 h-8 w-8 p-0">
               <X className="w-5 h-5" />
             </Button>
@@ -853,18 +879,17 @@ function KesimKagidiOverlay({
               </div>
             )}
 
-            <div className="hidden sm:block overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
+            <div className="overflow-x-auto -mx-4 px-4">
+              <table className="text-sm border-collapse" style={{ minWidth: "700px", width: "100%" }}>
                 <thead>
                   <tr className="bg-muted/50">
                     <th className="text-center p-2 font-semibold border-b w-10">HAYVAN</th>
                     <th className="text-center p-2 font-semibold border-b w-10">SIRA</th>
-                    <th className="text-left p-2 font-semibold border-b">VEKALET</th>
-                    <th className="text-left p-2 font-semibold border-b">VEKALETİ VEREN</th>
-                    <th className="text-left p-2 font-semibold border-b">ADINA KESİLEN</th>
-                    <th className="text-left p-2 font-semibold border-b">CİNSİ</th>
-                    <th className="text-left p-2 font-semibold border-b">NOTLAR</th>
-                    <th className="text-center p-2 font-semibold border-b w-8"></th>
+                    <th className="text-left p-2 font-semibold border-b whitespace-nowrap">VEKALET</th>
+                    <th className="text-left p-2 font-semibold border-b whitespace-nowrap">VEKALETİ VEREN</th>
+                    <th className="text-left p-2 font-semibold border-b whitespace-nowrap">ADINA KESİLEN</th>
+                    <th className="text-left p-2 font-semibold border-b whitespace-nowrap">CİNSİ</th>
+                    <th className="text-left p-2 font-semibold border-b whitespace-nowrap">NOTLAR</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -874,81 +899,54 @@ function KesimKagidiOverlay({
                         <td rowSpan={7} className="p-2 border-b text-center font-bold text-lg align-middle border-r">{group.animalNo}</td>
                       )}
                       <td className="p-2 border-b text-center font-medium">{row.sira}</td>
-                      <td className="p-2 border-b text-xs">{row.vekalet || "—"}</td>
-                      <td className="p-2 border-b">{row.vekaletVeren || "—"}</td>
-                      <td className="p-2 border-b">{row.adinaKesilen || "—"}</td>
-                      <td className="p-2 border-b text-xs">{row.cinsi || "—"}</td>
-                      <td className="p-2 border-b text-xs">{row.notlar || "—"}</td>
-                      <td className="p-2 border-b text-center">
-                        {!row.empty && (
-                          <button
-                            className="text-amber-500 hover:text-amber-700"
-                            onClick={(e) => { e.stopPropagation(); setEditDonorIdx(editDonorIdx === idx ? null : idx); }}
-                            title="Düzenleme talebi"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                      <td
+                        className={`p-2 border-b text-xs whitespace-nowrap cursor-pointer select-none ${cellHighlightClass(idx, "vekalet")}`}
+                        onDoubleClick={() => handleCellDoubleClick(idx, "vekalet")}
+                      >
+                        {row.vekalet || "—"}
+                      </td>
+                      <td
+                        className={`p-2 border-b whitespace-nowrap cursor-pointer select-none ${cellHighlightClass(idx, "description")}`}
+                        onDoubleClick={() => handleCellDoubleClick(idx, "description")}
+                      >
+                        {row.vekaletVeren || "—"}
+                      </td>
+                      <td
+                        className={`p-2 border-b whitespace-nowrap cursor-pointer select-none ${cellHighlightClass(idx, "name")}`}
+                        onDoubleClick={() => handleCellDoubleClick(idx, "name")}
+                      >
+                        {row.adinaKesilen || "—"}
+                      </td>
+                      <td
+                        className={`p-2 border-b text-xs whitespace-nowrap cursor-pointer select-none ${cellHighlightClass(idx, "donationType")}`}
+                        onDoubleClick={() => handleCellDoubleClick(idx, "donationType")}
+                      >
+                        {row.cinsi || "—"}
+                      </td>
+                      <td
+                        className={`p-2 border-b text-xs whitespace-nowrap cursor-pointer select-none ${cellHighlightClass(idx, "notes")}`}
+                        onDoubleClick={() => handleCellDoubleClick(idx, "notes")}
+                      >
+                        {row.notlar || "—"}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
-
-            <div className="sm:hidden space-y-2">
-              {rows.map((row, idx) => (
-                <div
-                  key={idx}
-                  className={`rounded-lg p-2.5 ${row.empty ? "bg-muted/20 opacity-40" : "bg-muted/40"}`}
-                >
-                  <div className="flex items-start gap-2">
-                    <span className="text-xs font-bold text-muted-foreground bg-background rounded-full w-5 h-5 flex items-center justify-center shrink-0">{row.sira}</span>
-                    <div className="flex-1 min-w-0">
-                      {row.empty ? (
-                        <p className="text-xs text-muted-foreground">Boş</p>
-                      ) : (
-                        <>
-                          <p className="font-medium text-sm truncate">{row.vekaletVeren}</p>
-                          {row.adinaKesilen && row.adinaKesilen !== row.vekaletVeren && (
-                            <p className="text-xs text-muted-foreground truncate">→ {row.adinaKesilen}</p>
-                          )}
-                          <div className="flex flex-wrap gap-1 mt-0.5">
-                            {row.vekalet && (
-                              <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">{row.vekalet}</span>
-                            )}
-                            {row.cinsi && (
-                              <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded">{row.cinsi}</span>
-                            )}
-                          </div>
-                          {row.notlar && (
-                            <p className="text-[10px] text-muted-foreground mt-0.5 italic truncate">{row.notlar}</p>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    {!row.empty && (
-                      <button
-                        className="text-amber-500 hover:text-amber-700 shrink-0 mt-0.5"
-                        onClick={(e) => { e.stopPropagation(); setEditDonorIdx(editDonorIdx === idx ? null : idx); }}
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+              <p className="text-[9px] text-muted-foreground mt-1 text-center">Düzenlemek istediğiniz alana çift tıklayın</p>
             </div>
 
             {editDonorIdx !== null && rows[editDonorIdx]?.donor && (
               <div className="mt-3" ref={editFormRef}>
                 <EditRequestForm
+                  key={`${editDonorIdx}-${editField}`}
                   donor={rows[editDonorIdx].donor!}
                   donorIndex={editDonorIdx}
                   groupId={group.id}
                   token={token}
                   onNoteAdded={onNoteAdded}
                   onClose={() => setEditDonorIdx(null)}
+                  initialField={editField}
                 />
               </div>
             )}
@@ -1020,40 +1018,61 @@ function KesimKagidiOverlay({
           </div>
         </Card>
 
-        <div className="mt-2 px-2 max-h-[25vh] overflow-auto">
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-1">
-            {groups.map((g, idx) => {
-              const rawNames = g.donors.slice(0, 7).map(d => d?.name || "");
-              const donorNames = [...rawNames, ...Array(Math.max(0, 7 - rawNames.length)).fill("")];
-              const filledSlots = donorNames.filter((n: string) => n).length;
-              return (
-                <button
-                  key={g.id}
-                  className={`text-left rounded-lg p-1.5 transition-all text-[10px] leading-tight ${
-                    idx === currentIndex
-                      ? "bg-white text-gray-900 shadow-lg ring-2 ring-white/50"
-                      : "bg-white/10 text-white/80 hover:bg-white/20"
-                  }`}
-                  onClick={() => { setCurrentIndex(idx); setEditDonorIdx(null); }}
-                  aria-label={`Hayvan #${g.animalNo}, ${filledSlots}/7 dolu`}
-                  aria-current={idx === currentIndex ? "true" : undefined}
-                >
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="font-bold text-xs">#{g.animalNo}</span>
-                    <span className={`text-[9px] ${idx === currentIndex ? "text-gray-500" : "text-white/50"}`}>
-                      {filledSlots}/7
-                    </span>
-                  </div>
-                  <div className="space-y-px">
-                    {donorNames.map((name, i) => (
-                      <div key={i} className={`truncate ${name ? "" : (idx === currentIndex ? "text-gray-300" : "text-white/30")}`}>
-                        {name || "—"}
+        <div className="mt-2 px-2">
+          <button
+            className="w-full flex items-center justify-center gap-2 py-1.5 text-white/80 hover:text-white text-xs font-medium transition-colors"
+            onClick={() => setShowGrid(!showGrid)}
+          >
+            {showGrid ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+            {showGrid ? "Hayvanları Gizle" : `Tüm Hayvanları Göster (${groups.length})`}
+          </button>
+
+          <div
+            className="overflow-hidden transition-all duration-300 ease-in-out"
+            style={{ maxHeight: showGrid ? "30vh" : "0" }}
+          >
+            <div className="overflow-auto max-h-[30vh] pt-1">
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-1">
+                {groups.map((g, idx) => {
+                  const rawNames = g.donors.slice(0, 7).map(d => d?.name || "");
+                  const donorNames = [...rawNames, ...Array(Math.max(0, 7 - rawNames.length)).fill("")];
+                  const filledSlots = donorNames.filter((n: string) => n).length;
+                  const isKesildi = g.kesildi;
+                  return (
+                    <button
+                      key={g.id}
+                      className={`text-left rounded-lg p-1.5 transition-all text-[10px] leading-tight ${
+                        idx === currentIndex
+                          ? "bg-white text-gray-900 shadow-lg ring-2 ring-white/50"
+                          : isKesildi
+                            ? "bg-emerald-500/30 text-white/90 hover:bg-emerald-500/50 border border-emerald-400/40"
+                            : "bg-white/10 text-white/80 hover:bg-white/20"
+                      }`}
+                      onClick={() => { setCurrentIndex(idx); setEditDonorIdx(null); }}
+                      aria-label={`Hayvan #${g.animalNo}, ${filledSlots}/7 dolu${isKesildi ? ", kesildi" : ""}`}
+                      aria-current={idx === currentIndex ? "true" : undefined}
+                    >
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="font-bold text-xs flex items-center gap-0.5">
+                          {isKesildi && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
+                          #{g.animalNo}
+                        </span>
+                        <span className={`text-[9px] ${idx === currentIndex ? "text-gray-500" : "text-white/50"}`}>
+                          {filledSlots}/7
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                </button>
-              );
-            })}
+                      <div className="space-y-px">
+                        {donorNames.map((name: string, i: number) => (
+                          <div key={i} className={`truncate ${name ? "" : (idx === currentIndex ? "text-gray-300" : "text-white/30")}`}>
+                            {name || "—"}
+                          </div>
+                        ))}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
 

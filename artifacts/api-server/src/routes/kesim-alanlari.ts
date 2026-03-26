@@ -2834,6 +2834,46 @@ router.put("/kesim-alanlari/:id/tracking-notes/:noteId/status", async (req, res)
       .set({ status: parsed.data.status })
       .where(and(eq(trackingNotesTable.id, noteId), eq(trackingNotesTable.kesimAlaniId, id)));
 
+    if (parsed.data.status === "approved") {
+      const [note] = await db.select().from(trackingNotesTable)
+        .where(and(eq(trackingNotesTable.id, noteId), eq(trackingNotesTable.kesimAlaniId, id)));
+
+      if (note && note.type === "edit_request" && note.animalGroupId && note.fieldName && note.newValue) {
+        const siraMatch = note.content.match(/[Ss][ıi]ra\s+(\d+)/);
+        const siraIndex = siraMatch ? parseInt(siraMatch[1], 10) - 1 : -1;
+
+        if (siraIndex < 0 || siraIndex >= 7) {
+          console.warn(`Edit request approval: could not parse slot index from content "${note.content}" (noteId=${noteId})`);
+        }
+
+        if (siraIndex >= 0 && siraIndex < 7) {
+          const groupDonationLinks = await db.select()
+            .from(animalGroupDonationsTable)
+            .where(eq(animalGroupDonationsTable.groupId, note.animalGroupId))
+            .orderBy(animalGroupDonationsTable.sortOrder);
+
+          if (siraIndex < groupDonationLinks.length) {
+            const donationId = groupDonationLinks[siraIndex].donationId;
+            const fieldMap: Record<string, keyof typeof donationsTable.$inferSelect> = {
+              name: "name",
+              description: "description",
+              donationType: "donationType",
+              vekalet: "vekalet",
+              notes: "notes",
+            };
+
+            const dbField = fieldMap[note.fieldName];
+            if (dbField) {
+              await db.update(donationsTable)
+                .set({ [dbField]: note.newValue })
+                .where(eq(donationsTable.id, donationId));
+              cacheInvalidatePrefix(KA_LIST_CACHE_KEY);
+            }
+          }
+        }
+      }
+    }
+
     res.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
@@ -3467,6 +3507,50 @@ router.get("/projects/:projectId/transfer-log", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error(`GET /projects/${req.params.projectId}/transfer-log error:`, message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/projects/:projectId/pending-edit-requests", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const kaRows = await db.select({ id: kesimAlanlariTable.id, name: kesimAlanlariTable.name })
+      .from(kesimAlanlariTable)
+      .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
+
+    if (kaRows.length === 0) {
+      res.json({ count: 0, requests: [] });
+      return;
+    }
+
+    const kaIds = kaRows.map(k => k.id);
+    const kaNameMap = new Map(kaRows.map(k => [k.id, k.name]));
+
+    const pendingNotes = await db.select().from(trackingNotesTable)
+      .where(and(
+        inArray(trackingNotesTable.kesimAlaniId, kaIds),
+        eq(trackingNotesTable.type, "edit_request"),
+        eq(trackingNotesTable.status, "pending"),
+        isNull(trackingNotesTable.deletedAt),
+      ))
+      .orderBy(desc(trackingNotesTable.createdAt));
+
+    const requests = pendingNotes.map(n => ({
+      id: n.id,
+      kesimAlaniId: n.kesimAlaniId,
+      kesimAlaniName: kaNameMap.get(n.kesimAlaniId) || "",
+      animalGroupId: n.animalGroupId,
+      fieldName: n.fieldName,
+      oldValue: n.oldValue,
+      newValue: n.newValue,
+      content: n.content,
+      createdAt: n.createdAt,
+    }));
+
+    res.json({ count: requests.length, requests });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error(`GET /projects/${req.params.projectId}/pending-edit-requests error:`, message);
     res.status(500).json({ error: message });
   }
 });

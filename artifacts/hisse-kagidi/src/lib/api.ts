@@ -586,6 +586,22 @@ export async function updateTrackingNoteStatus(kesimAlaniId: string, noteId: str
   });
 }
 
+export interface PendingEditRequest {
+  id: string;
+  kesimAlaniId: string;
+  kesimAlaniName: string;
+  animalGroupId: string | null;
+  fieldName: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  content: string;
+  createdAt: string;
+}
+
+export async function fetchPendingEditRequests(projectId: string): Promise<{ count: number; requests: PendingEditRequest[] }> {
+  return apiFetch<{ count: number; requests: PendingEditRequest[] }>(`/projects/${projectId}/pending-edit-requests`);
+}
+
 export interface GroupPhoto {
   id: string;
   mimeType: string;
