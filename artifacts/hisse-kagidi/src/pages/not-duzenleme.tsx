@@ -91,6 +91,7 @@ export default function NotDuzenlemePage() {
   const [kesim, setKesim] = useState<KesimAlani | null>(null);
   const [donations, setDonations] = useState<LocalDonation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [projectName, setProjectName] = useState<string | null>(null);
@@ -174,10 +175,13 @@ export default function NotDuzenlemePage() {
 
   useEffect(() => {
     if (!params.id) return;
+    setLoading(true);
+    setLoadError(null);
     fetchKesimAlani(params.id).then(async (data) => {
       if (!data) {
         toast({ title: "Hata", description: "Kesim alanı bulunamadı", variant: "destructive" });
-        setLocation("/");
+        setLoadError("Kesim alanı bulunamadı");
+        setLoading(false);
         return;
       }
       setKesim(data);
@@ -191,13 +195,13 @@ export default function NotDuzenlemePage() {
       const allDonations: LocalDonation[] = [];
       for (const d of data.donations) {
         if (!allDonations.find(x => x.id === d.id)) {
-          allDonations.push({ id: d.id, name: d.name, description: d.description, donationType: d.donationType, vekalet: d.vekalet, notes: d.notes, aiCategories: d.aiCategories, aiWarnings: d.aiWarnings });
+          allDonations.push({ id: d.id, name: d.name || "", description: d.description || "", donationType: d.donationType || "", vekalet: d.vekalet || "", notes: d.notes || "", aiCategories: d.aiCategories, aiWarnings: d.aiWarnings });
         }
       }
       for (const g of data.animalGroups) {
         for (const d of g.donations) {
           if (!allDonations.find(x => x.id === d.id)) {
-            allDonations.push({ id: d.id, name: d.name, description: d.description, donationType: d.donationType, vekalet: d.vekalet, notes: d.notes, aiCategories: d.aiCategories, aiWarnings: d.aiWarnings });
+            allDonations.push({ id: d.id, name: d.name || "", description: d.description || "", donationType: d.donationType || "", vekalet: d.vekalet || "", notes: d.notes || "", aiCategories: d.aiCategories, aiWarnings: d.aiWarnings });
           }
         }
       }
@@ -222,17 +226,24 @@ export default function NotDuzenlemePage() {
       historyIndexRef.current = 0;
       updateHistoryState();
       setLoading(false);
+    }).catch((err) => {
+      console.error("NotDuzenlemePage load error:", err);
+      setLoadError(err instanceof Error ? err.message : "Veriler yüklenirken bir hata oluştu");
+      setLoading(false);
     });
   }, [params.id]);
 
   const filteredDonations = donations.filter(d => {
-    if (hideEmptyNotes && (!d.notes || d.notes.trim() === "")) return false;
+    const notes = d.notes || "";
+    const name = d.name || "";
+    const desc = d.description || "";
+    if (hideEmptyNotes && notes.trim() === "") return false;
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
-      d.notes.toLowerCase().includes(q) ||
-      d.name.toLowerCase().includes(q) ||
-      d.description.toLowerCase().includes(q)
+      notes.toLowerCase().includes(q) ||
+      name.toLowerCase().includes(q) ||
+      desc.toLowerCase().includes(q)
     );
   });
 
@@ -261,9 +272,10 @@ export default function NotDuzenlemePage() {
     if (!findText.trim()) return;
     let count = 0;
     updateDonationsWithHistory(prev => prev.map(d => {
-      if (d.notes.includes(findText)) {
+      const notes = d.notes || "";
+      if (notes.includes(findText)) {
         count++;
-        return { ...d, notes: d.notes.replaceAll(findText, replaceText) };
+        return { ...d, notes: notes.replaceAll(findText, replaceText) };
       }
       return d;
     }));
@@ -275,7 +287,7 @@ export default function NotDuzenlemePage() {
   };
 
   const handleBulkDeleteNotes = () => {
-    const targets = filteredDonations.filter(d => d.notes.trim() !== "");
+    const targets = filteredDonations.filter(d => (d.notes || "").trim() !== "");
     if (targets.length === 0) {
       toast({ title: "Silinecek not yok" });
       return;
@@ -330,7 +342,7 @@ export default function NotDuzenlemePage() {
     }
   };
 
-  const notesWithContent = donations.filter(d => d.notes.trim() !== "");
+  const notesWithContent = donations.filter(d => (d.notes || "").trim() !== "");
 
   const startAiClassification = async () => {
     if (!kesim) return;
@@ -351,7 +363,7 @@ export default function NotDuzenlemePage() {
       const end = Math.min(donations.length, rangeEnd);
       toProcess = donations.slice(start, end);
     }
-    const withNotes = toProcess.filter(d => d.notes.trim() !== "");
+    const withNotes = toProcess.filter(d => (d.notes || "").trim() !== "");
 
     if (withNotes.length === 0) {
       toast({ title: "İşlenecek not yok", description: "Notu olan bağışçı bulunamadı" });
@@ -502,6 +514,18 @@ export default function NotDuzenlemePage() {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen gap-4">
+        <AlertTriangle className="w-10 h-10 text-destructive" />
+        <p className="text-sm text-muted-foreground">{loadError}</p>
+        <Button variant="outline" onClick={() => setLocation("/")}>
+          Ana Sayfaya Dön
+        </Button>
       </div>
     );
   }
@@ -919,14 +943,14 @@ export default function NotDuzenlemePage() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Textarea
-                          value={d.notes}
+                          value={d.notes || ""}
                           onChange={e => handleNoteChange(d.id, e.target.value)}
                           onBlur={() => commitNoteChange(d.id)}
                           placeholder="Not yok..."
                           className="text-xs min-h-[36px] resize-none py-1 px-2"
                           rows={1}
                         />
-                        {d.notes.trim() !== "" && (
+                        {(d.notes || "").trim() !== "" && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -943,7 +967,7 @@ export default function NotDuzenlemePage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {aiRunning && !aiResult && d.notes.trim() !== "" && (
+                      {aiRunning && !aiResult && (d.notes || "").trim() !== "" && (
                         <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
                       )}
                       {aiResult && (
@@ -1022,7 +1046,7 @@ export default function NotDuzenlemePage() {
             <AlertDialogTitle>Notları Sil</AlertDialogTitle>
             <AlertDialogDescription>
               {searchQuery
-                ? `Filtrelenmiş ${filteredDonations.filter(d => d.notes.trim() !== "").length} bağışçının notu silinecek.`
+                ? `Filtrelenmiş ${filteredDonations.filter(d => (d.notes || "").trim() !== "").length} bağışçının notu silinecek.`
                 : `${notesWithContent.length} bağışçının tüm notları silinecek.`}
               Bu işlem geri alınabilir (Geri Al butonuyla veya Ctrl+Z ile geri alabilirsiniz).
             </AlertDialogDescription>

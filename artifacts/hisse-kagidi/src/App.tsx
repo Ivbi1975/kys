@@ -2,10 +2,46 @@ import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, Component } from "react";
+import type { ReactNode } from "react";
 const NotFound = lazy(() => import("@/pages/not-found"));
 import { useTheme } from "@/lib/useTheme";
 import PasswordGate from "@/components/PasswordGate";
+
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-4">
+          <h1 className="text-xl font-semibold text-destructive">Bir hata oluştu</h1>
+          <p className="text-sm text-muted-foreground text-center max-w-md">
+            {this.state.error?.message || "Beklenmeyen bir hata oluştu."}
+          </p>
+          <button
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm"
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              window.location.href = import.meta.env.BASE_URL || "/";
+            }}
+          >
+            Ana Sayfaya Dön
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const Home = lazy(() => import("@/pages/home"));
 const KesimAlaniPage = lazy(() => import("@/pages/kesim-alani"));
@@ -48,18 +84,20 @@ function ProtectedRouter() {
   usePrefetchAdjacentRoutes();
   return (
     <PasswordGate>
-      <Suspense fallback={<PageFallback />}>
-        <Switch>
-          <Route path="/" component={Home} />
-          <Route path="/kesim/:id" component={KesimAlaniPage} />
-          <Route path="/print/:id" component={PrintPage} />
-          <Route path="/rapor/:id" component={KesimRaporPage} />
-          <Route path="/not-duzenleme/:id" component={NotDuzenlemePage} />
-          <Route path="/ai-prompt-ayarlari" component={AiPromptAyarlariPage} />
-          <Route path="/proje/:id" component={ProjeDetayPage} />
-          <Route component={NotFound} />
-        </Switch>
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<PageFallback />}>
+          <Switch>
+            <Route path="/" component={Home} />
+            <Route path="/kesim/:id" component={KesimAlaniPage} />
+            <Route path="/print/:id" component={PrintPage} />
+            <Route path="/rapor/:id" component={KesimRaporPage} />
+            <Route path="/not-duzenleme/:id" component={NotDuzenlemePage} />
+            <Route path="/ai-prompt-ayarlari" component={AiPromptAyarlariPage} />
+            <Route path="/proje/:id" component={ProjeDetayPage} />
+            <Route component={NotFound} />
+          </Switch>
+        </Suspense>
+      </ErrorBoundary>
     </PasswordGate>
   );
 }
@@ -68,11 +106,13 @@ function AppRouter() {
   const [location] = useLocation();
   if (location.startsWith("/takip/")) {
     return (
-      <Suspense fallback={<PageFallback />}>
-        <Switch>
-          <Route path="/takip/:token" component={KesimTakipPage} />
-        </Switch>
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<PageFallback />}>
+          <Switch>
+            <Route path="/takip/:token" component={KesimTakipPage} />
+          </Switch>
+        </Suspense>
+      </ErrorBoundary>
     );
   }
   return <ProtectedRouter />;
