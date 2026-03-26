@@ -1873,27 +1873,36 @@ router.post("/catisma-tespiti/transfer", async (req, res) => {
 
         await tx.delete(animalGroupDonationsTable).where(eq(animalGroupDonationsTable.groupId, animalGroupId));
 
+        const allTagRows = donationIdsInGroup.length > 0
+          ? await tx.select().from(donationTagsTable)
+              .where(inArray(donationTagsTable.donationId, donationIdsInGroup))
+          : [];
+
+        if (donationIdsInGroup.length > 0) {
+          await tx.delete(donationTagsTable)
+            .where(inArray(donationTagsTable.donationId, donationIdsInGroup));
+        }
+
         for (let i = 0; i < donationsInGroup.length; i++) {
           const d = donationsInGroup[i];
-          const tagRows = await tx.select().from(donationTagsTable).where(eq(donationTagsTable.donationId, d.id));
-          await tx.delete(donationTagsTable).where(eq(donationTagsTable.donationId, d.id));
           await tx.update(donationsTable)
             .set({ kesimAlaniId: targetKesimAlaniId, sortOrder: donationSortBase + i })
             .where(eq(donationsTable.id, d.id));
-          if (tagRows.length > 0) {
-            await tx.insert(donationTagsTable)
-              .values(tagRows.map(t => ({ donationId: d.id, tagId: t.tagId })))
-              .onConflictDoNothing();
-          }
+        }
+
+        if (allTagRows.length > 0) {
+          await tx.insert(donationTagsTable)
+            .values(allTagRows.map(t => ({ donationId: t.donationId, tagId: t.tagId })))
+            .onConflictDoNothing();
         }
 
         await tx.update(animalGroupsTable)
           .set({ kesimAlaniId: targetKesimAlaniId, sortOrder: groupSortBase })
           .where(eq(animalGroupsTable.id, animalGroupId));
 
-        for (let i = 0; i < donationIdsInGroup.length; i++) {
+        if (donationIdsInGroup.length > 0) {
           await tx.insert(animalGroupDonationsTable)
-            .values({ groupId: animalGroupId, donationId: donationIdsInGroup[i], sortOrder: i })
+            .values(donationIdsInGroup.map((did, i) => ({ groupId: animalGroupId, donationId: did, sortOrder: i })))
             .onConflictDoNothing();
         }
 
