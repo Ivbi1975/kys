@@ -87,6 +87,7 @@ const animalGroupPayloadSchema = z.object({
   colorTag: z.string().optional().default(""),
   locked: z.boolean().optional().default(false),
   notes: z.string().optional().default(""),
+  kesildi: z.boolean().optional(),
   donations: z.array(donationPayloadSchema).optional().default([]),
 });
 
@@ -261,6 +262,7 @@ async function getFullKesimAlaniList(kaRows: KesimAlaniRow[]) {
         excluded: d.excluded,
         sortOrder: d.sort_order,
         deletedAt: null,
+        updatedAt: new Date(),
         aiCategories: d.ai_categories,
         aiWarnings: d.ai_warnings,
       });
@@ -280,6 +282,8 @@ async function getFullKesimAlaniList(kaRows: KesimAlaniRow[]) {
         kesildiAt: g.kesildi_at ? new Date(g.kesildi_at) : null,
         teamId: g.team_id,
         sortOrder: g.sort_order,
+        deletedAt: null,
+        updatedAt: new Date(),
       });
       for (const link of g.donation_links || []) {
         groupLinks.push({ groupId: g.id, donationId: link.donationId, sortOrder: link.sortOrder });
@@ -291,6 +295,7 @@ async function getFullKesimAlaniList(kaRows: KesimAlaniRow[]) {
       kesimAlaniId: rawRow.ka_id,
       name: t.name,
       color: t.color,
+      updatedAt: new Date(),
     }));
 
     assembled.set(rawRow.ka_id, assembleKesimAlani(ka, donations, groups, tagsByDonation, groupLinks, teams));
@@ -363,6 +368,7 @@ async function getFullKesimAlani(id: string) {
     name: rawRow.name,
     createdAt: new Date(rawRow.created_at),
     deletedAt: rawRow.deleted_at ? new Date(rawRow.deleted_at) : null,
+    updatedAt: new Date(),
     projectId: rawRow.project_id,
     trackingToken: rawRow.tracking_token,
     kesimListeId: rawRow.kesim_liste_id,
@@ -385,6 +391,7 @@ async function getFullKesimAlani(id: string) {
       excluded: d.excluded,
       sortOrder: d.sort_order,
       deletedAt: null,
+      updatedAt: new Date(),
       aiCategories: d.ai_categories,
       aiWarnings: d.ai_warnings,
     });
@@ -404,6 +411,8 @@ async function getFullKesimAlani(id: string) {
       kesildiAt: g.kesildi_at ? new Date(g.kesildi_at) : null,
       teamId: g.team_id,
       sortOrder: g.sort_order,
+      deletedAt: null,
+      updatedAt: new Date(),
     });
     for (const link of g.donation_links || []) {
       groupLinks.push({ groupId: g.id, donationId: link.donationId, sortOrder: link.sortOrder });
@@ -415,18 +424,19 @@ async function getFullKesimAlani(id: string) {
     kesimAlaniId: rawRow.ka_id,
     name: t.name,
     color: t.color,
+    updatedAt: new Date(),
   }));
 
   return assembleKesimAlani(ka, donations, groups, tagsByDonation, groupLinks, teams);
 }
 
-router.get("/kesim-alanlari", async (req, res) => {
+router.get("/kesim-alanlari", async (req, res): Promise<void> => {
   try {
     const includeDeleted = req.query.includeDeleted === "true";
     const cacheKey = includeDeleted ? KA_LIST_CACHE_KEY + ":all" : KA_LIST_CACHE_KEY;
 
     const cached = cacheGet<unknown[]>(cacheKey);
-    if (cached) return res.json(cached);
+    if (cached) { res.json(cached); return; }
 
     const whereClause = includeDeleted ? undefined : isNull(kesimAlanlariTable.deletedAt);
 
@@ -3321,7 +3331,7 @@ router.get("/tracking/:token/notification-logs", async (req, res) => {
     const conditions = [eq(notificationLogsTable.kesimAlaniId, ka.id)];
     if (since) {
       const { gt } = await import("drizzle-orm");
-      conditions.push(gt(notificationLogsTable.createdAt, since));
+      conditions.push(gt(notificationLogsTable.createdAt, new Date(since)));
     }
 
     const logs = await db.select().from(notificationLogsTable)
@@ -3488,7 +3498,9 @@ router.post("/donation-transfers", async (req, res) => {
       return;
     }
     const { entries } = parsed.data;
-    await db.insert(donationTransfersTable).values(entries);
+    await db.insert(donationTransfersTable).values(
+      entries.map(e => ({ ...e, createdAt: new Date(e.createdAt) }))
+    );
     res.json({ success: true, count: entries.length });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";

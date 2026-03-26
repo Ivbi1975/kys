@@ -720,13 +720,7 @@ function KesimKagidiOverlay({
     setSwipeOffset(0);
   };
 
-  const handleCellDoubleClick = (donorIdx: number, field: DonorFieldKey) => {
-    if (rows[donorIdx]?.empty) return;
-    setEditDonorIdx(donorIdx);
-    setEditField(field);
-  };
-
-  const rows = [];
+  const rows: { sira: number; vekalet: string; vekaletVeren: string; adinaKesilen: string; cinsi: string; notlar: string; empty: boolean; donor: typeof group.donors[number] | undefined }[] = [];
   for (let i = 0; i < 7; i++) {
     const donor = group.donors[i];
     rows.push({
@@ -740,6 +734,12 @@ function KesimKagidiOverlay({
       donor,
     });
   }
+
+  const handleCellDoubleClick = (donorIdx: number, field: DonorFieldKey) => {
+    if (rows[donorIdx]?.empty) return;
+    setEditDonorIdx(donorIdx);
+    setEditField(field);
+  };
 
   const isToggling = toggling.has(group.id);
   const groupNoteCount = notes.filter(n => n.animalGroupId === group.id).length;

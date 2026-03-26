@@ -28,12 +28,12 @@ interface CountRow { cnt: number }
 interface ShareMismatchRow { id: string; donation_share_count: number; assigned_group_count: number }
 
 function extractIds(rows: Record<string, unknown>[]): string[] {
-  return rows.map(r => String((r as IdRow).id));
+  return rows.map(r => String((r as unknown as IdRow).id));
 }
 
 function extractCount(rows: Record<string, unknown>[]): number {
   if (rows.length === 0) return 0;
-  return (rows[0] as CountRow).cnt || 0;
+  return (rows[0] as unknown as CountRow).cnt || 0;
 }
 
 async function runChecks(): Promise<CheckResult[]> {

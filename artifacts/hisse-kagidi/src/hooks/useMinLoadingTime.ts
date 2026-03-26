@@ -8,19 +8,21 @@ export function useMinLoadingTime(isLoading: boolean, minMs = 200): boolean {
     if (isLoading) {
       loadStartRef.current = Date.now();
       setShowSkeleton(true);
-    } else if (loadStartRef.current !== null) {
+      return;
+    }
+    if (loadStartRef.current !== null) {
       const elapsed = Date.now() - loadStartRef.current;
       const remaining = minMs - elapsed;
       if (remaining > 0) {
         const timer = setTimeout(() => setShowSkeleton(false), remaining);
         return () => clearTimeout(timer);
-      } else {
-        setShowSkeleton(false);
       }
+      setShowSkeleton(false);
       loadStartRef.current = null;
     } else {
       setShowSkeleton(false);
     }
+    return;
   }, [isLoading, minMs]);
 
   return showSkeleton;

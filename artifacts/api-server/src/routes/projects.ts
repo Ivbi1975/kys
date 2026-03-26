@@ -99,11 +99,12 @@ router.get("/projects", async (_req, res) => {
   }
 });
 
-router.post("/projects", async (req, res) => {
+router.post("/projects", async (req, res): Promise<void> => {
   try {
     const { name } = req.body;
     if (!name || typeof name !== "string" || !name.trim()) {
-      return res.status(400).json({ error: "Name is required" });
+      res.status(400).json({ error: "Name is required" });
+      return;
     }
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
     const now = new Date();
@@ -121,15 +122,16 @@ router.post("/projects", async (req, res) => {
   }
 });
 
-router.put("/projects/:id", async (req, res) => {
+router.put("/projects/:id", async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
     const { name } = req.body;
     if (!name || typeof name !== "string" || !name.trim()) {
-      return res.status(400).json({ error: "Name is required" });
+      res.status(400).json({ error: "Name is required" });
+      return;
     }
     const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-    if (!existing) return res.status(404).json({ error: "Project not found" });
+    if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
 
     await db.update(projectsTable).set({ name: name.trim() }).where(eq(projectsTable.id, id));
     cacheInvalidate(PROJECTS_CACHE_KEY);
@@ -141,11 +143,11 @@ router.put("/projects/:id", async (req, res) => {
   }
 });
 
-router.delete("/projects/:id", async (req, res) => {
+router.delete("/projects/:id", async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
     const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-    if (!existing) return res.status(404).json({ error: "Project not found" });
+    if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
 
     await db.update(projectsTable).set({ deletedAt: new Date() }).where(eq(projectsTable.id, id));
     await db.update(kesimAlanlariTable).set({ projectId: null }).where(eq(kesimAlanlariTable.projectId, id));
@@ -157,11 +159,11 @@ router.delete("/projects/:id", async (req, res) => {
   }
 });
 
-router.post("/projects/:id/restore", async (req, res) => {
+router.post("/projects/:id/restore", async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
     const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-    if (!existing) return res.status(404).json({ error: "Project not found" });
+    if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
 
     await db.update(projectsTable).set({ deletedAt: null }).where(eq(projectsTable.id, id));
     await refreshProjectStats();
@@ -234,13 +236,13 @@ router.get("/projects/archived", async (_req, res) => {
   }
 });
 
-router.post("/projects/:id/archive", async (req, res) => {
+router.post("/projects/:id/archive", async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-    if (!project) return res.status(404).json({ error: "Proje bulunamadı" });
-    if (project.deletedAt) return res.status(400).json({ error: "Silinmiş proje arşivlenemez" });
-    if (project.archivedAt) return res.status(400).json({ error: "Proje zaten arşivlenmiş" });
+    if (!project) { res.status(404).json({ error: "Proje bulunamadı" }); return; }
+    if (project.deletedAt) { res.status(400).json({ error: "Silinmiş proje arşivlenemez" }); return; }
+    if (project.archivedAt) { res.status(400).json({ error: "Proje zaten arşivlenmiş" }); return; }
 
     const now = new Date();
 
@@ -274,12 +276,12 @@ router.post("/projects/:id/archive", async (req, res) => {
   }
 });
 
-router.post("/projects/:id/unarchive", async (req, res) => {
+router.post("/projects/:id/unarchive", async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-    if (!project) return res.status(404).json({ error: "Proje bulunamadı" });
-    if (!project.archivedAt) return res.status(400).json({ error: "Proje arşivde değil" });
+    if (!project) { res.status(404).json({ error: "Proje bulunamadı" }); return; }
+    if (!project.archivedAt) { res.status(400).json({ error: "Proje arşivde değil" }); return; }
 
     await db.transaction(async (tx) => {
       const archivedAt = project.archivedAt!;
@@ -307,11 +309,11 @@ router.post("/projects/:id/unarchive", async (req, res) => {
   }
 });
 
-router.get("/projects/:id/dashboard", async (req, res) => {
+router.get("/projects/:id/dashboard", async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-    if (!project) return res.status(404).json({ error: "Project not found" });
+    if (!project) { res.status(404).json({ error: "Project not found" }); return; }
 
     const kesimRows = await db.select({
       id: kesimAlanlariTable.id,

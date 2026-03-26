@@ -557,7 +557,7 @@ export async function downloadCsvExport(
   }
 
   onProgress?.(totalRows, totalRows);
-  return new Blob(chunks, { type: "text/csv; charset=utf-8" });
+  return new Blob(chunks as BlobPart[], { type: "text/csv; charset=utf-8" });
 }
 
 export async function toggleKesildi(token: string, groupId: string, kesildi: boolean): Promise<void> {

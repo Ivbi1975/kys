@@ -1560,7 +1560,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                 style={{ height: `min(calc(100vh - 150px), ${filteredDonations.length * 45 + 50}px)`, minHeight: 200 }}
                 data={filteredDonations}
                 overscan={30}
-                itemKey={(_idx: number, d: Donation) => d.id}
+                computeItemKey={(_idx: number, d: Donation) => d.id}
                 components={virtuosoTableComponents as any}
                 fixedHeaderContent={() => (
                   <tr className="border-b bg-muted/50">

@@ -228,7 +228,7 @@ router.post("/backup/import", async (req, res) => {
           for (let i = 0; i < ka.donations.length; i++) {
             const d = ka.donations[i];
             const donationId = d.id || Math.random().toString(36).substring(2, 12);
-            const dValues: Record<string, unknown> = {
+            const dValues: typeof donationsTable.$inferInsert = {
               id: donationId,
               kesimAlaniId: kaId,
               name: d.name || "",
