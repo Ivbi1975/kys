@@ -20,6 +20,7 @@ export const pool = new Pool({
 
 pool.on("error", (err) => {
   console.error("Unexpected pool error:", err.message);
+  ensureMinConnections().catch(() => {});
 });
 
 const MIN_POOL_SIZE = 2;
