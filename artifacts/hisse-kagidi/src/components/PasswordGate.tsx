@@ -2,6 +2,16 @@ import { useState } from "react";
 
 const CORRECT_PASSWORD = "Muratabi12.";
 
+const DORTLUKLER = [
+  "Hâtırası gönüllerde yaşar, ismi dillerde,\nMurat Abi namı gezer her bir mecliste,\nKadrini bilmeyen kalır daim müşkilde,\nHürmet etmeyen kalır kahvesiz elde.",
+  "Hâtırası gönüllerde yaşar, ismi dillerde,\nMurat Abi adı anılır her bir sözde,\nKıymet bilmeyen kalır kendi derdinde,\nHürmet etmeyen kalır çaysız elde.",
+  "Sözleri ibret olur, dolaşır dillerde,\nMurat Abi namı anılır her yerde,\nBir dokunuşla açar düğümü en derinde,\nMeseleler bir bir delip geçer önünde.",
+  "Hikmeti derin olur, sözü hep yerinde,\nMurat Abi adı parlar her bir ilminde,\nEl uzatsa çözülür en müşkil bir anda,\nSetler dahi delip açılır yol önünde.",
+  "İşi düşen bulur çâre onun izinde,\nMurat Abi nâmı yankı bulur her yerde,\nBir bakışı kifâyet eder nice müşkile,\nDağlar bile delip yol verir önünde.",
+  "Ferâseti yol gösterir karanlık her hâlde,\nMurat Abi sözü ölçü olur her sözde,\nÇetin işler erir gider bir anda özünde,\nTaşlar dahi delip çözülür önünde.",
+  "Himmeti yetişir en dar vakit her derde,\nMurat Abi yâdı düşmez hiçbir dilden de,\nBir iş varsa nihâyet bulur onun izinde,\nDuvarlar bile delip eğilir önünde.",
+];
+
 function EyeIcon({ open }: { open: boolean }) {
   if (open) {
     return (
@@ -25,6 +35,7 @@ export default function PasswordGate({ children }: { children: React.ReactNode }
   const [unlocked, setUnlocked] = useState(() => {
     return sessionStorage.getItem("app_unlocked") === "true";
   });
+  const [dortluk] = useState(() => DORTLUKLER[Math.floor(Math.random() * DORTLUKLER.length)]);
   const [password1, setPassword1] = useState("");
   const [password2, setPassword2] = useState("");
   const [error, setError] = useState("");
@@ -54,7 +65,7 @@ export default function PasswordGate({ children }: { children: React.ReactNode }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100 dark:from-gray-900 dark:to-gray-800 p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-50 to-green-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <form
         onSubmit={handleSubmit}
         className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-8 w-full max-w-md space-y-6 border border-green-200 dark:border-gray-700"
@@ -128,6 +139,12 @@ export default function PasswordGate({ children }: { children: React.ReactNode }
           Giriş Yap
         </button>
       </form>
+
+        <div className="mt-6 max-w-md w-full text-center px-4">
+          <p className="italic text-green-700/70 dark:text-green-400/60 text-sm leading-relaxed whitespace-pre-line font-serif">
+            {dortluk}
+          </p>
+        </div>
     </div>
   );
 }
