@@ -14,9 +14,11 @@ const PUBLIC_PATH_PREFIXES = [
 const PHOTO_SERVE_PATTERN = /^\/kesim-alanlari\/[^/]+\/group\/[^/]+\/photos\/[^/]+$/;
 
 function isPublicPath(path: string): boolean {
-  if (PUBLIC_PATH_PREFIXES.some((prefix) => path.startsWith(prefix))) return true;
-  if (PHOTO_SERVE_PATTERN.test(path)) return true;
-  return false;
+  return PUBLIC_PATH_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
+function isPhotoServeGet(req: Request): boolean {
+  return req.method === "GET" && PHOTO_SERVE_PATTERN.test(req.path);
 }
 
 export function apiKeyAuth(req: Request, res: Response, next: NextFunction): void {
@@ -35,7 +37,9 @@ export function apiKeyAuth(req: Request, res: Response, next: NextFunction): voi
     return;
   }
 
-  const providedKey = req.headers["x-api-key"] as string | undefined;
+  const headerKey = req.headers["x-api-key"] as string | undefined;
+  const queryKey = isPhotoServeGet(req) ? (req.query["apiKey"] as string | undefined) : undefined;
+  const providedKey = headerKey || queryKey;
 
   if (!providedKey) {
     res.status(401).json({ error: "Kimlik doğrulama gerekli. X-API-Key header eksik." });
@@ -67,7 +71,12 @@ export function adminKeyAuth(req: Request, res: Response, next: NextFunction): v
   }
 
   if (!ADMIN_KEY) {
-    next();
+    if (IS_DEV) {
+      logger.warn("ADMIN_KEY not set — admin auth disabled in development mode.");
+      next();
+      return;
+    }
+    res.status(503).json({ error: "Sunucu yapılandırma hatası. ADMIN_KEY ayarlanmamış." });
     return;
   }
 

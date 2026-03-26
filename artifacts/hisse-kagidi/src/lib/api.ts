@@ -659,7 +659,12 @@ export async function fetchGroupPhotosAdmin(kesimAlaniId: string, groupId: strin
 
 export function getGroupPhotoUrlAdmin(kesimAlaniId: string, groupId: string, photoId: string, size?: "thumb"): string {
   const base = `${API_BASE}/kesim-alanlari/${kesimAlaniId}/group/${groupId}/photos/${photoId}`;
-  return size ? `${base}?size=${size}` : base;
+  const apiKey = getApiKey();
+  const params = new URLSearchParams();
+  if (size) params.set("size", size);
+  if (apiKey) params.set("apiKey", apiKey);
+  const qs = params.toString();
+  return qs ? `${base}?${qs}` : base;
 }
 
 export async function fetchPhotoCountsAdmin(kesimAlaniId: string): Promise<Record<string, number>> {
