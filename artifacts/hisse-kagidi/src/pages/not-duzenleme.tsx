@@ -179,7 +179,6 @@ export default function NotDuzenlemePage() {
     setLoadError(null);
     fetchKesimAlani(params.id).then(async (data) => {
       if (!data) {
-        toast({ title: "Hata", description: "Kesim alanı bulunamadı", variant: "destructive" });
         setLoadError("Kesim alanı bulunamadı");
         setLoading(false);
         return;
