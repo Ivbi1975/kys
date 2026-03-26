@@ -950,9 +950,9 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
 
   function getFindDeleteMatches() {
     if (!kesim || !findDeleteValue.trim()) return [];
-    const q = findDeleteValue.trim().toLowerCase();
+    const q = findDeleteValue.trim().toLocaleLowerCase("tr");
     return kesim.donations.filter((d) => {
-      const val = (d[findDeleteColumn] || "").toString().toLowerCase();
+      const val = (d[findDeleteColumn] || "").toString().toLocaleLowerCase("tr");
       return val.includes(q);
     });
   }
@@ -985,12 +985,12 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
 
   function getGroupFindDeleteMatches() {
     if (!kesim || !groupFindDeleteValue.trim()) return [];
-    const q = groupFindDeleteValue.trim().toLowerCase();
+    const q = groupFindDeleteValue.trim().toLocaleLowerCase("tr");
     const matchIds = new Set<string>();
     for (const group of kesim.animalGroups) {
       for (const d of group.donations) {
         if (!d.id) continue;
-        const val = (d[groupFindDeleteColumn] || "").toString().toLowerCase();
+        const val = (d[groupFindDeleteColumn] || "").toString().toLocaleLowerCase("tr");
         if (val.includes(q)) {
           matchIds.add(d.id);
         }
@@ -2290,16 +2290,16 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
 
   const groupSearchMatches = useCallback(() => {
     if (!kesim || !groupSearchQuery.trim()) return [];
-    const q = groupSearchQuery.trim().toLowerCase();
+    const q = groupSearchQuery.trim().toLocaleLowerCase("tr");
     const matches: { groupIdx: number; dIdx: number; groupId: string; animalNo: number }[] = [];
     kesim.animalGroups.forEach((group, groupIdx) => {
       group.donations.forEach((d, dIdx) => {
         if (
-          d.name.toLowerCase().includes(q) ||
-          d.description.toLowerCase().includes(q) ||
-          d.vekalet.toLowerCase().includes(q) ||
-          d.donationType.toLowerCase().includes(q) ||
-          (d.notes || "").toLowerCase().includes(q)
+          d.name.toLocaleLowerCase("tr").includes(q) ||
+          d.description.toLocaleLowerCase("tr").includes(q) ||
+          d.vekalet.toLocaleLowerCase("tr").includes(q) ||
+          d.donationType.toLocaleLowerCase("tr").includes(q) ||
+          (d.notes || "").toLocaleLowerCase("tr").includes(q)
         ) {
           matches.push({ groupIdx, dIdx, groupId: group.id, animalNo: group.animalNo });
         }
@@ -2328,15 +2328,15 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
 
   function isGroupSearchMatch(groupIdx: number, dIdx: number): boolean {
     if (!groupSearchQuery.trim()) return false;
-    const q = groupSearchQuery.trim().toLowerCase();
+    const q = groupSearchQuery.trim().toLocaleLowerCase("tr");
     const d = kesim?.animalGroups[groupIdx]?.donations[dIdx];
     if (!d) return false;
     return (
-      d.name.toLowerCase().includes(q) ||
-      d.description.toLowerCase().includes(q) ||
-      d.vekalet.toLowerCase().includes(q) ||
-      d.donationType.toLowerCase().includes(q) ||
-      (d.notes || "").toLowerCase().includes(q)
+      d.name.toLocaleLowerCase("tr").includes(q) ||
+      d.description.toLocaleLowerCase("tr").includes(q) ||
+      d.vekalet.toLocaleLowerCase("tr").includes(q) ||
+      d.donationType.toLocaleLowerCase("tr").includes(q) ||
+      (d.notes || "").toLocaleLowerCase("tr").includes(q)
     );
   }
 
@@ -3217,7 +3217,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     }
 
     for (const d of donations) {
-      const text = [d.name, d.description, d.vekalet, d.donationType, d.notes || ""].join("\t").toLowerCase();
+      const text = [d.name, d.description, d.vekalet, d.donationType, d.notes || ""].join("\t").toLocaleLowerCase("tr");
       contentMap.set(d.id, text);
       addTrigrams(text, d.id);
     }
@@ -3225,7 +3225,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     return {
       search(query: string): Set<string> | null {
         if (!query) return null;
-        const q = query.trim().toLowerCase();
+        const q = query.trim().toLocaleLowerCase("tr");
         if (q.length === 0) return null;
 
         if (q.length < 3) {
@@ -3274,7 +3274,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     const advFiltered = preFiltered.filter(d => {
       if (filterStatus === "active" && d.excluded) return false;
       if (filterStatus === "excluded" && !d.excluded) return false;
-      if (filterCinsi !== "all" && d.donationType.toLowerCase() !== filterCinsi.toLowerCase()) return false;
+      if (filterCinsi !== "all" && d.donationType.toLocaleLowerCase("tr") !== filterCinsi.toLocaleLowerCase("tr")) return false;
       if (filterHisseMin > 0 && d.shareCount < filterHisseMin) return false;
       if (filterHisseMax > 0 && d.shareCount > filterHisseMax) return false;
       if (filterTags.length > 0) {

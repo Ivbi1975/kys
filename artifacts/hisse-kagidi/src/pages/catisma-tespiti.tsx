@@ -96,13 +96,13 @@ export default function CatismaTespitiPage() {
   }
 
   const filteredConflicts = conflicts.filter(c => {
-    const q = searchQuery.toLowerCase();
+    const q = searchQuery.toLocaleLowerCase("tr");
     if (!q) return true;
     return (
-      c.displayName.toLowerCase().includes(q) ||
+      c.displayName.toLocaleLowerCase("tr").includes(q) ||
       c.entries.some(e =>
-        e.kesimAlaniName.toLowerCase().includes(q) ||
-        e.donationDescription.toLowerCase().includes(q)
+        e.kesimAlaniName.toLocaleLowerCase("tr").includes(q) ||
+        e.donationDescription.toLocaleLowerCase("tr").includes(q)
       )
     );
   });

@@ -1194,14 +1194,14 @@ export default function KesimTakipPage() {
       groups = groups.filter(g => g.kesildi);
     }
     if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
+      const q = searchQuery.trim().toLocaleLowerCase("tr");
       groups = groups.filter(g =>
         String(g.animalNo).includes(q) ||
         g.donors.some(d =>
-          d.name.toLowerCase().includes(q) ||
-          d.description.toLowerCase().includes(q) ||
-          d.donationType.toLowerCase().includes(q) ||
-          d.vekalet.toLowerCase().includes(q)
+          d.name.toLocaleLowerCase("tr").includes(q) ||
+          d.description.toLocaleLowerCase("tr").includes(q) ||
+          d.donationType.toLocaleLowerCase("tr").includes(q) ||
+          d.vekalet.toLocaleLowerCase("tr").includes(q)
         )
       );
     }

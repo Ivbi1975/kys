@@ -1409,12 +1409,12 @@ export default function KesimAlaniPage() {
       if (currentFieldIdx < 0) return;
       const donations = searchQuery.trim()
         ? kesim!.donations.filter(d => {
-            const q = searchQuery.trim().toLowerCase();
-            return d.name.toLowerCase().includes(q) ||
-              d.description.toLowerCase().includes(q) ||
-              d.vekalet.toLowerCase().includes(q) ||
-              d.donationType.toLowerCase().includes(q) ||
-              (d.notes || "").toLowerCase().includes(q);
+            const q = searchQuery.trim().toLocaleLowerCase("tr");
+            return d.name.toLocaleLowerCase("tr").includes(q) ||
+              d.description.toLocaleLowerCase("tr").includes(q) ||
+              d.vekalet.toLocaleLowerCase("tr").includes(q) ||
+              d.donationType.toLocaleLowerCase("tr").includes(q) ||
+              (d.notes || "").toLocaleLowerCase("tr").includes(q);
           })
         : kesim!.donations;
       const donationIdx = donations.findIndex(d => d.id === donationId);
@@ -2098,16 +2098,16 @@ export default function KesimAlaniPage() {
 
   const groupSearchMatches = useCallback(() => {
     if (!kesim || !groupSearchQuery.trim()) return [];
-    const q = groupSearchQuery.trim().toLowerCase();
+    const q = groupSearchQuery.trim().toLocaleLowerCase("tr");
     const matches: { groupIdx: number; dIdx: number; groupId: string; animalNo: number }[] = [];
     kesim.animalGroups.forEach((group, groupIdx) => {
       group.donations.forEach((d, dIdx) => {
         if (
-          d.name.toLowerCase().includes(q) ||
-          d.description.toLowerCase().includes(q) ||
-          d.vekalet.toLowerCase().includes(q) ||
-          d.donationType.toLowerCase().includes(q) ||
-          (d.notes || "").toLowerCase().includes(q)
+          d.name.toLocaleLowerCase("tr").includes(q) ||
+          d.description.toLocaleLowerCase("tr").includes(q) ||
+          d.vekalet.toLocaleLowerCase("tr").includes(q) ||
+          d.donationType.toLocaleLowerCase("tr").includes(q) ||
+          (d.notes || "").toLocaleLowerCase("tr").includes(q)
         ) {
           matches.push({ groupIdx, dIdx, groupId: group.id, animalNo: group.animalNo });
         }
@@ -2137,15 +2137,15 @@ export default function KesimAlaniPage() {
 
   function isGroupSearchMatch(groupIdx: number, dIdx: number): boolean {
     if (!groupSearchQuery.trim()) return false;
-    const q = groupSearchQuery.trim().toLowerCase();
+    const q = groupSearchQuery.trim().toLocaleLowerCase("tr");
     const d = kesim?.animalGroups[groupIdx]?.donations[dIdx];
     if (!d) return false;
     return (
-      d.name.toLowerCase().includes(q) ||
-      d.description.toLowerCase().includes(q) ||
-      d.vekalet.toLowerCase().includes(q) ||
-      d.donationType.toLowerCase().includes(q) ||
-      (d.notes || "").toLowerCase().includes(q)
+      d.name.toLocaleLowerCase("tr").includes(q) ||
+      d.description.toLocaleLowerCase("tr").includes(q) ||
+      d.vekalet.toLocaleLowerCase("tr").includes(q) ||
+      d.donationType.toLocaleLowerCase("tr").includes(q) ||
+      (d.notes || "").toLocaleLowerCase("tr").includes(q)
     );
   }
 
@@ -3009,13 +3009,13 @@ export default function KesimAlaniPage() {
     });
 
     if (!debouncedSearchQuery.trim()) return advFiltered;
-    const q = debouncedSearchQuery.trim().toLowerCase();
+    const q = debouncedSearchQuery.trim().toLocaleLowerCase("tr");
     return advFiltered.filter(d =>
-      d.name.toLowerCase().includes(q) ||
-      d.description.toLowerCase().includes(q) ||
-      d.vekalet.toLowerCase().includes(q) ||
-      d.donationType.toLowerCase().includes(q) ||
-      (d.notes || "").toLowerCase().includes(q)
+      d.name.toLocaleLowerCase("tr").includes(q) ||
+      d.description.toLocaleLowerCase("tr").includes(q) ||
+      d.vekalet.toLocaleLowerCase("tr").includes(q) ||
+      d.donationType.toLocaleLowerCase("tr").includes(q) ||
+      (d.notes || "").toLocaleLowerCase("tr").includes(q)
     );
   }, [donations, showRemovedFilter, removedFromGroupIds, filterUngrouped, groupedDonorIds, filterStatus, filterCinsi, filterHisseMin, filterHisseMax, filterTags, filterAiCategories, filterAiWarnings, debouncedSearchQuery]);
 

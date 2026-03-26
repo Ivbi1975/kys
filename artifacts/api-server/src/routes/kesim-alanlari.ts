@@ -3298,7 +3298,7 @@ router.get("/tracking/:token/notification-logs", async (req, res) => {
 
 router.get("/global-search", async (req, res) => {
   try {
-    const q = (typeof req.query.q === "string" ? req.query.q : "").trim().toLowerCase();
+    const q = (typeof req.query.q === "string" ? req.query.q : "").trim().toLocaleLowerCase("tr");
     const column = typeof req.query.column === "string" ? req.query.column : "all";
     const projectId = typeof req.query.projectId === "string" ? req.query.projectId : undefined;
 
@@ -3388,9 +3388,9 @@ router.get("/global-search", async (req, res) => {
 
       let matches = false;
       if (column === "all") {
-        matches = Object.values(matchFields).some(v => v.toLowerCase().includes(q));
+        matches = Object.values(matchFields).some(v => v.toLocaleLowerCase("tr").includes(q));
       } else if (column in matchFields) {
-        matches = matchFields[column].toLowerCase().includes(q);
+        matches = matchFields[column].toLocaleLowerCase("tr").includes(q);
       }
 
       if (matches) {
