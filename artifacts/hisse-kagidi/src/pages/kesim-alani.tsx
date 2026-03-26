@@ -824,11 +824,11 @@ export default function KesimAlaniPage() {
     if (field === "excluded" && value === true) {
       const target = kesim.donations.find(d => d.id === id);
       if (target && target.description.trim()) {
-        const key = target.description.trim().toLowerCase();
+        const key = target.description.trim().toLocaleLowerCase("tr");
         save({
           ...kesim,
           donations: kesim.donations.map((d) =>
-            d.description.trim().toLowerCase() === key ? { ...d, excluded: true } : d
+            d.description.trim().toLocaleLowerCase("tr") === key ? { ...d, excluded: true } : d
           ),
         }, `Hariç tutuldu: ${target.description}`);
         return;
@@ -837,11 +837,11 @@ export default function KesimAlaniPage() {
     if (field === "excluded" && value === false) {
       const target = kesim.donations.find(d => d.id === id);
       if (target && target.description.trim()) {
-        const key = target.description.trim().toLowerCase();
+        const key = target.description.trim().toLocaleLowerCase("tr");
         save({
           ...kesim,
           donations: kesim.donations.map((d) =>
-            d.description.trim().toLowerCase() === key ? { ...d, excluded: false } : d
+            d.description.trim().toLocaleLowerCase("tr") === key ? { ...d, excluded: false } : d
           ),
         }, `Dahil edildi: ${target.description}`);
         return;
@@ -878,19 +878,19 @@ export default function KesimAlaniPage() {
 
   function bulkExcludeByDesc(description: string, excluded: boolean) {
     if (!kesim) return;
-    const key = description.trim().toLowerCase();
+    const key = description.trim().toLocaleLowerCase("tr");
     save({
       ...kesim,
       donations: kesim.donations.map((d) =>
-        d.description.trim().toLowerCase() === key ? { ...d, excluded } : d
+        d.description.trim().toLocaleLowerCase("tr") === key ? { ...d, excluded } : d
       ),
     }, excluded ? `Toplu hariç tutuldu: ${description}` : `Toplu dahil edildi: ${description}`);
   }
 
   async function bulkDeleteByDesc(description: string) {
     if (!kesim) return;
-    const key = description.trim().toLowerCase();
-    const toDelete = kesim.donations.filter(d => d.description.trim().toLowerCase() === key);
+    const key = description.trim().toLocaleLowerCase("tr");
+    const toDelete = kesim.donations.filter(d => d.description.trim().toLocaleLowerCase("tr") === key);
     if (toDelete.length === 0) return;
     try {
       await Promise.all(toDelete.map(d => apiSoftDeleteDonation(kesim.id, d.id)));
@@ -922,9 +922,9 @@ export default function KesimAlaniPage() {
 
   function getFindDeleteMatches() {
     if (!kesim || !findDeleteValue.trim()) return [];
-    const q = findDeleteValue.trim().toLowerCase();
+    const q = findDeleteValue.trim().toLocaleLowerCase("tr");
     return kesim.donations.filter((d) => {
-      const val = (d[findDeleteColumn] || "").toString().toLowerCase();
+      const val = (d[findDeleteColumn] || "").toString().toLocaleLowerCase("tr");
       return val.includes(q);
     });
   }
@@ -957,12 +957,12 @@ export default function KesimAlaniPage() {
 
   function getGroupFindDeleteMatches() {
     if (!kesim || !groupFindDeleteValue.trim()) return [];
-    const q = groupFindDeleteValue.trim().toLowerCase();
+    const q = groupFindDeleteValue.trim().toLocaleLowerCase("tr");
     const matchIds = new Set<string>();
     for (const group of kesim.animalGroups) {
       for (const d of group.donations) {
         if (!d.id) continue;
-        const val = (d[groupFindDeleteColumn] || "").toString().toLowerCase();
+        const val = (d[groupFindDeleteColumn] || "").toString().toLocaleLowerCase("tr");
         if (val.includes(q)) {
           matchIds.add(d.id);
         }
@@ -1087,7 +1087,7 @@ export default function KesimAlaniPage() {
 
       for (let r = startRow; r < previewData.length; r++) {
         const row = previewData[r];
-        const desc = descColIdx >= 0 ? String(row[descColIdx] ?? "").trim().toLowerCase() : "";
+        const desc = descColIdx >= 0 ? String(row[descColIdx] ?? "").trim().toLocaleLowerCase("tr") : "";
         const shareCount = shareCountColIdx >= 0
           ? (parseInt(String(row[shareCountColIdx] ?? "1").trim(), 10) || 1)
           : 1;
@@ -1876,12 +1876,12 @@ export default function KesimAlaniPage() {
     const results: typeof resolveResults = [];
 
     for (const conflict of unexpectedConflicts) {
-      const key = conflict.description.trim().toLowerCase();
+      const key = conflict.description.trim().toLocaleLowerCase("tr");
       const entriesByGroup: Map<number, Array<{ groupIdx: number; dIdx: number }>> = new Map();
 
       workingCopy.forEach((group, groupIdx) => {
         group.donations.forEach((d, dIdx) => {
-          if (d.description.trim().toLowerCase() === key) {
+          if (d.description.trim().toLocaleLowerCase("tr") === key) {
             if (!entriesByGroup.has(groupIdx)) entriesByGroup.set(groupIdx, []);
             entriesByGroup.get(groupIdx)!.push({ groupIdx, dIdx });
           }
@@ -1939,7 +1939,7 @@ export default function KesimAlaniPage() {
             const swappableIdx = workingCopy[targetGroupIdx].donations.findIndex(
               (d, idx) => {
                 if (!d.name.trim()) return false;
-                if (d.description.trim().toLowerCase() === key) return false;
+                if (d.description.trim().toLocaleLowerCase("tr") === key) return false;
                 return !globalUsedSlots.has(slotKey(targetGroupIdx, idx));
               }
             );
@@ -2906,7 +2906,7 @@ export default function KesimAlaniPage() {
     const map = new Map<string, number>();
     for (const d of donations) {
       if (d.excluded) continue;
-      const normalizedDesc = d.description.trim().toLowerCase();
+      const normalizedDesc = d.description.trim().toLocaleLowerCase("tr");
       if (normalizedDesc) {
         map.set(normalizedDesc, (map.get(normalizedDesc) || 0) + 1);
       }
@@ -2934,7 +2934,7 @@ export default function KesimAlaniPage() {
     const processed = new Set<string>();
     let count = 0;
     for (const d of ungroupedDonors) {
-      const key = d.description.trim().toLowerCase();
+      const key = d.description.trim().toLocaleLowerCase("tr");
       if (key && processed.has(key)) continue;
       processed.add(key);
       count += ungroupedEffective.get(d.id) || d.shareCount;
@@ -2953,7 +2953,7 @@ export default function KesimAlaniPage() {
     const processed = new Set<string>();
     for (const d of donations) {
       if (d.excluded) continue;
-      const key = d.description.trim().toLowerCase();
+      const key = d.description.trim().toLocaleLowerCase("tr");
       if (key && processed.has(key)) continue;
       processed.add(key);
       const eff = effectiveShareMap.get(d.id) || d.shareCount;
@@ -2969,7 +2969,7 @@ export default function KesimAlaniPage() {
       const filled = g.donations.filter(d => d.name.trim());
       const shareMap = new Map<string, number>();
       for (const d of filled) {
-        const key = d.description.trim().toLowerCase() || d.id;
+        const key = d.description.trim().toLocaleLowerCase("tr") || d.id;
         shareMap.set(key, (shareMap.get(key) || 0) + 1);
       }
       const parts = Array.from(shareMap.values()).sort((a, b) => a - b);
@@ -2992,7 +2992,7 @@ export default function KesimAlaniPage() {
     const advFiltered = preFiltered.filter(d => {
       if (filterStatus === "active" && d.excluded) return false;
       if (filterStatus === "excluded" && !d.excluded) return false;
-      if (filterCinsi !== "all" && d.donationType.toLowerCase() !== filterCinsi.toLowerCase()) return false;
+      if (filterCinsi !== "all" && d.donationType.toLocaleLowerCase("tr") !== filterCinsi.toLocaleLowerCase("tr")) return false;
       if (filterHisseMin > 0 && d.shareCount < filterHisseMin) return false;
       if (filterHisseMax > 0 && d.shareCount > filterHisseMax) return false;
       if (filterTags.length > 0) {
@@ -4447,7 +4447,7 @@ export default function KesimAlaniPage() {
                     </tr>
                   )}
                   itemContent={(idx, d) => {
-                    const descCount = d.excluded ? 0 : (descCountMap.get(d.description.trim().toLowerCase()) || 1);
+                    const descCount = d.excluded ? 0 : (descCountMap.get(d.description.trim().toLocaleLowerCase("tr")) || 1);
                     const effectiveShare = descCount > 1 ? descCount : d.shareCount;
                     return (<>
                           <td className="p-2">
@@ -5541,15 +5541,15 @@ export default function KesimAlaniPage() {
             </DialogTitle>
           </DialogHeader>
           {personEditDesc && kesim && (() => {
-            const key = personEditDesc.trim().toLowerCase();
+            const key = personEditDesc.trim().toLocaleLowerCase("tr");
             const matchingDonations = kesim.donations.filter(
-              d => d.description.trim().toLowerCase() === key
+              d => d.description.trim().toLocaleLowerCase("tr") === key
             );
             const allExcluded = matchingDonations.length > 0 && matchingDonations.every(d => d.excluded);
             const matchingGroupEntries: { groupIdx: number; dIdx: number; donation: Donation; animalNo: number }[] = [];
             kesim.animalGroups.forEach((group, groupIdx) => {
               group.donations.forEach((d, dIdx) => {
-                if (d.description.trim().toLowerCase() === key) {
+                if (d.description.trim().toLocaleLowerCase("tr") === key) {
                   matchingGroupEntries.push({ groupIdx, dIdx, donation: d, animalNo: group.animalNo });
                 }
               });

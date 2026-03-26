@@ -853,11 +853,11 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     if (field === "excluded" && value === true) {
       const target = kesim.donations.find(d => d.id === id);
       if (target && target.description.trim()) {
-        const key = target.description.trim().toLowerCase();
+        const key = target.description.trim().toLocaleLowerCase("tr");
         save({
           ...kesim,
           donations: kesim.donations.map((d) =>
-            d.description.trim().toLowerCase() === key ? { ...d, excluded: true } : d
+            d.description.trim().toLocaleLowerCase("tr") === key ? { ...d, excluded: true } : d
           ),
         }, `Hariç tutuldu: ${target.description}`);
         return;
@@ -866,11 +866,11 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     if (field === "excluded" && value === false) {
       const target = kesim.donations.find(d => d.id === id);
       if (target && target.description.trim()) {
-        const key = target.description.trim().toLowerCase();
+        const key = target.description.trim().toLocaleLowerCase("tr");
         save({
           ...kesim,
           donations: kesim.donations.map((d) =>
-            d.description.trim().toLowerCase() === key ? { ...d, excluded: false } : d
+            d.description.trim().toLocaleLowerCase("tr") === key ? { ...d, excluded: false } : d
           ),
         }, `Dahil edildi: ${target.description}`);
         return;
@@ -907,19 +907,19 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
 
   function bulkExcludeByDesc(description: string, excluded: boolean) {
     if (!kesim) return;
-    const key = description.trim().toLowerCase();
+    const key = description.trim().toLocaleLowerCase("tr");
     save({
       ...kesim,
       donations: kesim.donations.map((d) =>
-        d.description.trim().toLowerCase() === key ? { ...d, excluded } : d
+        d.description.trim().toLocaleLowerCase("tr") === key ? { ...d, excluded } : d
       ),
     }, excluded ? `Toplu hariç tutuldu: ${description}` : `Toplu dahil edildi: ${description}`);
   }
 
   async function bulkDeleteByDesc(description: string) {
     if (!kesim) return;
-    const key = description.trim().toLowerCase();
-    const toDelete = kesim.donations.filter(d => d.description.trim().toLowerCase() === key);
+    const key = description.trim().toLocaleLowerCase("tr");
+    const toDelete = kesim.donations.filter(d => d.description.trim().toLocaleLowerCase("tr") === key);
     if (toDelete.length === 0) return;
     try {
       await Promise.all(toDelete.map(d => apiSoftDeleteDonation(kesim.id, d.id)));
@@ -1117,7 +1117,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
 
       for (let r = startRow; r < previewData.length; r++) {
         const row = previewData[r];
-        const desc = descColIdx >= 0 ? String(row[descColIdx] ?? "").trim().toLowerCase() : "";
+        const desc = descColIdx >= 0 ? String(row[descColIdx] ?? "").trim().toLocaleLowerCase("tr") : "";
         const shareCount = shareCountColIdx >= 0
           ? (parseInt(String(row[shareCountColIdx] ?? "1").trim(), 10) || 1)
           : 1;
@@ -1263,7 +1263,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
       for (const id of changedIdSet) {
         const d = activeDonationMap.get(id) || groupedDonationMap.get(id);
         if (d) {
-          const key = d.description.trim().toLowerCase();
+          const key = d.description.trim().toLocaleLowerCase("tr");
           if (key) changedDescs.add(key);
         }
       }
@@ -1271,14 +1271,14 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
         for (const g of kesim.animalGroups) {
           if (g.locked) continue;
           for (const d of g.donations) {
-            const key = d.description.trim().toLowerCase();
+            const key = d.description.trim().toLocaleLowerCase("tr");
             if (key && changedDescs.has(key) && !changedIdSet.has(d.id)) {
               changedIdSet.add(d.id);
             }
           }
         }
         for (const [id, d] of activeDonationMap) {
-          const key = d.description.trim().toLowerCase();
+          const key = d.description.trim().toLocaleLowerCase("tr");
           if (key && changedDescs.has(key) && !changedIdSet.has(id)) {
             changedIdSet.add(id);
           }
@@ -2066,12 +2066,12 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     const results: typeof resolveResults = [];
 
     for (const conflict of unexpectedConflicts) {
-      const key = conflict.description.trim().toLowerCase();
+      const key = conflict.description.trim().toLocaleLowerCase("tr");
       const entriesByGroup: Map<number, Array<{ groupIdx: number; dIdx: number }>> = new Map();
 
       workingCopy.forEach((group, groupIdx) => {
         group.donations.forEach((d, dIdx) => {
-          if (d.description.trim().toLowerCase() === key) {
+          if (d.description.trim().toLocaleLowerCase("tr") === key) {
             if (!entriesByGroup.has(groupIdx)) entriesByGroup.set(groupIdx, []);
             entriesByGroup.get(groupIdx)!.push({ groupIdx, dIdx });
           }
@@ -2129,7 +2129,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
             const swappableIdx = workingCopy[targetGroupIdx].donations.findIndex(
               (d, idx) => {
                 if (!d.name.trim()) return false;
-                if (d.description.trim().toLowerCase() === key) return false;
+                if (d.description.trim().toLocaleLowerCase("tr") === key) return false;
                 return !globalUsedSlots.has(slotKey(targetGroupIdx, idx));
               }
             );
@@ -3097,7 +3097,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     const map = new Map<string, number>();
     for (const d of donations) {
       if (d.excluded) continue;
-      const normalizedDesc = d.description.trim().toLowerCase();
+      const normalizedDesc = d.description.trim().toLocaleLowerCase("tr");
       if (normalizedDesc) {
         map.set(normalizedDesc, (map.get(normalizedDesc) || 0) + 1);
       }
@@ -3125,7 +3125,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     const processed = new Set<string>();
     let count = 0;
     for (const d of ungroupedDonors) {
-      const key = d.description.trim().toLowerCase();
+      const key = d.description.trim().toLocaleLowerCase("tr");
       if (key && processed.has(key)) continue;
       processed.add(key);
       count += ungroupedEffective.get(d.id) || d.shareCount;
@@ -3144,7 +3144,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     const processed = new Set<string>();
     for (const d of donations) {
       if (d.excluded) continue;
-      const key = d.description.trim().toLowerCase();
+      const key = d.description.trim().toLocaleLowerCase("tr");
       if (key && processed.has(key)) continue;
       processed.add(key);
       const eff = effectiveShareMap.get(d.id) || d.shareCount;
@@ -3160,7 +3160,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
       const filled = g.donations.filter(d => d.name.trim());
       const shareMap = new Map<string, number>();
       for (const d of filled) {
-        const key = d.description.trim().toLowerCase() || d.id;
+        const key = d.description.trim().toLocaleLowerCase("tr") || d.id;
         shareMap.set(key, (shareMap.get(key) || 0) + 1);
       }
       const parts = Array.from(shareMap.values()).sort((a, b) => a - b);
