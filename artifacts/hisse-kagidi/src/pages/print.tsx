@@ -33,19 +33,36 @@ export default function PrintPage() {
   const [, setLocation] = useLocation();
   const [kesim, setKesim] = useState<KesimAlani | null>(null);
   const [logo, setLogo] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [contentRulesOpen, setContentRulesOpen] = useState<string | null>(null);
   const [prefs, setPrefs] = useState<PrintPreferences>(() => loadPrintPreferences());
 
   useEffect(() => {
     async function loadData() {
-      if (params.id) {
+      setIsLoading(true);
+      try {
+        if (!params.id) {
+          setLocation("/");
+          return;
+        }
         const data = await fetchKesimAlani(params.id);
-        if (data) setKesim(data);
-        else setLocation("/");
+        if (!data) {
+          setLocation("/");
+          return;
+        }
+        setKesim(data);
+        try {
+          const logoData = await fetchLogo();
+          setLogo(logoData);
+        } catch {
+          setLogo(null);
+        }
+      } catch {
+        setLocation("/");
+      } finally {
+        setIsLoading(false);
       }
-      const logoData = await fetchLogo();
-      setLogo(logoData);
     }
     loadData();
   }, [params.id, setLocation]);
@@ -767,7 +784,13 @@ export default function PrintPage() {
     return `@page { size: A4 landscape; margin: 0; }`;
   }, [prefs.template]);
 
-  if (!kesim) return null;
+  if (isLoading || !kesim) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   return (
     <div>
