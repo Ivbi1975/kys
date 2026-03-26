@@ -85,11 +85,8 @@ export async function fetchKesimAlani(id: string): Promise<KesimAlani | null> {
   try {
     return await apiFetch<KesimAlani>(`/kesim-alanlari/${id}`);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("404") || msg.includes("bulunamadı") || msg.includes("not found")) {
-      return null;
-    }
-    throw err;
+    console.warn(`fetchKesimAlani(${id}) failed:`, err instanceof Error ? err.message : err);
+    return null;
   }
 }
 
