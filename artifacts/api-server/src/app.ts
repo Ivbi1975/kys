@@ -123,14 +123,34 @@ app.use(
   }),
 );
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
+const IS_DEV = process.env.NODE_ENV === "development";
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)
+  : [];
+
+if (allowedOrigins.length > 0) {
+  logger.info({ origins: allowedOrigins }, "CORS allowed origins configured");
+} else if (IS_DEV) {
+  logger.info("CORS: development mode — all origins allowed");
+} else {
+  logger.warn("CORS: ALLOWED_ORIGINS not set in production — only same-origin requests allowed");
+}
+
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+    if (!origin) {
       callback(null, true);
-    } else {
-      callback(new Error(`Origin ${origin} not allowed by CORS`), false);
+      return;
     }
+    if (allowedOrigins.length > 0 && allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    if (allowedOrigins.length === 0 && IS_DEV) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error(`Origin ${origin} not allowed by CORS`), false);
   },
   credentials: true,
 }));
