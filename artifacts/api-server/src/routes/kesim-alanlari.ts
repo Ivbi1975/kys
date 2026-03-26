@@ -1890,10 +1890,14 @@ router.post("/catisma-tespiti/transfer", async (req, res) => {
             .where(eq(donationsTable.id, d.id));
         }
 
+        const CHUNK_SIZE = 500;
         if (allTagRows.length > 0) {
-          await tx.insert(donationTagsTable)
-            .values(allTagRows.map(t => ({ donationId: t.donationId, tagId: t.tagId })))
-            .onConflictDoNothing();
+          const tagValues = allTagRows.map(t => ({ donationId: t.donationId, tagId: t.tagId }));
+          for (let c = 0; c < tagValues.length; c += CHUNK_SIZE) {
+            await tx.insert(donationTagsTable)
+              .values(tagValues.slice(c, c + CHUNK_SIZE))
+              .onConflictDoNothing();
+          }
         }
 
         await tx.update(animalGroupsTable)
@@ -1901,9 +1905,12 @@ router.post("/catisma-tespiti/transfer", async (req, res) => {
           .where(eq(animalGroupsTable.id, animalGroupId));
 
         if (donationIdsInGroup.length > 0) {
-          await tx.insert(animalGroupDonationsTable)
-            .values(donationIdsInGroup.map((did, i) => ({ groupId: animalGroupId, donationId: did, sortOrder: i })))
-            .onConflictDoNothing();
+          const groupLinkValues = donationIdsInGroup.map((did, i) => ({ groupId: animalGroupId, donationId: did, sortOrder: i }));
+          for (let c = 0; c < groupLinkValues.length; c += CHUNK_SIZE) {
+            await tx.insert(animalGroupDonationsTable)
+              .values(groupLinkValues.slice(c, c + CHUNK_SIZE))
+              .onConflictDoNothing();
+          }
         }
 
       } else {
