@@ -1,6 +1,8 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import zlib from "node:zlib";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
@@ -63,6 +65,8 @@ function compressionMiddleware(req: Request, res: Response, next: NextFunction) 
 
 const app: Express = express();
 
+app.set("trust proxy", 1);
+
 app.use(compressionMiddleware);
 
 app.use(
@@ -81,6 +85,39 @@ app.use(
           statusCode: res.statusCode,
         };
       },
+    },
+  }),
+);
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        fontSrc: ["'self'", "data:"],
+        connectSrc: ["'self'"],
+        frameSrc: ["'none'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }),
+);
+
+app.use(
+  rateLimit({
+    windowMs: 60 * 1000,
+    limit: 200,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: {
+      error: "Çok fazla istek gönderildi. Lütfen bir süre bekleyip tekrar deneyin.",
     },
   }),
 );
