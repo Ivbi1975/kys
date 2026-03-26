@@ -207,18 +207,8 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   const [bulkReviewRows, setBulkReviewRows] = useState<{ idx: number; row: string[]; rawShareCount: number; selected: boolean; groupKey: string; groupTotal: number }[]>([]);
   const [bulkReviewExpanded, setBulkReviewExpanded] = useState<Set<string>>(new Set());
   const [jumpDialogOpen, setJumpDialogOpen] = useState(false);
-  const [jumpDialogValue, setJumpDialogValue] = useState("");
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [newDonation, setNewDonation] = useState({
-    name: "",
-    description: "",
-    donationType: "",
-    shareCount: 1,
-    vekalet: "",
-    notes: "",
-    phone: "",
-  });
   const [editingCell, setEditingCell] = useState<{
     donationId: string;
     field: string;
@@ -233,11 +223,9 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   const [showConflicts, setShowConflicts] = useState(false);
   const [personEditDesc, setPersonEditDesc] = useState<string | null>(null);
   const [personSearchQuery, setPersonSearchQuery] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [filterUngrouped, setFilterUngrouped] = useState(false);
   const [groupSearchQuery, setGroupSearchQuery] = useState("");
-  const [groupSearchInput, setGroupSearchInput] = useState("");
   const [groupSearchMatchIdx, setGroupSearchMatchIdx] = useState(0);
   const [showOnlyIncomplete, setShowOnlyIncomplete] = useState(false);
   const [highlightIncomplete, setHighlightIncomplete] = useState(true);
@@ -513,7 +501,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
         e.preventDefault();
         if (!jumpDialogOpen) {
           setJumpDialogOpen(true);
-          setJumpDialogValue("");
         }
       }
       if (e.key === "F11") {
@@ -583,25 +570,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSaveRef = useRef<KesimAlani | null>(null);
 
-  const handleDonorSearch = useCallback(() => {
-    setDebouncedSearchQuery(searchQuery);
-  }, [searchQuery]);
-
-  const handleDonorSearchClear = useCallback(() => {
-    setSearchQuery("");
-    setDebouncedSearchQuery("");
-  }, []);
-
-  const handleGroupSearch = useCallback(() => {
-    setGroupSearchQuery(groupSearchInput);
-    setGroupSearchMatchIdx(0);
-  }, [groupSearchInput]);
-
-  const handleGroupSearchClear = useCallback(() => {
-    setGroupSearchInput("");
-    setGroupSearchQuery("");
-    setGroupSearchMatchIdx(0);
-  }, []);
 
   const buildErrorDescription = useCallback((errMsg: string) => {
     const animalNoMatches = errMsg.match(/[Hh]ayvan\s*(?:No|no|#)?\s*[:.]?\s*(\d+(?:\s*[,\/]\s*\d+)*)/g);
@@ -765,20 +733,19 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     });
   }, [kesim?.id, toast]);
 
-  function addDonation() {
-    if (!kesim || !newDonation.name.trim()) return;
+  function addDonation(donationData?: { name: string; description: string; donationType: string; shareCount: number; vekalet: string; notes: string; phone: string }) {
+    if (!kesim || !donationData || !donationData.name.trim()) return;
     const donation: Donation = {
       id: generateId(),
-      name: newDonation.name.trim(),
-      description: newDonation.description.trim(),
-      donationType: newDonation.donationType.trim(),
-      shareCount: Math.max(1, Math.min(7, newDonation.shareCount)),
-      vekalet: newDonation.vekalet.trim(),
-      notes: newDonation.notes.trim(),
-      phone: newDonation.phone?.trim() || "",
+      name: donationData.name.trim(),
+      description: donationData.description.trim(),
+      donationType: donationData.donationType.trim(),
+      shareCount: Math.max(1, Math.min(7, donationData.shareCount)),
+      vekalet: donationData.vekalet.trim(),
+      notes: donationData.notes.trim(),
+      phone: donationData.phone?.trim() || "",
     };
     save({ ...kesim, donations: [...kesim.donations, donation] }, `Bağışçı eklendi: ${donation.description || donation.name}`);
-    setNewDonation({ name: "", description: "", donationType: "", shareCount: 1, vekalet: "", notes: "", phone: "" });
     setAddDialogOpen(false);
   }
 
@@ -1602,7 +1569,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
       commitEdit();
       const currentFieldIdx = DONOR_EDITABLE_FIELDS.indexOf(field as any);
       if (currentFieldIdx < 0) return;
-      const matchedTabIds = searchQuery.trim() ? searchIndex.search(searchQuery) : null;
+      const matchedTabIds = debouncedSearchQuery.trim() ? searchIndex.search(debouncedSearchQuery) : null;
       const donations = matchedTabIds
         ? kesim!.donations.filter(d => matchedTabIds.has(d.id))
         : kesim!.donations;
@@ -3595,7 +3562,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     groupFindDeleteOpen,
     groupFindDeleteValue,
     groupRows,
-    groupSearchInput,
     groupSearchMatchIdx,
     groupSearchMatches,
     groupSearchQuery,
@@ -3607,10 +3573,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     groupsVirtuosoRef,
     handleAssignTeam,
     handleAutoGroup,
-    handleDonorSearch,
-    handleDonorSearchClear,
-    handleGroupSearch,
-    handleGroupSearchClear,
     handleAutoGroupSelected,
     handleColumnDragEnd,
     handleColumnDragOver,
@@ -3649,7 +3611,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     isGroupSearchMatch,
     isMobile,
     jumpDialogOpen,
-    jumpDialogValue,
     jumpInputRef,
     jumpToAnimal,
     kesim,
@@ -3663,7 +3624,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     moveGroupDonation,
     moveGroupDown,
     moveGroupUp,
-    newDonation,
     notificationLogs,
     notificationLogsLoading,
     notificationLogsOpen,
@@ -3711,7 +3671,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     scrollToAnimalGroup,
     searchIndex,
     searchInputRef,
-    searchQuery,
     selectedGroupDonations,
     selectedGroupIds,
     selectedIds,
@@ -3768,7 +3727,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     setGroupFindDeleteConfirm,
     setGroupFindDeleteOpen,
     setGroupFindDeleteValue,
-    setGroupSearchInput,
     setGroupSearchMatchIdx,
     setGroupSearchQuery,
     setGroupingInProgress,
@@ -3779,14 +3737,12 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     setIsDraggingSplit,
     setIsFullscreen,
     setJumpDialogOpen,
-    setJumpDialogValue,
     setJumpToAnimal,
     setKesim,
     setLastSavedTime,
     setLocation,
     setMinimapOpen,
     setMobileTab,
-    setNewDonation,
     setNotificationLogs,
     setNotificationLogsLoading,
     setNotificationLogsOpen,
@@ -3809,7 +3765,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     setRemovedFromGroupIds,
     setResolveResults,
     setSaveStatus,
-    setSearchQuery,
     setSelectedGroupDonations,
     setSelectedGroupIds,
     setSelectedIds,

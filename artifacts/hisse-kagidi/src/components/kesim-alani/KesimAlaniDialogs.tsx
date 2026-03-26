@@ -1,4 +1,4 @@
-import { lazy } from "react";
+import { lazy, useState } from "react";
   import { LazyLoadBoundary } from "@/components/LazyLoadBoundary";
   import type { KesimAlani, Donation, AnimalGroup, ColorTag } from "@/lib/types";
   const LazyPersonEditDialog = lazy(() => import("./dialogs/PersonEditDialog"));
@@ -45,13 +45,15 @@ import { lazy } from "react";
       addToBasket, removeFromBasket, clearBasket, addDonorToBasket, transferBasketToGroup, autoDistributeBasket,
       crossKATransferring, transferBasketToOtherKA, transferForeignToCurrentDonorList,
       siblingKesimAlanlari, sortedDonorList, totalShares, filterTeam, setFilterTeam,
-      jumpDialogOpen, setJumpDialogOpen, jumpDialogValue, setJumpDialogValue,
+      jumpDialogOpen, setJumpDialogOpen,
       donorListReportOpen, setDonorListReportOpen, fullscreenMode, showScrollTop,
       qrModalOpen, setQrModalOpen, qrUrl,
       transferToDonorListConfirm, setTransferToDonorListConfirm, transferToDonorListRemoving,
       updateGroupDonation, addEmptyGroup,
       handleAssignTeam,
     } = props;
+
+    const [jumpDialogValue, setJumpDialogValue] = useState("");
 
     if (!kesim) return null;
 
@@ -566,7 +568,7 @@ import { lazy } from "react";
     })()}
 
     {jumpDialogOpen && (
-      <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[20vh]" onClick={() => setJumpDialogOpen(false)}>
+      <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[20vh]" onClick={() => { setJumpDialogOpen(false); setJumpDialogValue(""); }}>
         <div className="absolute inset-0 bg-black/40" />
         <div
           className="relative bg-background rounded-2xl shadow-2xl border p-6 w-[340px] flex flex-col items-center gap-4 animate-in fade-in zoom-in-95 duration-150"
@@ -588,17 +590,19 @@ import { lazy } from "react";
                 if (exists) {
                   scrollToAnimalGroup(targetNo);
                   setJumpDialogOpen(false);
+                  setJumpDialogValue("");
                 } else {
                   toast({ title: `Hayvan No ${jumpDialogValue} bulunamadı`, variant: "destructive" });
                 }
               }
               if (e.key === "Escape") {
                 setJumpDialogOpen(false);
+                setJumpDialogValue("");
               }
             }}
           />
           <div className="flex gap-2 w-full">
-            <Button variant="outline" onClick={() => setJumpDialogOpen(false)} className="flex-1">
+            <Button variant="outline" onClick={() => { setJumpDialogOpen(false); setJumpDialogValue(""); }} className="flex-1">
               İptal
             </Button>
             <Button
@@ -609,6 +613,7 @@ import { lazy } from "react";
                 if (exists) {
                   scrollToAnimalGroup(targetNo);
                   setJumpDialogOpen(false);
+                  setJumpDialogValue("");
                 } else {
                   toast({ title: `Hayvan No ${jumpDialogValue} bulunamadı`, variant: "destructive" });
                 }

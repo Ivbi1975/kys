@@ -1,4 +1,4 @@
-import React, { Suspense, forwardRef } from "react";
+import React, { Suspense, forwardRef, useState, useCallback } from "react";
 import type { KesimAlani, Donation, AnimalGroup, ColorTag } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,7 +108,6 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
     groupFindDeleteOpen,
     groupFindDeleteValue,
     groupRows,
-    groupSearchInput,
     groupSearchMatchIdx,
     groupSearchQuery,
     groupedDonorIds,
@@ -119,10 +118,6 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
     groupsVirtuosoRef,
     handleAssignTeam,
     handleAutoGroup,
-    handleDonorSearch,
-    handleDonorSearchClear,
-    handleGroupSearch,
-    handleGroupSearchClear,
     handleAutoGroupSelected,
     handleColumnDragEnd,
     handleColumnDragOver,
@@ -165,7 +160,6 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
     mobileTab,
     moveGroupDown,
     moveGroupUp,
-    newDonation,
     openAutoResolve,
     openSplitGroupDialog,
     openTrash,
@@ -184,7 +178,6 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
     scrollContainerRef,
     scrollToAnimalGroup,
     searchInputRef,
-    searchQuery,
     selectedGroupDonations,
     selectedGroupIds,
     selectedIds,
@@ -224,7 +217,6 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
     setGroupFindDeleteConfirm,
     setGroupFindDeleteOpen,
     setGroupFindDeleteValue,
-    setGroupSearchInput,
     setGroupSearchMatchIdx,
     setGroupSearchQuery,
     setHasHeaderRow,
@@ -232,12 +224,10 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
     setHistoryPanelOpen,
     setIsDraggingSplit,
     setJumpDialogOpen,
-    setJumpDialogValue,
     setKesim,
     setLocation,
     setMinimapOpen,
     setMobileTab,
-    setNewDonation,
     setNotificationLogs,
     setNotificationLogsLoading,
     setNotificationLogsOpen,
@@ -246,7 +236,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
     setQrModalOpen,
     setQrUrl,
     setRangeLockInput,
-    setSearchQuery,
+    setDebouncedSearchQuery,
     setSelectedGroupDonations,
     setSelectedGroupIds,
     setSelectedIds,
@@ -296,6 +286,43 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
     virtuosoTableComponents,
     workspace,
   } = props;
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [groupSearchInput, setGroupSearchInput] = useState("");
+  const [newDonation, setNewDonation] = useState({
+    name: "",
+    description: "",
+    donationType: "",
+    shareCount: 1,
+    vekalet: "",
+    notes: "",
+    phone: "",
+  });
+
+  const handleDonorSearch = useCallback(() => {
+    setDebouncedSearchQuery(searchQuery);
+  }, [searchQuery, setDebouncedSearchQuery]);
+
+  const handleDonorSearchClear = useCallback(() => {
+    setSearchQuery("");
+    setDebouncedSearchQuery("");
+  }, [setDebouncedSearchQuery]);
+
+  const handleGroupSearch = useCallback(() => {
+    setGroupSearchQuery(groupSearchInput);
+    setGroupSearchMatchIdx(0);
+  }, [groupSearchInput, setGroupSearchQuery, setGroupSearchMatchIdx]);
+
+  const handleGroupSearchClear = useCallback(() => {
+    setGroupSearchInput("");
+    setGroupSearchQuery("");
+    setGroupSearchMatchIdx(0);
+  }, [setGroupSearchQuery, setGroupSearchMatchIdx]);
+
+  const handleAddDonation = useCallback(() => {
+    addDonation(newDonation);
+    setNewDonation({ name: "", description: "", donationType: "", shareCount: 1, vekalet: "", notes: "", phone: "" });
+  }, [addDonation, newDonation]);
 
   if (!kesim) return null;
 
@@ -470,10 +497,10 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                 Kaydetme hatası
               </span>
             )}
-            {saveStatus === "idle" && lastSavedTime && (
+            {(saveStatus === "idle" || saveStatus === "saved") && lastSavedTime && (
               <span className="flex items-center gap-1">
                 <Save className="w-3 h-3" />
-                Son kayıt: {lastSavedTime.toLocaleTimeString("tr-TR")}
+                Son kayıt: {lastSavedTime.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" })} {lastSavedTime.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
               </span>
             )}
           </div>
@@ -1315,7 +1342,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                         </SelectContent>
                       </Select>
                     </div>
-                    <Button onClick={addDonation} className="w-full">
+                    <Button onClick={handleAddDonation} className="w-full">
                       Ekle
                     </Button>
                   </div>
@@ -2051,13 +2078,13 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                     className="h-8 w-20 text-sm text-center cursor-pointer"
                     placeholder="No (Ctrl+G)"
                     readOnly
-                    onClick={() => { setJumpDialogOpen(true); setJumpDialogValue(""); }}
+                    onClick={() => setJumpDialogOpen(true)}
                   />
                   <Button
                     variant="outline"
                     size="sm"
                     className="h-8"
-                    onClick={() => { setJumpDialogOpen(true); setJumpDialogValue(""); }}
+                    onClick={() => setJumpDialogOpen(true)}
                   >
                     Git
                   </Button>
