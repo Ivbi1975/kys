@@ -57,6 +57,7 @@ export default function PasswordGate({ children }: { children: React.ReactNode }
     }
 
     sessionStorage.setItem("app_unlocked", "true");
+    sessionStorage.setItem("app_api_key", password1);
     setUnlocked(true);
   };
 

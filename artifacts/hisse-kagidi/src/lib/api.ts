@@ -9,15 +9,33 @@ interface ApiError {
   details?: unknown;
 }
 
+function getApiKey(): string {
+  return sessionStorage.getItem("app_api_key") || "";
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const apiKey = getApiKey();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (apiKey) {
+    headers["X-API-Key"] = apiKey;
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...headers,
       ...options?.headers,
     },
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      sessionStorage.removeItem("app_unlocked");
+      sessionStorage.removeItem("app_api_key");
+      window.location.reload();
+      throw new Error("Oturum süresi doldu. Yeniden giriş yapılıyor...");
+    }
     const err: ApiError = await res.json().catch(() => ({ error: "Sunucu hatası" }));
     throw new Error(err.error || `HTTP ${res.status}`);
   }
@@ -506,7 +524,12 @@ export async function downloadCsvExport(
   onProgress?: (received: number, total: number) => void,
 ): Promise<Blob> {
   const qs = kaId ? `?kaId=${encodeURIComponent(kaId)}` : "";
-  const res = await fetch(`${API_BASE}/export/csv${qs}`);
+  const apiKey = getApiKey();
+  const fetchHeaders: Record<string, string> = {};
+  if (apiKey) {
+    fetchHeaders["X-API-Key"] = apiKey;
+  }
+  const res = await fetch(`${API_BASE}/export/csv${qs}`, { headers: fetchHeaders });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Export hatası" }));
     throw new Error(err.error || "Export hatası");
