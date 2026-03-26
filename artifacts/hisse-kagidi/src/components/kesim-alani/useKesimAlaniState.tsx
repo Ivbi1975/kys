@@ -245,6 +245,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   const [bulkGroupEditField, setBulkGroupEditField] = useState<"donationType" | "notes">("donationType");
   const [bulkGroupEditValue, setBulkGroupEditValue] = useState("");
   const [jumpToAnimal, setJumpToAnimal] = useState("");
+  const [highlightDonationId, setHighlightDonationId] = useState<string | null>(null);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkEditField, setBulkEditField] = useState<"donationType" | "shareCount" | "notes" | "vekalet">("donationType");
   const [bulkEditValue, setBulkEditValue] = useState("");
@@ -426,6 +427,25 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     }
     loadData();
   }, [params.id, setLocation]);
+
+  useEffect(() => {
+    if (!kesim) return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const highlightId = urlParams.get("highlight");
+    if (highlightId) {
+      setHighlightDonationId(highlightId);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("highlight");
+      window.history.replaceState({}, "", url.toString());
+      setTimeout(() => {
+        const el = document.querySelector(`[data-donation-id="${highlightId}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        setTimeout(() => setHighlightDonationId(null), 4000);
+      }, 500);
+    }
+  }, [kesim?.id]);
 
   useEffect(() => {
     if (kesim) {
@@ -1663,6 +1683,9 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
 
     const updated = {
       ...kesim,
+      donations: kesim.donations.map((d) =>
+        d.id === donation.id ? { ...d, [field]: value } : d
+      ),
       animalGroups: kesim.animalGroups.map((g, gi) =>
         gi === groupIdx
           ? {
@@ -3278,10 +3301,11 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     TableRow: ({ item: d, ...props }: React.HTMLAttributes<HTMLTableRowElement> & { item?: Donation }) => (
       <tr
         {...props}
-        className={`border-b hover:bg-muted/30 transition-colors ${d && selectedIds.has(d.id) ? "bg-primary/5" : ""} ${d?.excluded ? "opacity-40 line-through" : ""}`}
+        data-donation-id={d?.id}
+        className={`border-b hover:bg-muted/30 transition-colors ${d && selectedIds.has(d.id) ? "bg-primary/5" : ""} ${d?.excluded ? "opacity-40 line-through" : ""} ${d && highlightDonationId === d.id ? "ring-2 ring-yellow-400 bg-yellow-100 dark:bg-yellow-900/40 animate-pulse" : ""}`}
       />
     ),
-  }), [selectedIds]);
+  }), [selectedIds, highlightDonationId]);
 
   const filteredGroupItems = useMemo(() => {
     if (!kesim) return [];

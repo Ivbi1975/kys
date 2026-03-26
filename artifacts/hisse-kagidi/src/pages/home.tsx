@@ -29,8 +29,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ChevronRight, ChevronDown, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, RotateCcw, Clock, Calendar, FolderOpen, FolderPlus, MoveRight, Link2, ExternalLink, QrCode, Archive } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronDown, Scissors, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil, RotateCcw, Clock, Calendar, FolderOpen, FolderPlus, MoveRight, Link2, ExternalLink, QrCode, Archive, Search } from "lucide-react";
 import QrCodeModal from "@/components/QrCodeModal";
+import GlobalSearchDialog from "@/components/GlobalSearchDialog";
 import type { KesimAlani, CustomTag, Project } from "@/lib/types";
 import {
   fetchKesimAlanlari,
@@ -109,6 +110,7 @@ export default function Home() {
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qrUrl, setQrUrl] = useState("");
   const [qrTitle, setQrTitle] = useState("");
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const { toast } = useToast();
 
   const TAG_COLORS = [
@@ -835,6 +837,10 @@ export default function Home() {
               yazdırın
             </p>
           </div>
+          <Button variant="outline" size="sm" onClick={() => setGlobalSearchOpen(true)} title="Global Arama">
+            <Search className="w-4 h-4 mr-1" />
+            Ara
+          </Button>
           <Button variant="ghost" size="sm" onClick={toggleTheme} title={themeMode === "light" ? "Açık" : themeMode === "dark" ? "Koyu" : "Sistem"}>
             {themeMode === "light" ? <Sun className="w-5 h-5" /> : themeMode === "dark" ? <Moon className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
           </Button>
@@ -1604,6 +1610,11 @@ export default function Home() {
         onOpenChange={setQrModalOpen}
         url={qrUrl}
         title={qrTitle}
+      />
+
+      <GlobalSearchDialog
+        open={globalSearchOpen}
+        onOpenChange={setGlobalSearchOpen}
       />
     </div>
   );

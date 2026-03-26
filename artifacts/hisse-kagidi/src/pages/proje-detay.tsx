@@ -54,6 +54,7 @@ import {
   Archive,
 } from "lucide-react";
 import QrCodeModal from "@/components/QrCodeModal";
+import GlobalSearchDialog from "@/components/GlobalSearchDialog";
 import { useToast } from "@/hooks/use-toast";
 import type { KesimAlani, Project } from "@/lib/types";
 import {
@@ -114,6 +115,8 @@ export default function ProjeDetayPage() {
   const [transferLog, setTransferLog] = useState<DonationTransferEntry[]>([]);
   const [transferLogLoading, setTransferLogLoading] = useState(false);
   const [showTransferLog, setShowTransferLog] = useState(false);
+
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
 
   const [transferDialog, setTransferDialog] = useState<{
     entry: ConflictEntry;
@@ -484,6 +487,15 @@ export default function ProjeDetayPage() {
               onClick={() => setDeleteProjectConfirm(true)}
             >
               <Trash2 className="w-4 h-4 text-destructive" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setGlobalSearchOpen(true)}
+              title="Global Arama"
+            >
+              <Search className="w-4 h-4 mr-1" />
+              Ara
             </Button>
             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={toggleTheme} title={themeMode === "light" ? "Koyu Mod" : themeMode === "dark" ? "Sistem" : "Açık Mod"}>
               {themeMode === "light" ? <Sun className="w-4 h-4" /> : themeMode === "dark" ? <Moon className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
@@ -1166,6 +1178,12 @@ export default function ProjeDetayPage() {
         onOpenChange={setQrModalOpen}
         url={qrUrl}
         title={qrTitle}
+      />
+
+      <GlobalSearchDialog
+        open={globalSearchOpen}
+        onOpenChange={setGlobalSearchOpen}
+        projectId={projectId}
       />
     </div>
   );

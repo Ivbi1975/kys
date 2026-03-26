@@ -746,3 +746,30 @@ export async function runIntegrityCheck(): Promise<IntegrityReport> {
 export async function repairIntegrity(): Promise<IntegrityRepairResult> {
   return apiFetch<IntegrityRepairResult>("/integrity/repair", { method: "POST" });
 }
+
+export interface GlobalSearchResult {
+  donationId: string;
+  name: string;
+  description: string;
+  donationType: string;
+  vekalet: string;
+  notes: string;
+  phone: string;
+  shareCount: number;
+  kesimAlaniId: string;
+  kesimAlaniName: string;
+  projectId: string | null;
+  projectName: string | null;
+  animalGroupId: string | null;
+  animalNo: number | null;
+}
+
+export async function globalSearch(
+  q: string,
+  column: string = "all",
+  projectId?: string
+): Promise<GlobalSearchResult[]> {
+  const params = new URLSearchParams({ q, column });
+  if (projectId) params.set("projectId", projectId);
+  return apiFetch<GlobalSearchResult[]>(`/global-search?${params.toString()}`);
+}
