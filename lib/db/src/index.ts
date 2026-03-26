@@ -51,6 +51,14 @@ export function startPoolMonitoring(intervalMs = 20_000) {
   poolLogInterval.unref();
 }
 
+export async function shutdownPool(): Promise<void> {
+  if (poolLogInterval) {
+    clearInterval(poolLogInterval);
+    poolLogInterval = null;
+  }
+  await pool.end();
+}
+
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";
