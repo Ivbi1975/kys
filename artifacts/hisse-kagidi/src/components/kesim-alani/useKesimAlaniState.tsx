@@ -102,7 +102,6 @@ import {
   Check,
   QrCode,
   Tag,
-  Camera,
   FileText,
   Monitor,
   UserPlus,
@@ -110,7 +109,6 @@ import {
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag, Team } from "@/lib/types";
 import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, apiUpdateKesimAlani, apiUpdateBulkAnimalGroups, apiUpdateSingleDonation, apiUpdateSingleGroup, fetchTags, fetchDeletedDonations, apiSoftDeleteDonation, apiRestoreDonation, apiPermanentDeleteDonation, moveDonationsToKesimAlani, generateTrackingToken, fetchKesimAlaniTrackingNotes, updateTrackingNoteStatus, fetchGroupPhotosAdmin, getGroupPhotoUrlAdmin, fetchPhotoCountsAdmin, createTeam, updateTeam, deleteTeam, assignTeamAdmin, fetchNotificationLogs, fetchNotificationTemplate, updateNotificationTemplate, createDonationTransfers, downloadCsvExport } from "@/lib/api";
 import type { DeletedDonation, TrackingNote, GroupPhoto, NotificationLog, DonationTransferEntry } from "@/lib/api";
-import PhotoGallery from "@/components/PhotoGallery";
 import { AnimalGroupCard } from "@/components/AnimalGroupCard";
 import { getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares, trCollator } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
