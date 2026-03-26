@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { logger } from "../lib/logger";
 
 const API_KEY = process.env.API_KEY || "";
+const ADMIN_KEY = process.env.ADMIN_KEY || "";
 const IS_DEV = process.env.NODE_ENV === "development";
 
 const PUBLIC_PATH_PREFIXES = [
@@ -10,8 +11,12 @@ const PUBLIC_PATH_PREFIXES = [
   "/cache-stats",
 ];
 
+const PHOTO_SERVE_PATTERN = /^\/kesim-alanlari\/[^/]+\/group\/[^/]+\/photos\/[^/]+$/;
+
 function isPublicPath(path: string): boolean {
-  return PUBLIC_PATH_PREFIXES.some((prefix) => path.startsWith(prefix));
+  if (PUBLIC_PATH_PREFIXES.some((prefix) => path.startsWith(prefix))) return true;
+  if (PHOTO_SERVE_PATTERN.test(path)) return true;
+  return false;
 }
 
 export function apiKeyAuth(req: Request, res: Response, next: NextFunction): void {
@@ -40,6 +45,37 @@ export function apiKeyAuth(req: Request, res: Response, next: NextFunction): voi
   if (providedKey !== API_KEY) {
     logger.warn({ path: req.path, ip: req.ip }, "Invalid API key attempt");
     res.status(401).json({ error: "Geçersiz API anahtarı." });
+    return;
+  }
+
+  next();
+}
+
+const ADMIN_ONLY_PATHS = [
+  "/integrity/repair",
+  "/backup/import",
+];
+
+function isAdminOnlyPath(path: string): boolean {
+  return ADMIN_ONLY_PATHS.some((p) => path.startsWith(p));
+}
+
+export function adminKeyAuth(req: Request, res: Response, next: NextFunction): void {
+  if (!isAdminOnlyPath(req.path)) {
+    next();
+    return;
+  }
+
+  if (!ADMIN_KEY) {
+    next();
+    return;
+  }
+
+  const providedKey = req.headers["x-admin-key"] as string | undefined;
+
+  if (!providedKey || providedKey !== ADMIN_KEY) {
+    logger.warn({ path: req.path, ip: req.ip }, "Unauthorized admin endpoint access attempt");
+    res.status(403).json({ error: "Bu işlem için yönetici yetkisi gerekli." });
     return;
   }
 
