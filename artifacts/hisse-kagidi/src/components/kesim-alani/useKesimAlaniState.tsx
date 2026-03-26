@@ -236,6 +236,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [filterUngrouped, setFilterUngrouped] = useState(false);
   const [groupSearchQuery, setGroupSearchQuery] = useState("");
+  const [groupSearchInput, setGroupSearchInput] = useState("");
   const [groupSearchMatchIdx, setGroupSearchMatchIdx] = useState(0);
   const [showOnlyIncomplete, setShowOnlyIncomplete] = useState(false);
   const [highlightIncomplete, setHighlightIncomplete] = useState(true);
@@ -581,10 +582,25 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSaveRef = useRef<KesimAlani | null>(null);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
-    return () => clearTimeout(timer);
+  const handleDonorSearch = useCallback(() => {
+    setDebouncedSearchQuery(searchQuery);
   }, [searchQuery]);
+
+  const handleDonorSearchClear = useCallback(() => {
+    setSearchQuery("");
+    setDebouncedSearchQuery("");
+  }, []);
+
+  const handleGroupSearch = useCallback(() => {
+    setGroupSearchQuery(groupSearchInput);
+    setGroupSearchMatchIdx(0);
+  }, [groupSearchInput]);
+
+  const handleGroupSearchClear = useCallback(() => {
+    setGroupSearchInput("");
+    setGroupSearchQuery("");
+    setGroupSearchMatchIdx(0);
+  }, []);
 
   const buildErrorDescription = useCallback((errMsg: string) => {
     const animalNoMatches = errMsg.match(/[Hh]ayvan\s*(?:No|no|#)?\s*[:.]?\s*(\d+(?:\s*[,\/]\s*\d+)*)/g);
@@ -3578,6 +3594,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     groupFindDeleteOpen,
     groupFindDeleteValue,
     groupRows,
+    groupSearchInput,
     groupSearchMatchIdx,
     groupSearchMatches,
     groupSearchQuery,
@@ -3589,6 +3606,10 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     groupsVirtuosoRef,
     handleAssignTeam,
     handleAutoGroup,
+    handleDonorSearch,
+    handleDonorSearchClear,
+    handleGroupSearch,
+    handleGroupSearchClear,
     handleAutoGroupSelected,
     handleColumnDragEnd,
     handleColumnDragOver,
@@ -3746,6 +3767,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     setGroupFindDeleteConfirm,
     setGroupFindDeleteOpen,
     setGroupFindDeleteValue,
+    setGroupSearchInput,
     setGroupSearchMatchIdx,
     setGroupSearchQuery,
     setGroupingInProgress,

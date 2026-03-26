@@ -233,6 +233,7 @@ export default function KesimAlaniPage() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [filterUngrouped, setFilterUngrouped] = useState(false);
   const [groupSearchQuery, setGroupSearchQuery] = useState("");
+  const [groupSearchInput, setGroupSearchInput] = useState("");
   const [groupSearchMatchIdx, setGroupSearchMatchIdx] = useState(0);
   const [showOnlyIncomplete, setShowOnlyIncomplete] = useState(false);
   const [highlightIncomplete, setHighlightIncomplete] = useState(true);
@@ -551,10 +552,25 @@ export default function KesimAlaniPage() {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSaveRef = useRef<KesimAlani | null>(null);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
-    return () => clearTimeout(timer);
+  const handleDonorSearch = useCallback(() => {
+    setDebouncedSearchQuery(searchQuery);
   }, [searchQuery]);
+
+  const handleDonorSearchClear = useCallback(() => {
+    setSearchQuery("");
+    setDebouncedSearchQuery("");
+  }, []);
+
+  const handleGroupSearch = useCallback(() => {
+    setGroupSearchQuery(groupSearchInput);
+    setGroupSearchMatchIdx(0);
+  }, [groupSearchInput]);
+
+  const handleGroupSearchClear = useCallback(() => {
+    setGroupSearchInput("");
+    setGroupSearchQuery("");
+    setGroupSearchMatchIdx(0);
+  }, []);
 
   const buildErrorDescription = useCallback((errMsg: string) => {
     const animalNoMatches = errMsg.match(/[Hh]ayvan\s*(?:No|no|#)?\s*[:.]?\s*(\d+(?:\s*[,\/]\s*\d+)*)/g);
@@ -3596,15 +3612,29 @@ export default function KesimAlaniPage() {
                 )}
               </div>
               <div className="flex gap-2 items-center flex-wrap">
-                <div className="relative">
-                  <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    ref={searchInputRef}
-                    className="h-8 text-sm pl-8 w-32 sm:w-48"
-                    placeholder="Ara... (Ctrl+F)"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
+                <div className="flex items-center gap-1">
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      ref={searchInputRef}
+                      className="h-8 text-sm pl-8 pr-7 w-32 sm:w-48"
+                      placeholder="Ara... (Ctrl+F)"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleDonorSearch(); } }}
+                    />
+                    {(searchQuery || debouncedSearchQuery) && (
+                      <button
+                        className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 hover:bg-muted rounded"
+                        onClick={handleDonorSearchClear}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                  <Button variant="outline" size="sm" className="h-8 px-2" onClick={handleDonorSearch} title="Ara">
+                    Ara
+                  </Button>
                 </div>
                 <Button
                   variant={showAdvancedFilter ? "default" : "outline"}
@@ -5060,43 +5090,53 @@ export default function KesimAlaniPage() {
 
             {kesim.animalGroups.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 mb-3 p-2 bg-muted/30 rounded-lg">
-                <div className="relative flex-1 min-w-[180px] max-w-xs">
-                  <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    className="h-8 text-sm pl-8 pr-16"
-                    placeholder="Gruplarda ara..."
-                    value={groupSearchQuery}
-                    onChange={(e) => { setGroupSearchQuery(e.target.value); setGroupSearchMatchIdx(0); }}
-                  />
-                  {groupSearchQuery.trim() && (
-                    <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                      <span className="text-xs text-muted-foreground mr-1">
-                        {currentGroupMatches.length > 0
-                          ? `${(groupSearchMatchIdx % currentGroupMatches.length) + 1}/${currentGroupMatches.length}`
-                          : "0"}
-                      </span>
-                      <button
-                        className="p-0.5 hover:bg-muted rounded"
-                        onClick={() => setGroupSearchMatchIdx(prev => Math.max(0, prev - 1))}
-                        disabled={currentGroupMatches.length === 0}
-                      >
-                        <ArrowUp className="w-3 h-3" />
-                      </button>
-                      <button
-                        className="p-0.5 hover:bg-muted rounded"
-                        onClick={() => setGroupSearchMatchIdx(prev => prev + 1)}
-                        disabled={currentGroupMatches.length === 0}
-                      >
-                        <ArrowDown className="w-3 h-3" />
-                      </button>
-                      <button
-                        className="p-0.5 hover:bg-muted rounded"
-                        onClick={() => { setGroupSearchQuery(""); setGroupSearchMatchIdx(0); }}
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
+                <div className="flex items-center gap-1 flex-1 min-w-[180px] max-w-xs">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      className="h-8 text-sm pl-8 pr-16"
+                      placeholder="Gruplarda ara..."
+                      value={groupSearchInput}
+                      onChange={(e) => setGroupSearchInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleGroupSearch(); } }}
+                    />
+                    {(groupSearchInput || groupSearchQuery) && (
+                      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                        {groupSearchQuery.trim() && (
+                          <>
+                            <span className="text-xs text-muted-foreground mr-1">
+                              {currentGroupMatches.length > 0
+                                ? `${(groupSearchMatchIdx % currentGroupMatches.length) + 1}/${currentGroupMatches.length}`
+                                : "0"}
+                            </span>
+                            <button
+                              className="p-0.5 hover:bg-muted rounded"
+                              onClick={() => setGroupSearchMatchIdx(prev => Math.max(0, prev - 1))}
+                              disabled={currentGroupMatches.length === 0}
+                            >
+                              <ArrowUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              className="p-0.5 hover:bg-muted rounded"
+                              onClick={() => setGroupSearchMatchIdx(prev => prev + 1)}
+                              disabled={currentGroupMatches.length === 0}
+                            >
+                              <ArrowDown className="w-3 h-3" />
+                            </button>
+                          </>
+                        )}
+                        <button
+                          className="p-0.5 hover:bg-muted rounded"
+                          onClick={handleGroupSearchClear}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <Button variant="outline" size="sm" className="h-8 px-2" onClick={handleGroupSearch} title="Ara">
+                    Ara
+                  </Button>
                 </div>
 
                 <div className="flex items-center gap-1">
