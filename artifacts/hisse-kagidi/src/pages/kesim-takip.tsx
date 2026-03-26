@@ -1127,6 +1127,44 @@ export default function KesimTakipPage() {
     setNotes(prev => [note, ...prev]);
   }, [setNotes]);
 
+  const filledGroups = useMemo(() => data ? data.groups.filter(g => g.filledCount > 0) : [], [data]);
+  const noteCountByGroup = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const n of notes) {
+      if (n.animalGroupId) {
+        map[n.animalGroupId] = (map[n.animalGroupId] || 0) + 1;
+      }
+    }
+    return map;
+  }, [notes]);
+  const editRequestCount = useMemo(() => notes.filter(n => n.type === "edit_request" && n.status === "pending").length, [notes]);
+
+  const filteredGroups = useMemo(() => {
+    let groups = filledGroups;
+    if (filterMode === "pending") {
+      groups = groups.filter(g => !g.kesildi);
+    } else if (filterMode === "done") {
+      groups = groups.filter(g => g.kesildi);
+    }
+    if (searchQuery.trim()) {
+      const q = turkishNormalize(searchQuery.trim());
+      groups = groups.filter(g =>
+        String(g.animalNo).includes(q) ||
+        g.donors.some(d =>
+          turkishNormalize(d.name).includes(q) ||
+          turkishNormalize(d.description).includes(q) ||
+          turkishNormalize(d.donationType).includes(q) ||
+          turkishNormalize(d.vekalet).includes(q)
+        )
+      );
+    }
+    return groups;
+  }, [filledGroups, filterMode, searchQuery]);
+
+  const handleSelectGroup = useCallback((idx: number) => {
+    setOverlayIndex(idx);
+  }, []);
+
   async function handleTeamAssign(groupId: string, teamId: string | null) {
     if (!params.token) return;
     try {
@@ -1175,43 +1213,6 @@ export default function KesimTakipPage() {
   }
 
   const progressPercent = data.totalGroups > 0 ? Math.round((data.kesildiCount / data.totalGroups) * 100) : 0;
-  const filledGroups = useMemo(() => data.groups.filter(g => g.filledCount > 0), [data.groups]);
-  const noteCountByGroup = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const n of notes) {
-      if (n.animalGroupId) {
-        map[n.animalGroupId] = (map[n.animalGroupId] || 0) + 1;
-      }
-    }
-    return map;
-  }, [notes]);
-  const editRequestCount = useMemo(() => notes.filter(n => n.type === "edit_request" && n.status === "pending").length, [notes]);
-
-  const filteredGroups = useMemo(() => {
-    let groups = filledGroups;
-    if (filterMode === "pending") {
-      groups = groups.filter(g => !g.kesildi);
-    } else if (filterMode === "done") {
-      groups = groups.filter(g => g.kesildi);
-    }
-    if (searchQuery.trim()) {
-      const q = turkishNormalize(searchQuery.trim());
-      groups = groups.filter(g =>
-        String(g.animalNo).includes(q) ||
-        g.donors.some(d =>
-          turkishNormalize(d.name).includes(q) ||
-          turkishNormalize(d.description).includes(q) ||
-          turkishNormalize(d.donationType).includes(q) ||
-          turkishNormalize(d.vekalet).includes(q)
-        )
-      );
-    }
-    return groups;
-  }, [filledGroups, filterMode, searchQuery]);
-
-  const handleSelectGroup = useCallback((idx: number) => {
-    setOverlayIndex(idx);
-  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white dark:from-emerald-950 dark:to-background">
