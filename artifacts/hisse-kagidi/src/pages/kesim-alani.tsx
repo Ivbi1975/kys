@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, createElement, useMemo, forwardRef, useTransition } from "react";
+import { turkishNormalize } from "@/lib/utils";
 import { TableVirtuoso } from "react-virtuoso";
 import QrCodeModal from "@/components/QrCodeModal";
 import { useParams, useLocation } from "wouter";
@@ -1409,12 +1410,12 @@ export default function KesimAlaniPage() {
       if (currentFieldIdx < 0) return;
       const donations = searchQuery.trim()
         ? kesim!.donations.filter(d => {
-            const q = searchQuery.trim().toLocaleLowerCase("tr");
-            return d.name.toLocaleLowerCase("tr").includes(q) ||
-              d.description.toLocaleLowerCase("tr").includes(q) ||
-              d.vekalet.toLocaleLowerCase("tr").includes(q) ||
-              d.donationType.toLocaleLowerCase("tr").includes(q) ||
-              (d.notes || "").toLocaleLowerCase("tr").includes(q);
+            const q = turkishNormalize(searchQuery.trim());
+            return turkishNormalize(d.name).includes(q) ||
+              turkishNormalize(d.description).includes(q) ||
+              turkishNormalize(d.vekalet).includes(q) ||
+              turkishNormalize(d.donationType).includes(q) ||
+              turkishNormalize(d.notes || "").includes(q);
           })
         : kesim!.donations;
       const donationIdx = donations.findIndex(d => d.id === donationId);
@@ -2098,16 +2099,16 @@ export default function KesimAlaniPage() {
 
   const groupSearchMatches = useCallback(() => {
     if (!kesim || !groupSearchQuery.trim()) return [];
-    const q = groupSearchQuery.trim().toLocaleLowerCase("tr");
+    const q = turkishNormalize(groupSearchQuery.trim());
     const matches: { groupIdx: number; dIdx: number; groupId: string; animalNo: number }[] = [];
     kesim.animalGroups.forEach((group, groupIdx) => {
       group.donations.forEach((d, dIdx) => {
         if (
-          d.name.toLocaleLowerCase("tr").includes(q) ||
-          d.description.toLocaleLowerCase("tr").includes(q) ||
-          d.vekalet.toLocaleLowerCase("tr").includes(q) ||
-          d.donationType.toLocaleLowerCase("tr").includes(q) ||
-          (d.notes || "").toLocaleLowerCase("tr").includes(q)
+          turkishNormalize(d.name).includes(q) ||
+          turkishNormalize(d.description).includes(q) ||
+          turkishNormalize(d.vekalet).includes(q) ||
+          turkishNormalize(d.donationType).includes(q) ||
+          turkishNormalize(d.notes || "").includes(q)
         ) {
           matches.push({ groupIdx, dIdx, groupId: group.id, animalNo: group.animalNo });
         }
@@ -2137,15 +2138,15 @@ export default function KesimAlaniPage() {
 
   function isGroupSearchMatch(groupIdx: number, dIdx: number): boolean {
     if (!groupSearchQuery.trim()) return false;
-    const q = groupSearchQuery.trim().toLocaleLowerCase("tr");
+    const q = turkishNormalize(groupSearchQuery.trim());
     const d = kesim?.animalGroups[groupIdx]?.donations[dIdx];
     if (!d) return false;
     return (
-      d.name.toLocaleLowerCase("tr").includes(q) ||
-      d.description.toLocaleLowerCase("tr").includes(q) ||
-      d.vekalet.toLocaleLowerCase("tr").includes(q) ||
-      d.donationType.toLocaleLowerCase("tr").includes(q) ||
-      (d.notes || "").toLocaleLowerCase("tr").includes(q)
+      turkishNormalize(d.name).includes(q) ||
+      turkishNormalize(d.description).includes(q) ||
+      turkishNormalize(d.vekalet).includes(q) ||
+      turkishNormalize(d.donationType).includes(q) ||
+      turkishNormalize(d.notes || "").includes(q)
     );
   }
 
@@ -3009,13 +3010,13 @@ export default function KesimAlaniPage() {
     });
 
     if (!debouncedSearchQuery.trim()) return advFiltered;
-    const q = debouncedSearchQuery.trim().toLocaleLowerCase("tr");
+    const q = turkishNormalize(debouncedSearchQuery.trim());
     return advFiltered.filter(d =>
-      d.name.toLocaleLowerCase("tr").includes(q) ||
-      d.description.toLocaleLowerCase("tr").includes(q) ||
-      d.vekalet.toLocaleLowerCase("tr").includes(q) ||
-      d.donationType.toLocaleLowerCase("tr").includes(q) ||
-      (d.notes || "").toLocaleLowerCase("tr").includes(q)
+      turkishNormalize(d.name).includes(q) ||
+      turkishNormalize(d.description).includes(q) ||
+      turkishNormalize(d.vekalet).includes(q) ||
+      turkishNormalize(d.donationType).includes(q) ||
+      turkishNormalize(d.notes || "").includes(q)
     );
   }, [donations, showRemovedFilter, removedFromGroupIds, filterUngrouped, groupedDonorIds, filterStatus, filterCinsi, filterHisseMin, filterHisseMax, filterTags, filterAiCategories, filterAiWarnings, debouncedSearchQuery]);
 

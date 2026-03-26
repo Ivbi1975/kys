@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { turkishNormalize } from "@/lib/utils";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -96,13 +97,13 @@ export default function CatismaTespitiPage() {
   }
 
   const filteredConflicts = conflicts.filter(c => {
-    const q = searchQuery.toLocaleLowerCase("tr");
+    const q = turkishNormalize(searchQuery);
     if (!q) return true;
     return (
-      c.displayName.toLocaleLowerCase("tr").includes(q) ||
+      turkishNormalize(c.displayName).includes(q) ||
       c.entries.some(e =>
-        e.kesimAlaniName.toLocaleLowerCase("tr").includes(q) ||
-        e.donationDescription.toLocaleLowerCase("tr").includes(q)
+        turkishNormalize(e.kesimAlaniName).includes(q) ||
+        turkishNormalize(e.donationDescription).includes(q)
       )
     );
   });

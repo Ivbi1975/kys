@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from "react";
+import { turkishNormalize } from "@/lib/utils";
 import { useParams } from "wouter";
 import { Virtuoso } from "react-virtuoso";
 import { createTrackingNote, fetchGroupPhotos, getGroupPhotoUrl, uploadGroupPhoto, deleteGroupPhoto, assignTeamTracking, fetchTrackingNotificationLogs } from "@/lib/api";
@@ -1194,14 +1195,14 @@ export default function KesimTakipPage() {
       groups = groups.filter(g => g.kesildi);
     }
     if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLocaleLowerCase("tr");
+      const q = turkishNormalize(searchQuery.trim());
       groups = groups.filter(g =>
         String(g.animalNo).includes(q) ||
         g.donors.some(d =>
-          d.name.toLocaleLowerCase("tr").includes(q) ||
-          d.description.toLocaleLowerCase("tr").includes(q) ||
-          d.donationType.toLocaleLowerCase("tr").includes(q) ||
-          d.vekalet.toLocaleLowerCase("tr").includes(q)
+          turkishNormalize(d.name).includes(q) ||
+          turkishNormalize(d.description).includes(q) ||
+          turkishNormalize(d.donationType).includes(q) ||
+          turkishNormalize(d.vekalet).includes(q)
         )
       );
     }

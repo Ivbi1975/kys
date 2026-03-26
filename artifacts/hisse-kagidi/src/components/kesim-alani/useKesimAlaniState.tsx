@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, createElement, useMemo, forwardRef, useTransition, Suspense } from "react";
+import { turkishNormalize } from "@/lib/utils";
 import { TableVirtuoso, Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 const QrCodeModal = React.lazy(() => import("@/components/QrCodeModal"));
 import { useParams, useLocation } from "wouter";
@@ -950,9 +951,9 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
 
   function getFindDeleteMatches() {
     if (!kesim || !findDeleteValue.trim()) return [];
-    const q = findDeleteValue.trim().toLocaleLowerCase("tr");
+    const q = turkishNormalize(findDeleteValue.trim());
     return kesim.donations.filter((d) => {
-      const val = (d[findDeleteColumn] || "").toString().toLocaleLowerCase("tr");
+      const val = turkishNormalize((d[findDeleteColumn] || "").toString());
       return val.includes(q);
     });
   }
@@ -985,12 +986,12 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
 
   function getGroupFindDeleteMatches() {
     if (!kesim || !groupFindDeleteValue.trim()) return [];
-    const q = groupFindDeleteValue.trim().toLocaleLowerCase("tr");
+    const q = turkishNormalize(groupFindDeleteValue.trim());
     const matchIds = new Set<string>();
     for (const group of kesim.animalGroups) {
       for (const d of group.donations) {
         if (!d.id) continue;
-        const val = (d[groupFindDeleteColumn] || "").toString().toLocaleLowerCase("tr");
+        const val = turkishNormalize((d[groupFindDeleteColumn] || "").toString());
         if (val.includes(q)) {
           matchIds.add(d.id);
         }
@@ -2290,16 +2291,16 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
 
   const groupSearchMatches = useCallback(() => {
     if (!kesim || !groupSearchQuery.trim()) return [];
-    const q = groupSearchQuery.trim().toLocaleLowerCase("tr");
+    const q = turkishNormalize(groupSearchQuery.trim());
     const matches: { groupIdx: number; dIdx: number; groupId: string; animalNo: number }[] = [];
     kesim.animalGroups.forEach((group, groupIdx) => {
       group.donations.forEach((d, dIdx) => {
         if (
-          d.name.toLocaleLowerCase("tr").includes(q) ||
-          d.description.toLocaleLowerCase("tr").includes(q) ||
-          d.vekalet.toLocaleLowerCase("tr").includes(q) ||
-          d.donationType.toLocaleLowerCase("tr").includes(q) ||
-          (d.notes || "").toLocaleLowerCase("tr").includes(q)
+          turkishNormalize(d.name).includes(q) ||
+          turkishNormalize(d.description).includes(q) ||
+          turkishNormalize(d.vekalet).includes(q) ||
+          turkishNormalize(d.donationType).includes(q) ||
+          turkishNormalize(d.notes || "").includes(q)
         ) {
           matches.push({ groupIdx, dIdx, groupId: group.id, animalNo: group.animalNo });
         }
@@ -2328,15 +2329,15 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
 
   function isGroupSearchMatch(groupIdx: number, dIdx: number): boolean {
     if (!groupSearchQuery.trim()) return false;
-    const q = groupSearchQuery.trim().toLocaleLowerCase("tr");
+    const q = turkishNormalize(groupSearchQuery.trim());
     const d = kesim?.animalGroups[groupIdx]?.donations[dIdx];
     if (!d) return false;
     return (
-      d.name.toLocaleLowerCase("tr").includes(q) ||
-      d.description.toLocaleLowerCase("tr").includes(q) ||
-      d.vekalet.toLocaleLowerCase("tr").includes(q) ||
-      d.donationType.toLocaleLowerCase("tr").includes(q) ||
-      (d.notes || "").toLocaleLowerCase("tr").includes(q)
+      turkishNormalize(d.name).includes(q) ||
+      turkishNormalize(d.description).includes(q) ||
+      turkishNormalize(d.vekalet).includes(q) ||
+      turkishNormalize(d.donationType).includes(q) ||
+      turkishNormalize(d.notes || "").includes(q)
     );
   }
 
@@ -3217,7 +3218,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     }
 
     for (const d of donations) {
-      const text = [d.name, d.description, d.vekalet, d.donationType, d.notes || ""].join("\t").toLocaleLowerCase("tr");
+      const text = turkishNormalize([d.name, d.description, d.vekalet, d.donationType, d.notes || ""].join("\t"));
       contentMap.set(d.id, text);
       addTrigrams(text, d.id);
     }
@@ -3225,7 +3226,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     return {
       search(query: string): Set<string> | null {
         if (!query) return null;
-        const q = query.trim().toLocaleLowerCase("tr");
+        const q = turkishNormalize(query.trim());
         if (q.length === 0) return null;
 
         if (q.length < 3) {
@@ -3274,7 +3275,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     const advFiltered = preFiltered.filter(d => {
       if (filterStatus === "active" && d.excluded) return false;
       if (filterStatus === "excluded" && !d.excluded) return false;
-      if (filterCinsi !== "all" && d.donationType.toLocaleLowerCase("tr") !== filterCinsi.toLocaleLowerCase("tr")) return false;
+      if (filterCinsi !== "all" && turkishNormalize(d.donationType) !== turkishNormalize(filterCinsi)) return false;
       if (filterHisseMin > 0 && d.shareCount < filterHisseMin) return false;
       if (filterHisseMax > 0 && d.shareCount > filterHisseMax) return false;
       if (filterTags.length > 0) {
