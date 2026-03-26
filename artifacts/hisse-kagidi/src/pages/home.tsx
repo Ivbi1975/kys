@@ -636,7 +636,7 @@ export default function Home() {
         token = await generateTrackingToken(k.id);
         setKesimAlanlari(prev => prev.map(ka => ka.id === k.id ? { ...ka, trackingToken: token } : ka));
       }
-      const url = `${window.location.origin}/hisse-kagidi/takip/${token}`;
+      const url = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/takip/${token}`;
       await navigator.clipboard.writeText(url);
       toast({ title: "Link kopyalandı", description: "Takip linki panoya kopyalandı." });
     } catch (err) {
@@ -652,7 +652,7 @@ export default function Home() {
         token = await generateTrackingToken(k.id);
         setKesimAlanlari(prev => prev.map(ka => ka.id === k.id ? { ...ka, trackingToken: token } : ka));
       }
-      window.open(`/hisse-kagidi/takip/${token}`, "_blank");
+      window.open(`${import.meta.env.BASE_URL.replace(/\/$/, "")}/takip/${token}`, "_blank");
     } catch (err) {
       toast({ title: "Hata", description: "Takip sayfası açılamadı.", variant: "destructive" });
     }
