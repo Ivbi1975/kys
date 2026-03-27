@@ -365,14 +365,13 @@ export function useHomeState() {
     }
   }, [toast]);
 
+  const deletedKesimAlanlariRef = useRef(deletedKesimAlanlari);
+  deletedKesimAlanlariRef.current = deletedKesimAlanlari;
+
   const requestPermanentDelete = useCallback((id: string) => {
-    setDeletedKesimAlanlari(prev => {
-      const target = prev.find(k => k.id === id);
-      if (target) {
-        setPermanentDeleteConfirm({ id, name: target.name });
-      }
-      return prev;
-    });
+    const target = deletedKesimAlanlariRef.current.find(k => k.id === id);
+    if (!target) return;
+    setPermanentDeleteConfirm({ id, name: target.name });
   }, []);
 
   const executePermanentDelete = useCallback(async () => {
