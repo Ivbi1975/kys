@@ -12,17 +12,30 @@ if (!process.env.DATABASE_URL) {
 
 const poolMax = Math.max(1, Number(process.env.DB_POOL_MAX) || 10);
 
+const connectionString = process.env.DATABASE_URL!.replace(
+  /[?&]sslmode=[^&]*/g,
+  (match) => (match.startsWith("?") ? "?" : ""),
+).replace(/\?$/, "");
+
+function resolveSsl(): boolean | { rejectUnauthorized: boolean } {
+  const dbSsl = process.env.DB_SSL;
+  if (dbSsl === "false" || dbSsl === "0") return false;
+  if (dbSsl === "insecure") return { rejectUnauthorized: false };
+  if (dbSsl === "true" || dbSsl === "1") return { rejectUnauthorized: true };
+  return process.env.NODE_ENV === "production"
+    ? { rejectUnauthorized: true }
+    : false;
+}
+
+const sslConfig = resolveSsl();
+
 export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString,
   max: poolMax,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
   statement_timeout: 30_000,
-  ssl: process.env.DATABASE_URL?.includes("sslmode=")
-    ? undefined
-    : process.env.NODE_ENV === "production"
-      ? { rejectUnauthorized: false }
-      : false,
+  ssl: sslConfig,
 });
 
 pool.on("error", (err) => {
@@ -46,7 +59,8 @@ let poolLogInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startPoolMonitoring(intervalMs = 20_000) {
   if (poolLogInterval) return;
-  console.log(`[DB Pool] Configured max=${poolMax}, ssl=${pool.options.ssl ? "enabled" : "disabled"}`);
+  const sslLabel = sslConfig === false ? "disabled" : typeof sslConfig === "object" && !sslConfig.rejectUnauthorized ? "enabled (insecure)" : "enabled (verified)";
+  console.log(`[DB Pool] Configured max=${poolMax}, ssl=${sslLabel}`);
   ensureMinConnections().catch((err) =>
     console.error("Pool warm-up failed:", err.message),
   );
