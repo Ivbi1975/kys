@@ -1,7 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationLogs } from "@/lib/api";
+import { fetchKesimAlaniTrackingNotes, fetchNotificationLogs } from "@/lib/api";
 import {
   ChevronRight, FileSpreadsheet, History, Home, Keyboard, Link2, Loader2,
   Maximize, MessageSquarePlus, Minimize, Printer, QrCode,
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useKesimAlaniContext } from "../KesimAlaniContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTrackingActions } from "@/hooks/useTrackingActions";
 
 export function KesimAlaniHeader() {
   const {
@@ -20,6 +21,12 @@ export function KesimAlaniHeader() {
     setNotificationLogsOpen, setNotificationLogsLoading, setNotificationLogs, setTeamDialogOpen,
     totalShares, requiredAnimals,
   } = useKesimAlaniContext();
+
+  const { resolveToken, buildTrackingUrl } = useTrackingActions({
+    onTokenGenerated: (_, token) => {
+      setKesim(prev => prev ? { ...prev, trackingToken: token } : prev);
+    },
+  });
 
   if (!kesim) return null;
 
@@ -74,12 +81,8 @@ export function KesimAlaniHeader() {
             aria-label="Takip Linki"
             onClick={async () => {
               try {
-                let token = kesim.trackingToken;
-                if (!token) {
-                  token = await generateTrackingToken(kesim.id);
-                  setKesim(prev => prev ? { ...prev, trackingToken: token } : prev);
-                }
-                const url = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/takip/${token}`;
+                const token = await resolveToken(kesim);
+                const url = buildTrackingUrl(token);
                 await navigator.clipboard.writeText(url);
                 toast({ title: "Takip linki kopyalandı", description: "Link panoya kopyalandı" });
               } catch {
@@ -96,12 +99,8 @@ export function KesimAlaniHeader() {
             aria-label="QR Kod"
             onClick={async () => {
               try {
-                let token = kesim.trackingToken;
-                if (!token) {
-                  token = await generateTrackingToken(kesim.id);
-                  setKesim(prev => prev ? { ...prev, trackingToken: token } : prev);
-                }
-                const url = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/takip/${token}`;
+                const token = await resolveToken(kesim);
+                const url = buildTrackingUrl(token);
                 setQrUrl(url);
                 setQrModalOpen(true);
               } catch {
