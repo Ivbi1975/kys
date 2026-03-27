@@ -15,6 +15,10 @@ import { eq, isNull, isNotNull, and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { cacheGet, cacheSet, cacheInvalidate, cacheInvalidatePrefix } from "../lib/cache";
 
+const idParamSchema = z.object({
+  id: z.string().min(1),
+});
+
 const createProjectSchema = z.object({
   name: z.string().trim().min(1, "Proje adı gerekli"),
 });
@@ -134,6 +138,11 @@ router.post("/projects", async (req, res): Promise<void> => {
 });
 
 router.put("/projects/:id", async (req, res): Promise<void> => {
+  const paramsParsed = idParamSchema.safeParse(req.params);
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: paramsParsed.error.issues });
+    return;
+  }
   const parsed = updateProjectSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
@@ -141,7 +150,7 @@ router.put("/projects/:id", async (req, res): Promise<void> => {
   }
 
   try {
-    const { id } = req.params;
+    const { id } = paramsParsed.data;
     const { name } = parsed.data;
     const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
     if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
@@ -157,8 +166,14 @@ router.put("/projects/:id", async (req, res): Promise<void> => {
 });
 
 router.delete("/projects/:id", async (req, res): Promise<void> => {
+  const paramsParsed = idParamSchema.safeParse(req.params);
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: paramsParsed.error.issues });
+    return;
+  }
+
   try {
-    const { id } = req.params;
+    const { id } = paramsParsed.data;
     const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
     if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
 
@@ -173,8 +188,14 @@ router.delete("/projects/:id", async (req, res): Promise<void> => {
 });
 
 router.post("/projects/:id/restore", async (req, res): Promise<void> => {
+  const paramsParsed = idParamSchema.safeParse(req.params);
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: paramsParsed.error.issues });
+    return;
+  }
+
   try {
-    const { id } = req.params;
+    const { id } = paramsParsed.data;
     const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
     if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
 
@@ -250,8 +271,14 @@ router.get("/projects/archived", async (_req, res) => {
 });
 
 router.post("/projects/:id/archive", async (req, res): Promise<void> => {
+  const paramsParsed = idParamSchema.safeParse(req.params);
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: paramsParsed.error.issues });
+    return;
+  }
+
   try {
-    const { id } = req.params;
+    const { id } = paramsParsed.data;
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
     if (!project) { res.status(404).json({ error: "Proje bulunamadı" }); return; }
     if (project.deletedAt) { res.status(400).json({ error: "Silinmiş proje arşivlenemez" }); return; }
@@ -290,8 +317,14 @@ router.post("/projects/:id/archive", async (req, res): Promise<void> => {
 });
 
 router.post("/projects/:id/unarchive", async (req, res): Promise<void> => {
+  const paramsParsed = idParamSchema.safeParse(req.params);
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: paramsParsed.error.issues });
+    return;
+  }
+
   try {
-    const { id } = req.params;
+    const { id } = paramsParsed.data;
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
     if (!project) { res.status(404).json({ error: "Proje bulunamadı" }); return; }
     if (!project.archivedAt) { res.status(400).json({ error: "Proje arşivde değil" }); return; }
