@@ -1455,9 +1455,9 @@ router.get("/catisma-tespiti", asyncHandler(async (req, res) => {
     JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id AND ka.deleted_at IS NULL ${projectClause}
     WHERE d.deleted_at IS NULL
       AND (
-        (${nameKeys.length > 0 ? sql`LOWER(TRIM(d.name)) = ANY(${sql.raw(`ARRAY[${nameKeys.map(k => `'${k.replace(/'/g, "''")}'`).join(",")}]`)})` : sql`FALSE`})
+        (${nameKeys.length > 0 ? sql`LOWER(TRIM(d.name)) IN (${sql.join(nameKeys.map(k => sql`${k}`), sql`, `)})` : sql`FALSE`})
         OR
-        (${descKeys.length > 0 ? sql`LOWER(TRIM(d.description)) = ANY(${sql.raw(`ARRAY[${descKeys.map(k => `'${k.replace(/'/g, "''")}'`).join(",")}]`)})` : sql`FALSE`})
+        (${descKeys.length > 0 ? sql`LOWER(TRIM(d.description)) IN (${sql.join(descKeys.map(k => sql`${k}`), sql`, `)})` : sql`FALSE`})
       )
   `);
 
@@ -1487,7 +1487,7 @@ router.get("/catisma-tespiti", asyncHandler(async (req, res) => {
         SELECT agd.donation_id, agd.group_id, ag.animal_no
         FROM animal_group_donations agd
         JOIN animal_groups ag ON ag.id = agd.group_id
-        WHERE agd.donation_id = ANY(${sql.raw(`ARRAY[${batch.map(id => `'${id.replace(/'/g, "''")}'`).join(",")}]`)})
+        WHERE agd.donation_id IN (${sql.join(batch.map(id => sql`${id}`), sql`, `)})
       `);
       allLinks.push(...(linksResult.rows as typeof allLinks));
     }
@@ -1504,7 +1504,7 @@ router.get("/catisma-tespiti", asyncHandler(async (req, res) => {
                d.share_count, d.vekalet, d.notes, d.phone, d.excluded, d.kesim_alani_id
         FROM animal_group_donations agd
         JOIN donations d ON d.id = agd.donation_id AND d.deleted_at IS NULL
-        WHERE agd.group_id = ANY(${sql.raw(`ARRAY[${affectedGroupIds.map(id => `'${id.replace(/'/g, "''")}'`).join(",")}]`)})
+        WHERE agd.group_id IN (${sql.join(affectedGroupIds.map(id => sql`${id}`), sql`, `)})
       `);
       for (const row of groupMembersResult.rows as any[]) {
         if (!donationById[row.donation_id]) {
@@ -1568,7 +1568,7 @@ router.get("/catisma-tespiti", asyncHandler(async (req, res) => {
       FROM donations d
       JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
       WHERE d.deleted_at IS NULL
-        AND d.kesim_alani_id = ANY(${sql.raw(`ARRAY[${ungroupedConflictKAIds.map(id => `'${id.replace(/'/g, "''")}'`).join(",")}]`)})
+        AND d.kesim_alani_id IN (${sql.join(ungroupedConflictKAIds.map(id => sql`${id}`), sql`, `)})
       ORDER BY d.created_at DESC
     `);
     for (const row of kaSiblingsResult.rows as DonationRow[]) {
