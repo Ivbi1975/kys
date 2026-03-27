@@ -41,6 +41,7 @@ export interface AnimalGroupPayload {
   colorTag?: string;
   locked?: boolean;
   notes?: string;
+  sortOrder?: number;
   donations?: DonationPayload[];
 }
 
@@ -441,7 +442,7 @@ export async function saveAnimalGroups(tx: Tx, kesimAlaniId: string, groups: Ani
       colorTag: g.colorTag || "",
       locked: g.locked || false,
       notes: g.notes || "",
-      sortOrder: (g as any).sortOrder ?? i,
+      sortOrder: g.sortOrder ?? i,
       kesildi: existing?.kesildi ?? false,
       kesildiAt: existing?.kesildiAt ?? null,
       teamId: existing?.teamId ?? null,
@@ -671,7 +672,7 @@ export async function diffUpdateGroups(tx: Tx, kesimAlaniId: string, incoming: A
   if (toInsert.length > 0) {
     const kesildiMap = new Map(existingRows.map(r => [r.id, { kesildi: r.kesildi, kesildiAt: r.kesildiAt, teamId: r.teamId }]));
     const insertIdx = incoming.reduce((acc, g, i) => { acc.set(g.id, i); return acc; }, new Map<string, number>());
-    await saveAnimalGroups(tx, kesimAlaniId, toInsert.map(g => ({ ...g, sortOrder: insertIdx.get(g.id) ?? 0 })) as any, kesildiMap);
+    await saveAnimalGroups(tx, kesimAlaniId, toInsert.map(g => ({ ...g, sortOrder: insertIdx.get(g.id) ?? 0 })), kesildiMap);
   }
 
   for (const { id, updates } of toUpdate) {

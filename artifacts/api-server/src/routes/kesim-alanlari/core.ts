@@ -1,26 +1,18 @@
 import { Router, type IRouter } from "express";
-import { db } from "@workspace/db";
-import { kesimAlanlariTable, projectsTable } from "@workspace/db/schema";
-import { eq, isNull, isNotNull } from "drizzle-orm";
 import { z } from "zod";
-import crypto from "crypto";
 import { refreshProjectStats } from "../projects";
 import { asyncHandler } from "../../middleware/error-handler";
 import { ERROR_MESSAGES } from "../../lib/constants";
 import {
-  requireActiveKesimAlani,
-  getFullKesimAlani,
-  getFullKesimAlaniList,
-  getCachedKAList,
-  setCachedKAList,
-  invalidateKACache,
-  saveDonations,
-  saveAnimalGroups,
-  diffUpdateDonations,
-  diffUpdateGroups,
-  type DonationPayload,
-  type AnimalGroupPayload,
-} from "../../services/kesim-alani.service";
+  listKesimAlanlari,
+  listDeletedKesimAlanlari,
+  getSingleKesimAlani,
+  createKesimAlani,
+  moveKesimAlani,
+  updateKesimAlani,
+  deleteKesimAlani,
+  restoreKesimAlani,
+} from "../../services/core.service";
 
 const donationPayloadSchema = z.object({
   id: z.string().min(1),
@@ -70,42 +62,22 @@ const router: IRouter = Router();
 
 router.get("/kesim-alanlari", asyncHandler(async (req, res) => {
   const includeDeleted = req.query.includeDeleted === "true";
-  const { cached, cacheKey } = getCachedKAList(includeDeleted);
-  if (cached) { res.json(cached); return; }
-
-  const whereClause = includeDeleted ? undefined : isNull(kesimAlanlariTable.deletedAt);
-
-  let rows;
-  if (whereClause) {
-    rows = await db.select().from(kesimAlanlariTable)
-      .where(whereClause)
-      .orderBy(kesimAlanlariTable.createdAt);
-  } else {
-    rows = await db.select().from(kesimAlanlariTable)
-      .orderBy(kesimAlanlariTable.createdAt);
-  }
-
-  const results = await getFullKesimAlaniList(rows);
-  setCachedKAList(cacheKey, results);
-  res.json(results);
+  const result = await listKesimAlanlari(includeDeleted);
+  res.json(result.data);
 }));
 
 router.get("/kesim-alanlari/deleted", asyncHandler(async (_req, res) => {
-  const rows = await db.select().from(kesimAlanlariTable)
-    .where(isNotNull(kesimAlanlariTable.deletedAt))
-    .orderBy(kesimAlanlariTable.createdAt);
-
-  const results = await getFullKesimAlaniList(rows);
-  res.json(results);
+  const result = await listDeletedKesimAlanlari();
+  res.json(result.data);
 }));
 
 router.get("/kesim-alanlari/:id", asyncHandler(async (req, res) => {
-  const result = await getFullKesimAlani(req.params.id);
-  if (!result) {
-    res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND });
+  const result = await getSingleKesimAlani(req.params.id);
+  if (!result.ok) {
+    res.status(result.status).json({ error: ERROR_MESSAGES.NOT_FOUND });
     return;
   }
-  res.json(result);
+  res.json(result.data);
 }));
 
 router.post("/kesim-alanlari", asyncHandler(async (req, res) => {
@@ -114,32 +86,8 @@ router.post("/kesim-alanlari", asyncHandler(async (req, res) => {
     res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
-
-  const { id, name, createdAt, kesimListeId, projectId: rawProjectId, donations, animalGroups } = parsed.data;
-  const projectId = rawProjectId || null;
-
-  await db.transaction(async (tx) => {
-    await tx.insert(kesimAlanlariTable).values({
-      id,
-      name,
-      createdAt: createdAt ? new Date(createdAt) : new Date(),
-      projectId,
-      trackingToken: crypto.randomBytes(16).toString("hex"),
-      kesimListeId: kesimListeId ?? null,
-    });
-
-    if (donations.length > 0) {
-      await saveDonations(tx, id, donations as DonationPayload[]);
-    }
-
-    if (animalGroups.length > 0) {
-      await saveAnimalGroups(tx, id, animalGroups as AnimalGroupPayload[]);
-    }
-  });
-
-  const result = await getFullKesimAlani(id);
-  invalidateKACache();
-  res.status(201).json(result);
+  const result = await createKesimAlani(parsed.data);
+  res.status(201).json(result.data);
   refreshProjectStats();
 }));
 
@@ -149,25 +97,16 @@ router.put("/kesim-alanlari/:id/move", asyncHandler(async (req, res) => {
     res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
-
-  const { id } = req.params;
-  const { projectId } = parsed.data;
-  const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
-  if (!existing) {
-    res.status(404).json({ error: ERROR_MESSAGES.KESIM_ALANI_NOT_FOUND });
+  const result = await moveKesimAlani(req.params.id, parsed.data.projectId);
+  if (!result.ok) {
+    const errorMap: Record<string, string> = {
+      not_found: ERROR_MESSAGES.KESIM_ALANI_NOT_FOUND,
+      project_not_found: ERROR_MESSAGES.TARGET_PROJECT_NOT_FOUND,
+    };
+    res.status(result.status).json({ error: errorMap[result.error] || result.error });
     return;
   }
-  if (projectId) {
-    const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-    if (!proj) {
-      res.status(404).json({ error: ERROR_MESSAGES.TARGET_PROJECT_NOT_FOUND });
-      return;
-    }
-  }
-  await db.update(kesimAlanlariTable).set({ projectId: projectId || null }).where(eq(kesimAlanlariTable.id, id));
-  const result = await getFullKesimAlani(id);
-  invalidateKACache();
-  res.json(result);
+  res.json(result.data);
   refreshProjectStats();
 }));
 
@@ -177,81 +116,37 @@ router.put("/kesim-alanlari/:id", asyncHandler(async (req, res) => {
     res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
-
-  const { id } = req.params;
-  const { name, kesimListeId, donations, animalGroups } = parsed.data;
-
-  const kaCheck = await requireActiveKesimAlani(id);
-  if (kaCheck.error) {
-    res.status(kaCheck.status).json({ error: kaCheck.error });
+  const result = await updateKesimAlani(req.params.id, parsed.data);
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
     return;
   }
-
-  await db.transaction(async (tx) => {
-    const kaUpdates: Record<string, string | null> = {};
-    if (name !== undefined) kaUpdates.name = name;
-    if (kesimListeId !== undefined) kaUpdates.kesimListeId = kesimListeId ?? null;
-    if (Object.keys(kaUpdates).length > 0) {
-      await tx.update(kesimAlanlariTable).set(kaUpdates).where(eq(kesimAlanlariTable.id, id));
-    }
-
-    if (donations !== undefined) {
-      await diffUpdateDonations(tx, id, donations as DonationPayload[]);
-    }
-    if (animalGroups !== undefined) {
-      await diffUpdateGroups(tx, id, animalGroups as AnimalGroupPayload[]);
-    }
-  });
-
-  const result = await getFullKesimAlani(id);
-  invalidateKACache();
-  res.json(result);
+  res.json(result.data);
   refreshProjectStats();
 }));
 
 router.delete("/kesim-alanlari/:id", asyncHandler(async (req, res) => {
-  const { id } = req.params;
   const permanent = req.query.permanent === "true";
-
-  const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
-  if (!existing) {
-    res.status(404).json({ error: ERROR_MESSAGES.KESIM_ALANI_NOT_FOUND });
+  const result = await deleteKesimAlani(req.params.id, permanent);
+  if (!result.ok) {
+    res.status(result.status).json({ error: ERROR_MESSAGES.KESIM_ALANI_NOT_FOUND });
     return;
   }
-
-  if (permanent) {
-    await db.delete(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
-  } else {
-    await db.update(kesimAlanlariTable)
-      .set({ deletedAt: new Date() })
-      .where(eq(kesimAlanlariTable.id, id));
-  }
-
-  invalidateKACache();
   res.json({ success: true });
   refreshProjectStats();
 }));
 
 router.post("/kesim-alanlari/:id/restore", asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
-  if (!existing) {
-    res.status(404).json({ error: ERROR_MESSAGES.KESIM_ALANI_NOT_FOUND });
+  const result = await restoreKesimAlani(req.params.id);
+  if (!result.ok) {
+    const errorMap: Record<string, string> = {
+      not_found: ERROR_MESSAGES.KESIM_ALANI_NOT_FOUND,
+      already_active: ERROR_MESSAGES.ALREADY_ACTIVE,
+    };
+    res.status(result.status).json({ error: errorMap[result.error] || result.error });
     return;
   }
-
-  if (!existing.deletedAt) {
-    res.status(400).json({ error: ERROR_MESSAGES.ALREADY_ACTIVE });
-    return;
-  }
-
-  await db.update(kesimAlanlariTable)
-    .set({ deletedAt: null })
-    .where(eq(kesimAlanlariTable.id, id));
-
-  const result = await getFullKesimAlani(id);
-  invalidateKACache();
-  res.json(result);
+  res.json(result.data);
   refreshProjectStats();
 }));
 

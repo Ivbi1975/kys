@@ -1,15 +1,15 @@
 import { Router, type IRouter } from "express";
-import { db } from "@workspace/db";
-import {
-  kesimAlanlariTable,
-  animalGroupsTable,
-  teamsTable,
-} from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import crypto from "crypto";
 import { asyncHandler } from "../../middleware/error-handler";
 import { ERROR_MESSAGES } from "../../lib/constants";
+import {
+  listTeams,
+  createTeam,
+  updateTeam,
+  deleteTeam,
+  assignTeamToGroup,
+  assignTeamByToken,
+} from "../../services/team.service";
 
 const createTeamSchema = z.object({
   name: z.string().trim().min(1, "Ekip adı gerekli"),
@@ -28,10 +28,8 @@ const assignTeamSchema = z.object({
 const router: IRouter = Router();
 
 router.get("/kesim-alanlari/:id/teams", asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const teams = await db.select().from(teamsTable)
-    .where(eq(teamsTable.kesimAlaniId, id));
-  res.json(teams.map(t => ({ id: t.id, name: t.name, color: t.color })));
+  const result = await listTeams(req.params.id);
+  res.json(result.data);
 }));
 
 router.post("/kesim-alanlari/:id/teams", asyncHandler(async (req, res) => {
@@ -40,17 +38,8 @@ router.post("/kesim-alanlari/:id/teams", asyncHandler(async (req, res) => {
     res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
-
-  const { id } = req.params;
-  const { name, color } = parsed.data;
-  const teamId = crypto.randomUUID();
-  await db.insert(teamsTable).values({
-    id: teamId,
-    kesimAlaniId: id,
-    name,
-    color,
-  });
-  res.status(201).json({ id: teamId, name, color });
+  const result = await createTeam(req.params.id, parsed.data.name, parsed.data.color);
+  res.status(201).json(result.data);
 }));
 
 router.put("/kesim-alanlari/:id/teams/:teamId", asyncHandler(async (req, res) => {
@@ -59,27 +48,20 @@ router.put("/kesim-alanlari/:id/teams/:teamId", asyncHandler(async (req, res) =>
     res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
-
-  const { id, teamId } = req.params;
-  const [team] = await db.select().from(teamsTable)
-    .where(and(eq(teamsTable.id, teamId), eq(teamsTable.kesimAlaniId, id)));
-  if (!team) { res.status(404).json({ error: ERROR_MESSAGES.TEAM_NOT_FOUND }); return; }
-  const updates: Record<string, string> = {};
-  if (parsed.data.name !== undefined) updates.name = parsed.data.name;
-  if (parsed.data.color !== undefined) updates.color = parsed.data.color;
-  await db.update(teamsTable).set(updates).where(eq(teamsTable.id, teamId));
-  res.json({ id: teamId, name: parsed.data.name ?? team.name, color: parsed.data.color ?? team.color });
+  const result = await updateTeam(req.params.id, req.params.teamId, parsed.data);
+  if (!result.ok) {
+    res.status(result.status).json({ error: ERROR_MESSAGES.TEAM_NOT_FOUND });
+    return;
+  }
+  res.json(result.data);
 }));
 
 router.delete("/kesim-alanlari/:id/teams/:teamId", asyncHandler(async (req, res) => {
-  const { id, teamId } = req.params;
-  const [team] = await db.select().from(teamsTable)
-    .where(and(eq(teamsTable.id, teamId), eq(teamsTable.kesimAlaniId, id)));
-  if (!team) { res.status(404).json({ error: ERROR_MESSAGES.TEAM_NOT_FOUND }); return; }
-  await db.update(animalGroupsTable)
-    .set({ teamId: null })
-    .where(and(eq(animalGroupsTable.kesimAlaniId, id), eq(animalGroupsTable.teamId, teamId)));
-  await db.delete(teamsTable).where(eq(teamsTable.id, teamId));
+  const result = await deleteTeam(req.params.id, req.params.teamId);
+  if (!result.ok) {
+    res.status(result.status).json({ error: ERROR_MESSAGES.TEAM_NOT_FOUND });
+    return;
+  }
   res.json({ success: true });
 }));
 
@@ -89,20 +71,19 @@ router.put("/kesim-alanlari/:id/groups/:groupId/team", asyncHandler(async (req, 
     res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
-
-  const { id, groupId } = req.params;
-  const { teamId } = parsed.data;
-  const [group] = await db.select().from(animalGroupsTable)
-    .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, id)));
-  if (!group) { res.status(404).json({ error: ERROR_MESSAGES.GROUP_NOT_FOUND }); return; }
-  if (teamId) {
-    const [team] = await db.select().from(teamsTable)
-      .where(and(eq(teamsTable.id, teamId), eq(teamsTable.kesimAlaniId, id)));
-    if (!team) { res.status(404).json({ error: ERROR_MESSAGES.TEAM_NOT_FOUND }); return; }
+  const result = await assignTeamToGroup({
+    kesimAlaniId: req.params.id,
+    groupId: req.params.groupId,
+    teamId: parsed.data.teamId,
+  });
+  if (!result.ok) {
+    const errorMap: Record<string, string> = {
+      group_not_found: ERROR_MESSAGES.GROUP_NOT_FOUND,
+      team_not_found: ERROR_MESSAGES.TEAM_NOT_FOUND,
+    };
+    res.status(result.status).json({ error: errorMap[result.error] || result.error });
+    return;
   }
-  await db.update(animalGroupsTable)
-    .set({ teamId: teamId || null })
-    .where(eq(animalGroupsTable.id, groupId));
   res.json({ success: true });
 }));
 
@@ -112,23 +93,16 @@ router.put("/tracking/:token/group/:groupId/team", asyncHandler(async (req, res)
     res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
-
-  const { token, groupId } = req.params;
-  const { teamId } = parsed.data;
-  const [ka] = await db.select().from(kesimAlanlariTable)
-    .where(eq(kesimAlanlariTable.trackingToken, token));
-  if (!ka) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
-  const [group] = await db.select().from(animalGroupsTable)
-    .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
-  if (!group) { res.status(404).json({ error: ERROR_MESSAGES.GROUP_NOT_FOUND }); return; }
-  if (teamId) {
-    const [team] = await db.select().from(teamsTable)
-      .where(and(eq(teamsTable.id, teamId), eq(teamsTable.kesimAlaniId, ka.id)));
-    if (!team) { res.status(404).json({ error: ERROR_MESSAGES.TEAM_NOT_FOUND }); return; }
+  const result = await assignTeamByToken(req.params.token, req.params.groupId, parsed.data.teamId);
+  if (!result.ok) {
+    const errorMap: Record<string, string> = {
+      ka_not_found: ERROR_MESSAGES.NOT_FOUND,
+      group_not_found: ERROR_MESSAGES.GROUP_NOT_FOUND,
+      team_not_found: ERROR_MESSAGES.TEAM_NOT_FOUND,
+    };
+    res.status(result.status).json({ error: errorMap[result.error] || result.error });
+    return;
   }
-  await db.update(animalGroupsTable)
-    .set({ teamId: teamId || null })
-    .where(eq(animalGroupsTable.id, groupId));
   res.json({ success: true });
 }));
 
