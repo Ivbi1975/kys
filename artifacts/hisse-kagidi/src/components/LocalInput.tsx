@@ -7,6 +7,7 @@ interface LocalInputProps {
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   className?: string;
   placeholder?: string;
+  "aria-label"?: string;
   "data-group-cell"?: string;
 }
 

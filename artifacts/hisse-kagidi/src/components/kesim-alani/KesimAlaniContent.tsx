@@ -330,9 +330,9 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
       <div className={`mx-auto p-4 ${fullscreenMode ? "max-w-full" : "max-w-7xl"} ${basketItems.length > 0 ? "pb-24" : ""}`}>
       {!fullscreenMode && (
       <div className="mb-4">
-        <nav className="flex items-center gap-1 text-xs text-muted-foreground mb-2 flex-wrap">
-          <button onClick={() => setLocation("/")} className="flex items-center gap-1 hover:text-foreground transition-colors">
-            <Home className="w-3 h-3" />
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-muted-foreground mb-2 flex-wrap">
+          <button onClick={() => setLocation("/")} className="flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Ana Sayfa">
+            <Home className="w-3 h-3" aria-hidden="true" />
             <span>Ana Sayfa</span>
           </button>
           {kesim.projectId && projectName && (
@@ -358,6 +358,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                 <Input
                   className="h-6 text-xs w-28 px-1.5"
                   placeholder="Liste ID"
+                  aria-label="Liste ID"
                   value={kesim.kesimListeId || ""}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -458,7 +459,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
               <Send className="w-4 h-4" />
               <span className="hidden sm:inline ml-1">Bildirimler</span>
             </Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0" onClick={toggleTheme} title={themeMode === "light" ? "Koyu Mod" : themeMode === "dark" ? "Sistem" : "Açık Mod"}>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0" onClick={toggleTheme} title={themeMode === "light" ? "Koyu Mod" : themeMode === "dark" ? "Sistem" : "Açık Mod"} aria-label={themeMode === "light" ? "Koyu Mod" : themeMode === "dark" ? "Sistem" : "Açık Mod"}>
               {themeMode === "light" ? <Sun className="w-4 h-4" /> : themeMode === "dark" ? <Moon className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
             </Button>
             <Button
@@ -507,20 +508,20 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
 
           <div className="flex items-center gap-1 flex-wrap justify-end">
             <div className="flex items-center gap-0.5 border rounded-md px-0.5">
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleUndo} disabled={!history.canUndo} title="Geri Al (Ctrl+Z)">
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleUndo} disabled={!history.canUndo} title="Geri Al (Ctrl+Z)" aria-label="Geri Al">
                 <Undo2 className="w-3.5 h-3.5" />
               </Button>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleRedo} disabled={!history.canRedo} title="İleri Al (Ctrl+Y)">
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleRedo} disabled={!history.canRedo} title="İleri Al (Ctrl+Y)" aria-label="İleri Al">
                 <Redo2 className="w-3.5 h-3.5" />
               </Button>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setHistoryPanelOpen(!historyPanelOpen)} title="Geçmiş">
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setHistoryPanelOpen(!historyPanelOpen)} title="Geçmiş" aria-label="Geçmiş">
                 <History className="w-3.5 h-3.5" />
               </Button>
             </div>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hidden sm:flex" onClick={() => setShortcutHelpOpen(true)} title="Klavye Kısayolları (?)">
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hidden sm:flex" onClick={() => setShortcutHelpOpen(true)} title="Klavye Kısayolları (?)" aria-label="Klavye Kısayolları">
               <Keyboard className="w-3.5 h-3.5" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hidden sm:flex" onClick={toggleFullscreen} title="Tam Ekran (F11)">
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hidden sm:flex" onClick={toggleFullscreen} title="Tam Ekran (F11)" aria-label={isFullscreen ? "Tam Ekrandan Çık" : "Tam Ekran"}>
               {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
             </Button>
             <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={exportDonorsExcel} title="Bağışçı Listesi Excel">
@@ -1929,6 +1930,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                   className="h-8 w-8 p-0"
                   onClick={() => startFilterTransition(() => setDonorListVisible(!donorListVisible))}
                   title={donorListVisible ? "Bağışçı Listesini Gizle" : "Bağışçı Listesini Göster"}
+                  aria-label={donorListVisible ? "Bağışçı Listesini Gizle" : "Bağışçı Listesini Göster"}
                 >
                   {donorListVisible ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
                 </Button>
@@ -1940,6 +1942,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                   className="h-8 w-8 p-0"
                   onClick={() => setMinimapOpen(!minimapOpen)}
                   title="Mini Harita"
+                  aria-label="Mini Harita"
                 >
                   <MapIcon className="w-4 h-4" />
                 </Button>
@@ -1974,6 +1977,8 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                         className="h-7 w-7 p-0"
                         onClick={() => workspace.setColumnCount(n)}
                         title={`${n} Sütun`}
+                        aria-label={`${n} Sütun`}
+                        aria-pressed={workspace.prefs.columnCount === n}
                       >
                         {n === 1 ? <Columns className="w-3.5 h-3.5" /> : n === 2 ? <Columns3 className="w-3.5 h-3.5" /> : <LayoutGrid className="w-3.5 h-3.5" />}
                       </Button>
@@ -1986,6 +1991,8 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                     className="h-7 px-2"
                     onClick={() => workspace.setCompactMode(!workspace.prefs.compactMode)}
                     title="Kompakt Mod"
+                    aria-label="Kompakt Mod"
+                    aria-pressed={workspace.prefs.compactMode}
                   >
                     <Minimize2 className="w-3.5 h-3.5" />
                   </Button>
@@ -1996,13 +2003,14 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                     className="h-7 px-2"
                     onClick={() => setFullscreenMode(!fullscreenMode)}
                     title={fullscreenMode ? "Tam Ekrandan Çık (ESC)" : "Tam Ekran"}
+                    aria-label={fullscreenMode ? "Tam Ekrandan Çık" : "Tam Ekran"}
                   >
                     <Maximize2 className="w-3.5 h-3.5" />
                   </Button>
 
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-7 px-2" title="Sütun Ayarları">
+                      <Button variant="ghost" size="sm" className="h-7 px-2" title="Sütun Ayarları" aria-label="Sütun Ayarları">
                         <SlidersHorizontal className="w-3.5 h-3.5" />
                       </Button>
                     </PopoverTrigger>

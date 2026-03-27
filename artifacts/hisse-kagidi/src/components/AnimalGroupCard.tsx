@@ -164,6 +164,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
               onCommit={(v) => handleCommit("vekalet", v)}
               onKeyDown={handleKeyDown("vekalet")}
               placeholder="—"
+              aria-label={`Satır ${dIdx + 1} Vekalet`}
             />
           </td>
         );
@@ -176,6 +177,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
               onCommit={(v) => handleCommit("description", v)}
               onKeyDown={handleKeyDown("description")}
               placeholder="—"
+              aria-label={`Satır ${dIdx + 1} Açıklama`}
             />
           </td>
         );
@@ -188,6 +190,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
               onCommit={(v) => handleCommit("name", v)}
               onKeyDown={handleKeyDown("name")}
               placeholder="—"
+              aria-label={`Satır ${dIdx + 1} Ad Soyad`}
             />
           </td>
         );
@@ -200,6 +203,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
               onCommit={(v) => handleCommit("donationType", v)}
               onKeyDown={handleKeyDown("donationType")}
               placeholder="—"
+              aria-label={`Satır ${dIdx + 1} Bağış Türü`}
             />
           </td>
         );
@@ -213,6 +217,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
                 onCommit={(v) => handleCommit("notes", v)}
                 onKeyDown={handleKeyDown("notes")}
                 placeholder="—"
+                aria-label={`Satır ${dIdx + 1} Notlar`}
               />
               {((d.aiCategories && d.aiCategories.length > 0) || (d.aiWarnings && d.aiWarnings.trim())) && (
                 <div className="flex gap-0.5 flex-wrap">
@@ -245,6 +250,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
                     }`}
                     onClick={() => onToggleBasketItem(groupIdx, dIdx, d.id, basketItemIds.has(d.id))}
                     title={basketItemIds.has(d.id) ? "Sepetten Çıkar" : "Keseye Koy"}
+                    aria-label={basketItemIds.has(d.id) ? "Sepetten Çıkar" : "Keseye Koy"}
                   >
                     <ShoppingBag className={compact ? "w-2.5 h-2.5 text-emerald-600" : "w-3 h-3 text-emerald-600"} />
                   </Button>
@@ -258,6 +264,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
                     }`}
                     onClick={() => onSwapSelect(groupIdx, dIdx)}
                     title="Takas için seç"
+                    aria-label="Takas için seç"
                   >
                     <ArrowLeftRight className={compact ? "w-2.5 h-2.5 text-purple-500" : "w-3 h-3 text-purple-500"} />
                   </Button>
@@ -266,6 +273,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
                     size="sm"
                     className={`${compact ? "h-4 w-4" : "h-5 w-5"} p-0`}
                     onClick={() => onRemoveFromGroup(groupIdx, dIdx)}
+                    aria-label="Gruptan çıkar"
                   >
                     <Trash2 className={compact ? "w-2.5 h-2.5 text-destructive" : "w-3 h-3 text-destructive"} />
                   </Button>
@@ -303,6 +311,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
             className="rounded"
             checked={selectedGroupDonations.has(d.id)}
             onChange={() => onToggleSelect(d.id)}
+            aria-label={`${d.name} seç`}
           />
         )}
       </td>
@@ -431,6 +440,8 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
             onClick={(e) => { e.stopPropagation(); if (!group.locked) onToggleSelect(group.id); }}
             className={`flex-shrink-0 ${group.locked ? "opacity-30 cursor-not-allowed" : ""}`}
             title={group.locked ? "Kilitli grup seçilemez" : "Seç"}
+            aria-label={group.locked ? "Kilitli grup seçilemez" : isSelected ? `Hayvan ${group.animalNo} grubunu seçimden kaldır` : `Hayvan ${group.animalNo} grubunu seç`}
+            aria-pressed={isSelected}
           >
             {isSelected
               ? <CheckSquare className={`${compact ? "w-3.5 h-3.5" : "w-4 h-4"} text-primary`} />
@@ -479,6 +490,8 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
                 } ${c === "" ? "border-dashed" : ""}`}
                 style={c ? { backgroundColor: colorMap[c] } : {}}
                 title={c === "green" ? "Yeşil" : c === "orange" ? "Turuncu" : c === "red" ? "Kırmızı" : "Renksiz"}
+                aria-label={c === "green" ? "Yeşil etiket" : c === "orange" ? "Turuncu etiket" : c === "red" ? "Kırmızı etiket" : "Renk etiketini kaldır"}
+                aria-pressed={(group.colorTag || "") === c}
               />
             ))}
           </div>
@@ -491,6 +504,7 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
             onClick={(e) => { e.stopPropagation(); onMoveUp(groupIdx); }}
             className={`p-0.5 rounded transition-colors ${groupIdx <= 0 ? "opacity-30 cursor-not-allowed" : "text-muted-foreground/60 hover:text-muted-foreground"}`}
             title="Yukarı Taşı"
+            aria-label="Yukarı Taşı"
             disabled={groupIdx <= 0}
           >
             <ArrowUp className="w-3.5 h-3.5" />
@@ -499,6 +513,7 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
             onClick={(e) => { e.stopPropagation(); onMoveDown(groupIdx); }}
             className={`p-0.5 rounded transition-colors ${groupIdx >= totalGroupCount - 1 ? "opacity-30 cursor-not-allowed" : "text-muted-foreground/60 hover:text-muted-foreground"}`}
             title="Aşağı Taşı"
+            aria-label="Aşağı Taşı"
             disabled={groupIdx >= totalGroupCount - 1}
           >
             <ArrowDown className="w-3.5 h-3.5" />
@@ -507,6 +522,7 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
             onClick={(e) => { e.stopPropagation(); onSplit(groupIdx); }}
             className={`p-0.5 rounded transition-colors ${group.locked || filledCount <= 1 ? "opacity-30 cursor-not-allowed" : "text-muted-foreground/60 hover:text-muted-foreground"}`}
             title={group.locked ? "Kilitli grup bölünemez" : filledCount <= 1 ? "Bölmek için en az 2 bağışçı gerekli" : "Grubu Böl"}
+            aria-label={group.locked ? "Kilitli grup bölünemez" : filledCount <= 1 ? "Bölmek için en az 2 bağışçı gerekli" : "Grubu Böl"}
             disabled={group.locked || filledCount <= 1}
           >
             <Scissors className="w-3.5 h-3.5" />
@@ -518,6 +534,7 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
             }}
             className={`p-0.5 rounded transition-colors ${group.locked || filledCount === 0 ? "opacity-30 cursor-not-allowed" : "text-emerald-500/60 hover:text-emerald-600"}`}
             title={group.locked ? "Kilitli grup sepete eklenemez" : filledCount === 0 ? "Grupta bağışçı yok" : `Tümünü Sepete Ekle (${filledCount})`}
+            aria-label={group.locked ? "Kilitli grup sepete eklenemez" : filledCount === 0 ? "Grupta bağışçı yok" : `Tümünü Sepete Ekle (${filledCount})`}
             disabled={group.locked || filledCount === 0}
           >
             <ShoppingBag className="w-3.5 h-3.5" />
@@ -530,9 +547,10 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
               }}
               className="p-0.5 rounded transition-colors text-blue-500 hover:text-blue-600 relative"
               title={`${photoCounts[group.id]} fotoğraf`}
+              aria-label={`${photoCounts[group.id]} fotoğraf görüntüle`}
             >
               <Camera className="w-3.5 h-3.5" />
-              <span className="absolute -top-1.5 -right-1.5 bg-blue-500 text-white text-[8px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none font-bold">
+              <span className="absolute -top-1.5 -right-1.5 bg-blue-500 text-white text-[8px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none font-bold" aria-hidden="true">
                 {photoCounts[group.id]}
               </span>
             </button>
@@ -544,6 +562,7 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
               onClick={(e) => e.stopPropagation()}
               className="h-5 text-[10px] rounded border bg-background px-1 max-w-[80px]"
               title="Ekip Ata"
+              aria-label={`Hayvan ${group.animalNo} için ekip ata`}
             >
               <option value="">Ekip yok</option>
               {teams.map(t => (
@@ -555,6 +574,8 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
             onClick={(e) => { e.stopPropagation(); onToggleLock(groupIdx); }}
             className={`p-0.5 rounded transition-colors ${group.locked ? "text-amber-500" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
             title={group.locked ? "Kilidi Aç" : "Kilitle"}
+            aria-label={group.locked ? "Kilidi Aç" : "Kilitle"}
+            aria-pressed={!!group.locked}
           >
             {group.locked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
           </button>
@@ -567,6 +588,7 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
             }}
             className={`p-0.5 rounded transition-colors ${group.locked ? "opacity-30 cursor-not-allowed" : "text-red-400/60 hover:text-red-500"}`}
             title={group.locked ? "Kilitli grup silinemez" : "Grubu Sil"}
+            aria-label={group.locked ? "Kilitli grup silinemez" : "Grubu Sil"}
             disabled={group.locked}
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -584,6 +606,7 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
                     className="rounded"
                     checked={allDonationsSelected}
                     onChange={() => onSelectAllGroupDonations(filledDonations, allDonationsSelected)}
+                    aria-label={`Hayvan ${group.animalNo} tüm bağışçıları seç`}
                   />
                 </th>
                 {visibleColumns.map(key => (
@@ -629,6 +652,7 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
               onCommit={handleNotesCommit}
               className={`w-full ${compact ? "text-[10px]" : "text-xs"} bg-transparent border-0 outline-none placeholder:text-muted-foreground/50 text-muted-foreground h-auto`}
               placeholder="Grup notu..."
+              aria-label={`Hayvan ${group.animalNo} grup notu`}
             />
           </div>
         </>
