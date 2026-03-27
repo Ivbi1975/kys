@@ -13,8 +13,13 @@ import {
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { asyncHandler } from "../middleware/error-handler";
+import { logger } from "../lib/logger";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+function stripHtml(input: string): string {
+  return input.replace(/<[^>]*>/g, "").trim();
+}
 
 const router: IRouter = Router();
 
@@ -181,6 +186,8 @@ router.post("/backup/import", asyncHandler(async (req, res) => {
     data = directParse.data;
   }
 
+  const importLog = { tags: 0, tagsSkipped: 0, kesimAlanlari: 0, kesimAlanlariSkipped: 0, donations: 0, donationsSkipped: 0, groups: 0, groupsSkipped: 0 };
+
   await db.transaction(async (tx) => {
     if (mode === "replace") {
       await tx.delete(animalGroupDonationsTable);
@@ -193,15 +200,18 @@ router.post("/backup/import", asyncHandler(async (req, res) => {
 
     if (data.globalTags && data.globalTags.length > 0) {
       for (const tag of data.globalTags) {
+        const sanitizedName = stripHtml(tag.name);
         if (mode === "merge") {
-          await tx.insert(customTagsTable).values({
-            id: tag.id, name: tag.name, color: tag.color || "#3b82f6",
-          }).onConflictDoNothing();
-        } else {
-          await tx.insert(customTagsTable).values({
-            id: tag.id, name: tag.name, color: tag.color || "#3b82f6",
-          });
+          const existing = await tx.select({ id: customTagsTable.id }).from(customTagsTable).where(eq(customTagsTable.id, tag.id));
+          if (existing.length > 0) {
+            importLog.tagsSkipped++;
+            continue;
+          }
         }
+        await tx.insert(customTagsTable).values({
+          id: tag.id, name: sanitizedName, color: tag.color || "#3b82f6",
+        });
+        importLog.tags++;
       }
     }
 
@@ -209,13 +219,20 @@ router.post("/backup/import", asyncHandler(async (req, res) => {
       const kaId = ka.id || Math.random().toString(36).substring(2, 12);
       const kaValues = {
         id: kaId,
-        name: ka.name || "İsimsiz",
+        name: stripHtml(ka.name || "İsimsiz"),
         createdAt: ka.createdAt ? new Date(ka.createdAt) : new Date(),
       };
       if (mode === "merge") {
-        await tx.insert(kesimAlanlariTable).values(kaValues).onConflictDoNothing();
+        const existing = await tx.select({ id: kesimAlanlariTable.id }).from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, kaId));
+        if (existing.length > 0) {
+          importLog.kesimAlanlariSkipped++;
+        } else {
+          await tx.insert(kesimAlanlariTable).values(kaValues);
+          importLog.kesimAlanlari++;
+        }
       } else {
         await tx.insert(kesimAlanlariTable).values(kaValues);
+        importLog.kesimAlanlari++;
       }
 
       if (ka.donations && ka.donations.length > 0) {
@@ -225,26 +242,36 @@ router.post("/backup/import", asyncHandler(async (req, res) => {
           const dValues: typeof donationsTable.$inferInsert = {
             id: donationId,
             kesimAlaniId: kaId,
-            name: d.name || "",
-            description: d.description || "",
-            donationType: d.donationType || "",
+            name: stripHtml(d.name || ""),
+            description: stripHtml(d.description || ""),
+            donationType: stripHtml(d.donationType || ""),
             shareCount: d.shareCount || 1,
-            vekalet: d.vekalet || "",
-            notes: d.notes || "",
+            vekalet: stripHtml(d.vekalet || ""),
+            notes: stripHtml(d.notes || ""),
             excluded: d.excluded || false,
             sortOrder: i,
           };
           if (d.aiCategories && d.aiCategories.length > 0) {
-            dValues.aiCategories = JSON.stringify(d.aiCategories);
+            dValues.aiCategories = JSON.stringify(d.aiCategories.map(stripHtml));
           }
           if (d.aiWarnings) {
-            dValues.aiWarnings = d.aiWarnings;
+            dValues.aiWarnings = stripHtml(d.aiWarnings);
           }
           if (mode === "merge") {
-            await tx.insert(donationsTable).values(dValues).onConflictDoNothing();
+            const existing = await tx.select({ id: donationsTable.id, kesimAlaniId: donationsTable.kesimAlaniId }).from(donationsTable).where(eq(donationsTable.id, donationId));
+            if (existing.length > 0) {
+              if (existing[0].kesimAlaniId !== kaId) {
+                logger.warn({ donationId, existingKaId: existing[0].kesimAlaniId, importKaId: kaId }, "Import donation ID collision: belongs to different kesim alanı");
+              }
+              importLog.donationsSkipped++;
+              continue;
+            }
+            await tx.insert(donationsTable).values(dValues);
           } else {
             await tx.insert(donationsTable).values(dValues);
           }
+          importLog.donations++;
+
           if (d.tags && d.tags.length > 0) {
             let existingTagIds: Set<string> | undefined;
             if (mode === "merge") {
@@ -269,15 +296,25 @@ router.post("/backup/import", asyncHandler(async (req, res) => {
             id: groupId,
             kesimAlaniId: kaId,
             animalNo: g.animalNo || 0,
-            colorTag: g.colorTag || "",
+            colorTag: stripHtml(g.colorTag || ""),
             locked: g.locked || false,
-            notes: g.notes || "",
+            notes: stripHtml(g.notes || ""),
             sortOrder: i,
           };
           if (mode === "merge") {
-            await tx.insert(animalGroupsTable).values(gValues).onConflictDoNothing();
+            const existing = await tx.select({ id: animalGroupsTable.id, kesimAlaniId: animalGroupsTable.kesimAlaniId }).from(animalGroupsTable).where(eq(animalGroupsTable.id, groupId));
+            if (existing.length > 0) {
+              if (existing[0].kesimAlaniId !== kaId) {
+                logger.warn({ groupId, existingKaId: existing[0].kesimAlaniId, importKaId: kaId }, "Import group ID collision: belongs to different kesim alanı");
+              }
+              importLog.groupsSkipped++;
+            } else {
+              await tx.insert(animalGroupsTable).values(gValues);
+              importLog.groups++;
+            }
           } else {
             await tx.insert(animalGroupsTable).values(gValues);
+            importLog.groups++;
           }
           if (g.donations && g.donations.length > 0) {
             let existingDonationIds: Set<string> | undefined;
@@ -307,7 +344,8 @@ router.post("/backup/import", asyncHandler(async (req, res) => {
     }
   });
 
-  res.json({ success: true, count: data.kesimAlanlari.length });
+  logger.info({ mode, importLog }, "Backup import completed");
+  res.json({ success: true, count: data.kesimAlanlari.length, mode, importLog });
   refreshProjectStats();
 }));
 
