@@ -12,10 +12,10 @@ if (!process.env.DATABASE_URL) {
 
 const poolMax = Math.max(1, Number(process.env.DB_POOL_MAX) || 10);
 
-const connectionString = process.env.DATABASE_URL!.replace(
-  /[?&]sslmode=[^&]*/g,
-  (match) => (match.startsWith("?") ? "?" : ""),
-).replace(/\?$/, "");
+const connectionString = process.env.DATABASE_URL!
+  .replace(/([?&])sslmode=[^&]*/g, "$1")
+  .replace(/[?&]$/, "")
+  .replace("?&", "?");
 
 function resolveSsl(): boolean | { rejectUnauthorized: boolean } {
   const dbSsl = process.env.DB_SSL;
