@@ -96,6 +96,7 @@ const createKesimAlaniSchema = z.object({
   name: z.string().min(1),
   createdAt: z.string().optional(),
   kesimListeId: z.string().optional().nullable(),
+  projectId: z.string().optional().nullable(),
   donations: z.array(donationPayloadSchema).optional().default([]),
   animalGroups: z.array(animalGroupPayloadSchema).optional().default([]),
 });
@@ -105,6 +106,37 @@ const updateKesimAlaniSchema = z.object({
   kesimListeId: z.string().optional().nullable(),
   donations: z.array(donationPayloadSchema).optional(),
   animalGroups: z.array(animalGroupPayloadSchema).optional(),
+});
+
+const moveKesimAlaniSchema = z.object({
+  projectId: z.string().nullable().optional(),
+});
+
+const kesildiSchema = z.object({
+  kesildi: z.boolean(),
+});
+
+const photoUploadSchema = z.object({
+  data: z.string().min(1, "Fotoğraf verisi gerekli"),
+  mimeType: z.string().optional().default("image/jpeg"),
+});
+
+const createTeamSchema = z.object({
+  name: z.string().min(1, "Ekip adı gerekli").transform(s => s.trim()),
+  color: z.string().optional().default("#3b82f6"),
+});
+
+const updateTeamSchema = z.object({
+  name: z.string().min(1).transform(s => s.trim()).optional(),
+  color: z.string().optional(),
+});
+
+const assignTeamSchema = z.object({
+  teamId: z.string().nullable().optional(),
+});
+
+const notificationTemplateSchema = z.object({
+  template: z.string().min(1, "Şablon metni gerekli").transform(s => s.trim()),
 });
 
 const router: IRouter = Router();
@@ -497,8 +529,8 @@ router.post("/kesim-alanlari", async (req, res) => {
     return;
   }
 
-  const { id, name, createdAt, kesimListeId, donations, animalGroups } = parsed.data;
-  const projectId = req.body.projectId || null;
+  const { id, name, createdAt, kesimListeId, projectId: rawProjectId, donations, animalGroups } = parsed.data;
+  const projectId = rawProjectId || null;
 
   try {
     await db.transaction(async (tx) => {
@@ -532,9 +564,15 @@ router.post("/kesim-alanlari", async (req, res) => {
 });
 
 router.put("/kesim-alanlari/:id/move", async (req, res) => {
+  const parsed = moveKesimAlaniSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
   try {
     const { id } = req.params;
-    const { projectId } = req.body;
+    const { projectId } = parsed.data;
     const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
     if (!existing) {
       res.status(404).json({ error: "Kesim alanı bulunamadı" });
@@ -2672,13 +2710,15 @@ async function createNotificationLogs(kesimAlaniId: string, groupId: string, ani
 }
 
 router.put("/tracking/:token/group/:groupId/kesildi", async (req, res) => {
+  const parsed = kesildiSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
   try {
     const { token, groupId } = req.params;
-    const { kesildi } = req.body;
-    if (typeof kesildi !== "boolean") {
-      res.status(400).json({ error: "kesildi alanı boolean olmalıdır" });
-      return;
-    }
+    const { kesildi } = parsed.data;
 
     const [ka] = await db.select().from(kesimAlanlariTable)
       .where(eq(kesimAlanlariTable.trackingToken, token));
@@ -2973,13 +3013,15 @@ router.get("/tracking/:token/group/:groupId/photos/:photoId", async (req, res) =
 });
 
 router.post("/tracking/:token/group/:groupId/photos", async (req, res) => {
+  const parsed = photoUploadSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
   try {
     const { token, groupId } = req.params;
-    const { data, mimeType } = req.body;
-
-    if (!data || typeof data !== "string") {
-      res.status(400).json({ error: "Fotoğraf verisi gerekli" }); return;
-    }
+    const { data, mimeType } = parsed.data;
 
     const validMimes = ["image/jpeg", "image/png", "image/webp"];
     const mime = validMimes.includes(mimeType) ? mimeType : "image/jpeg";
@@ -3185,20 +3227,23 @@ router.get("/kesim-alanlari/:id/teams", async (req, res) => {
 });
 
 router.post("/kesim-alanlari/:id/teams", async (req, res) => {
+  const parsed = createTeamSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
   try {
     const { id } = req.params;
-    const { name, color } = req.body;
-    if (!name || typeof name !== "string") {
-      res.status(400).json({ error: "Ekip adı gerekli" }); return;
-    }
+    const { name, color } = parsed.data;
     const teamId = crypto.randomUUID();
     await db.insert(teamsTable).values({
       id: teamId,
       kesimAlaniId: id,
-      name: name.trim(),
-      color: color || "#3b82f6",
+      name,
+      color,
     });
-    res.status(201).json({ id: teamId, name: name.trim(), color: color || "#3b82f6" });
+    res.status(201).json({ id: teamId, name, color });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     res.status(500).json({ error: message });
@@ -3206,17 +3251,22 @@ router.post("/kesim-alanlari/:id/teams", async (req, res) => {
 });
 
 router.put("/kesim-alanlari/:id/teams/:teamId", async (req, res) => {
+  const parsed = updateTeamSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
   try {
     const { id, teamId } = req.params;
-    const { name, color } = req.body;
     const [team] = await db.select().from(teamsTable)
       .where(and(eq(teamsTable.id, teamId), eq(teamsTable.kesimAlaniId, id)));
     if (!team) { res.status(404).json({ error: "Ekip bulunamadı" }); return; }
     const updates: Record<string, string> = {};
-    if (name !== undefined) updates.name = name.trim();
-    if (color !== undefined) updates.color = color;
+    if (parsed.data.name !== undefined) updates.name = parsed.data.name;
+    if (parsed.data.color !== undefined) updates.color = parsed.data.color;
     await db.update(teamsTable).set(updates).where(eq(teamsTable.id, teamId));
-    res.json({ id: teamId, name: name !== undefined ? name.trim() : team.name, color: color !== undefined ? color : team.color });
+    res.json({ id: teamId, name: parsed.data.name ?? team.name, color: parsed.data.color ?? team.color });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     res.status(500).json({ error: message });
@@ -3241,9 +3291,15 @@ router.delete("/kesim-alanlari/:id/teams/:teamId", async (req, res) => {
 });
 
 router.put("/kesim-alanlari/:id/groups/:groupId/team", async (req, res) => {
+  const parsed = assignTeamSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
   try {
     const { id, groupId } = req.params;
-    const { teamId } = req.body;
+    const { teamId } = parsed.data;
     const [group] = await db.select().from(animalGroupsTable)
       .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, id)));
     if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
@@ -3263,9 +3319,15 @@ router.put("/kesim-alanlari/:id/groups/:groupId/team", async (req, res) => {
 });
 
 router.put("/tracking/:token/group/:groupId/team", async (req, res) => {
+  const parsed = assignTeamSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
   try {
     const { token, groupId } = req.params;
-    const { teamId } = req.body;
+    const { teamId } = parsed.data;
     const [ka] = await db.select().from(kesimAlanlariTable)
       .where(eq(kesimAlanlariTable.trackingToken, token));
     if (!ka) { res.status(404).json({ error: "Bulunamadı" }); return; }
@@ -3317,16 +3379,18 @@ router.get("/settings/notification-template", async (_req, res) => {
 });
 
 router.put("/settings/notification-template", async (req, res) => {
+  const parsed = notificationTemplateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
   try {
-    const { template } = req.body;
-    if (typeof template !== "string" || !template.trim()) {
-      res.status(400).json({ error: "Şablon metni gerekli" });
-      return;
-    }
+    const { template } = parsed.data;
     await db.insert(appSettingsTable)
-      .values({ key: "notification_template", value: template.trim() })
-      .onConflictDoUpdate({ target: appSettingsTable.key, set: { value: template.trim() } });
-    res.json({ success: true, template: template.trim() });
+      .values({ key: "notification_template", value: template })
+      .onConflictDoUpdate({ target: appSettingsTable.key, set: { value: template } });
+    res.json({ success: true, template });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     res.status(500).json({ error: message });

@@ -12,7 +12,16 @@ import {
   teamsTable,
 } from "@workspace/db/schema";
 import { eq, isNull, isNotNull, and, sql, inArray } from "drizzle-orm";
+import { z } from "zod";
 import { cacheGet, cacheSet, cacheInvalidate, cacheInvalidatePrefix } from "../lib/cache";
+
+const createProjectSchema = z.object({
+  name: z.string().min(1, "Proje adı gerekli").transform(s => s.trim()),
+});
+
+const updateProjectSchema = z.object({
+  name: z.string().min(1, "Proje adı gerekli").transform(s => s.trim()),
+});
 
 const PROJECTS_CACHE_KEY = "projects:list";
 const PROJECTS_TTL = 30_000;
@@ -100,17 +109,19 @@ router.get("/projects", async (_req, res) => {
 });
 
 router.post("/projects", async (req, res): Promise<void> => {
+  const parsed = createProjectSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
   try {
-    const { name } = req.body;
-    if (!name || typeof name !== "string" || !name.trim()) {
-      res.status(400).json({ error: "Name is required" });
-      return;
-    }
+    const { name } = parsed.data;
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
     const now = new Date();
     await db.insert(projectsTable).values({
       id,
-      name: name.trim(),
+      name,
       createdAt: now,
     });
     await refreshProjectStats();
@@ -123,17 +134,19 @@ router.post("/projects", async (req, res): Promise<void> => {
 });
 
 router.put("/projects/:id", async (req, res): Promise<void> => {
+  const parsed = updateProjectSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
   try {
     const { id } = req.params;
-    const { name } = req.body;
-    if (!name || typeof name !== "string" || !name.trim()) {
-      res.status(400).json({ error: "Name is required" });
-      return;
-    }
+    const { name } = parsed.data;
     const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
     if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
 
-    await db.update(projectsTable).set({ name: name.trim() }).where(eq(projectsTable.id, id));
+    await db.update(projectsTable).set({ name }).where(eq(projectsTable.id, id));
     cacheInvalidate(PROJECTS_CACHE_KEY);
     const [updated] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
     res.json({ ...updated, stats: emptyStats });
