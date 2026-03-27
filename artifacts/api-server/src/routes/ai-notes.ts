@@ -5,6 +5,7 @@ import { eq, inArray, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import crypto from "crypto";
+import { asyncHandler } from "../middleware/error-handler";
 
 const router: IRouter = Router();
 
@@ -77,130 +78,106 @@ function parseAiResults(content: string): unknown[] {
   }
 }
 
-router.get("/ai-notes/settings", async (_req, res) => {
-  try {
-    const [promptRow, categoriesRow] = await Promise.all([
-      db.select().from(appSettingsTable).where(eq(appSettingsTable.key, "ai_prompt")).then(r => r[0]),
-      db.select().from(appSettingsTable).where(eq(appSettingsTable.key, "ai_categories")).then(r => r[0]),
-    ]);
+router.get("/ai-notes/settings", asyncHandler(async (_req, res) => {
+  const [promptRow, categoriesRow] = await Promise.all([
+    db.select().from(appSettingsTable).where(eq(appSettingsTable.key, "ai_prompt")).then(r => r[0]),
+    db.select().from(appSettingsTable).where(eq(appSettingsTable.key, "ai_categories")).then(r => r[0]),
+  ]);
 
-    res.json({
-      prompt: promptRow?.value || DEFAULT_PROMPT,
-      categories: categoriesRow ? JSON.parse(categoriesRow.value) : DEFAULT_CATEGORIES,
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-    console.error("GET /ai-notes/settings error:", message);
-    res.status(500).json({ error: message });
+  res.json({
+    prompt: promptRow?.value || DEFAULT_PROMPT,
+    categories: categoriesRow ? JSON.parse(categoriesRow.value) : DEFAULT_CATEGORIES,
+  });
+}));
+
+router.put("/ai-notes/settings", asyncHandler(async (req, res) => {
+  const parsed = z.object({
+    prompt: z.string().optional(),
+    categories: z.array(z.string()).optional(),
+  }).safeParse(req.body);
+
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
   }
-});
 
-router.put("/ai-notes/settings", async (req, res) => {
-  try {
-    const parsed = z.object({
-      prompt: z.string().optional(),
-      categories: z.array(z.string()).optional(),
-    }).safeParse(req.body);
+  const { prompt, categories } = parsed.data;
 
-    if (!parsed.success) {
-      res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
-      return;
-    }
-
-    const { prompt, categories } = parsed.data;
-
-    if (prompt !== undefined) {
-      await db.insert(appSettingsTable)
-        .values({ key: "ai_prompt", value: prompt })
-        .onConflictDoUpdate({ target: appSettingsTable.key, set: { value: prompt } });
-    }
-
-    if (categories !== undefined) {
-      const val = JSON.stringify(categories);
-      await db.insert(appSettingsTable)
-        .values({ key: "ai_categories", value: val })
-        .onConflictDoUpdate({ target: appSettingsTable.key, set: { value: val } });
-    }
-
-    res.json({ success: true });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-    console.error("PUT /ai-notes/settings error:", message);
-    res.status(500).json({ error: message });
+  if (prompt !== undefined) {
+    await db.insert(appSettingsTable)
+      .values({ key: "ai_prompt", value: prompt })
+      .onConflictDoUpdate({ target: appSettingsTable.key, set: { value: prompt } });
   }
-});
 
-router.post("/ai-notes/classify", async (req, res) => {
+  if (categories !== undefined) {
+    const val = JSON.stringify(categories);
+    await db.insert(appSettingsTable)
+      .values({ key: "ai_categories", value: val })
+      .onConflictDoUpdate({ target: appSettingsTable.key, set: { value: val } });
+  }
+
+  res.json({ success: true });
+}));
+
+router.post("/ai-notes/classify", asyncHandler(async (req, res) => {
   const parsed = classifySchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
     return;
   }
 
-  try {
-    const { donations } = parsed.data;
-    const { prompt, categories } = await getAiSettings();
+  const { donations } = parsed.data;
+  const { prompt, categories } = await getAiSettings();
 
-    const systemPrompt = prompt.replace("{{CATEGORIES}}", categories.join(", "));
+  const systemPrompt = prompt.replace("{{CATEGORIES}}", categories.join(", "));
 
-    const userContent = donations.map(d => ({
-      donationId: d.id,
-      isim: d.name,
-      cinsi: d.donationType,
-      vekalet: d.vekalet,
-      not: d.notes,
-    }));
+  const userContent = donations.map(d => ({
+    donationId: d.id,
+    isim: d.name,
+    cinsi: d.donationType,
+    vekalet: d.vekalet,
+    not: d.notes,
+  }));
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-5-mini",
-      max_completion_tokens: 8192,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: JSON.stringify(userContent) },
-      ],
-      response_format: { type: "json_object" },
-    });
+  const response = await openai.chat.completions.create({
+    model: "gpt-5-mini",
+    max_completion_tokens: 8192,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: JSON.stringify(userContent) },
+    ],
+    response_format: { type: "json_object" },
+  });
 
-    const content = response.choices[0]?.message?.content || "{}";
-    const results = parseAiResults(content);
+  const content = response.choices[0]?.message?.content || "{}";
+  const results = parseAiResults(content);
 
-    res.json({ results });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-    console.error("POST /ai-notes/classify error:", message);
-    res.status(500).json({ error: message });
-  }
-});
+  res.json({ results });
+}));
 
-router.post("/ai-notes/classify-async", async (req, res) => {
+router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
   const parsed = classifySchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
     return;
   }
 
-  try {
-    const { donations } = parsed.data;
-    const jobId = crypto.randomUUID();
+  const { donations } = parsed.data;
+  const jobId = crypto.randomUUID();
 
-    await db.insert(aiJobsTable).values({
-      id: jobId,
-      status: "pending",
-      totalDonations: donations.length,
-      processedDonations: 0,
-    });
+  await db.insert(aiJobsTable).values({
+    id: jobId,
+    status: "pending",
+    totalDonations: donations.length,
+    processedDonations: 0,
+  });
 
-    res.status(202).json({ jobId, status: "pending", totalDonations: donations.length });
+  res.status(202).json({ jobId, status: "pending", totalDonations: donations.length });
 
-    processClassifyJob(jobId, donations).catch(err => {
-      console.error(`[ai-job:${jobId}] Unhandled error:`, err);
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-    console.error("POST /ai-notes/classify-async error:", message);
-    res.status(500).json({ error: message });
-  }
-});
+  processClassifyJob(jobId, donations).catch(err => {
+    console.error(`[ai-job:${jobId}] Unhandled error:`, err);
+  });
+}));
 
 const CHUNK_SIZE = 50;
 
@@ -295,122 +272,104 @@ async function processClassifyJob(
   }
 }
 
-router.get("/ai-notes/jobs/:jobId", async (req, res) => {
-  try {
-    const { jobId } = req.params;
-    const [job] = await db.select().from(aiJobsTable).where(eq(aiJobsTable.id, jobId));
+router.get("/ai-notes/jobs/:jobId", asyncHandler(async (req, res) => {
+  const { jobId } = req.params;
+  const [job] = await db.select().from(aiJobsTable).where(eq(aiJobsTable.id, jobId));
 
-    if (!job) {
-      res.status(404).json({ error: "İş bulunamadı" });
-      return;
-    }
-
-    const response: Record<string, unknown> = {
-      jobId: job.id,
-      status: job.status,
-      totalDonations: job.totalDonations,
-      processedDonations: job.processedDonations,
-      createdAt: job.createdAt,
-      updatedAt: job.updatedAt,
-    };
-
-    if (job.status === "completed" && job.result) {
-      try {
-        response.results = JSON.parse(job.result);
-      } catch {
-        response.results = [];
-        response.error = "Sonuç ayrıştırılamadı";
-      }
-    }
-
-    if (job.status === "failed" && job.error) {
-      response.error = job.error;
-    }
-
-    res.json(response);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-    console.error("GET /ai-notes/jobs/:jobId error:", message);
-    res.status(500).json({ error: message });
+  if (!job) {
+    res.status(404).json({ error: "İş bulunamadı" });
+    return;
   }
-});
+
+  const response: Record<string, unknown> = {
+    jobId: job.id,
+    status: job.status,
+    totalDonations: job.totalDonations,
+    processedDonations: job.processedDonations,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+  };
+
+  if (job.status === "completed" && job.result) {
+    try {
+      response.results = JSON.parse(job.result);
+    } catch {
+      response.results = [];
+      response.error = "Sonuç ayrıştırılamadı";
+    }
+  }
+
+  if (job.status === "failed" && job.error) {
+    response.error = job.error;
+  }
+
+  res.json(response);
+}));
 
 const TX_BATCH_SIZE = 100;
 
-router.put("/ai-notes/save-classifications", async (req, res) => {
-  try {
-    const parsed = z.object({
-      classifications: z.array(z.object({
-        donationId: z.string(),
-        categories: z.array(z.string()),
-        warnings: z.string().optional().default(""),
-      })).max(2000),
-    }).safeParse(req.body);
+router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
+  const parsed = z.object({
+    classifications: z.array(z.object({
+      donationId: z.string(),
+      categories: z.array(z.string()),
+      warnings: z.string().optional().default(""),
+    })).max(2000),
+  }).safeParse(req.body);
 
-    if (!parsed.success) {
-      res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
-      return;
-    }
-
-    const { classifications } = parsed.data;
-
-    await db.transaction(async (tx) => {
-      for (let i = 0; i < classifications.length; i += TX_BATCH_SIZE) {
-        const chunk = classifications.slice(i, i + TX_BATCH_SIZE);
-        await Promise.all(chunk.map(c =>
-          tx.update(donationsTable)
-            .set({
-              aiCategories: JSON.stringify(c.categories),
-              aiWarnings: c.warnings,
-            })
-            .where(eq(donationsTable.id, c.donationId))
-        ));
-      }
-    });
-
-    res.json({ success: true, count: classifications.length });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-    console.error("PUT /ai-notes/save-classifications error:", message);
-    res.status(500).json({ error: message });
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
   }
-});
 
-router.put("/ai-notes/bulk-update", async (req, res) => {
-  try {
-    const parsed = z.object({
-      kesimAlaniId: z.string(),
-      updates: z.array(z.object({
-        donationId: z.string(),
-        notes: z.string(),
-      })).max(2000),
-    }).safeParse(req.body);
+  const { classifications } = parsed.data;
 
-    if (!parsed.success) {
-      res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
-      return;
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < classifications.length; i += TX_BATCH_SIZE) {
+      const chunk = classifications.slice(i, i + TX_BATCH_SIZE);
+      await Promise.all(chunk.map(c =>
+        tx.update(donationsTable)
+          .set({
+            aiCategories: JSON.stringify(c.categories),
+            aiWarnings: c.warnings,
+          })
+          .where(eq(donationsTable.id, c.donationId))
+      ));
     }
+  });
 
-    const { updates } = parsed.data;
+  res.json({ success: true, count: classifications.length });
+}));
 
-    await db.transaction(async (tx) => {
-      for (let i = 0; i < updates.length; i += TX_BATCH_SIZE) {
-        const chunk = updates.slice(i, i + TX_BATCH_SIZE);
-        await Promise.all(chunk.map(u =>
-          tx.update(donationsTable)
-            .set({ notes: u.notes })
-            .where(eq(donationsTable.id, u.donationId))
-        ));
-      }
-    });
+router.put("/ai-notes/bulk-update", asyncHandler(async (req, res) => {
+  const parsed = z.object({
+    kesimAlaniId: z.string(),
+    updates: z.array(z.object({
+      donationId: z.string(),
+      notes: z.string(),
+    })).max(2000),
+  }).safeParse(req.body);
 
-    res.json({ success: true, count: updates.length });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-    console.error("PUT /ai-notes/bulk-update error:", message);
-    res.status(500).json({ error: message });
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
   }
-});
+
+  const { updates } = parsed.data;
+
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < updates.length; i += TX_BATCH_SIZE) {
+      const chunk = updates.slice(i, i + TX_BATCH_SIZE);
+      await Promise.all(chunk.map(u =>
+        tx.update(donationsTable)
+          .set({ notes: u.notes })
+          .where(eq(donationsTable.id, u.donationId))
+      ));
+    }
+  });
+
+  res.json({ success: true, count: updates.length });
+}));
 
 (async () => {
   try {

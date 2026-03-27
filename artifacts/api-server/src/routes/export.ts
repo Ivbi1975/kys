@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
+import { asyncHandler } from "../middleware/error-handler";
 
 const router: IRouter = Router();
 
@@ -29,7 +30,7 @@ const CSV_HEADERS = [
   "Ekip",
 ];
 
-router.get("/export/csv", async (req, res) => {
+router.get("/export/csv", asyncHandler(async (req, res) => {
   const kaId = req.query.kaId as string | undefined;
 
   const client = await pool.connect();
@@ -139,36 +140,29 @@ router.get("/export/csv", async (req, res) => {
     res.end();
   } catch (err) {
     try { await client.query("ROLLBACK"); } catch (_) {}
-    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-    console.error("GET /export/csv error:", message);
     if (!res.headersSent) {
-      res.status(500).json({ error: message });
+      throw err;
     } else {
       res.end();
     }
   } finally {
     client.release();
   }
-});
+}));
 
-router.get("/export/count", async (req, res) => {
+router.get("/export/count", asyncHandler(async (req, res) => {
   const kaId = req.query.kaId as string | undefined;
+  const client = await pool.connect();
   try {
-    const client = await pool.connect();
-    try {
-      const query = kaId
-        ? `SELECT count(*)::int AS total FROM donations WHERE deleted_at IS NULL AND kesim_alani_id = $1`
-        : `SELECT count(*)::int AS total FROM donations d JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id WHERE d.deleted_at IS NULL AND ka.deleted_at IS NULL`;
-      const params = kaId ? [kaId] : [];
-      const result = await client.query(query, params);
-      res.json({ total: result.rows[0]?.total ?? 0 });
-    } finally {
-      client.release();
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-    res.status(500).json({ error: message });
+    const query = kaId
+      ? `SELECT count(*)::int AS total FROM donations WHERE deleted_at IS NULL AND kesim_alani_id = $1`
+      : `SELECT count(*)::int AS total FROM donations d JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id WHERE d.deleted_at IS NULL AND ka.deleted_at IS NULL`;
+    const params = kaId ? [kaId] : [];
+    const result = await client.query(query, params);
+    res.json({ total: result.rows[0]?.total ?? 0 });
+  } finally {
+    client.release();
   }
-});
+}));
 
 export default router;

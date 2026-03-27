@@ -4,6 +4,7 @@ import { customTagsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { cacheGet, cacheSet, cacheInvalidate } from "../lib/cache";
+import { asyncHandler } from "../middleware/error-handler";
 
 const TAGS_CACHE_KEY = "tags:list";
 const TAGS_TTL = 60_000;
@@ -21,81 +22,57 @@ const updateTagSchema = z.object({
   color: z.string().optional(),
 });
 
-router.get("/tags", async (_req, res) => {
-  try {
-    const cached = cacheGet<unknown[]>(TAGS_CACHE_KEY);
-    if (cached) {
-      res.json(cached);
-      return;
-    }
-
-    const tags = await db.select().from(customTagsTable);
-    cacheSet(TAGS_CACHE_KEY, tags, TAGS_TTL);
-    res.json(tags);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-    console.error("GET /tags error:", message);
-    res.status(500).json({ error: message });
+router.get("/tags", asyncHandler(async (_req, res) => {
+  const cached = cacheGet<unknown[]>(TAGS_CACHE_KEY);
+  if (cached) {
+    res.json(cached);
+    return;
   }
-});
 
-router.post("/tags", async (req, res) => {
+  const tags = await db.select().from(customTagsTable);
+  cacheSet(TAGS_CACHE_KEY, tags, TAGS_TTL);
+  res.json(tags);
+}));
+
+router.post("/tags", asyncHandler(async (req, res) => {
   const parsed = createTagSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
     return;
   }
 
-  try {
-    const { id, name, color } = parsed.data;
-    await db.insert(customTagsTable).values({ id, name, color: color || "#3b82f6" });
-    cacheInvalidate(TAGS_CACHE_KEY);
-    const [tag] = await db.select().from(customTagsTable).where(eq(customTagsTable.id, id));
-    res.status(201).json(tag);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-    console.error("POST /tags error:", message);
-    res.status(500).json({ error: message });
-  }
-});
+  const { id, name, color } = parsed.data;
+  await db.insert(customTagsTable).values({ id, name, color: color || "#3b82f6" });
+  cacheInvalidate(TAGS_CACHE_KEY);
+  const [tag] = await db.select().from(customTagsTable).where(eq(customTagsTable.id, id));
+  res.status(201).json(tag);
+}));
 
-router.put("/tags/:id", async (req, res) => {
+router.put("/tags/:id", asyncHandler(async (req, res) => {
   const parsed = updateTagSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
     return;
   }
 
-  try {
-    const { id } = req.params;
-    const updates: { name?: string; color?: string } = {};
-    if (parsed.data.name !== undefined) updates.name = parsed.data.name;
-    if (parsed.data.color !== undefined) updates.color = parsed.data.color;
-    await db.update(customTagsTable).set(updates).where(eq(customTagsTable.id, id));
-    cacheInvalidate(TAGS_CACHE_KEY);
-    const [tag] = await db.select().from(customTagsTable).where(eq(customTagsTable.id, id));
-    if (!tag) {
-      res.status(404).json({ error: "Bulunamadı" });
-      return;
-    }
-    res.json(tag);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-    console.error(`PUT /tags/${req.params.id} error:`, message);
-    res.status(500).json({ error: message });
+  const { id } = req.params;
+  const updates: { name?: string; color?: string } = {};
+  if (parsed.data.name !== undefined) updates.name = parsed.data.name;
+  if (parsed.data.color !== undefined) updates.color = parsed.data.color;
+  await db.update(customTagsTable).set(updates).where(eq(customTagsTable.id, id));
+  cacheInvalidate(TAGS_CACHE_KEY);
+  const [tag] = await db.select().from(customTagsTable).where(eq(customTagsTable.id, id));
+  if (!tag) {
+    res.status(404).json({ error: "Bulunamadı" });
+    return;
   }
-});
+  res.json(tag);
+}));
 
-router.delete("/tags/:id", async (req, res) => {
-  try {
-    await db.delete(customTagsTable).where(eq(customTagsTable.id, req.params.id));
-    cacheInvalidate(TAGS_CACHE_KEY);
-    res.json({ success: true });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-    console.error(`DELETE /tags/${req.params.id} error:`, message);
-    res.status(500).json({ error: message });
-  }
-});
+router.delete("/tags/:id", asyncHandler(async (req, res) => {
+  await db.delete(customTagsTable).where(eq(customTagsTable.id, req.params.id));
+  cacheInvalidate(TAGS_CACHE_KEY);
+  res.json({ success: true });
+}));
 
 export default router;

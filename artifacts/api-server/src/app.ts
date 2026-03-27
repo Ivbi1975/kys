@@ -7,6 +7,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { apiKeyAuth, adminKeyAuth } from "./middleware/auth";
+import { errorHandler } from "./middleware/error-handler";
 
 const COMPRESSION_THRESHOLD = 1024;
 
@@ -159,5 +160,7 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 app.use("/api", apiKeyAuth, adminKeyAuth, router);
+
+app.use(errorHandler);
 
 export default app;

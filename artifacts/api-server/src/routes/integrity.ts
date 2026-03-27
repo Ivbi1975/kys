@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { asyncHandler } from "../middleware/error-handler";
 
 const router: IRouter = Router();
 
@@ -25,7 +26,6 @@ interface CheckResult {
 
 interface IdRow { id: string }
 interface CountRow { cnt: number }
-interface ShareMismatchRow { id: string; donation_share_count: number; assigned_group_count: number }
 
 function extractIds(rows: Record<string, unknown>[]): string[] {
   return rows.map(r => String((r as unknown as IdRow).id));
@@ -207,152 +207,140 @@ async function runChecks(): Promise<CheckResult[]> {
   return results;
 }
 
-router.get("/integrity/check", async (_req, res) => {
-  try {
-    const results = await runChecks();
-    const report: IntegrityReport = {
-      checkedAt: new Date().toISOString(),
-      totalIssues: results.reduce((sum, r) => sum + r.issue.count, 0),
-      issues: results.map(r => r.issue),
-    };
-    res.json(report);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-    console.error("GET /integrity/check error:", message);
-    res.status(500).json({ error: message });
-  }
-});
+router.get("/integrity/check", asyncHandler(async (_req, res) => {
+  const results = await runChecks();
+  const report: IntegrityReport = {
+    checkedAt: new Date().toISOString(),
+    totalIssues: results.reduce((sum, r) => sum + r.issue.count, 0),
+    issues: results.map(r => r.issue),
+  };
+  res.json(report);
+}));
 
-router.post("/integrity/repair", async (_req, res) => {
-  try {
-    const results = await runChecks();
-    const repairs: { type: string; action: string; count: number }[] = [];
+router.post("/integrity/repair", asyncHandler(async (_req, res) => {
+  const results = await runChecks();
+  const repairs: { type: string; action: string; count: number }[] = [];
 
-    await db.transaction(async (tx) => {
-      const repairOrder = [
-        "invalid_share_count",
-        "orphan_donations",
-        "orphan_groups",
-        "broken_group_donation_links",
-        "orphan_photos",
-        "orphan_tracking_notes",
-        "orphan_teams",
-        "broken_donation_tags",
-        "duplicate_group_donations",
-        "ka_with_deleted_project",
-        "share_count_exceeded",
-      ];
-      const sortedResults = [...results].sort((a, b) => {
-        const ai = repairOrder.indexOf(a.issue.type);
-        const bi = repairOrder.indexOf(b.issue.type);
-        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-      });
+  await db.transaction(async (tx) => {
+    const repairOrder = [
+      "invalid_share_count",
+      "orphan_donations",
+      "orphan_groups",
+      "broken_group_donation_links",
+      "orphan_photos",
+      "orphan_tracking_notes",
+      "orphan_teams",
+      "broken_donation_tags",
+      "duplicate_group_donations",
+      "ka_with_deleted_project",
+      "share_count_exceeded",
+    ];
+    const sortedResults = [...results].sort((a, b) => {
+      const ai = repairOrder.indexOf(a.issue.type);
+      const bi = repairOrder.indexOf(b.issue.type);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
 
-      for (const r of sortedResults) {
-        if (!r.issue.repairable) continue;
+    for (const r of sortedResults) {
+      if (!r.issue.repairable) continue;
 
-        switch (r.issue.type) {
-          case "orphan_donations":
-            if (r.ids.length > 0) {
-              await tx.execute(sql`UPDATE donations SET deleted_at = NOW(), updated_at = NOW() WHERE id IN (${sql.join(r.ids.map(id => sql`${id}`), sql`, `)})`);
-              repairs.push({ type: r.issue.type, action: "Yetim bağışçılar soft-delete edildi", count: r.issue.count });
-            }
-            break;
-          case "orphan_groups":
-            if (r.ids.length > 0) {
-              await tx.execute(sql`UPDATE animal_groups SET deleted_at = NOW(), updated_at = NOW() WHERE id IN (${sql.join(r.ids.map(id => sql`${id}`), sql`, `)})`);
-              repairs.push({ type: r.issue.type, action: "Yetim hayvan grupları soft-delete edildi", count: r.issue.count });
-            }
-            break;
-          case "broken_group_donation_links":
-            if (r.ids.length > 0) {
-              await tx.execute(sql`DELETE FROM animal_group_donations WHERE id IN (${sql.join(r.ids.map(id => sql`${Number(id)}`), sql`, `)})`);
-              repairs.push({ type: r.issue.type, action: "Kırık grup-bağışçı bağlantıları silindi", count: r.issue.count });
-            }
-            break;
-          case "orphan_photos":
-            if (r.ids.length > 0) {
-              await tx.execute(sql`DELETE FROM animal_group_photos WHERE id IN (${sql.join(r.ids.map(id => sql`${id}`), sql`, `)})`);
-              repairs.push({ type: r.issue.type, action: "Yetim fotoğraflar silindi", count: r.issue.count });
-            }
-            break;
-          case "orphan_tracking_notes":
-            if (r.ids.length > 0) {
-              await tx.execute(sql`DELETE FROM tracking_notes WHERE id IN (${sql.join(r.ids.map(id => sql`${id}`), sql`, `)})`);
-              repairs.push({ type: r.issue.type, action: "Yetim takip notları silindi", count: r.issue.count });
-            }
-            break;
-          case "orphan_teams":
-            if (r.ids.length > 0) {
-              await tx.execute(sql`DELETE FROM teams WHERE id IN (${sql.join(r.ids.map(id => sql`${id}`), sql`, `)})`);
-              repairs.push({ type: r.issue.type, action: "Yetim ekipler silindi", count: r.issue.count });
-            }
-            break;
-          case "broken_donation_tags":
-            if (r.ids.length > 0) {
-              await tx.execute(sql`DELETE FROM donation_tags WHERE id IN (${sql.join(r.ids.map(id => sql`${Number(id)}`), sql`, `)})`);
-              repairs.push({ type: r.issue.type, action: "Kırık etiket bağlantıları silindi", count: r.issue.count });
-            }
-            break;
-          case "duplicate_group_donations":
-            await tx.execute(sql`
-              DELETE FROM animal_group_donations WHERE id NOT IN (
-                SELECT MIN(id) FROM animal_group_donations GROUP BY group_id, donation_id
-              )
-            `);
-            repairs.push({ type: r.issue.type, action: "Tekrarlanan grup-bağışçı atamaları kaldırıldı", count: r.issue.count });
-            break;
-          case "ka_with_deleted_project":
-            if (r.ids.length > 0) {
-              await tx.execute(sql`UPDATE kesim_alanlari SET project_id = NULL, updated_at = NOW() WHERE id IN (${sql.join(r.ids.map(id => sql`${id}`), sql`, `)})`);
-              repairs.push({ type: r.issue.type, action: "Silinmiş proje bağlantısı kaldırıldı", count: r.issue.count });
-            }
-            break;
-          case "share_count_exceeded": {
-            if (r.ids.length > 0) {
-              for (const donationId of r.ids) {
-                const donRow = await tx.execute(sql`SELECT share_count FROM donations WHERE id = ${donationId}`);
-                const shareCount = (donRow.rows[0] as { share_count: number } | undefined)?.share_count ?? 1;
-                await tx.execute(sql`
-                  DELETE FROM animal_group_donations
-                  WHERE id IN (
-                    SELECT id FROM animal_group_donations
-                    WHERE donation_id = ${donationId}
-                    ORDER BY sort_order DESC
-                    LIMIT (
-                      SELECT GREATEST(0, COUNT(*) - ${shareCount})
-                      FROM animal_group_donations WHERE donation_id = ${donationId}
-                    )
-                  )
-                `);
-              }
-              repairs.push({ type: r.issue.type, action: "Fazla grup atamları kaldırıldı (hisse sayısına göre)", count: r.issue.count });
-            }
-            break;
+      switch (r.issue.type) {
+        case "orphan_donations":
+          if (r.ids.length > 0) {
+            await tx.execute(sql`UPDATE donations SET deleted_at = NOW(), updated_at = NOW() WHERE id IN (${sql.join(r.ids.map(id => sql`${id}`), sql`, `)})`);
+            repairs.push({ type: r.issue.type, action: "Yetim bağışçılar soft-delete edildi", count: r.issue.count });
           }
-          case "invalid_share_count":
-            if (r.ids.length > 0) {
-              await tx.execute(sql`UPDATE donations SET share_count = 1, updated_at = NOW() WHERE id IN (${sql.join(r.ids.map(id => sql`${id}`), sql`, `)})`);
-              repairs.push({ type: r.issue.type, action: "Geçersiz hisse sayıları 1'e düzeltildi", count: r.issue.count });
+          break;
+        case "orphan_groups":
+          if (r.ids.length > 0) {
+            await tx.execute(sql`UPDATE animal_groups SET deleted_at = NOW(), updated_at = NOW() WHERE id IN (${sql.join(r.ids.map(id => sql`${id}`), sql`, `)})`);
+            repairs.push({ type: r.issue.type, action: "Yetim hayvan grupları soft-delete edildi", count: r.issue.count });
+          }
+          break;
+        case "broken_group_donation_links":
+          if (r.ids.length > 0) {
+            await tx.execute(sql`DELETE FROM animal_group_donations WHERE id IN (${sql.join(r.ids.map(id => sql`${Number(id)}`), sql`, `)})`);
+            repairs.push({ type: r.issue.type, action: "Kırık grup-bağışçı bağlantıları silindi", count: r.issue.count });
+          }
+          break;
+        case "orphan_photos":
+          if (r.ids.length > 0) {
+            await tx.execute(sql`DELETE FROM animal_group_photos WHERE id IN (${sql.join(r.ids.map(id => sql`${id}`), sql`, `)})`);
+            repairs.push({ type: r.issue.type, action: "Yetim fotoğraflar silindi", count: r.issue.count });
+          }
+          break;
+        case "orphan_tracking_notes":
+          if (r.ids.length > 0) {
+            await tx.execute(sql`DELETE FROM tracking_notes WHERE id IN (${sql.join(r.ids.map(id => sql`${id}`), sql`, `)})`);
+            repairs.push({ type: r.issue.type, action: "Yetim takip notları silindi", count: r.issue.count });
+          }
+          break;
+        case "orphan_teams":
+          if (r.ids.length > 0) {
+            await tx.execute(sql`DELETE FROM teams WHERE id IN (${sql.join(r.ids.map(id => sql`${id}`), sql`, `)})`);
+            repairs.push({ type: r.issue.type, action: "Yetim ekipler silindi", count: r.issue.count });
+          }
+          break;
+        case "broken_donation_tags":
+          if (r.ids.length > 0) {
+            await tx.execute(sql`DELETE FROM donation_tags WHERE id IN (${sql.join(r.ids.map(id => sql`${Number(id)}`), sql`, `)})`);
+            repairs.push({ type: r.issue.type, action: "Kırık etiket bağlantıları silindi", count: r.issue.count });
+          }
+          break;
+        case "duplicate_group_donations":
+          await tx.execute(sql`
+            DELETE FROM animal_group_donations WHERE id NOT IN (
+              SELECT MIN(id) FROM animal_group_donations GROUP BY group_id, donation_id
+            )
+          `);
+          repairs.push({ type: r.issue.type, action: "Tekrarlanan grup-bağışçı atamaları kaldırıldı", count: r.issue.count });
+          break;
+        case "ka_with_deleted_project":
+          if (r.ids.length > 0) {
+            await tx.execute(sql`UPDATE kesim_alanlari SET project_id = NULL, updated_at = NOW() WHERE id IN (${sql.join(r.ids.map(id => sql`${id}`), sql`, `)})`);
+            repairs.push({ type: r.issue.type, action: "Silinmiş proje bağlantısı kaldırıldı", count: r.issue.count });
+          }
+          break;
+        case "share_count_exceeded": {
+          if (r.ids.length > 0) {
+            for (const donationId of r.ids) {
+              const donRow = await tx.execute(sql`SELECT share_count FROM donations WHERE id = ${donationId}`);
+              const shareCount = (donRow.rows[0] as { share_count: number } | undefined)?.share_count ?? 1;
+              await tx.execute(sql`
+                DELETE FROM animal_group_donations
+                WHERE id IN (
+                  SELECT id FROM animal_group_donations
+                  WHERE donation_id = ${donationId}
+                  ORDER BY sort_order DESC
+                  LIMIT (
+                    SELECT GREATEST(0, COUNT(*) - ${shareCount})
+                    FROM animal_group_donations WHERE donation_id = ${donationId}
+                  )
+                )
+              `);
             }
-            break;
+            repairs.push({ type: r.issue.type, action: "Fazla grup atamları kaldırıldı (hisse sayısına göre)", count: r.issue.count });
+          }
+          break;
         }
+        case "invalid_share_count":
+          if (r.ids.length > 0) {
+            await tx.execute(sql`UPDATE donations SET share_count = 1, updated_at = NOW() WHERE id IN (${sql.join(r.ids.map(id => sql`${id}`), sql`, `)})`);
+            repairs.push({ type: r.issue.type, action: "Geçersiz hisse sayıları 1'e düzeltildi", count: r.issue.count });
+          }
+          break;
       }
-    });
+    }
+  });
 
-    const afterResults = await runChecks();
+  const afterResults = await runChecks();
 
-    res.json({
-      repairedAt: new Date().toISOString(),
-      repairs,
-      remainingIssues: afterResults.reduce((sum, r) => sum + r.issue.count, 0),
-      remainingDetails: afterResults.map(r => r.issue),
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-    console.error("POST /integrity/repair error:", message);
-    res.status(500).json({ error: message });
-  }
-});
+  res.json({
+    repairedAt: new Date().toISOString(),
+    repairs,
+    remainingIssues: afterResults.reduce((sum, r) => sum + r.issue.count, 0),
+    remainingDetails: afterResults.map(r => r.issue),
+  });
+}));
 
 export default router;
