@@ -122,7 +122,9 @@ export const customTagsTable = pgTable("custom_tags", {
   name: text("name").notNull(),
   color: text("color").notNull().default("#3b82f6"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("idx_custom_tags_name").on(table.name),
+]);
 
 export const insertCustomTagSchema = createInsertSchema(customTagsTable);
 export type InsertCustomTag = z.infer<typeof insertCustomTagSchema>;
