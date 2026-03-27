@@ -76,6 +76,7 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - Donation transfer log: `donation_transfers` DB table tracks all cross-KA donor movements (from/to KA names, donor info, timestamps, removal status); viewable on project detail page via "Aktarımlar Logu" button
 - Custom tag system: global tag definitions (name + color) managed in Settings, assignable to donors via popover, displayed as colored badges, included in backup/restore, orphaned tags cleaned on deletion
 - Advanced filtering: filter donor list by cinsi (dropdown), hisse range (min/max), status (active/excluded), tags (multi-select) — combinable filters with active count badge and clear button
+- Shared utility modules: `src/lib/formatting.ts` (formatDate, formatDateTime, formatTime, formatKesildiTime, formatNoteTime, timeSince), `src/lib/constants.ts` (TAG_COLORS, COLOR_MAP, FIELD_LABELS, DonorFieldKey), `src/hooks/useTrackingActions.ts` (handleCopyTrackingLink, handleOpenTrackingPage, resolveToken, buildTrackingUrl), `src/components/ThemeToggle.tsx` (shared theme toggle button)
 - Data persisted in PostgreSQL via API server (migrated from localStorage)
 - One-time automatic localStorage → PostgreSQL migration on first load
 - Soft delete for kesim alanları (trash/restore functionality with permanent delete option)

@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from "react";
 import { turkishNormalize } from "@/lib/utils";
 import { useParams } from "wouter";
+import { formatKesildiTime, formatNoteTime } from "@/lib/formatting";
+import { COLOR_MAP, FIELD_LABELS } from "@/lib/constants";
+import type { DonorFieldKey } from "@/lib/constants";
 import { Virtuoso } from "react-virtuoso";
 import { createTrackingNote, fetchGroupPhotos, getGroupPhotoUrl, uploadGroupPhoto, deleteGroupPhoto, assignTeamTracking, fetchTrackingNotificationLogs } from "@/lib/api";
 import { KesimTakipSkeleton } from "@/components/skeletons/KesimTakipSkeleton";
@@ -19,46 +22,6 @@ import {
   FileText, Printer, Search
 } from "lucide-react";
 
-const colorMap: Record<string, string> = {
-  green: "#22c55e",
-  orange: "#f97316",
-  red: "#ef4444",
-};
-
-type DonorFieldKey = "name" | "description" | "donationType" | "vekalet" | "notes";
-
-const FIELD_LABELS: Record<DonorFieldKey, string> = {
-  name: "Adına Kesilen",
-  description: "Vekaleti Veren",
-  donationType: "Cinsi",
-  vekalet: "Vekalet",
-  notes: "Notlar",
-};
-
-function formatKesildiTime(isoString: string | null): string {
-  if (!isoString) return "";
-  try {
-    const d = new Date(isoString);
-    return d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
-  } catch {
-    return "";
-  }
-}
-
-function formatNoteTime(isoString: string): string {
-  try {
-    const d = new Date(isoString);
-    const now = new Date();
-    const isToday = d.toDateString() === now.toDateString();
-    if (isToday) {
-      return d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
-    }
-    return d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" }) + " " +
-      d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
-  } catch {
-    return "";
-  }
-}
 
 interface SpeechRecognitionResult {
   readonly [index: number]: { transcript: string };
@@ -405,7 +368,7 @@ const GroupCard = memo(function GroupCard({
             ? "bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800"
             : "hover:bg-muted/50"
         }`}
-        style={group.colorTag && colorMap[group.colorTag] ? { borderLeft: `4px solid ${colorMap[group.colorTag]}` } : {}}
+        style={group.colorTag && COLOR_MAP[group.colorTag] ? { borderLeft: `4px solid ${COLOR_MAP[group.colorTag]}` } : {}}
         onClick={() => onSelect(index)}
       >
         <div className="flex items-center gap-3">
@@ -796,7 +759,7 @@ function KesimKagidiOverlay({
 
         <Card
           className="flex-1 overflow-auto rounded-xl"
-          style={group.colorTag && colorMap[group.colorTag] ? { borderTop: `4px solid ${colorMap[group.colorTag]}` } : {}}
+          style={group.colorTag && COLOR_MAP[group.colorTag] ? { borderTop: `4px solid ${COLOR_MAP[group.colorTag]}` } : {}}
         >
           <div className="p-4">
             <div className="flex items-center justify-between mb-3">

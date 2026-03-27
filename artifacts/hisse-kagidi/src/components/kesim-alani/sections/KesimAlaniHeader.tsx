@@ -4,15 +4,16 @@ import { Input } from "@/components/ui/input";
 import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationLogs } from "@/lib/api";
 import {
   ChevronRight, FileSpreadsheet, History, Home, Keyboard, Link2, Loader2,
-  Maximize, MessageSquarePlus, Minimize, Monitor, Moon, Printer, QrCode,
-  Redo2, Save, Search, Send, Sun, Undo2, UserCog, Download,
+  Maximize, MessageSquarePlus, Minimize, Printer, QrCode,
+  Redo2, Save, Search, Send, Undo2, UserCog, Download,
 } from "lucide-react";
 import { useKesimAlaniContext } from "../KesimAlaniContext";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function KesimAlaniHeader() {
   const {
     kesim, setKesim, setLocation, projectName, save, saveToApi, saveStatus, lastSavedTime,
-    toast, toggleTheme, themeMode, handleUndo, handleRedo, history, historyPanelOpen,
+    toast, handleUndo, handleRedo, history, historyPanelOpen,
     setHistoryPanelOpen, setShortcutHelpOpen, toggleFullscreen, isFullscreen,
     exportDonorsExcel, exportGroupsExcel, handleExportKaCsv, csvExporting,
     setQrUrl, setQrModalOpen, setTrackingNotesOpen, setTrackingNotesLoading, setTrackingNotes,
@@ -158,9 +159,7 @@ export function KesimAlaniHeader() {
             <Send className="w-4 h-4" />
             <span className="hidden sm:inline ml-1">Bildirimler</span>
           </Button>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0" onClick={toggleTheme} title={themeMode === "light" ? "Koyu Mod" : themeMode === "dark" ? "Sistem" : "Açık Mod"} aria-label={themeMode === "light" ? "Koyu Mod" : themeMode === "dark" ? "Sistem" : "Açık Mod"}>
-            {themeMode === "light" ? <Sun className="w-4 h-4" /> : themeMode === "dark" ? <Moon className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
-          </Button>
+          <ThemeToggle className="h-8 w-8 p-0 shrink-0" />
           <Button
             size="sm"
             className="shrink-0"

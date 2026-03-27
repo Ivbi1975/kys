@@ -48,9 +48,6 @@ import {
   Link2,
   ExternalLink,
   QrCode,
-  Sun,
-  Moon,
-  Monitor,
   Archive,
   Edit3,
   Bell,
@@ -69,21 +66,20 @@ import {
   archiveProject,
   fetchCatismaTespiti,
   transferDonation,
-  generateTrackingToken,
   fetchTransferLog,
   fetchPendingEditRequests,
 } from "@/lib/api";
 import type { PendingEditRequest } from "@/lib/api";
 import type { Conflict, ConflictEntry, DonationTransferEntry } from "@/lib/api";
 import { getTotalShares, getRequiredAnimals } from "@/lib/grouping";
-import { useTheme } from "@/lib/useTheme";
+import { formatDate, timeSince } from "@/lib/formatting";
+import { useTrackingActions } from "@/hooks/useTrackingActions";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function ProjeDetayPage() {
   const { id: projectId } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-
-  const { toggle: toggleTheme, mode: themeMode } = useTheme();
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<Project | null>(null);
   const [kesimAlanlari, setKesimAlanlari] = useState<KesimAlani[]>([]);
@@ -115,6 +111,11 @@ export default function ProjeDetayPage() {
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qrUrl, setQrUrl] = useState("");
   const [qrTitle, setQrTitle] = useState("");
+  const { handleCopyTrackingLink, handleOpenTrackingPage, resolveToken, buildTrackingUrl } = useTrackingActions({
+    onTokenGenerated: (kesimId, token) => {
+      setKesimAlanlari(prev => prev.map(ka => ka.id === kesimId ? { ...ka, trackingToken: token } : ka));
+    },
+  });
 
   const [transferLog, setTransferLog] = useState<DonationTransferEntry[]>([]);
   const [transferLogLoading, setTransferLogLoading] = useState(false);
@@ -284,36 +285,6 @@ export default function ProjeDetayPage() {
     setDeleteConfirm(null);
   }
 
-  function formatDate(dateStr: string): string {
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString("tr-TR", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      });
-    } catch {
-      return dateStr;
-    }
-  }
-
-  function timeSince(dateStr: string): string {
-    try {
-      const date = new Date(dateStr);
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      if (diffDays === 0) return "Bugün";
-      if (diffDays === 1) return "Dün";
-      if (diffDays < 7) return `${diffDays} gün önce`;
-      if (diffDays < 30) return `${Math.floor(diffDays / 7)} hafta önce`;
-      if (diffDays < 365) return `${Math.floor(diffDays / 30)} ay önce`;
-      return `${Math.floor(diffDays / 365)} yıl önce`;
-    } catch {
-      return "";
-    }
-  }
-
   function toggleExpand(key: string) {
     setExpandedKeys(prev => {
       const next = new Set(prev);
@@ -365,36 +336,6 @@ export default function ProjeDetayPage() {
       });
     } finally {
       setTransferring(false);
-    }
-  }
-
-  async function handleCopyTrackingLink(e: React.MouseEvent, k: KesimAlani) {
-    e.stopPropagation();
-    try {
-      let token = k.trackingToken;
-      if (!token) {
-        token = await generateTrackingToken(k.id);
-        setKesimAlanlari(prev => prev.map(ka => ka.id === k.id ? { ...ka, trackingToken: token } : ka));
-      }
-      const url = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/takip/${token}`;
-      await navigator.clipboard.writeText(url);
-      toast({ title: "Link kopyalandı", description: "Takip linki panoya kopyalandı." });
-    } catch (err) {
-      toast({ title: "Hata", description: "Link kopyalanamadı.", variant: "destructive" });
-    }
-  }
-
-  async function handleOpenTrackingPage(e: React.MouseEvent, k: KesimAlani) {
-    e.stopPropagation();
-    try {
-      let token = k.trackingToken;
-      if (!token) {
-        token = await generateTrackingToken(k.id);
-        setKesimAlanlari(prev => prev.map(ka => ka.id === k.id ? { ...ka, trackingToken: token } : ka));
-      }
-      window.open(`${import.meta.env.BASE_URL.replace(/\/$/, "")}/takip/${token}`, "_blank");
-    } catch (err) {
-      toast({ title: "Hata", description: "Takip sayfası açılamadı.", variant: "destructive" });
     }
   }
 
@@ -519,9 +460,7 @@ export default function ProjeDetayPage() {
               <Search className="w-4 h-4 mr-1" />
               Ara
             </Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={toggleTheme} title={themeMode === "light" ? "Koyu Mod" : themeMode === "dark" ? "Sistem" : "Açık Mod"}>
-              {themeMode === "light" ? <Sun className="w-4 h-4" /> : themeMode === "dark" ? <Moon className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
-            </Button>
+            <ThemeToggle />
           </div>
         </div>
 
@@ -686,12 +625,8 @@ export default function ProjeDetayPage() {
                         onClick={async (e) => {
                           e.stopPropagation();
                           try {
-                            let token = k.trackingToken;
-                            if (!token) {
-                              token = await generateTrackingToken(k.id);
-                              setKesimAlanlari(prev => prev.map(ka => ka.id === k.id ? { ...ka, trackingToken: token } : ka));
-                            }
-                            const url = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/takip/${token}`;
+                            const token = await resolveToken(k);
+                            const url = buildTrackingUrl(token);
                             setQrUrl(url);
                             setQrTitle(k.name);
                             setQrModalOpen(true);

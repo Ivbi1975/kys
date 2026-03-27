@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LocalInput } from "@/components/LocalInput";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, Team } from "@/lib/types";
+import { COLOR_MAP } from "@/lib/constants";
 import type { ColumnKey } from "@/lib/useWorkspacePreferences";
 import {
   GripVertical,
@@ -71,12 +72,6 @@ interface AnimalGroupCardProps {
   columnHeaderLabel: (key: ColumnKey) => string;
   columnHeaderWidth: (key: ColumnKey) => string;
 }
-
-const colorMap: Record<string, string> = {
-  green: "#22c55e",
-  orange: "#f97316",
-  red: "#ef4444",
-};
 
 const GroupDonationRow = memo(function GroupDonationRow({
   donation,
@@ -427,7 +422,7 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
     <Card
       id={`animal-group-${group.animalNo}`}
       className={`overflow-hidden transition-all ${swapSelection?.groupIdx === groupIdx ? "ring-2 ring-purple-400" : ""} ${highlightIncomplete && isIncomplete ? "ring-2 ring-orange-400" : ""} ${dragItem && dragItem.groupIdx !== groupIdx && dragOverGroup === groupIdx ? (filledCount >= 7 ? "ring-2 ring-red-500 shadow-lg scale-[1.01] bg-red-50/50 dark:bg-red-950/30" : "ring-2 ring-primary shadow-lg scale-[1.01]") : ""} ${dragItem && dragItem.groupIdx !== groupIdx && !isLocked ? "border-dashed border-2 border-primary/30" : ""}`}
-      style={group.colorTag ? { borderLeft: `4px solid ${colorMap[group.colorTag]}` } : (highlightIncomplete && isIncomplete ? { borderLeft: "4px solid #f97316" } : {})}
+      style={group.colorTag ? { borderLeft: `4px solid ${COLOR_MAP[group.colorTag]}` } : (highlightIncomplete && isIncomplete ? { borderLeft: "4px solid #f97316" } : {})}
       onDragOver={(e) => { e.preventDefault(); onDragOverCard(e, groupIdx); }}
       onDragLeave={(e) => onDragLeaveCard(e, groupIdx)}
     >
@@ -493,7 +488,7 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
                 className={`${compact ? "w-3 h-3" : "w-3.5 h-3.5"} rounded-full border transition-transform ${
                   (group.colorTag || "") === c ? "scale-125 ring-1 ring-offset-1" : "opacity-50 hover:opacity-100"
                 } ${c === "" ? "border-dashed" : ""}`}
-                style={c ? { backgroundColor: colorMap[c] } : {}}
+                style={c ? { backgroundColor: COLOR_MAP[c] } : {}}
                 title={c === "green" ? "Yeşil" : c === "orange" ? "Turuncu" : c === "red" ? "Kırmızı" : "Renksiz"}
                 aria-label={c === "green" ? "Yeşil etiket" : c === "orange" ? "Turuncu etiket" : c === "red" ? "Kırmızı etiket" : "Renk etiketini kaldır"}
                 aria-pressed={(group.colorTag || "") === c}

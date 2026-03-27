@@ -5,6 +5,7 @@ import { ArrowLeft, Printer, Download } from "lucide-react";
 import type { KesimAlani } from "@/lib/types";
 import { fetchKesimAlani, fetchKesimAlaniTrackingNotes } from "@/lib/api";
 import type { TrackingNote } from "@/lib/api";
+import { formatDate, formatTime } from "@/lib/formatting";
 
 interface HourBucket {
   hour: string;
@@ -16,29 +17,6 @@ interface TeamStat {
   color: string;
   total: number;
   completed: number;
-}
-
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("tr-TR", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  } catch {
-    return "";
-  }
-}
-
-function formatTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleTimeString("tr-TR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "";
-  }
 }
 
 export default function KesimRaporPage() {
