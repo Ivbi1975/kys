@@ -122,12 +122,12 @@ const photoUploadSchema = z.object({
 });
 
 const createTeamSchema = z.object({
-  name: z.string().min(1, "Ekip adı gerekli").transform(s => s.trim()),
+  name: z.string().trim().min(1, "Ekip adı gerekli"),
   color: z.string().optional().default("#3b82f6"),
 });
 
 const updateTeamSchema = z.object({
-  name: z.string().min(1).transform(s => s.trim()).optional(),
+  name: z.string().trim().min(1).optional(),
   color: z.string().optional(),
 });
 
@@ -136,7 +136,7 @@ const assignTeamSchema = z.object({
 });
 
 const notificationTemplateSchema = z.object({
-  template: z.string().min(1, "Şablon metni gerekli").transform(s => s.trim()),
+  template: z.string().trim().min(1, "Şablon metni gerekli"),
 });
 
 const router: IRouter = Router();

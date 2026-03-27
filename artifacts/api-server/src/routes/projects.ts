@@ -16,11 +16,11 @@ import { z } from "zod";
 import { cacheGet, cacheSet, cacheInvalidate, cacheInvalidatePrefix } from "../lib/cache";
 
 const createProjectSchema = z.object({
-  name: z.string().min(1, "Proje adı gerekli").transform(s => s.trim()),
+  name: z.string().trim().min(1, "Proje adı gerekli"),
 });
 
 const updateProjectSchema = z.object({
-  name: z.string().min(1, "Proje adı gerekli").transform(s => s.trim()),
+  name: z.string().trim().min(1, "Proje adı gerekli"),
 });
 
 const PROJECTS_CACHE_KEY = "projects:list";

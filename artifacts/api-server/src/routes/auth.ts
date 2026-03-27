@@ -1,9 +1,19 @@
 import { Router } from "express";
+import { z } from "zod";
 
 const router = Router();
 
+const loginSchema = z.object({
+  password: z.string().min(1, "Şifre gerekli"),
+});
+
 router.post("/auth/login", (req, res) => {
-  const { password } = req.body || {};
+  const parsed = loginSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    return;
+  }
+
   const apiKey = process.env.API_KEY || "";
 
   if (!apiKey) {
@@ -11,7 +21,7 @@ router.post("/auth/login", (req, res) => {
     return;
   }
 
-  if (!password || password !== apiKey) {
+  if (parsed.data.password !== apiKey) {
     res.status(401).json({ error: "Şifre hatalı." });
     return;
   }
