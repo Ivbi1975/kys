@@ -109,7 +109,12 @@ Key files:
 - `src/pages/home.tsx` - Home page with project cards (collapsible), kesim alanı list grouped by project, project CRUD, move kesim alanı between projects, settings (logo, backup, theme selector, tag management)
 - `src/pages/kesim-alani.tsx` - Main editing page entry point (imports hook + content + dialogs components)
 - `src/components/kesim-alani/useKesimAlaniState.tsx` - All state, hooks, handlers, effects for kesim-alani page (~3800 lines)
-- `src/components/kesim-alani/KesimAlaniContent.tsx` - Main content layout: donor table, animal groups, stats, export (~2700 lines)
+- `src/components/kesim-alani/KesimAlaniContent.tsx` - Thin orchestrator (~140 lines) wrapping sub-components via KesimAlaniContext
+- `src/components/kesim-alani/KesimAlaniContext.tsx` - React Context provider eliminating 250+ prop drilling
+- `src/components/kesim-alani/sections/KesimAlaniHeader.tsx` - Breadcrumb, action buttons, save status, undo/redo, export
+- `src/components/kesim-alani/sections/StatsCards.tsx` - Stats grid, share distribution, group compositions
+- `src/components/kesim-alani/sections/DonorListPanel.tsx` - Left panel: search, filters, bulk import, virtual donor table
+- `src/components/kesim-alani/sections/GroupListPanel.tsx` - Right panel: group toolbar, minimap, conflict display, virtualized group cards
 - `src/components/kesim-alani/KesimAlaniDialogs.tsx` - All dialog/modal components for kesim-alani (~1400 lines)
 - `src/pages/print.tsx` - Print-optimized A4 landscape view matching Excel design
 - `src/pages/kesim-takip.tsx` - Public kesim tracking page (no auth), shows animal groups with kesildi toggle, offline mode with IndexedDB + Service Worker
