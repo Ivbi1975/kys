@@ -13,7 +13,8 @@ import { AlertTriangle, ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, Brain, 
 import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationLogs } from "@/lib/api";
   import { checkGroupConflicts } from "@/lib/grouping";
   import { ALL_GROUP_COLUMNS, type ColumnKey } from "@/lib/useWorkspacePreferences";
-  import type { useKesimAlaniState, ColumnMapping } from "./useKesimAlaniState";
+  import type { useKesimAlaniState } from "./useKesimAlaniState";
+import type { ColumnMapping } from "./hooks/useImportExport";
 
   type KesimAlaniStateReturn = ReturnType<typeof useKesimAlaniState>;
 

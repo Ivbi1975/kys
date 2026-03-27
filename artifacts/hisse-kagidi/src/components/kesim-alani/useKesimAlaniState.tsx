@@ -113,20 +113,18 @@ import { AnimalGroupCard } from "@/components/AnimalGroupCard";
 import { getTotalShares, getRequiredAnimals, checkGroupConflicts, computeEffectiveShares, trCollator } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
 import { useGroupingWorker } from "@/lib/useGroupingWorker";
-import { useHistory } from "@/lib/useHistory";
 import { useWorkspacePreferences, ALL_GROUP_COLUMNS, type ColumnKey } from "@/lib/useWorkspacePreferences";
+import { useUndoRedo } from "./hooks/useUndoRedo";
+import { useDragAndDrop } from "./hooks/useDragAndDrop";
+import { useImportExport } from "./hooks/useImportExport";
+import { useKesimAlaniFilters } from "./hooks/useKesimAlaniFilters";
 import { useTheme } from "@/lib/useTheme";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-const getXLSX = () => import("xlsx-js-style");
-
-
   type SortField = "name" | "description" | "donationType" | "shareCount";
-type SortDir = "asc" | "desc";
-export type ColumnMapping = "name" | "description" | "donationType" | "shareCount" | "vekalet" | "notes" | "skip";
 
 interface BasketItem {
   donationId: string;
@@ -158,15 +156,6 @@ function saveBasketToStorage(items: BasketItem[], projectId: string | null | und
   } catch {}
 }
 
-const COLUMN_OPTIONS: { value: ColumnMapping; label: string }[] = [
-  { value: "name", label: "Adına Kesilen" },
-  { value: "description", label: "Vekaleti Veren" },
-  { value: "donationType", label: "Cinsi" },
-  { value: "shareCount", label: "Hisse Sayısı" },
-  { value: "vekalet", label: "Vekalet No" },
-  { value: "notes", label: "Notlar" },
-  { value: "skip", label: "Atla (kullanma)" },
-];
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -188,22 +177,9 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [kesim, setKesim] = useState<KesimAlani | null>(null);
-  const [sortField, setSortField] = useState<SortField | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
-  const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const [colorTagFilter, setColorTagFilter] = useState<ColorTag | "all">("all");
-  const history = useHistory();
   const { toggle: toggleTheme, mode: themeMode } = useTheme();
 
-  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
-  const [bulkMode, setBulkMode] = useState<"upload" | "paste">("upload");
-  const [pasteText, setPasteText] = useState("");
-  const [previewData, setPreviewData] = useState<string[][]>([]);
-  const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([]);
-  const [hasHeaderRow, setHasHeaderRow] = useState(true);
-  const [bulkStep, setBulkStep] = useState<"input" | "mapping" | "review">("input");
-  const [bulkReviewRows, setBulkReviewRows] = useState<{ idx: number; row: string[]; rawShareCount: number; selected: boolean; groupKey: string; groupTotal: number }[]>([]);
-  const [bulkReviewExpanded, setBulkReviewExpanded] = useState<Set<string>>(new Set());
   const [jumpDialogOpen, setJumpDialogOpen] = useState(false);
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -220,13 +196,8 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   const [conflicts, setConflicts] = useState<ConflictInfo[]>([]);
   const [showConflicts, setShowConflicts] = useState(false);
   const [personEditDesc, setPersonEditDesc] = useState<string | null>(null);
-  const [personSearchQuery, setPersonSearchQuery] = useState("");
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-  const [filterUngrouped, setFilterUngrouped] = useState(false);
   const [groupSearchQuery, setGroupSearchQuery] = useState("");
   const [groupSearchMatchIdx, setGroupSearchMatchIdx] = useState(0);
-  const [showOnlyIncomplete, setShowOnlyIncomplete] = useState(false);
-  const [highlightIncomplete, setHighlightIncomplete] = useState(true);
   const [selectedGroupDonations, setSelectedGroupDonations] = useState<Set<string>>(new Set());
   const [bulkMoveTargetGroup, setBulkMoveTargetGroup] = useState<number>(-1);
   const [bulkGroupEditOpen, setBulkGroupEditOpen] = useState(false);
@@ -238,22 +209,14 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   const [bulkEditField, setBulkEditField] = useState<"donationType" | "shareCount" | "notes" | "vekalet">("donationType");
   const [bulkEditValue, setBulkEditValue] = useState("");
   const [rangeLockInput, setRangeLockInput] = useState("");
-  const [dragItem, setDragItem] = useState<{
-    groupIdx: number;
-    donationIdx: number;
-  } | null>(null);
-  const [dragOverItem, setDragOverItem] = useState<{
-    groupIdx: number;
-    donationIdx: number;
-  } | null>(null);
   const [donorListVisible, setDonorListVisible] = useState(true);
   const [fullscreenMode, setFullscreenMode] = useState(false);
   const workspace = useWorkspacePreferences();
   const { runGrouping, runIncrementalGrouping, cancelGrouping } = useGroupingWorker();
+  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const groupsScrollTopRef = useRef<number>(0);
-  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const [columnDragItem, setColumnDragItem] = useState<ColumnKey | null>(null);
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
   const [swapSelection, setSwapSelection] = useState<{
@@ -281,14 +244,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   const [minimapOpen, setMinimapOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [globalTags, setGlobalTags] = useState<CustomTag[]>([]);
-  const [filterCinsi, setFilterCinsi] = useState<string>("all");
-  const [filterHisseMin, setFilterHisseMin] = useState<number>(0);
-  const [filterHisseMax, setFilterHisseMax] = useState<number>(0);
-  const [filterTags, setFilterTags] = useState<string[]>([]);
-  const [filterAiCategories, setFilterAiCategories] = useState<string[]>([]);
-  const [filterAiWarnings, setFilterAiWarnings] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "excluded">("all");
-  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [tagPopoverDonorId, setTagPopoverDonorId] = useState<string | null>(null);
   const [basketItems, setBasketItems] = useState<BasketItem[]>([]);
   const [basketTransferTarget, setBasketTransferTarget] = useState<number>(-1);
@@ -298,9 +253,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   const [basketOpen, setBasketOpen] = useState(true);
   const [projectName, setProjectName] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [, startFilterTransition] = useTransition();
   const [removedFromGroupIds, setRemovedFromGroupIds] = useState<Set<string>>(new Set());
-  const [showRemovedFilter, setShowRemovedFilter] = useState(false);
   const [smartPlacePopover, setSmartPlacePopover] = useState<string | null>(null);
   const [splitShareDialog, setSplitShareDialog] = useState<{ donationId: string; totalShares: number } | null>(null);
   const [splitGroupDialog, setSplitGroupDialog] = useState<{ groupIdx: number; splitAt: number } | null>(null);
@@ -323,7 +276,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   const [teamName, setTeamName] = useState("");
   const [teamColor, setTeamColor] = useState("#3b82f6");
   const [teamSaving, setTeamSaving] = useState(false);
-  const [filterTeam, setFilterTeam] = useState<string>("all");
 
   const [notificationLogsOpen, setNotificationLogsOpen] = useState(false);
   const [notificationLogs, setNotificationLogs] = useState<NotificationLog[]>([]);
@@ -332,31 +284,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   const [notificationTemplate, setNotificationTemplate] = useState("Hayvan {animalNo} kesildi. Hayırlı olsun!");
   const [notificationTemplateSaving, setNotificationTemplateSaving] = useState(false);
 
-  const [donorListReportOpen, setDonorListReportOpen] = useState(false);
-  const [csvExporting, setCsvExporting] = useState(false);
-
-  async function handleExportKaCsv() {
-    if (!kesim) return;
-    setCsvExporting(true);
-    try {
-      const blob = await downloadCsvExport(kesim.id);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${kesim.name.replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ ]/g, "").replace(/\s+/g, "_")}_bagiscilar.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast({ title: "CSV indirildi" });
-    } catch (err) {
-      toast({
-        title: "CSV export hatası",
-        description: err instanceof Error ? err.message : "Bilinmeyen hata",
-        variant: "destructive",
-      });
-    } finally {
-      setCsvExporting(false);
-    }
-  }
   const [transferToDonorListConfirm, setTransferToDonorListConfirm] = useState(false);
   const [transferToDonorListRemoving, setTransferToDonorListRemoving] = useState(false);
   const [findDeleteOpen, setFindDeleteOpen] = useState(false);
@@ -374,7 +301,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   const [trashLoading, setTrashLoading] = useState(false);
   const [trashPermanentConfirm, setTrashPermanentConfirm] = useState<string | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const jumpInputRef = useRef<HTMLInputElement>(null);
   const groupsHeaderRef = useRef<HTMLDivElement>(null);
@@ -667,6 +593,9 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     pendingSaveRef.current = null;
   }, []);
 
+  const undoRedo = useUndoRedo({ setKesim, saveToApi, discardPendingSave });
+  const { history, historyPanelOpen, setHistoryPanelOpen, handleUndo, handleRedo, handleGoToStep } = undoRedo;
+
   const save = useCallback(
     (updated: KesimAlani, desc?: string, immediate?: boolean, saveType: 'full' | 'donations' | 'groups' = 'full') => {
       setKesim(updated);
@@ -680,34 +609,19 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
         history.push(updated, desc);
       }
     },
-    [saveToApi, debouncedSaveToApi, discardPendingSave]
+    [saveToApi, debouncedSaveToApi, discardPendingSave, history]
   );
 
-  const handleUndo = useCallback(() => {
-    const prev = history.undo();
-    if (prev) {
-      setKesim(prev);
-      discardPendingSave();
-      saveToApi(prev);
-    }
-  }, [history, saveToApi, discardPendingSave]);
-
-  const handleRedo = useCallback(() => {
-    const next = history.redo();
-    if (next) {
-      setKesim(next);
-      discardPendingSave();
-      saveToApi(next);
-    }
-  }, [history, saveToApi, discardPendingSave]);
-
-  const handleGoToStep = useCallback((index: number) => {
-    const target = history.goToStep(index);
-    if (target) {
-      setKesim(target);
-      saveToApi(target);
-    }
-  }, [history, saveToApi]);
+  const importExport = useImportExport({ kesim, save, toast });
+  const {
+    bulkDialogOpen, setBulkDialogOpen, bulkMode, setBulkMode, pasteText, setPasteText,
+    previewData, setPreviewData, columnMappings, setColumnMappings, hasHeaderRow, setHasHeaderRow,
+    bulkStep, setBulkStep, bulkReviewRows, setBulkReviewRows, bulkReviewExpanded, setBulkReviewExpanded,
+    csvExporting, setCsvExporting, donorListReportOpen, setDonorListReportOpen, fileInputRef,
+    handleFileUpload, handlePasteData, processRawData, applyBulkImport, resetBulkDialog,
+    exportDonorsExcel, exportGroupsExcel, handleExportKaCsv, displayPreviewRows, headerRow,
+    COLUMN_OPTIONS,
+  } = importExport;
 
   const saveSingleDonationField = useCallback((
     donationId: string,
@@ -1029,146 +943,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     }
   }
 
-  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const XLSX = await getXLSX();
-        const data = evt.target?.result;
-        const workbook = XLSX.read(data, { type: "binary" });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-        if (rows.length > 0) {
-          processRawData(rows);
-        }
-      } catch {
-        toast({ title: "Excel dosyası okunamadı", description: "Lütfen geçerli bir dosya seçin.", variant: "destructive" });
-      }
-    };
-    reader.readAsBinaryString(file);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }
-
-  function handlePasteData() {
-    if (!pasteText.trim()) return;
-    const lines = pasteText.trim().split("\n");
-    const rows = lines.map((line) => line.split("\t").map((c) => c.trim()));
-    processRawData(rows);
-  }
-
-  function processRawData(rows: string[][]) {
-    setPreviewData(rows);
-    const colCount = Math.max(...rows.map((r) => r.length));
-    const defaultMappings: ColumnMapping[] = [];
-    const defaults: ColumnMapping[] = ["skip", "skip", "vekalet", "description", "name", "donationType", "notes"];
-    for (let i = 0; i < colCount; i++) {
-      defaultMappings.push(i < defaults.length ? defaults[i] : "skip");
-    }
-    setColumnMappings(defaultMappings);
-    setBulkStep("mapping");
-  }
-
-  function applyBulkImport() {
-    if (!kesim || previewData.length === 0) return;
-    const startRow = hasHeaderRow ? 1 : 0;
-    const shareCountColIdx = columnMappings.indexOf("shareCount");
-    const descColIdx = columnMappings.indexOf("description");
-
-    if (bulkStep !== "review") {
-      const groupTotals = new Map<string, { total: number; rows: { idx: number; row: string[]; shareCount: number }[] }>();
-
-      for (let r = startRow; r < previewData.length; r++) {
-        const row = previewData[r];
-        const desc = descColIdx >= 0 ? String(row[descColIdx] ?? "").trim().toLocaleLowerCase("tr") : "";
-        const shareCount = shareCountColIdx >= 0
-          ? (parseInt(String(row[shareCountColIdx] ?? "1").trim(), 10) || 1)
-          : 1;
-
-        if (!desc) continue;
-
-        if (!groupTotals.has(desc)) {
-          groupTotals.set(desc, { total: 0, rows: [] });
-        }
-        const group = groupTotals.get(desc)!;
-        group.total += shareCount;
-        group.rows.push({ idx: r, row, shareCount });
-      }
-
-      const highShareRows: typeof bulkReviewRows = [];
-      for (const [groupKey, group] of groupTotals) {
-        if (group.total > 50) {
-          for (const item of group.rows) {
-            highShareRows.push({
-              idx: item.idx,
-              row: item.row,
-              rawShareCount: item.shareCount,
-              selected: true,
-              groupKey,
-              groupTotal: group.total,
-            });
-          }
-        }
-      }
-
-      if (highShareRows.length > 0) {
-        highShareRows.sort((a, b) => a.groupKey.localeCompare(b.groupKey) || a.idx - b.idx);
-        setBulkReviewRows(highShareRows);
-        setBulkStep("review");
-        return;
-      }
-    }
-
-    const excludedIdxs = new Set(bulkReviewRows.filter(r => r.selected).map(r => r.idx));
-
-    const newDonations: Donation[] = [];
-    for (let r = startRow; r < previewData.length; r++) {
-      if (excludedIdxs.has(r)) continue;
-      const row = previewData[r];
-      const donation: Partial<Donation> = {
-        id: generateId(),
-        name: "",
-        description: "",
-        donationType: "",
-        shareCount: 1,
-        vekalet: "",
-        notes: "",
-      };
-
-      for (let c = 0; c < columnMappings.length; c++) {
-        const mapping = columnMappings[c];
-        const cellValue = String(row[c] ?? "").trim();
-        if (mapping === "skip" || !cellValue) continue;
-        if (mapping === "shareCount") {
-          donation.shareCount = Math.max(1, Math.min(7, parseInt(cellValue, 10) || 1));
-        } else {
-          (donation as any)[mapping] = cellValue;
-        }
-      }
-
-      if (donation.name) {
-        newDonations.push(donation as Donation);
-      }
-    }
-
-    save({ ...kesim, donations: [...kesim.donations, ...newDonations] }, `${newDonations.length} bağışçı toplu eklendi`, true);
-    resetBulkDialog();
-  }
-
-  function resetBulkDialog() {
-    setBulkDialogOpen(false);
-    setBulkStep("input");
-    setBulkMode("upload");
-    setPasteText("");
-    setPreviewData([]);
-    setColumnMappings([]);
-    setHasHeaderRow(true);
-    setBulkReviewRows([]);
-    setBulkReviewExpanded(new Set());
-  }
-
   async function handleAutoGroup(forceFullRegroup = false) {
     if (!kesim || groupingInProgress) return;
     setGroupingInProgress(true);
@@ -1336,189 +1110,11 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     return !!kesim?.animalGroups[groupIdx]?.locked;
   }
 
-  function moveGroupDonation(
-    groupIdx: number,
-    fromIdx: number,
-    toGroupIdx: number,
-    toIdx: number
-  ) {
-    if (!kesim) return;
-    if (isGroupLocked(groupIdx) || isGroupLocked(toGroupIdx)) return;
-    const groups = kesim.animalGroups.map((g) => ({
-      ...g,
-      donations: [...g.donations],
-    }));
-    const [item] = groups[groupIdx].donations.splice(fromIdx, 1);
-    groups[toGroupIdx].donations.splice(toIdx, 0, item);
-
-    if (groups[groupIdx].donations.length > 7) {
-      groups[groupIdx].donations = groups[groupIdx].donations.slice(0, 7);
-    }
-    if (groups[toGroupIdx].donations.length > 7) {
-      const overflow = groups[toGroupIdx].donations.splice(7);
-      groups[groupIdx].donations.push(...overflow);
-    }
-
-    save({ ...kesim, animalGroups: groups }, `Grup içi taşıma yapıldı`, false, 'groups');
-  }
-
-  const [dragOverGroup, setDragOverGroup] = useState<number | null>(null);
-
-  const dragOverRef = useRef<{ groupIdx: number; donationIdx: number } | null>(null);
-  const dragOverGroupRef = useRef<number | null>(null);
-  const dragRafRef = useRef<number>(0);
-  const dragGhostRef = useRef<HTMLDivElement | null>(null);
-  const autoScrollRafRef = useRef<number>(0);
-
-  useEffect(() => {
-    return () => {
-      if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current);
-      if (autoScrollRafRef.current) cancelAnimationFrame(autoScrollRafRef.current);
-      if (dragGhostRef.current) {
-        document.body.removeChild(dragGhostRef.current);
-        dragGhostRef.current = null;
-      }
-    };
-  }, []);
-
-  const handleDragStart = useCallback((groupIdx: number, donationIdx: number, e?: React.DragEvent) => {
-    setDragItem({ groupIdx, donationIdx });
-    if (e?.dataTransfer) {
-      e.dataTransfer.effectAllowed = "move";
-      const target = e.currentTarget as HTMLElement;
-      target.style.opacity = "0.5";
-
-      const ghost = document.createElement("div");
-      ghost.style.cssText = "position:fixed;top:-1000px;left:-1000px;padding:6px 12px;background:#6366f1;color:#fff;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;pointer-events:none;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);";
-      if (kesim) {
-        const donation = kesim.animalGroups[groupIdx]?.donations[donationIdx];
-        if (donation?.name.trim()) {
-          ghost.textContent = `${donation.name} (${donation.shareCount} hisse)`;
-          e.dataTransfer.setData("text/plain", `${donation.name} (${donation.shareCount} hisse)`);
-        } else {
-          ghost.textContent = `Sıra ${donationIdx + 1}`;
-        }
-      }
-      document.body.appendChild(ghost);
-      dragGhostRef.current = ghost;
-      e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, ghost.offsetHeight / 2);
-    }
-  }, [kesim]);
-
-  const handleDragOver = useCallback((
-    e: React.DragEvent,
-    groupIdx: number,
-    donationIdx: number
-  ) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-
-    const prev = dragOverRef.current;
-    if (prev && prev.groupIdx === groupIdx && prev.donationIdx === donationIdx) return;
-    dragOverRef.current = { groupIdx, donationIdx };
-    dragOverGroupRef.current = groupIdx;
-
-    if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current);
-    dragRafRef.current = requestAnimationFrame(() => {
-      setDragOverItem({ groupIdx, donationIdx });
-      setDragOverGroup(groupIdx);
-    });
-
-    const container = scrollContainerRef.current;
-    if (container) {
-      const rect = container.getBoundingClientRect();
-      const y = e.clientY;
-      const edgeZone = 60;
-      if (autoScrollRafRef.current) cancelAnimationFrame(autoScrollRafRef.current);
-
-      const doAutoScroll = () => {
-        if (!scrollContainerRef.current) return;
-        const r = scrollContainerRef.current.getBoundingClientRect();
-        const curY = dragOverRef.current ? y : 0;
-        if (curY < r.top + edgeZone) {
-          scrollContainerRef.current.scrollTop -= 8;
-          autoScrollRafRef.current = requestAnimationFrame(doAutoScroll);
-        } else if (curY > r.bottom - edgeZone) {
-          scrollContainerRef.current.scrollTop += 8;
-          autoScrollRafRef.current = requestAnimationFrame(doAutoScroll);
-        }
-      };
-
-      if (y < rect.top + edgeZone || y > rect.bottom - edgeZone) {
-        autoScrollRafRef.current = requestAnimationFrame(doAutoScroll);
-      }
-    }
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent, groupIdx: number) => {
-    const relatedTarget = e.relatedTarget as HTMLElement;
-    const currentTarget = e.currentTarget as HTMLElement;
-    if (!currentTarget.contains(relatedTarget)) {
-      if (dragOverGroupRef.current === groupIdx) {
-        dragOverGroupRef.current = null;
-        dragOverRef.current = null;
-        setDragOverGroup(null);
-      }
-      if (autoScrollRafRef.current) {
-        cancelAnimationFrame(autoScrollRafRef.current);
-        autoScrollRafRef.current = 0;
-      }
-    }
-  }, []);
-
-  const handleDrop = useCallback((groupIdx: number, donationIdx: number) => {
-    if (autoScrollRafRef.current) cancelAnimationFrame(autoScrollRafRef.current);
-    dragOverRef.current = null;
-    dragOverGroupRef.current = null;
-
-    if (dragItem && kesim) {
-      const srcGroup = kesim.animalGroups[dragItem.groupIdx];
-      const tgtGroup = kesim.animalGroups[groupIdx];
-      if (srcGroup && tgtGroup && dragItem.groupIdx !== groupIdx) {
-        const dragDonation = srcGroup.donations[dragItem.donationIdx];
-        const tgtDonation = tgtGroup.donations[donationIdx];
-        if (dragDonation?.name.trim() && !tgtDonation?.name.trim()) {
-          const tgtFilledCount = tgtGroup.donations.filter(d => d.name.trim()).length;
-          if (tgtFilledCount + 1 > 7) {
-            toast({
-              title: "Kapasite Aşımı",
-              description: `Hedef grupta boş slot kalmadı.`,
-              variant: "destructive",
-            });
-            setDragItem(null);
-            setDragOverItem(null);
-            setDragOverGroup(null);
-            return;
-          }
-        }
-      }
-      moveGroupDonation(
-        dragItem.groupIdx,
-        dragItem.donationIdx,
-        groupIdx,
-        donationIdx
-      );
-    }
-    setDragItem(null);
-    setDragOverItem(null);
-    setDragOverGroup(null);
-  }, [dragItem, kesim]);
-
-  const handleDragEnd = useCallback((e: React.DragEvent) => {
-    (e.currentTarget as HTMLElement).style.opacity = "1";
-    if (autoScrollRafRef.current) cancelAnimationFrame(autoScrollRafRef.current);
-    if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current);
-    dragOverRef.current = null;
-    dragOverGroupRef.current = null;
-    setDragItem(null);
-    setDragOverItem(null);
-    setDragOverGroup(null);
-
-    if (dragGhostRef.current) {
-      document.body.removeChild(dragGhostRef.current);
-      dragGhostRef.current = null;
-    }
-  }, []);
+  const dragAndDrop = useDragAndDrop({ kesim, save, toast, isGroupLocked, scrollContainerRef });
+  const {
+    dragItem, setDragItem, dragOverItem, setDragOverItem, dragOverGroup, setDragOverGroup,
+    moveGroupDonation, handleDragStart, handleDragOver, handleDragLeave, handleDrop, handleDragEnd, handleDragOverCard,
+  } = dragAndDrop;
 
   function startEditing(donationId: string, field: string) {
     if (!kesim) return;
@@ -2166,83 +1762,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     const newConflicts = checkGroupConflicts(groups);
     setConflicts(newConflicts);
     if (newConflicts.length > 0) setShowConflicts(true);
-  }
-
-  async function exportDonorsExcel() {
-    if (!kesim) return;
-    const XLSX = await getXLSX();
-    const wb = XLSX.utils.book_new();
-
-    const donorData = kesim.donations.map((d, i) => ({
-      "Sıra": i + 1,
-      "Kesim Listesi ID": kesim.kesimListeId || "",
-      "Adına Kesilen": d.name,
-      "Vekaleti Veren": d.description,
-      "Cinsi": d.donationType,
-      "Hisse": d.shareCount,
-      "Vekalet": d.vekalet,
-      "Notlar": d.notes,
-      "Durum": d.excluded ? "Hariç" : "Dahil",
-    }));
-    const wsDonors = XLSX.utils.json_to_sheet(donorData);
-    wsDonors["!cols"] = [
-      { wch: 6 }, { wch: 16 }, { wch: 22 }, { wch: 22 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 18 }, { wch: 8 },
-    ];
-    XLSX.utils.book_append_sheet(wb, wsDonors, "Bağışçılar");
-
-    if (kesim.animalGroups.length > 0) {
-      const groupData: Record<string, string | number>[] = [];
-      for (const group of kesim.animalGroups) {
-        for (let i = 0; i < group.donations.length; i++) {
-          const d = group.donations[i];
-          groupData.push({
-            "Kesim Listesi ID": kesim.kesimListeId || "",
-            "Hayvan No": group.animalNo,
-            "Sıra": i + 1,
-            "Vekalet": d.vekalet,
-            "Vekaleti Veren": d.description,
-            "Adına Kesilen": d.name,
-            "Cinsi": d.donationType,
-            "Notlar": d.notes,
-          });
-        }
-      }
-      const wsGroups = XLSX.utils.json_to_sheet(groupData);
-      wsGroups["!cols"] = [
-        { wch: 16 }, { wch: 10 }, { wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 10 }, { wch: 18 },
-      ];
-      XLSX.utils.book_append_sheet(wb, wsGroups, "Hayvan Grupları");
-    }
-
-    XLSX.writeFile(wb, `${kesim.name}_bagiscilar.xlsx`);
-  }
-
-  async function exportGroupsExcel() {
-    if (!kesim || kesim.animalGroups.length === 0) return;
-    const XLSX = await getXLSX();
-    const data: Record<string, string | number>[] = [];
-    for (const group of kesim.animalGroups) {
-      for (let i = 0; i < group.donations.length; i++) {
-        const d = group.donations[i];
-        data.push({
-          "Kesim Listesi ID": kesim.kesimListeId || "",
-          "Hayvan No": group.animalNo,
-          "Sıra": i + 1,
-          "Vekalet": d.vekalet,
-          "Vekaleti Veren": d.description,
-          "Adına Kesilen": d.name,
-          "Cinsi": d.donationType,
-          "Notlar": d.notes,
-        });
-      }
-    }
-    const ws = XLSX.utils.json_to_sheet(data);
-    ws["!cols"] = [
-      { wch: 16 }, { wch: 10 }, { wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 10 }, { wch: 18 },
-    ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Kesim Kağıdı");
-    XLSX.writeFile(wb, `${kesim.name}_kesim_kagidi.xlsx`);
   }
 
   const toggleGroupCollapse = useCallback((groupId: string) => {
@@ -3155,6 +2674,20 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     return map;
   }, [donations]);
 
+  const filters = useKesimAlaniFilters({ donations, groupedDonorIds, removedFromGroupIds });
+  const {
+    sortField, setSortField, sortDir, setSortDir,
+    personSearchQuery, setPersonSearchQuery, debouncedSearchQuery, setDebouncedSearchQuery,
+    filterUngrouped, setFilterUngrouped, showOnlyIncomplete, setShowOnlyIncomplete,
+    highlightIncomplete, setHighlightIncomplete,
+    filterCinsi, setFilterCinsi, filterHisseMin, setFilterHisseMin, filterHisseMax, setFilterHisseMax,
+    filterTags, setFilterTags, filterAiCategories, setFilterAiCategories, filterAiWarnings, setFilterAiWarnings,
+    filterStatus, setFilterStatus, showAdvancedFilter, setShowAdvancedFilter,
+    filterTeam, setFilterTeam, showRemovedFilter, setShowRemovedFilter,
+    startFilterTransition, activeFilterCount, clearAdvancedFilters,
+    searchIndex, filteredDonations, uniqueDonationTypes, availableAiCategories,
+  } = filters;
+
   const sortedDonorList = useMemo(() => {
     const active = donations.filter(d => !d.excluded);
     return [...active].sort((a, b) => {
@@ -3164,118 +2697,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
       return trCollator.compare(ka.descSurname, kb.descSurname);
     });
   }, [donations, sortKeyMap]);
-
-  const searchIndex = useMemo(() => {
-    const trigramIndex = new Map<string, Set<string>>();
-    const contentMap = new Map<string, string>();
-
-    function addTrigrams(text: string, id: string) {
-      const padded = `  ${text}  `;
-      for (let i = 0; i <= padded.length - 3; i++) {
-        const tri = padded.substring(i, i + 3);
-        let set = trigramIndex.get(tri);
-        if (!set) {
-          set = new Set();
-          trigramIndex.set(tri, set);
-        }
-        set.add(id);
-      }
-    }
-
-    for (const d of donations) {
-      const text = turkishNormalize([d.name, d.description, d.vekalet, d.donationType, d.notes || ""].join("\t"));
-      contentMap.set(d.id, text);
-      addTrigrams(text, d.id);
-    }
-
-    return {
-      search(query: string): Set<string> | null {
-        if (!query) return null;
-        const q = turkishNormalize(query.trim());
-        if (q.length === 0) return null;
-
-        if (q.length < 3) {
-          const results = new Set<string>();
-          for (const [id, text] of contentMap) {
-            if (text.includes(q)) results.add(id);
-          }
-          return results;
-        }
-
-        const padded = `  ${q}  `;
-        let result: Set<string> | null = null;
-        for (let i = 0; i <= padded.length - 3; i++) {
-          const tri = padded.substring(i, i + 3);
-          const matches = trigramIndex.get(tri);
-          if (!matches || matches.size === 0) return new Set();
-          if (result === null) {
-            result = new Set(matches);
-          } else {
-            for (const id of result) {
-              if (!matches.has(id)) result.delete(id);
-            }
-            if (result.size === 0) return result;
-          }
-        }
-
-        if (result) {
-          for (const id of result) {
-            const text = contentMap.get(id);
-            if (!text || !text.includes(q)) result.delete(id);
-          }
-        }
-
-        return result ?? new Set();
-      }
-    };
-  }, [donations]);
-
-  const filteredDonations = useMemo(() => {
-    const preFiltered = showRemovedFilter
-      ? donations.filter(d => removedFromGroupIds.has(d.id))
-      : filterUngrouped
-      ? donations.filter(d => !d.excluded && !groupedDonorIds.has(d.id))
-      : donations;
-
-    const advFiltered = preFiltered.filter(d => {
-      if (filterStatus === "active" && d.excluded) return false;
-      if (filterStatus === "excluded" && !d.excluded) return false;
-      if (filterCinsi !== "all" && turkishNormalize(d.donationType) !== turkishNormalize(filterCinsi)) return false;
-      if (filterHisseMin > 0 && d.shareCount < filterHisseMin) return false;
-      if (filterHisseMax > 0 && d.shareCount > filterHisseMax) return false;
-      if (filterTags.length > 0) {
-        const donorTags = d.tags || [];
-        if (!filterTags.some(ft => donorTags.includes(ft))) return false;
-      }
-      if (filterAiCategories.length > 0) {
-        const cats = d.aiCategories || [];
-        if (!filterAiCategories.some(fc => cats.includes(fc))) return false;
-      }
-      if (filterAiWarnings) {
-        if (!d.aiWarnings || !d.aiWarnings.trim()) return false;
-      }
-      return true;
-    });
-
-    if (!debouncedSearchQuery.trim()) return advFiltered;
-    const matchedIds = searchIndex.search(debouncedSearchQuery);
-    if (!matchedIds) return advFiltered;
-    return advFiltered.filter(d => matchedIds.has(d.id));
-  }, [donations, showRemovedFilter, removedFromGroupIds, filterUngrouped, groupedDonorIds, filterStatus, filterCinsi, filterHisseMin, filterHisseMax, filterTags, filterAiCategories, filterAiWarnings, debouncedSearchQuery, searchIndex]);
-
-  const uniqueDonationTypes = useMemo(() =>
-    Array.from(new Set(
-      donations.map(d => d.donationType.trim()).filter(Boolean)
-    )).sort(),
-    [donations]
-  );
-
-  const availableAiCategories = useMemo(() =>
-    Array.from(new Set(
-      donations.flatMap(d => d.aiCategories || [])
-    )).sort(),
-    [donations]
-  );
 
   const virtuosoTableComponents = useMemo(() => ({
     Table: VirtuosoTable,
@@ -3351,13 +2772,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     }
   }, [kesim, basketItemIds]);
 
-  const handleDragOverCard = useCallback((e: React.DragEvent, groupIdx: number) => {
-    e.preventDefault();
-    if (dragOverGroupRef.current === groupIdx) return;
-    dragOverGroupRef.current = groupIdx;
-    setDragOverGroup(groupIdx);
-  }, []);
-
   const handleSelectAllGroupDonations = useCallback((filledDonations: Donation[], allSelected: boolean) => {
     setSelectedGroupDonations(prev => {
       const next = new Set(prev);
@@ -3370,27 +2784,6 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   const totalShares = kesim ? getTotalShares(kesim.donations) : 0;
   const requiredAnimals = kesim ? getRequiredAnimals(kesim.donations) : 0;
   const remainingSlots = requiredAnimals * 7 - totalShares;
-
-  const activeFilterCount =
-    (filterCinsi !== "all" ? 1 : 0) +
-    (filterHisseMin > 0 || filterHisseMax > 0 ? 1 : 0) +
-    (filterTags.length > 0 ? 1 : 0) +
-    (filterAiCategories.length > 0 ? 1 : 0) +
-    (filterAiWarnings ? 1 : 0) +
-    (filterStatus !== "all" ? 1 : 0);
-
-  function clearAdvancedFilters() {
-    setFilterCinsi("all");
-    setFilterHisseMin(0);
-    setFilterHisseMax(0);
-    setFilterTags([]);
-    setFilterAiCategories([]);
-    setFilterAiWarnings(false);
-    setFilterStatus("all");
-  }
-
-  const displayPreviewRows = hasHeaderRow ? previewData.slice(1) : previewData;
-  const headerRow = hasHeaderRow && previewData.length > 0 ? previewData[0] : null;
 
   const collapseAll = () => {
     if (!kesim) return;
