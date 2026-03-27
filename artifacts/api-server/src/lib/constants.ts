@@ -69,3 +69,8 @@ export const ERROR_MESSAGES = {
   UNAUTHORIZED: "Yetkisiz erişim",
   TEAM_NOT_FOUND: "Ekip bulunamadı",
 } as const;
+
+export const NOTE_WARNING_KEYWORDS = [
+  "iade", "iptal", "hata", "yanlış", "sorun", "problem",
+  "dikkat", "uyarı", "eksik", "hatalı", "değiştirilecek",
+] as const;

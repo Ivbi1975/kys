@@ -26,7 +26,7 @@ import { refreshProjectStats } from "./projects";
 import { asyncHandler } from "../middleware/error-handler";
 import { cacheGet, cacheSet, cacheInvalidatePrefix } from "../lib/cache";
 import { generateThumbnail } from "../lib/thumbnail";
-import { BATCH_SIZE, LARGE_BATCH_SIZE, MAX_QUERY_LIMIT, NoteType, NoteStatus, ERROR_MESSAGES } from "../lib/constants";
+import { BATCH_SIZE, LARGE_BATCH_SIZE, MAX_QUERY_LIMIT, NoteType, NoteStatus, ERROR_MESSAGES, NOTE_WARNING_KEYWORDS } from "../lib/constants";
 
 const KA_LIST_CACHE_KEY = "kesim-alanlari:list";
 const KA_LIST_TTL = 15_000;
@@ -1517,7 +1517,6 @@ router.get("/catisma-tespiti", asyncHandler(async (req, res) => {
     }
   }
 
-  const NOTE_WARNING_KEYWORDS = ["iade", "iptal", "hata", "yanlış", "sorun", "problem", "dikkat", "uyarı", "eksik", "hatalı", "değiştirilecek"];
   const hasNoteWarning = (notes: string) => {
     if (!notes) return false;
     const lower = notes.toLowerCase();
