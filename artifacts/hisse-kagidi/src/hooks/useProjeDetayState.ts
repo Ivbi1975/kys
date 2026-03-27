@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { useMinLoadingTime } from "@/hooks/useMinLoadingTime";
+import { useKesimAlaniActions } from "@/hooks/useKesimAlaniActions";
 import type { KesimAlani, Project } from "@/lib/types";
 import {
   fetchKesimAlanlari,
   createKesimAlani,
-  apiDeleteKesimAlani,
   fetchProjects,
   updateProject,
   deleteProject,
@@ -17,13 +18,13 @@ import {
 } from "@/lib/api";
 import type { PendingEditRequest, Conflict, ConflictEntry, DonationTransferEntry } from "@/lib/api";
 import { getTotalShares, getRequiredAnimals } from "@/lib/grouping";
-import { useTrackingActions } from "@/hooks/useTrackingActions";
 
 export function useProjeDetayState() {
   const { id: projectId } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
+  const [rawLoading, setRawLoading] = useState(true);
+  const loading = useMinLoadingTime(rawLoading);
   const [project, setProject] = useState<Project | null>(null);
   const [kesimAlanlari, setKesimAlanlari] = useState<KesimAlani[]>([]);
   const [allKesimAlanlari, setAllKesimAlanlari] = useState<KesimAlani[]>([]);
@@ -38,12 +39,6 @@ export function useProjeDetayState() {
   const [archiveConfirm, setArchiveConfirm] = useState(false);
   const [archiving, setArchiving] = useState(false);
 
-  const [deleteConfirm, setDeleteConfirm] = useState<{
-    id: string;
-    name: string;
-    hasDonations: boolean;
-  } | null>(null);
-
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
   const [totalConflicts, setTotalConflicts] = useState(0);
   const [conflictLoading, setConflictLoading] = useState(false);
@@ -51,13 +46,15 @@ export function useProjeDetayState() {
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [showConflicts, setShowConflicts] = useState(false);
 
-  const [qrModalOpen, setQrModalOpen] = useState(false);
-  const [qrUrl, setQrUrl] = useState("");
-  const [qrTitle, setQrTitle] = useState("");
-  const { handleCopyTrackingLink, handleOpenTrackingPage, resolveToken, buildTrackingUrl } = useTrackingActions({
+  const kesimActions = useKesimAlaniActions({
     onTokenGenerated: (kesimId, token) => {
       setKesimAlanlari(prev => prev.map(ka => ka.id === kesimId ? { ...ka, trackingToken: token } : ka));
     },
+    onDeleted: async () => {
+      await loadData();
+      if (showConflicts) await loadConflicts();
+    },
+    findKesimAlani: (id) => kesimAlanlari.find(k => k.id === id),
   });
 
   const [transferLog, setTransferLog] = useState<DonationTransferEntry[]>([]);
@@ -79,7 +76,7 @@ export function useProjeDetayState() {
   const [transferring, setTransferring] = useState(false);
 
   async function loadData() {
-    setLoading(true);
+    setRawLoading(true);
     try {
       const [projectsRes, kaRes] = await Promise.all([
         fetchProjects(),
@@ -99,7 +96,7 @@ export function useProjeDetayState() {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setRawLoading(false);
     }
   }
 
@@ -233,32 +230,6 @@ export function useProjeDetayState() {
     }
   }
 
-  function requestDelete(id: string) {
-    const k = kesimAlanlari.find(ka => ka.id === id);
-    if (!k) return;
-    setDeleteConfirm({
-      id: k.id,
-      name: k.name,
-      hasDonations: k.donations.length > 0,
-    });
-  }
-
-  async function executeDelete() {
-    if (!deleteConfirm) return;
-    try {
-      await apiDeleteKesimAlani(deleteConfirm.id);
-      toast({ title: "Kesim alanı silindi" });
-      await loadData();
-      if (showConflicts) await loadConflicts();
-    } catch (err) {
-      toast({
-        title: "Silme hatası",
-        description: err instanceof Error ? err.message : "Bilinmeyen hata",
-        variant: "destructive",
-      });
-    }
-    setDeleteConfirm(null);
-  }
 
   function toggleExpand(key: string) {
     setExpandedKeys(prev => {
@@ -314,18 +285,6 @@ export function useProjeDetayState() {
     }
   }
 
-  async function handleShowQrCode(e: React.MouseEvent, k: KesimAlani) {
-    e.stopPropagation();
-    try {
-      const token = await resolveToken(k);
-      const url = buildTrackingUrl(token);
-      setQrUrl(url);
-      setQrTitle(k.name);
-      setQrModalOpen(true);
-    } catch {
-      toast({ title: "Hata", description: "QR kod oluşturulamadı.", variant: "destructive" });
-    }
-  }
 
   const totals = kesimAlanlari.reduce(
     (acc, k) => {
@@ -372,8 +331,8 @@ export function useProjeDetayState() {
     archiveConfirm,
     setArchiveConfirm,
     archiving,
-    deleteConfirm,
-    setDeleteConfirm,
+    deleteConfirm: kesimActions.deleteConfirm,
+    setDeleteConfirm: kesimActions.setDeleteConfirm,
     conflicts,
     totalConflicts,
     conflictLoading,
@@ -382,10 +341,10 @@ export function useProjeDetayState() {
     expandedKeys,
     showConflicts,
     setShowConflicts,
-    qrModalOpen,
-    setQrModalOpen,
-    qrUrl,
-    qrTitle,
+    qrModalOpen: kesimActions.qrModalOpen,
+    setQrModalOpen: kesimActions.setQrModalOpen,
+    qrUrl: kesimActions.qrUrl,
+    qrTitle: kesimActions.qrTitle,
     transferLog,
     transferLogLoading,
     showTransferLog,
@@ -409,14 +368,14 @@ export function useProjeDetayState() {
     handleUpdateProject,
     handleDeleteProject,
     handleArchiveProject,
-    requestDelete,
-    executeDelete,
+    requestDelete: kesimActions.requestDelete,
+    executeDelete: kesimActions.executeDelete,
     toggleExpand,
     openTransferDialog,
     executeTransfer,
-    handleCopyTrackingLink,
-    handleOpenTrackingPage,
-    handleShowQrCode,
+    handleCopyTrackingLink: kesimActions.handleCopyTrackingLink,
+    handleOpenTrackingPage: kesimActions.handleOpenTrackingPage,
+    handleShowQrCode: kesimActions.handleShowQrCode,
   };
 }
 

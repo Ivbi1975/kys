@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   Plus,
   Trash2,
-  Scissors,
   Pencil,
   FolderOpen,
   Search,
@@ -12,6 +11,7 @@ import {
 import QrCodeModal from "@/components/QrCodeModal";
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ProjeDetaySkeleton } from "@/components/skeletons/ProjeDetaySkeleton";
 import { useProjeDetayState } from "@/hooks/useProjeDetayState";
 import { ProjectSummaryCard } from "@/components/proje-detay/ProjectSummaryCard";
 import { PendingEditRequestsCard } from "@/components/proje-detay/PendingEditRequestsCard";
@@ -24,14 +24,7 @@ export default function ProjeDetayPage() {
   const state = useProjeDetayState();
 
   if (state.loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <Scissors className="w-12 h-12 text-primary mx-auto mb-4 animate-pulse" />
-          <p className="text-muted-foreground">Yükleniyor...</p>
-        </div>
-      </div>
-    );
+    return <ProjeDetaySkeleton />;
   }
 
   if (!state.project) {

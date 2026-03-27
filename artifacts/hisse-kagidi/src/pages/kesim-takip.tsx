@@ -9,18 +9,19 @@ import { useMinLoadingTime } from "@/hooks/useMinLoadingTime";
 import type { TrackingGroup, TrackingNote } from "@/lib/api";
 import { useOfflineSync } from "@/lib/useOfflineSync";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  AlertTriangle, Beef, X,
-  ChevronDown, ChevronUp, WifiOff, RefreshCw,
-  FileText, StickyNote, Search,
+  AlertTriangle, Beef,
+  ChevronDown, ChevronUp,
+  StickyNote,
 } from "lucide-react";
 import { NoteInput } from "@/components/kesim-takip/NoteInput";
 import { NotesList } from "@/components/kesim-takip/NotesList";
 import { GroupCard } from "@/components/kesim-takip/GroupCard";
 import { SummaryReportOverlay } from "@/components/kesim-takip/SummaryReportOverlay";
 import { KesimKagidiOverlay } from "@/components/kesim-takip/KesimKagidiOverlay";
+import { SearchFilterBar } from "@/components/kesim-takip/SearchFilterBar";
+import { ProgressCard } from "@/components/kesim-takip/ProgressCard";
+import { StatusAlerts } from "@/components/kesim-takip/StatusAlerts";
 
 type FilterMode = "all" | "pending" | "done";
 
@@ -173,8 +174,6 @@ export default function KesimTakipPage() {
     );
   }
 
-  const progressPercent = data.totalGroups > 0 ? Math.round((data.kesildiCount / data.totalGroups) * 100) : 0;
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white dark:from-emerald-950 dark:to-background">
       <div className="max-w-lg mx-auto p-4">
@@ -187,88 +186,18 @@ export default function KesimTakipPage() {
           <p className="text-xs text-muted-foreground mt-1">Kesim Takip Sayfası</p>
         </div>
 
-        <Card className="p-4 mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">Kesim Durumu</span>
-            <span className="text-sm font-bold text-emerald-600">
-              {data.kesildiCount} / {data.totalGroups}
-            </span>
-          </div>
-          <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
-            <div
-              className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-              style={{ width: `${Math.max(progressPercent, 1)}%` }}
-            />
-          </div>
-          <div className="flex items-center justify-between mt-2">
-            <p className="text-xs text-muted-foreground">%{progressPercent} tamamlandı</p>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowSummaryReport(true)}>
-              <FileText className="w-3.5 h-3.5 mr-1" /> Durum Raporu
-            </Button>
-          </div>
-        </Card>
+        <ProgressCard
+          kesildiCount={data.kesildiCount}
+          totalGroups={data.totalGroups}
+          onShowReport={() => setShowSummaryReport(true)}
+        />
 
-        {!syncState.isOnline && (
-          <Card className="p-3 mb-4 bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800">
-            <div className="flex items-center gap-2">
-              <WifiOff className="w-4 h-4 text-amber-600 shrink-0" />
-              <div className="flex-1">
-                <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
-                  Çevrimdışı — değişiklikler kaydedilecek
-                </span>
-                {syncState.pendingCount > 0 && (
-                  <span className="text-[10px] text-amber-600 dark:text-amber-400 block">
-                    {syncState.pendingCount} bekleyen değişiklik
-                  </span>
-                )}
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {syncState.isOnline && syncState.pendingCount > 0 && (
-          <Card className="p-3 mb-4 bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <RefreshCw className={`w-4 h-4 text-blue-600 shrink-0 ${syncState.isSyncing ? "animate-spin" : ""}`} />
-                <span className="text-xs text-blue-700 dark:text-blue-300">
-                  {syncState.isSyncing
-                    ? "Senkronize ediliyor..."
-                    : `${syncState.pendingCount} bekleyen değişiklik`}
-                </span>
-              </div>
-              {!syncState.isSyncing && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-100"
-                  onClick={() => syncQueue()}
-                >
-                  Şimdi Gönder
-                </Button>
-              )}
-            </div>
-            {syncState.lastSyncError && (
-              <p className="text-[10px] text-red-600 mt-1">{syncState.lastSyncError}</p>
-            )}
-          </Card>
-        )}
-
-        {typeof Notification !== "undefined" && notifPermission === "default" && (
-          <Card className="p-3 mb-4 bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-blue-700 dark:text-blue-300">Kesim bildirimlerini almak ister misiniz?</span>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-100"
-                onClick={() => Notification.requestPermission().then(perm => setNotifPermission(perm))}
-              >
-                Bildirimleri Aç
-              </Button>
-            </div>
-          </Card>
-        )}
+        <StatusAlerts
+          syncState={syncState}
+          syncQueue={syncQueue}
+          notifPermission={notifPermission}
+          onRequestPermission={() => Notification.requestPermission().then(perm => setNotifPermission(perm))}
+        />
 
         <Card className="p-3 mb-4">
           <button
@@ -296,42 +225,14 @@ export default function KesimTakipPage() {
         </Card>
 
         {filledGroups.length > 0 && (
-          <div className="mb-3 space-y-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Hayvan no, isim, vekalet ara..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 text-sm"
-              />
-              {searchQuery && (
-                <button className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => setSearchQuery("")}>
-                  <X className="w-4 h-4 text-muted-foreground" />
-                </button>
-              )}
-            </div>
-            <div className="flex gap-1">
-              {([["all", "Tümü"], ["pending", "Bekleyen"], ["done", "Kesildi"]] as const).map(([mode, label]) => (
-                <button
-                  key={mode}
-                  className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                    filterMode === mode
-                      ? "bg-primary text-primary-foreground border-primary font-semibold"
-                      : "bg-background border-border hover:bg-muted"
-                  }`}
-                  onClick={() => setFilterMode(mode)}
-                >
-                  {label}
-                </button>
-              ))}
-              {(searchQuery || filterMode !== "all") && (
-                <span className="text-xs text-muted-foreground self-center ml-auto">
-                  {filteredGroups.length} / {filledGroups.length}
-                </span>
-              )}
-            </div>
-          </div>
+          <SearchFilterBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            filterMode={filterMode}
+            onFilterChange={setFilterMode}
+            filteredCount={filteredGroups.length}
+            totalCount={filledGroups.length}
+          />
         )}
 
         {filteredGroups.length > 0 ? (
