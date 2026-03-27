@@ -17,8 +17,17 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-let server: Server;
 let isShuttingDown = false;
+
+const server: Server = app.listen(port, (err) => {
+  if (err) {
+    logger.error({ err }, "Error listening on port");
+    process.exit(1);
+  }
+
+  logger.info({ port }, "Server listening");
+  startPoolMonitoring();
+});
 
 function gracefulShutdown(signal: string) {
   if (isShuttingDown) return;
@@ -42,16 +51,6 @@ function gracefulShutdown(signal: string) {
     process.exit(0);
   });
 }
-
-server = app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
-  }
-
-  logger.info({ port }, "Server listening");
-  startPoolMonitoring();
-});
 
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));

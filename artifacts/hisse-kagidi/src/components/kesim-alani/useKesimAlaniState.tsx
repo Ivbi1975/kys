@@ -570,7 +570,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
 
 
   const buildErrorDescription = useCallback((errMsg: string) => {
-    const animalNoMatches = errMsg.match(/[Hh]ayvan\s*(?:No|no|#)?\s*[:.]?\s*(\d+(?:\s*[,\/]\s*\d+)*)/g);
+    const animalNoMatches = errMsg.match(/[Hh]ayvan\s*(?:No|no|#)?\s*[:.]?\s*(\d+(?:\s*[,/]\s*\d+)*)/g);
     if (animalNoMatches) {
       const parts: (string | ReturnType<typeof createElement>)[] = [];
       let lastIndex = 0;
@@ -580,7 +580,7 @@ const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttribut
           parts.push(errMsg.substring(lastIndex, matchIndex));
         }
         const numbers = match.match(/\d+/g) || [];
-        const prefix = match.replace(/\d+(?:\s*[,\/]\s*\d+)*/g, "").trim();
+        const prefix = match.replace(/\d+(?:\s*[,/]\s*\d+)*/g, "").trim();
         parts.push(prefix + " ");
         numbers.forEach((num, idx) => {
           if (idx > 0) parts.push(", ");

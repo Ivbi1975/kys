@@ -1570,9 +1570,9 @@ router.get("/catisma-tespiti", async (req, res) => {
 
     const donationIds = conflictDonations.map(d => d.id);
 
-    let groupLinksMap: Record<string, { groupId: string; animalNo: number }[]> = {};
-    let donationsByGroupId: Record<string, string[]> = {};
-    let donationById: Record<string, DonationRow> = {};
+    const groupLinksMap: Record<string, { groupId: string; animalNo: number }[]> = {};
+    const donationsByGroupId: Record<string, string[]> = {};
+    const donationById: Record<string, DonationRow> = {};
 
     for (const d of conflictDonations) {
       donationById[d.id] = d;
@@ -2531,7 +2531,7 @@ router.get("/tracking/:token/delta", async (req, res) => {
 
     const changedGroupIds = changedGroups.map(g => g.id);
     let groupDonationLinks: { groupId: string; donationId: string; sortOrder: number }[] = [];
-    let donationsById: Record<string, { name: string; description: string; donationType: string; vekalet: string; notes: string }> = {};
+    const donationsById: Record<string, { name: string; description: string; donationType: string; vekalet: string; notes: string }> = {};
 
     if (changedGroupIds.length > 0) {
       groupDonationLinks = await db.select({
