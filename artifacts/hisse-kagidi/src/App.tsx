@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 const NotFound = lazy(() => import("@/pages/not-found"));
 import { useTheme } from "@/lib/useTheme";
 import PasswordGate from "@/components/PasswordGate";
+import ReloadPrompt from "@/components/ReloadPrompt";
 
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -127,6 +128,7 @@ function App() {
           <AppRouter />
         </WouterRouter>
         <Toaster />
+        <ReloadPrompt />
       </TooltipProvider>
     </QueryClientProvider>
   );
