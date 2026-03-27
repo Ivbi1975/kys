@@ -535,7 +535,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
             </Button>
             {kesim.animalGroups.length > 0 && (
               <>
-                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={exportGroupsExcel} title="Kesim Kağıdı Excel">
+                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={exportGroupsExcel} title="Kesim Kağıdı Excel" aria-label="Kesim Kağıdı Excel">
                   <FileSpreadsheet className="w-3.5 h-3.5 mr-1" />
                   <span className="hidden sm:inline">Excel</span>
                 </Button>
@@ -1691,6 +1691,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                                   size="sm"
                                   className="h-5 w-5 p-0 shrink-0"
                                   title="Bu kişinin tüm kayıtlarını düzenle"
+                                  aria-label="Bu kişinin tüm kayıtlarını düzenle"
                                   onClick={() => setPersonEditDesc(d.description)}
                                 >
                                   <UserCog className="w-3 h-3 text-muted-foreground" />
@@ -1826,7 +1827,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                             {globalTags.length > 0 && (
                               <Popover open={tagPopoverDonorId === d.id} onOpenChange={(open) => setTagPopoverDonorId(open ? d.id : null)}>
                                 <PopoverTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Etiket ata">
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Etiket ata" aria-label="Etiket ata">
                                     <Tag className="w-3 h-3 text-muted-foreground" />
                                   </Button>
                                 </PopoverTrigger>
@@ -1860,6 +1861,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                                 size="sm"
                                 className={`h-7 w-7 p-0 ${basketItemIds.has(d.id) ? "bg-emerald-100 dark:bg-emerald-900" : ""}`}
                                 title={basketItemIds.has(d.id) ? "Sepetten Çıkar" : "Sepete Ekle"}
+                                aria-label={basketItemIds.has(d.id) ? "Sepetten Çıkar" : "Sepete Ekle"}
                                 onClick={() => basketItemIds.has(d.id) ? removeFromBasket(d.id) : addDonorToBasket(d.id)}
                               >
                                 <ShoppingBag className={`w-3 h-3 ${basketItemIds.has(d.id) ? "text-emerald-600" : "text-muted-foreground"}`} />
@@ -1871,6 +1873,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                                 size="sm"
                                 className="h-7 w-7 p-0"
                                 title="Akıllı Yerleştir"
+                                aria-label="Akıllı Yerleştir"
                                 onClick={() => setSmartPlacePopover(d.id)}
                               >
                                 <Wand2 className="w-3 h-3 text-primary" />
@@ -1882,6 +1885,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                                 size="sm"
                                 className="h-7 w-7 p-0"
                                 title="Hisse Böl"
+                                aria-label="Hisse Böl"
                                 onClick={() => setSplitShareDialog({ donationId: d.id, totalShares: effectiveShareMap.get(d.id) || d.shareCount })}
                               >
                                 <Scissors className="w-3 h-3 text-amber-600" />
@@ -1892,6 +1896,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                               size="sm"
                               className="h-7 w-7 p-0"
                               title={d.excluded ? "Dahil et" : "Hariç tut"}
+                              aria-label={d.excluded ? "Dahil et" : "Hariç tut"}
                               onClick={() => updateDonationField(d.id, "excluded", !d.excluded)}
                             >
                               {d.excluded ? <Eye className="w-3 h-3 text-green-600" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
@@ -1900,6 +1905,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                               variant="ghost"
                               size="sm"
                               className="h-7 w-7 p-0"
+                              aria-label="Bağışçıyı sil"
                               onClick={() => deleteDonation(d.id)}
                             >
                               <Trash2 className="w-3 h-3 text-destructive" />
@@ -2068,6 +2074,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                       className="h-7 px-2"
                       onClick={collapseAll}
                       title="Tümünü Daralt"
+                      aria-label="Tümünü Daralt"
                     >
                       <ChevronsDownUp className="w-3.5 h-3.5" />
                     </Button>
@@ -2077,6 +2084,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                       className="h-7 px-2"
                       onClick={expandAll}
                       title="Tümünü Genişlet"
+                      aria-label="Tümünü Genişlet"
                     >
                       <ChevronsUpDown className="w-3.5 h-3.5" />
                     </Button>
@@ -2344,23 +2352,31 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
                   className={`w-5 h-5 rounded-full border-2 ${colorTagFilter === "green" ? "ring-2 ring-offset-1 ring-green-500" : ""}`}
                   style={{ backgroundColor: "#22c55e" }}
                   title="Yeşil"
+                  aria-label="Yeşil filtre"
+                  aria-pressed={colorTagFilter === "green"}
                 />
                 <button
                   onClick={() => startFilterTransition(() => setColorTagFilter("orange"))}
                   className={`w-5 h-5 rounded-full border-2 ${colorTagFilter === "orange" ? "ring-2 ring-offset-1 ring-orange-500" : ""}`}
                   style={{ backgroundColor: "#f97316" }}
                   title="Turuncu"
+                  aria-label="Turuncu filtre"
+                  aria-pressed={colorTagFilter === "orange"}
                 />
                 <button
                   onClick={() => startFilterTransition(() => setColorTagFilter("red"))}
                   className={`w-5 h-5 rounded-full border-2 ${colorTagFilter === "red" ? "ring-2 ring-offset-1 ring-red-500" : ""}`}
                   style={{ backgroundColor: "#ef4444" }}
                   title="Kırmızı"
+                  aria-label="Kırmızı filtre"
+                  aria-pressed={colorTagFilter === "red"}
                 />
                 <button
                   onClick={() => startFilterTransition(() => setColorTagFilter(""))}
                   className={`w-5 h-5 rounded-full border-2 border-dashed ${colorTagFilter === "" ? "ring-2 ring-offset-1 ring-gray-400" : ""}`}
                   title="Renksiz"
+                  aria-label="Renksiz filtre"
+                  aria-pressed={colorTagFilter === ""}
                 />
               </div>
 
