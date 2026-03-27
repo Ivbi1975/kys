@@ -40,4 +40,8 @@ export const ERROR_MESSAGES = {
   SERVER_CONFIG_ERROR: "Sunucu yapılandırma hatası.",
   WRONG_PASSWORD: "Şifre hatalı.",
   SERVER_RESTARTED: "Sunucu yeniden başlatıldı",
+  INVALID_STATUS: "Geçersiz durum",
+  GROUP_NOT_FOUND: "Grup bulunamadı",
+  JOB_NOT_FOUND: "İş bulunamadı",
+  RESULT_PARSE_ERROR: "Sonuç ayrıştırılamadı",
 } as const;

@@ -2689,7 +2689,7 @@ router.put("/kesim-alanlari/:id/tracking-notes/:noteId/status", asyncHandler(asy
   const statusSchema = z.object({ status: z.enum([NoteStatus.PENDING, NoteStatus.APPROVED, NoteStatus.REJECTED]) });
   const parsed = statusSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz durum" });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_STATUS });
     return;
   }
 
@@ -2751,7 +2751,7 @@ router.get("/tracking/:token/group/:groupId/photos", asyncHandler(async (req, re
 
   const [group] = await db.select().from(animalGroupsTable)
     .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
-  if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+  if (!group) { res.status(404).json({ error: ERROR_MESSAGES.GROUP_NOT_FOUND }); return; }
 
   const photos = await db.select({
     id: animalGroupPhotosTable.id,
@@ -2773,7 +2773,7 @@ router.get("/tracking/:token/group/:groupId/photos/:photoId", asyncHandler(async
 
   const [group] = await db.select().from(animalGroupsTable)
     .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
-  if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+  if (!group) { res.status(404).json({ error: ERROR_MESSAGES.GROUP_NOT_FOUND }); return; }
 
   const [photo] = await db.select({
     id: animalGroupPhotosTable.id,
@@ -2819,7 +2819,7 @@ router.post("/tracking/:token/group/:groupId/photos", asyncHandler(async (req, r
 
   const [group] = await db.select().from(animalGroupsTable)
     .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
-  if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+  if (!group) { res.status(404).json({ error: ERROR_MESSAGES.GROUP_NOT_FOUND }); return; }
 
   const existingPhotos = await db.select({ id: animalGroupPhotosTable.id })
     .from(animalGroupPhotosTable)
@@ -2859,7 +2859,7 @@ router.delete("/tracking/:token/group/:groupId/photos/:photoId", asyncHandler(as
 
   const [group] = await db.select().from(animalGroupsTable)
     .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
-  if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+  if (!group) { res.status(404).json({ error: ERROR_MESSAGES.GROUP_NOT_FOUND }); return; }
 
   await db.delete(animalGroupPhotosTable)
     .where(and(eq(animalGroupPhotosTable.id, photoId), eq(animalGroupPhotosTable.animalGroupId, groupId)));
@@ -2871,7 +2871,7 @@ router.get("/kesim-alanlari/:id/group/:groupId/photos", asyncHandler(async (req,
   const { id, groupId } = req.params;
   const [group] = await db.select().from(animalGroupsTable)
     .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, id)));
-  if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+  if (!group) { res.status(404).json({ error: ERROR_MESSAGES.GROUP_NOT_FOUND }); return; }
 
   const photos = await db.select({
     id: animalGroupPhotosTable.id,
@@ -2889,7 +2889,7 @@ router.get("/kesim-alanlari/:id/group/:groupId/photos/:photoId", asyncHandler(as
   const size = req.query.size as string | undefined;
   const [group] = await db.select().from(animalGroupsTable)
     .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, id)));
-  if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+  if (!group) { res.status(404).json({ error: ERROR_MESSAGES.GROUP_NOT_FOUND }); return; }
 
   const [photo] = await db.select({
     id: animalGroupPhotosTable.id,
@@ -3033,7 +3033,7 @@ router.put("/kesim-alanlari/:id/groups/:groupId/team", asyncHandler(async (req, 
   const { teamId } = parsed.data;
   const [group] = await db.select().from(animalGroupsTable)
     .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, id)));
-  if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+  if (!group) { res.status(404).json({ error: ERROR_MESSAGES.GROUP_NOT_FOUND }); return; }
   if (teamId) {
     const [team] = await db.select().from(teamsTable)
       .where(and(eq(teamsTable.id, teamId), eq(teamsTable.kesimAlaniId, id)));
@@ -3059,7 +3059,7 @@ router.put("/tracking/:token/group/:groupId/team", asyncHandler(async (req, res)
   if (!ka) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
   const [group] = await db.select().from(animalGroupsTable)
     .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
-  if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+  if (!group) { res.status(404).json({ error: ERROR_MESSAGES.GROUP_NOT_FOUND }); return; }
   if (teamId) {
     const [team] = await db.select().from(teamsTable)
       .where(and(eq(teamsTable.id, teamId), eq(teamsTable.kesimAlaniId, ka.id)));

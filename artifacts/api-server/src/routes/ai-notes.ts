@@ -278,7 +278,7 @@ router.get("/ai-notes/jobs/:jobId", asyncHandler(async (req, res) => {
   const [job] = await db.select().from(aiJobsTable).where(eq(aiJobsTable.id, jobId));
 
   if (!job) {
-    res.status(404).json({ error: "İş bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.JOB_NOT_FOUND });
     return;
   }
 
@@ -296,7 +296,7 @@ router.get("/ai-notes/jobs/:jobId", asyncHandler(async (req, res) => {
       response.results = JSON.parse(job.result);
     } catch {
       response.results = [];
-      response.error = "Sonuç ayrıştırılamadı";
+      response.error = ERROR_MESSAGES.RESULT_PARSE_ERROR;
     }
   }
 
