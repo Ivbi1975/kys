@@ -21,6 +21,19 @@ function stripHtml(input: string): string {
   return input.replace(/<[^>]*>/g, "").trim();
 }
 
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{3,8}$/;
+function sanitizeColor(input: string, fallback = "#3b82f6"): string {
+  const trimmed = input.trim();
+  return HEX_COLOR_RE.test(trimmed) ? trimmed : fallback;
+}
+
+const SAFE_DATA_URI_RE = /^data:image\/(png|jpeg|jpg|gif|svg\+xml|webp|bmp|ico);base64,[A-Za-z0-9+/\n\r=]+$/;
+function sanitizeLogo(input: string): string | null {
+  if (SAFE_DATA_URI_RE.test(input.trim())) return input.trim();
+  logger.warn("Import logo rejected: not a valid data:image URI");
+  return null;
+}
+
 const router: IRouter = Router();
 
 interface DonationExport {
@@ -209,7 +222,7 @@ router.post("/backup/import", asyncHandler(async (req, res) => {
           }
         }
         await tx.insert(customTagsTable).values({
-          id: tag.id, name: sanitizedName, color: tag.color || "#3b82f6",
+          id: tag.id, name: sanitizedName, color: sanitizeColor(tag.color || "#3b82f6"),
         });
         importLog.tags++;
       }
@@ -336,9 +349,10 @@ router.post("/backup/import", asyncHandler(async (req, res) => {
       }
     }
 
-    if (data.logo) {
-      await tx.insert(appSettingsTable).values({ key: "logo", value: data.logo })
-        .onConflictDoUpdate({ target: appSettingsTable.key, set: { value: data.logo } });
+    const sanitizedLogo = data.logo ? sanitizeLogo(data.logo) : null;
+    if (sanitizedLogo) {
+      await tx.insert(appSettingsTable).values({ key: "logo", value: sanitizedLogo })
+        .onConflictDoUpdate({ target: appSettingsTable.key, set: { value: sanitizedLogo } });
     } else if (mode === "replace") {
       await tx.delete(appSettingsTable).where(eq(appSettingsTable.key, "logo"));
     }
