@@ -6,6 +6,7 @@ import type { KesimAlani } from "@/lib/types";
 import { fetchKesimAlani, fetchKesimAlaniTrackingNotes } from "@/lib/api";
 import type { TrackingNote } from "@/lib/api";
 import { formatDate, formatTime } from "@/lib/formatting";
+import { NoteType, NoteStatus } from "@/lib/constants";
 
 interface HourBucket {
   hour: string;
@@ -127,11 +128,11 @@ export default function KesimRaporPage() {
   }, [kesim]);
 
   const filteredNotes = useMemo(() => {
-    return notes.filter((n) => n.type === "note").slice(0, 50);
+    return notes.filter((n) => n.type === NoteType.NOTE).slice(0, 50);
   }, [notes]);
 
   const editRequests = useMemo(() => {
-    return notes.filter((n) => n.type === "edit_request");
+    return notes.filter((n) => n.type === NoteType.EDIT_REQUEST);
   }, [notes]);
 
   if (!kesim || !stats) {
@@ -332,7 +333,7 @@ export default function KesimRaporPage() {
                           <td className="rapor-table-value">{note.newValue || ""}</td>
                           <td className="rapor-table-label">
                             <span className={`rapor-status rapor-status-${note.status}`}>
-                              {note.status === "approved" ? "Onay" : note.status === "rejected" ? "Red" : "Bekliyor"}
+                              {note.status === NoteStatus.APPROVED ? "Onay" : note.status === NoteStatus.REJECTED ? "Red" : "Bekliyor"}
                             </span>
                           </td>
                         </tr>

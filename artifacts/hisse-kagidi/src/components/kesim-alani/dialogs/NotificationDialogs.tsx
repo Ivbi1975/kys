@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Check, Edit3, Loader2, MessageSquarePlus, Send, Settings2, X } from "lucide-react";
 import { updateTrackingNoteStatus, fetchNotificationTemplate, updateNotificationTemplate } from "@/lib/api";
+import { NoteType, NoteStatus } from "@/lib/constants";
 
 interface NotificationDialogsProps {
   kesim: KesimAlani;
@@ -72,20 +73,20 @@ export default function NotificationDialogs({
                   <div
                     key={note.id}
                     className={`rounded-lg p-3 text-sm border ${
-                      note.type === "edit_request"
+                      note.type === NoteType.EDIT_REQUEST
                         ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
                         : "bg-muted/30 border-border"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div className="flex items-center gap-1.5">
-                        {note.type === "edit_request" ? (
+                        {note.type === NoteType.EDIT_REQUEST ? (
                           <Edit3 className="w-3.5 h-3.5 text-amber-600" />
                         ) : (
                           <MessageSquarePlus className="w-3.5 h-3.5 text-blue-500" />
                         )}
                         <span className="text-xs font-semibold">
-                          {note.type === "edit_request" ? "Düzenleme Talebi" : "Not"}
+                          {note.type === NoteType.EDIT_REQUEST ? "Düzenleme Talebi" : "Not"}
                           {groupNo != null && ` — Hayvan ${groupNo}`}
                         </span>
                       </div>
@@ -94,7 +95,7 @@ export default function NotificationDialogs({
                       </span>
                     </div>
 
-                    {note.type === "edit_request" ? (
+                    {note.type === NoteType.EDIT_REQUEST ? (
                       <>
                         <div className="text-xs mb-1">
                           <span className="font-medium">{
@@ -111,7 +112,7 @@ export default function NotificationDialogs({
                           <span className="font-medium text-emerald-600">{note.newValue}</span>
                         </div>
                         <div className="flex items-center gap-1.5 mt-2">
-                          {note.status === "pending" ? (
+                          {note.status === NoteStatus.PENDING ? (
                             <>
                               <Button
                                 size="sm"
@@ -119,8 +120,8 @@ export default function NotificationDialogs({
                                 className="h-6 px-2 text-[10px] text-emerald-600 border-emerald-300 hover:bg-emerald-50"
                                 onClick={async () => {
                                   try {
-                                    await updateTrackingNoteStatus(kesim!.id, note.id, "approved");
-                                    setTrackingNotes(prev => prev.map(n => n.id === note.id ? { ...n, status: "approved" as const } : n));
+                                    await updateTrackingNoteStatus(kesim!.id, note.id, NoteStatus.APPROVED);
+                                    setTrackingNotes(prev => prev.map(n => n.id === note.id ? { ...n, status: NoteStatus.APPROVED } : n));
                                     toast({ title: "Talep onaylandı" });
                                   } catch {
                                     toast({ title: "Hata", variant: "destructive" });
@@ -135,8 +136,8 @@ export default function NotificationDialogs({
                                 className="h-6 px-2 text-[10px] text-red-600 border-red-300 hover:bg-red-50"
                                 onClick={async () => {
                                   try {
-                                    await updateTrackingNoteStatus(kesim!.id, note.id, "rejected");
-                                    setTrackingNotes(prev => prev.map(n => n.id === note.id ? { ...n, status: "rejected" as const } : n));
+                                    await updateTrackingNoteStatus(kesim!.id, note.id, NoteStatus.REJECTED);
+                                    setTrackingNotes(prev => prev.map(n => n.id === note.id ? { ...n, status: NoteStatus.REJECTED } : n));
                                     toast({ title: "Talep reddedildi" });
                                   } catch {
                                     toast({ title: "Hata", variant: "destructive" });
@@ -148,11 +149,11 @@ export default function NotificationDialogs({
                             </>
                           ) : (
                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                              note.status === "approved"
+                              note.status === NoteStatus.APPROVED
                                 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
                                 : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
                             }`}>
-                              {note.status === "approved" ? "Onaylandı" : "Reddedildi"}
+                              {note.status === NoteStatus.APPROVED ? "Onaylandı" : "Reddedildi"}
                             </span>
                           )}
                         </div>

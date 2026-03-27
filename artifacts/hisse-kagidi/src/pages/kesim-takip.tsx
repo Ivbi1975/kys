@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, memo } from "react";
 import { turkishNormalize } from "@/lib/utils";
 import { useParams } from "wouter";
 import { formatKesildiTime, formatNoteTime } from "@/lib/formatting";
-import { COLOR_MAP, FIELD_LABELS } from "@/lib/constants";
+import { COLOR_MAP, FIELD_LABELS, NoteType, NoteStatus } from "@/lib/constants";
 import type { DonorFieldKey } from "@/lib/constants";
 import { Virtuoso } from "react-virtuoso";
 import { createTrackingNote, fetchGroupPhotos, getGroupPhotoUrl, uploadGroupPhoto, deleteGroupPhoto, assignTeamTracking, fetchTrackingNotificationLogs } from "@/lib/api";
@@ -128,7 +128,7 @@ function NoteInput({
     try {
       const noteData = {
         animalGroupId: groupId,
-        type: "note" as const,
+        type: NoteType.NOTE,
         content,
       };
       let note: TrackingNote | null = null;
@@ -233,7 +233,7 @@ function EditRequestForm({
     try {
       const note = await createTrackingNote(token, {
         animalGroupId: groupId,
-        type: "edit_request",
+        type: NoteType.EDIT_REQUEST,
         content: `Sıra ${donorIndex + 1}: ${FIELD_LABELS[field] || field} değişiklik talebi`,
         fieldName: field,
         oldValue: currentValue,
@@ -303,14 +303,14 @@ function NotesList({ notes, groupId }: { notes: TrackingNote[]; groupId?: string
         <div
           key={note.id}
           className={`rounded-lg p-2 text-xs ${
-            note.type === "edit_request"
+            note.type === NoteType.EDIT_REQUEST
               ? "bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800"
               : "bg-muted/50"
           }`}
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              {note.type === "edit_request" ? (
+              {note.type === NoteType.EDIT_REQUEST ? (
                 <>
                   <span className="font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-0.5 mb-0.5">
                     <Edit3 className="w-2.5 h-2.5" /> {FIELD_LABELS[note.fieldName as DonorFieldKey] || note.fieldName}
@@ -320,11 +320,11 @@ function NotesList({ notes, groupId }: { notes: TrackingNote[]; groupId?: string
                     <span className="text-muted-foreground">→</span>
                     <span className="font-medium text-emerald-600">{note.newValue}</span>
                   </div>
-                  {note.status !== "pending" && (
+                  {note.status !== NoteStatus.PENDING && (
                     <span className={`text-[10px] mt-0.5 inline-block px-1.5 py-0.5 rounded-full font-semibold ${
-                      note.status === "approved" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                      note.status === NoteStatus.APPROVED ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
                     }`}>
-                      {note.status === "approved" ? "Onaylandı" : "Reddedildi"}
+                      {note.status === NoteStatus.APPROVED ? "Onaylandı" : "Reddedildi"}
                     </span>
                   )}
                 </>
@@ -457,9 +457,9 @@ function SummaryReportOverlay({
     }
   }
 
-  const noteCount = notes.filter((n) => n.type === "note").length;
-  const editReqCount = notes.filter((n) => n.type === "edit_request").length;
-  const pendingReqCount = notes.filter((n) => n.type === "edit_request" && n.status === "pending").length;
+  const noteCount = notes.filter((n) => n.type === NoteType.NOTE).length;
+  const editReqCount = notes.filter((n) => n.type === NoteType.EDIT_REQUEST).length;
+  const pendingReqCount = notes.filter((n) => n.type === NoteType.EDIT_REQUEST && n.status === NoteStatus.PENDING).length;
 
   const handlePrint = () => {
     window.print();
@@ -1119,7 +1119,7 @@ export default function KesimTakipPage() {
     }
     return map;
   }, [notes]);
-  const editRequestCount = useMemo(() => notes.filter(n => n.type === "edit_request" && n.status === "pending").length, [notes]);
+  const editRequestCount = useMemo(() => notes.filter(n => n.type === NoteType.EDIT_REQUEST && n.status === NoteStatus.PENDING).length, [notes]);
 
   const filteredGroups = useMemo(() => {
     let groups = filledGroups;

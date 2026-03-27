@@ -6,6 +6,7 @@ import { z } from "zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import crypto from "crypto";
 import { asyncHandler } from "../middleware/error-handler";
+import { TX_BATCH_SIZE, AiJobStatus, STALE_JOB_CUTOFF_MS, STALE_JOB_CLEANUP_INTERVAL_MS, ERROR_MESSAGES } from "../lib/constants";
 
 const router: IRouter = Router();
 
@@ -97,7 +98,7 @@ router.put("/ai-notes/settings", asyncHandler(async (req, res) => {
   }).safeParse(req.body);
 
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -122,7 +123,7 @@ router.put("/ai-notes/settings", asyncHandler(async (req, res) => {
 router.post("/ai-notes/classify", asyncHandler(async (req, res) => {
   const parsed = classifySchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -158,7 +159,7 @@ router.post("/ai-notes/classify", asyncHandler(async (req, res) => {
 router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
   const parsed = classifySchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -167,12 +168,12 @@ router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
 
   await db.insert(aiJobsTable).values({
     id: jobId,
-    status: "pending",
+    status: AiJobStatus.PENDING,
     totalDonations: donations.length,
     processedDonations: 0,
   });
 
-  res.status(202).json({ jobId, status: "pending", totalDonations: donations.length });
+  res.status(202).json({ jobId, status: AiJobStatus.PENDING, totalDonations: donations.length });
 
   processClassifyJob(jobId, donations).catch(err => {
     console.error(`[ai-job:${jobId}] Unhandled error:`, err);
@@ -187,7 +188,7 @@ async function processClassifyJob(
 ) {
   try {
     await db.update(aiJobsTable)
-      .set({ status: "processing", updatedAt: new Date() })
+      .set({ status: AiJobStatus.PROCESSING, updatedAt: new Date() })
       .where(eq(aiJobsTable.id, jobId));
 
     const { prompt, categories } = await getAiSettings();
@@ -254,7 +255,7 @@ async function processClassifyJob(
 
     await db.update(aiJobsTable)
       .set({
-        status: "completed",
+        status: AiJobStatus.COMPLETED,
         processedDonations: donations.length,
         result: JSON.stringify(allResults),
         updatedAt: new Date(),
@@ -263,11 +264,11 @@ async function processClassifyJob(
 
     console.log(`[ai-job:${jobId}] Completed: ${donations.length} donations processed`);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    const message = err instanceof Error ? err.message : ERROR_MESSAGES.UNKNOWN_ERROR;
     console.error(`[ai-job:${jobId}] Failed:`, message);
 
     await db.update(aiJobsTable)
-      .set({ status: "failed", error: message, updatedAt: new Date() })
+      .set({ status: AiJobStatus.FAILED, error: message, updatedAt: new Date() })
       .where(eq(aiJobsTable.id, jobId));
   }
 }
@@ -290,7 +291,7 @@ router.get("/ai-notes/jobs/:jobId", asyncHandler(async (req, res) => {
     updatedAt: job.updatedAt,
   };
 
-  if (job.status === "completed" && job.result) {
+  if (job.status === AiJobStatus.COMPLETED && job.result) {
     try {
       response.results = JSON.parse(job.result);
     } catch {
@@ -299,14 +300,14 @@ router.get("/ai-notes/jobs/:jobId", asyncHandler(async (req, res) => {
     }
   }
 
-  if (job.status === "failed" && job.error) {
+  if (job.status === AiJobStatus.FAILED && job.error) {
     response.error = job.error;
   }
 
   res.json(response);
 }));
 
-const TX_BATCH_SIZE = 100;
+
 
 router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
   const parsed = z.object({
@@ -318,7 +319,7 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
   }).safeParse(req.body);
 
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -351,7 +352,7 @@ router.put("/ai-notes/bulk-update", asyncHandler(async (req, res) => {
   }).safeParse(req.body);
 
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -374,11 +375,11 @@ router.put("/ai-notes/bulk-update", asyncHandler(async (req, res) => {
 (async () => {
   try {
     const staleCondition = or(
-      eq(aiJobsTable.status, "pending"),
-      eq(aiJobsTable.status, "processing"),
+      eq(aiJobsTable.status, AiJobStatus.PENDING),
+      eq(aiJobsTable.status, AiJobStatus.PROCESSING),
     );
     await db.update(aiJobsTable)
-      .set({ status: "failed", error: "Sunucu yeniden başlatıldı", updatedAt: new Date() })
+      .set({ status: AiJobStatus.FAILED, error: ERROR_MESSAGES.SERVER_RESTARTED, updatedAt: new Date() })
       .where(staleCondition!);
     console.log("[ai-jobs] Startup: marked stale jobs as failed");
   } catch (err) {
@@ -388,11 +389,11 @@ router.put("/ai-notes/bulk-update", asyncHandler(async (req, res) => {
 
 setInterval(async () => {
   try {
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const cutoff = new Date(Date.now() - STALE_JOB_CUTOFF_MS);
     await db.delete(aiJobsTable).where(lt(aiJobsTable.createdAt, cutoff));
   } catch (err) {
     console.error("[ai-jobs] Cleanup error:", err);
   }
-}, 60 * 60 * 1000);
+}, STALE_JOB_CLEANUP_INTERVAL_MS);
 
 export default router;

@@ -9,6 +9,7 @@ import { eq, isNull, isNotNull, and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { cacheGet, cacheSet, cacheInvalidate, cacheInvalidatePrefix } from "../lib/cache";
 import { asyncHandler } from "../middleware/error-handler";
+import { ERROR_MESSAGES } from "../lib/constants";
 
 const idParamSchema = z.object({
   id: z.string().min(1),
@@ -112,7 +113,7 @@ router.get("/projects", asyncHandler(async (_req, res) => {
 router.post("/projects", asyncHandler(async (req, res) => {
   const parsed = createProjectSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -128,19 +129,19 @@ router.post("/projects", asyncHandler(async (req, res) => {
 router.put("/projects/:id", asyncHandler(async (req, res) => {
   const paramsParsed = idParamSchema.safeParse(req.params);
   if (!paramsParsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: paramsParsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: paramsParsed.error.issues });
     return;
   }
   const parsed = updateProjectSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
   const { id } = paramsParsed.data;
   const { name } = parsed.data;
   const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-  if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
+  if (!existing) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
 
   await db.update(projectsTable).set({ name }).where(eq(projectsTable.id, id));
   cacheInvalidate(PROJECTS_CACHE_KEY);
@@ -151,13 +152,13 @@ router.put("/projects/:id", asyncHandler(async (req, res) => {
 router.delete("/projects/:id", asyncHandler(async (req, res) => {
   const paramsParsed = idParamSchema.safeParse(req.params);
   if (!paramsParsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: paramsParsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: paramsParsed.error.issues });
     return;
   }
 
   const { id } = paramsParsed.data;
   const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-  if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
+  if (!existing) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
 
   await db.update(projectsTable).set({ deletedAt: new Date() }).where(eq(projectsTable.id, id));
   await db.update(kesimAlanlariTable).set({ projectId: null }).where(eq(kesimAlanlariTable.projectId, id));
@@ -168,13 +169,13 @@ router.delete("/projects/:id", asyncHandler(async (req, res) => {
 router.post("/projects/:id/restore", asyncHandler(async (req, res) => {
   const paramsParsed = idParamSchema.safeParse(req.params);
   if (!paramsParsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: paramsParsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: paramsParsed.error.issues });
     return;
   }
 
   const { id } = paramsParsed.data;
   const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-  if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
+  if (!existing) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
 
   await db.update(projectsTable).set({ deletedAt: null }).where(eq(projectsTable.id, id));
   await refreshProjectStats();
@@ -204,15 +205,15 @@ router.get("/projects/archived", asyncHandler(async (_req, res) => {
 router.post("/projects/:id/archive", asyncHandler(async (req, res) => {
   const paramsParsed = idParamSchema.safeParse(req.params);
   if (!paramsParsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: paramsParsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: paramsParsed.error.issues });
     return;
   }
 
   const { id } = paramsParsed.data;
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-  if (!project) { res.status(404).json({ error: "Proje bulunamadı" }); return; }
-  if (project.deletedAt) { res.status(400).json({ error: "Silinmiş proje arşivlenemez" }); return; }
-  if (project.archivedAt) { res.status(400).json({ error: "Proje zaten arşivlenmiş" }); return; }
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+  if (project.deletedAt) { res.status(400).json({ error: ERROR_MESSAGES.DELETED_PROJECT_CANNOT_ARCHIVE }); return; }
+  if (project.archivedAt) { res.status(400).json({ error: ERROR_MESSAGES.PROJECT_ALREADY_ARCHIVED }); return; }
 
   const now = new Date();
 
@@ -245,14 +246,14 @@ router.post("/projects/:id/archive", asyncHandler(async (req, res) => {
 router.post("/projects/:id/unarchive", asyncHandler(async (req, res) => {
   const paramsParsed = idParamSchema.safeParse(req.params);
   if (!paramsParsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: paramsParsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: paramsParsed.error.issues });
     return;
   }
 
   const { id } = paramsParsed.data;
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-  if (!project) { res.status(404).json({ error: "Proje bulunamadı" }); return; }
-  if (!project.archivedAt) { res.status(400).json({ error: "Proje arşivde değil" }); return; }
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+  if (!project.archivedAt) { res.status(400).json({ error: ERROR_MESSAGES.PROJECT_NOT_ARCHIVED }); return; }
 
   await db.transaction(async (tx) => {
     const archivedAt = project.archivedAt!;
@@ -279,7 +280,7 @@ router.post("/projects/:id/unarchive", asyncHandler(async (req, res) => {
 router.get("/projects/:id/dashboard", asyncHandler(async (req, res) => {
   const { id } = req.params;
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-  if (!project) { res.status(404).json({ error: "Project not found" }); return; }
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
 
   const kesimRows = await db.select({
     id: kesimAlanlariTable.id,

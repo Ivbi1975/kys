@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { cacheGet, cacheSet, cacheInvalidate } from "../lib/cache";
 import { asyncHandler } from "../middleware/error-handler";
+import { ERROR_MESSAGES } from "../lib/constants";
 
 const TAGS_CACHE_KEY = "tags:list";
 const TAGS_TTL = 60_000;
@@ -37,7 +38,7 @@ router.get("/tags", asyncHandler(async (_req, res) => {
 router.post("/tags", asyncHandler(async (req, res) => {
   const parsed = createTagSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -51,7 +52,7 @@ router.post("/tags", asyncHandler(async (req, res) => {
 router.put("/tags/:id", asyncHandler(async (req, res) => {
   const parsed = updateTagSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -63,7 +64,7 @@ router.put("/tags/:id", asyncHandler(async (req, res) => {
   cacheInvalidate(TAGS_CACHE_KEY);
   const [tag] = await db.select().from(customTagsTable).where(eq(customTagsTable.id, id));
   if (!tag) {
-    res.status(404).json({ error: "Bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND });
     return;
   }
   res.json(tag);

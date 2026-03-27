@@ -26,6 +26,7 @@ import { refreshProjectStats } from "./projects";
 import { asyncHandler } from "../middleware/error-handler";
 import { cacheGet, cacheSet, cacheInvalidatePrefix } from "../lib/cache";
 import { generateThumbnail } from "../lib/thumbnail";
+import { BATCH_SIZE, LARGE_BATCH_SIZE, MAX_QUERY_LIMIT, NoteType, NoteStatus, ERROR_MESSAGES } from "../lib/constants";
 
 const KA_LIST_CACHE_KEY = "kesim-alanlari:list";
 const KA_LIST_TTL = 15_000;
@@ -499,7 +500,7 @@ router.get("/kesim-alanlari/deleted", asyncHandler(async (_req, res) => {
 router.get("/kesim-alanlari/:id", asyncHandler(async (req, res) => {
   const result = await getFullKesimAlani(req.params.id);
   if (!result) {
-    res.status(404).json({ error: "Bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND });
     return;
   }
   res.json(result);
@@ -508,7 +509,7 @@ router.get("/kesim-alanlari/:id", asyncHandler(async (req, res) => {
 router.post("/kesim-alanlari", asyncHandler(async (req, res) => {
   const parsed = createKesimAlaniSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -543,7 +544,7 @@ router.post("/kesim-alanlari", asyncHandler(async (req, res) => {
 router.put("/kesim-alanlari/:id/move", asyncHandler(async (req, res) => {
   const parsed = moveKesimAlaniSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -551,7 +552,7 @@ router.put("/kesim-alanlari/:id/move", asyncHandler(async (req, res) => {
   const { projectId } = parsed.data;
   const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
   if (!existing) {
-    res.status(404).json({ error: "Kesim alanı bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.KESIM_ALANI_NOT_FOUND });
     return;
   }
   if (projectId) {
@@ -571,7 +572,7 @@ router.put("/kesim-alanlari/:id/move", asyncHandler(async (req, res) => {
 router.put("/kesim-alanlari/:id", asyncHandler(async (req, res) => {
   const parsed = updateKesimAlaniSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -612,7 +613,7 @@ router.delete("/kesim-alanlari/:id", asyncHandler(async (req, res) => {
 
   const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
   if (!existing) {
-    res.status(404).json({ error: "Kesim alanı bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.KESIM_ALANI_NOT_FOUND });
     return;
   }
 
@@ -633,7 +634,7 @@ router.post("/kesim-alanlari/:id/restore", asyncHandler(async (req, res) => {
   const { id } = req.params;
   const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
   if (!existing) {
-    res.status(404).json({ error: "Kesim alanı bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.KESIM_ALANI_NOT_FOUND });
     return;
   }
 
@@ -699,12 +700,12 @@ router.get("/kesim-alanlari/:id/donations", asyncHandler(async (req, res) => {
   const { id: kesimAlaniId } = req.params;
   const [ka] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, kesimAlaniId));
   if (!ka) {
-    res.status(404).json({ error: "Kesim alanı bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.KESIM_ALANI_NOT_FOUND });
     return;
   }
 
   const rawLimit = Number(req.query.limit) || 100;
-  const limit = Math.min(Math.max(rawLimit, 1), 500);
+  const limit = Math.min(Math.max(rawLimit, 1), MAX_QUERY_LIMIT);
   const cursor = typeof req.query.cursor === "string" ? req.query.cursor : null;
   const { sortField, sortDir } = parseSortParams(req.query as Record<string, unknown>);
 
@@ -787,7 +788,7 @@ router.get("/kesim-alanlari/:id/donations/count", asyncHandler(async (req, res) 
   const { id: kesimAlaniId } = req.params;
   const [ka] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, kesimAlaniId));
   if (!ka) {
-    res.status(404).json({ error: "Kesim alanı bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.KESIM_ALANI_NOT_FOUND });
     return;
   }
 
@@ -831,7 +832,7 @@ router.get("/kesim-alanlari/:id/groups", asyncHandler(async (req, res) => {
   const { id: kesimAlaniId } = req.params;
   const [ka] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, kesimAlaniId));
   if (!ka) {
-    res.status(404).json({ error: "Kesim alanı bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.KESIM_ALANI_NOT_FOUND });
     return;
   }
 
@@ -935,7 +936,7 @@ router.get("/kesim-alanlari/:id/groups/count", asyncHandler(async (req, res) => 
   const { id: kesimAlaniId } = req.params;
   const [ka] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, kesimAlaniId));
   if (!ka) {
-    res.status(404).json({ error: "Kesim alanı bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.KESIM_ALANI_NOT_FOUND });
     return;
   }
 
@@ -1015,7 +1016,7 @@ const bulkLockSchema = z.object({
 router.post("/kesim-alanlari/:id/groups/bulk-lock", asyncHandler(async (req, res) => {
   const parsed = bulkLockSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -1054,7 +1055,7 @@ router.post("/kesim-alanlari/:id/groups/bulk-lock", asyncHandler(async (req, res
 router.post("/kesim-alanlari/:id/donations", asyncHandler(async (req, res) => {
   const parsed = donationPayloadSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -1100,7 +1101,7 @@ router.post("/kesim-alanlari/:id/donations", asyncHandler(async (req, res) => {
 router.put("/kesim-alanlari/:id/donations/:donationId", asyncHandler(async (req, res) => {
   const parsed = donationPayloadSchema.partial().safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -1197,7 +1198,7 @@ router.get("/kesim-alanlari/:id/donations/deleted", asyncHandler(async (req, res
   const { id: kesimAlaniId } = req.params;
   const [ka] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, kesimAlaniId));
   if (!ka) {
-    res.status(404).json({ error: "Kesim alanı bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.KESIM_ALANI_NOT_FOUND });
     return;
   }
   const deletedDonations = await db.select().from(donationsTable)
@@ -1237,7 +1238,7 @@ router.get("/kesim-alanlari/:id/donations/deleted", asyncHandler(async (req, res
 router.post("/kesim-alanlari/:id/animal-groups", asyncHandler(async (req, res) => {
   const parsed = animalGroupPayloadSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -1288,7 +1289,7 @@ const bulkAnimalGroupsSchema = z.object({
 router.put("/kesim-alanlari/:id/animal-groups/bulk", asyncHandler(async (req, res) => {
   const parsed = bulkAnimalGroupsSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -1327,7 +1328,7 @@ router.put("/kesim-alanlari/:id/animal-groups/bulk", asyncHandler(async (req, re
 router.put("/kesim-alanlari/:id/animal-groups/:groupId", asyncHandler(async (req, res) => {
   const parsed = animalGroupPayloadSchema.partial().safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -1479,7 +1480,7 @@ router.get("/catisma-tespiti", asyncHandler(async (req, res) => {
   }
 
   if (donationIds.length > 0) {
-    const BATCH = 5000;
+    const BATCH = LARGE_BATCH_SIZE;
     const allLinks: { donation_id: string; group_id: string; animal_no: number }[] = [];
     for (let i = 0; i < donationIds.length; i += BATCH) {
       const batch = donationIds.slice(i, i + BATCH);
@@ -1710,7 +1711,7 @@ const transferSchema = z.object({
 router.post("/catisma-tespiti/transfer", asyncHandler(async (req, res) => {
   const parsed = transferSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -1784,7 +1785,7 @@ router.post("/catisma-tespiti/transfer", asyncHandler(async (req, res) => {
           .where(eq(donationsTable.id, d.id));
       }
 
-      const CHUNK_SIZE = 500;
+      const CHUNK_SIZE = BATCH_SIZE;
       if (allTagRows.length > 0) {
         const tagValues = allTagRows.map(t => ({ donationId: t.donationId, tagId: t.tagId }));
         for (let c = 0; c < tagValues.length; c += CHUNK_SIZE) {
@@ -1830,7 +1831,7 @@ router.post("/catisma-tespiti/transfer", asyncHandler(async (req, res) => {
   refreshProjectStats();
 }));
 
-const BATCH_SIZE = 500;
+
 
 async function saveDonations(tx: Tx, kesimAlaniId: string, donations: DonationPayload[]) {
   if (donations.length === 0) return;
@@ -2217,7 +2218,7 @@ router.post("/kesim-alanlari/move-donations", asyncHandler(async (req, res) => {
   }).safeParse(req.body);
 
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -2539,7 +2540,7 @@ async function createNotificationLogs(kesimAlaniId: string, groupId: string, ani
 router.put("/tracking/:token/group/:groupId/kesildi", asyncHandler(async (req, res) => {
   const parsed = kesildiSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -2623,7 +2624,7 @@ router.post("/tracking/:token/notes", asyncHandler(async (req, res) => {
 
   const schema = z.object({
     animalGroupId: z.string().optional(),
-    type: z.enum(["note", "edit_request"]),
+    type: z.enum([NoteType.NOTE, NoteType.EDIT_REQUEST]),
     content: z.string().default(""),
     fieldName: z.string().optional(),
     oldValue: z.string().optional(),
@@ -2632,7 +2633,7 @@ router.post("/tracking/:token/notes", asyncHandler(async (req, res) => {
 
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -2660,7 +2661,7 @@ router.post("/tracking/:token/notes", asyncHandler(async (req, res) => {
     fieldName: fieldName || null,
     oldValue: oldValue || null,
     newValue: newValue || null,
-    status: "pending",
+    status: NoteStatus.PENDING,
     createdAt: now,
   });
 
@@ -2685,7 +2686,7 @@ router.put("/kesim-alanlari/:id/tracking-notes/:noteId/status", asyncHandler(asy
   const check = await requireActiveKesimAlani(id);
   if (check.error) { res.status(check.status).json({ error: check.error }); return; }
 
-  const statusSchema = z.object({ status: z.enum(["pending", "approved", "rejected"]) });
+  const statusSchema = z.object({ status: z.enum([NoteStatus.PENDING, NoteStatus.APPROVED, NoteStatus.REJECTED]) });
   const parsed = statusSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Geçersiz durum" });
@@ -2696,11 +2697,11 @@ router.put("/kesim-alanlari/:id/tracking-notes/:noteId/status", asyncHandler(asy
     .set({ status: parsed.data.status })
     .where(and(eq(trackingNotesTable.id, noteId), eq(trackingNotesTable.kesimAlaniId, id)));
 
-  if (parsed.data.status === "approved") {
+  if (parsed.data.status === NoteStatus.APPROVED) {
     const [note] = await db.select().from(trackingNotesTable)
       .where(and(eq(trackingNotesTable.id, noteId), eq(trackingNotesTable.kesimAlaniId, id)));
 
-    if (note && note.type === "edit_request" && note.animalGroupId && note.fieldName && note.newValue) {
+    if (note && note.type === NoteType.EDIT_REQUEST && note.animalGroupId && note.fieldName && note.newValue) {
       const siraMatch = note.content.match(/[Ss][ıi]ra\s+(\d+)/);
       const siraIndex = siraMatch ? parseInt(siraMatch[1], 10) - 1 : -1;
 
@@ -2746,7 +2747,7 @@ router.get("/tracking/:token/group/:groupId/photos", asyncHandler(async (req, re
   const { token, groupId } = req.params;
   const [ka] = await db.select().from(kesimAlanlariTable)
     .where(eq(kesimAlanlariTable.trackingToken, token));
-  if (!ka) { res.status(404).json({ error: "Bulunamadı" }); return; }
+  if (!ka) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
 
   const [group] = await db.select().from(animalGroupsTable)
     .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
@@ -2768,7 +2769,7 @@ router.get("/tracking/:token/group/:groupId/photos/:photoId", asyncHandler(async
   const size = req.query.size as string | undefined;
   const [ka] = await db.select().from(kesimAlanlariTable)
     .where(eq(kesimAlanlariTable.trackingToken, token));
-  if (!ka) { res.status(404).json({ error: "Bulunamadı" }); return; }
+  if (!ka) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
 
   const [group] = await db.select().from(animalGroupsTable)
     .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
@@ -2796,7 +2797,7 @@ router.get("/tracking/:token/group/:groupId/photos/:photoId", asyncHandler(async
 router.post("/tracking/:token/group/:groupId/photos", asyncHandler(async (req, res) => {
   const parsed = photoUploadSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -2814,7 +2815,7 @@ router.post("/tracking/:token/group/:groupId/photos", asyncHandler(async (req, r
 
   const [ka] = await db.select().from(kesimAlanlariTable)
     .where(eq(kesimAlanlariTable.trackingToken, token));
-  if (!ka) { res.status(404).json({ error: "Bulunamadı" }); return; }
+  if (!ka) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
 
   const [group] = await db.select().from(animalGroupsTable)
     .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
@@ -2854,7 +2855,7 @@ router.delete("/tracking/:token/group/:groupId/photos/:photoId", asyncHandler(as
   const { token, groupId, photoId } = req.params;
   const [ka] = await db.select().from(kesimAlanlariTable)
     .where(eq(kesimAlanlariTable.trackingToken, token));
-  if (!ka) { res.status(404).json({ error: "Bulunamadı" }); return; }
+  if (!ka) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
 
   const [group] = await db.select().from(animalGroupsTable)
     .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
@@ -2975,7 +2976,7 @@ router.get("/kesim-alanlari/:id/teams", asyncHandler(async (req, res) => {
 router.post("/kesim-alanlari/:id/teams", asyncHandler(async (req, res) => {
   const parsed = createTeamSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -2994,7 +2995,7 @@ router.post("/kesim-alanlari/:id/teams", asyncHandler(async (req, res) => {
 router.put("/kesim-alanlari/:id/teams/:teamId", asyncHandler(async (req, res) => {
   const parsed = updateTeamSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -3024,7 +3025,7 @@ router.delete("/kesim-alanlari/:id/teams/:teamId", asyncHandler(async (req, res)
 router.put("/kesim-alanlari/:id/groups/:groupId/team", asyncHandler(async (req, res) => {
   const parsed = assignTeamSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -3047,7 +3048,7 @@ router.put("/kesim-alanlari/:id/groups/:groupId/team", asyncHandler(async (req, 
 router.put("/tracking/:token/group/:groupId/team", asyncHandler(async (req, res) => {
   const parsed = assignTeamSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -3055,7 +3056,7 @@ router.put("/tracking/:token/group/:groupId/team", asyncHandler(async (req, res)
   const { teamId } = parsed.data;
   const [ka] = await db.select().from(kesimAlanlariTable)
     .where(eq(kesimAlanlariTable.trackingToken, token));
-  if (!ka) { res.status(404).json({ error: "Bulunamadı" }); return; }
+  if (!ka) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
   const [group] = await db.select().from(animalGroupsTable)
     .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
   if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
@@ -3091,7 +3092,7 @@ router.get("/settings/notification-template", asyncHandler(async (_req, res) => 
 router.put("/settings/notification-template", asyncHandler(async (req, res) => {
   const parsed = notificationTemplateSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Geçersiz veri", details: parsed.error.issues });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
@@ -3301,8 +3302,8 @@ router.get("/projects/:projectId/pending-edit-requests", asyncHandler(async (req
   const pendingNotes = await db.select().from(trackingNotesTable)
     .where(and(
       inArray(trackingNotesTable.kesimAlaniId, kaIds),
-      eq(trackingNotesTable.type, "edit_request"),
-      eq(trackingNotesTable.status, "pending"),
+      eq(trackingNotesTable.type, NoteType.EDIT_REQUEST),
+      eq(trackingNotesTable.status, NoteStatus.PENDING),
       isNull(trackingNotesTable.deletedAt),
     ))
     .orderBy(desc(trackingNotesTable.createdAt));

@@ -18,3 +18,16 @@ export const FIELD_LABELS: Record<DonorFieldKey, string> = {
   vekalet: "Vekalet",
   notes: "Notlar",
 };
+
+export const NoteType = {
+  NOTE: "note",
+  EDIT_REQUEST: "edit_request",
+} as const;
+export type NoteType = (typeof NoteType)[keyof typeof NoteType];
+
+export const NoteStatus = {
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+} as const;
+export type NoteStatus = (typeof NoteStatus)[keyof typeof NoteStatus];

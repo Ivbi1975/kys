@@ -1,4 +1,5 @@
 import type { KesimAlani, CustomTag, Project } from "./types";
+import type { NoteType, NoteStatus } from "./constants";
 
 const API_BASE = import.meta.env.BASE_URL
   ? `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/").replace(/\/$/, "")
@@ -571,12 +572,12 @@ export interface TrackingNote {
   id: string;
   kesimAlaniId: string;
   animalGroupId: string | null;
-  type: "note" | "edit_request";
+  type: NoteType;
   content: string;
   fieldName: string | null;
   oldValue: string | null;
   newValue: string | null;
-  status: "pending" | "approved" | "rejected";
+  status: NoteStatus;
   createdAt: string;
 }
 
@@ -586,7 +587,7 @@ export async function fetchTrackingNotes(token: string): Promise<TrackingNote[]>
 
 export async function createTrackingNote(token: string, data: {
   animalGroupId?: string;
-  type: "note" | "edit_request";
+  type: NoteType;
   content?: string;
   fieldName?: string;
   oldValue?: string;
@@ -602,7 +603,7 @@ export async function fetchKesimAlaniTrackingNotes(kesimAlaniId: string): Promis
   return apiFetch<TrackingNote[]>(`/kesim-alanlari/${kesimAlaniId}/tracking-notes`);
 }
 
-export async function updateTrackingNoteStatus(kesimAlaniId: string, noteId: string, status: "pending" | "approved" | "rejected"): Promise<void> {
+export async function updateTrackingNoteStatus(kesimAlaniId: string, noteId: string, status: NoteStatus): Promise<void> {
   await apiFetch(`/kesim-alanlari/${kesimAlaniId}/tracking-notes/${noteId}/status`, {
     method: "PUT",
     body: JSON.stringify({ status }),

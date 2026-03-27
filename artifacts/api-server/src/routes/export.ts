@@ -1,10 +1,9 @@
 import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 import { asyncHandler } from "../middleware/error-handler";
+import { CURSOR_BATCH_SIZE } from "../lib/constants";
 
 const router: IRouter = Router();
-
-const CURSOR_BATCH = 500;
 
 function escapeCsvField(val: string): string {
   if (val.includes(",") || val.includes('"') || val.includes("\n") || val.includes("\r")) {
@@ -96,7 +95,7 @@ router.get("/export/csv", asyncHandler(async (req, res) => {
     res.on("close", () => { clientDisconnected = true; });
 
     while (hasMore && !clientDisconnected) {
-      const batch = await client.query(`FETCH ${CURSOR_BATCH} FROM ${cursorName}`);
+      const batch = await client.query(`FETCH ${CURSOR_BATCH_SIZE} FROM ${cursorName}`);
       if (batch.rows.length === 0) {
         hasMore = false;
         break;
@@ -129,7 +128,7 @@ router.get("/export/csv", asyncHandler(async (req, res) => {
         await new Promise<void>((resolve) => res.once("drain", resolve));
       }
 
-      if (batch.rows.length < CURSOR_BATCH) {
+      if (batch.rows.length < CURSOR_BATCH_SIZE) {
         hasMore = false;
       }
     }
