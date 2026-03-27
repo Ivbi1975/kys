@@ -13,7 +13,7 @@ export function errorHandler(
   err: unknown,
   req: Request,
   res: Response,
-  _next: NextFunction,
+  next: NextFunction,
 ): void {
   const error = err instanceof Error ? err : new Error(String(err));
   const status = (err as { status?: number; statusCode?: number }).status
@@ -30,7 +30,10 @@ export function errorHandler(
     `${req.method} ${req.originalUrl} error`,
   );
 
-  if (res.headersSent) return;
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
 
   const body: { error: string; stack?: string } = {
     error: status >= 500 ? "Sunucu hatası" : error.message,
