@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useTrackingActions } from "@/hooks/useTrackingActions";
 import { apiDeleteKesimAlani } from "@/lib/api";
@@ -29,24 +29,34 @@ export function useKesimAlaniActions({
   const [qrUrl, setQrUrl] = useState("");
   const [qrTitle, setQrTitle] = useState("");
 
-  function requestDelete(id: string) {
-    const target = findKesimAlani(id);
+  const findKesimAlaniRef = useRef(findKesimAlani);
+  findKesimAlaniRef.current = findKesimAlani;
+
+  const onDeletedRef = useRef(onDeleted);
+  onDeletedRef.current = onDeleted;
+
+  const deleteConfirmRef = useRef(deleteConfirm);
+  deleteConfirmRef.current = deleteConfirm;
+
+  const requestDelete = useCallback((id: string) => {
+    const target = findKesimAlaniRef.current(id);
     if (!target) return;
     setDeleteConfirm({
       id,
       name: target.name,
       hasDonations: target.donations.length > 0,
     });
-  }
+  }, []);
 
-  async function executeDelete() {
-    if (!deleteConfirm) return;
+  const executeDelete = useCallback(async () => {
+    const current = deleteConfirmRef.current;
+    if (!current) return;
     try {
-      await apiDeleteKesimAlani(deleteConfirm.id);
-      onDeleted?.(deleteConfirm.id);
+      await apiDeleteKesimAlani(current.id);
+      onDeletedRef.current?.(current.id);
       toast({
         title: "Kesim alanı silindi",
-        description: `"${deleteConfirm.name}" çöp kutusuna taşındı.`,
+        description: `"${current.name}" çöp kutusuna taşındı.`,
       });
     } catch (err) {
       toast({
@@ -56,9 +66,9 @@ export function useKesimAlaniActions({
       });
     }
     setDeleteConfirm(null);
-  }
+  }, [toast]);
 
-  async function handleShowQrCode(e: React.MouseEvent, k: KesimAlani) {
+  const handleShowQrCode = useCallback(async (e: React.MouseEvent, k: KesimAlani) => {
     e.stopPropagation();
     try {
       const token = await resolveToken(k);
@@ -69,7 +79,7 @@ export function useKesimAlaniActions({
     } catch {
       toast({ title: "Hata", description: "QR kod oluşturulamadı.", variant: "destructive" });
     }
-  }
+  }, [resolveToken, buildTrackingUrl, toast]);
 
   return {
     handleCopyTrackingLink,

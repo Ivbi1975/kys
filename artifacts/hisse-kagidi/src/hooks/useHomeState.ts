@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import type { KesimAlani, CustomTag, Project } from "@/lib/types";
 import {
@@ -75,18 +75,28 @@ export function useHomeState() {
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const { toast } = useToast();
 
-  const kesimActions = useKesimAlaniActions({
-    onTokenGenerated: (kesimId, token) => {
-      setKesimAlanlari(prev => prev.map(ka => ka.id === kesimId ? { ...ka, trackingToken: token } : ka));
-    },
-    onDeleted: (id) => {
-      const deletedItem = kesimAlanlari.find(k => k.id === id);
-      setKesimAlanlari(prev => prev.filter(k => k.id !== id));
+  const onTokenGenerated = useCallback((kesimId: string, token: string) => {
+    setKesimAlanlari(prev => prev.map(ka => ka.id === kesimId ? { ...ka, trackingToken: token } : ka));
+  }, []);
+
+  const onDeleted = useCallback((id: string) => {
+    setKesimAlanlari(prev => {
+      const deletedItem = prev.find(k => k.id === id);
       if (deletedItem) {
-        setDeletedKesimAlanlari(prev => [...prev, { ...deletedItem, deletedAt: new Date().toISOString() }]);
+        setDeletedKesimAlanlari(old => [...old, { ...deletedItem, deletedAt: new Date().toISOString() }]);
       }
-    },
-    findKesimAlani: (id) => kesimAlanlari.find(k => k.id === id),
+      return prev.filter(k => k.id !== id);
+    });
+  }, []);
+
+  const findKesimAlani = useCallback((id: string) => {
+    return kesimAlanlari.find(k => k.id === id);
+  }, [kesimAlanlari]);
+
+  const kesimActions = useKesimAlaniActions({
+    onTokenGenerated,
+    onDeleted,
+    findKesimAlani,
   });
 
   const [csvExporting, setCsvExporting] = useState(false);
@@ -138,7 +148,7 @@ export function useHomeState() {
     init();
   }, []);
 
-  async function handleAddTag() {
+  const handleAddTag = useCallback(async () => {
     if (!newTagName.trim()) return;
     const tag: CustomTag = {
       id: crypto.randomUUID(),
@@ -147,7 +157,7 @@ export function useHomeState() {
     };
     try {
       await createTag(tag);
-      setGlobalTags([...globalTags, tag]);
+      setGlobalTags(prev => [...prev, tag]);
       setNewTagName("");
       setNewTagColor("#3b82f6");
       toast({ title: "Etiket oluşturuldu", description: tag.name });
@@ -158,13 +168,13 @@ export function useHomeState() {
         variant: "destructive",
       });
     }
-  }
+  }, [newTagName, newTagColor, toast]);
 
-  async function handleDeleteTag(id: string) {
+  const handleDeleteTag = useCallback(async (id: string) => {
     const tag = globalTags.find(t => t.id === id);
     try {
       await deleteTagApi(id);
-      setGlobalTags(globalTags.filter(t => t.id !== id));
+      setGlobalTags(prev => prev.filter(t => t.id !== id));
       toast({ title: "Etiket silindi", description: tag?.name || "" });
     } catch (err) {
       toast({
@@ -173,15 +183,15 @@ export function useHomeState() {
         variant: "destructive",
       });
     }
-  }
+  }, [globalTags, toast]);
 
-  function startEditTag(tag: CustomTag) {
+  const startEditTag = useCallback((tag: CustomTag) => {
     setEditingTagId(tag.id);
     setEditTagName(tag.name);
     setEditTagColor(tag.color);
-  }
+  }, []);
 
-  async function commitEditTag() {
+  const commitEditTag = useCallback(async () => {
     if (!editingTagId || !editTagName.trim()) {
       setEditingTagId(null);
       return;
@@ -189,7 +199,7 @@ export function useHomeState() {
     const updated = { id: editingTagId, name: editTagName.trim(), color: editTagColor };
     try {
       await updateTag(updated);
-      setGlobalTags(globalTags.map(t =>
+      setGlobalTags(prev => prev.map(t =>
         t.id === editingTagId ? updated : t
       ));
       toast({ title: "Etiket güncellendi" });
@@ -201,9 +211,9 @@ export function useHomeState() {
       });
     }
     setEditingTagId(null);
-  }
+  }, [editingTagId, editTagName, editTagColor, toast]);
 
-  async function handleCreate() {
+  const handleCreate = useCallback(async () => {
     if (!newName.trim()) return;
     const newKesim: KesimAlani & { projectId?: string | null } = {
       id: crypto.randomUUID(),
@@ -227,9 +237,9 @@ export function useHomeState() {
         variant: "destructive",
       });
     }
-  }
+  }, [newName, createProjectId, toast, setLocation]);
 
-  async function handleCreateProject() {
+  const handleCreateProject = useCallback(async () => {
     if (!newProjectName.trim()) return;
     try {
       const proj = await createProject(newProjectName.trim());
@@ -244,9 +254,9 @@ export function useHomeState() {
         variant: "destructive",
       });
     }
-  }
+  }, [newProjectName, toast]);
 
-  async function handleUpdateProject() {
+  const handleUpdateProject = useCallback(async () => {
     if (!editingProject || !editingProject.name.trim()) return;
     try {
       const updated = await updateProject(editingProject.id, editingProject.name.trim());
@@ -261,9 +271,9 @@ export function useHomeState() {
         variant: "destructive",
       });
     }
-  }
+  }, [editingProject, toast]);
 
-  async function handleDeleteProject() {
+  const handleDeleteProject = useCallback(async () => {
     if (!deleteProjectConfirm) return;
     try {
       await deleteProject(deleteProjectConfirm.id);
@@ -284,9 +294,9 @@ export function useHomeState() {
       });
     }
     setDeleteProjectConfirm(null);
-  }
+  }, [deleteProjectConfirm, projects, toast]);
 
-  async function handleRestoreProject(id: string) {
+  const handleRestoreProject = useCallback(async (id: string) => {
     try {
       const restored = await restoreProject(id);
       setDeletedProjects(prev => prev.filter(p => p.id !== id));
@@ -299,9 +309,9 @@ export function useHomeState() {
         variant: "destructive",
       });
     }
-  }
+  }, [toast]);
 
-  async function handleUnarchiveProject(id: string) {
+  const handleUnarchiveProject = useCallback(async (id: string) => {
     try {
       const restored = await unarchiveProject(id);
       setArchivedProjects(prev => prev.filter(p => p.id !== id));
@@ -316,9 +326,9 @@ export function useHomeState() {
         variant: "destructive",
       });
     }
-  }
+  }, [toast]);
 
-  async function handleMoveKesimAlani() {
+  const handleMoveKesimAlani = useCallback(async () => {
     if (!movingKesim) return;
     const targetId = moveTargetProjectId === "__none__" ? null : moveTargetProjectId;
     try {
@@ -337,13 +347,13 @@ export function useHomeState() {
         variant: "destructive",
       });
     }
-  }
+  }, [movingKesim, moveTargetProjectId, projects, toast]);
 
 
-  async function handleRestore(id: string) {
+  const handleRestore = useCallback(async (id: string) => {
     try {
       const restored = await apiRestoreKesimAlani(id);
-      setDeletedKesimAlanlari(deletedKesimAlanlari.filter(k => k.id !== id));
+      setDeletedKesimAlanlari(prev => prev.filter(k => k.id !== id));
       setKesimAlanlari(prev => [...prev, restored]);
       toast({ title: "Geri yüklendi", description: `"${restored.name}" başarıyla geri yüklendi.` });
     } catch (err) {
@@ -353,19 +363,23 @@ export function useHomeState() {
         variant: "destructive",
       });
     }
-  }
+  }, [toast]);
 
-  function requestPermanentDelete(id: string) {
-    const target = deletedKesimAlanlari.find(k => k.id === id);
-    if (!target) return;
-    setPermanentDeleteConfirm({ id, name: target.name });
-  }
+  const requestPermanentDelete = useCallback((id: string) => {
+    setDeletedKesimAlanlari(prev => {
+      const target = prev.find(k => k.id === id);
+      if (target) {
+        setPermanentDeleteConfirm({ id, name: target.name });
+      }
+      return prev;
+    });
+  }, []);
 
-  async function executePermanentDelete() {
+  const executePermanentDelete = useCallback(async () => {
     if (!permanentDeleteConfirm) return;
     try {
       await apiPermanentDeleteKesimAlani(permanentDeleteConfirm.id);
-      setDeletedKesimAlanlari(deletedKesimAlanlari.filter(k => k.id !== permanentDeleteConfirm.id));
+      setDeletedKesimAlanlari(prev => prev.filter(k => k.id !== permanentDeleteConfirm.id));
       toast({ title: "Kalıcı olarak silindi", description: `"${permanentDeleteConfirm.name}" tamamen silindi.` });
     } catch (err) {
       toast({
@@ -375,9 +389,9 @@ export function useHomeState() {
       });
     }
     setPermanentDeleteConfirm(null);
-  }
+  }, [permanentDeleteConfirm, toast]);
 
-  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  const handleLogoUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
@@ -405,9 +419,9 @@ export function useHomeState() {
     };
     reader.readAsDataURL(file);
     if (logoInputRef.current) logoInputRef.current.value = "";
-  }
+  }, [toast]);
 
-  async function handleDeleteLogo() {
+  const handleDeleteLogo = useCallback(async () => {
     try {
       await deleteLogoApi();
       setLogoPreview(null);
@@ -419,9 +433,9 @@ export function useHomeState() {
         variant: "destructive",
       });
     }
-  }
+  }, [toast]);
 
-  async function handleExportBackup() {
+  const handleExportBackup = useCallback(async () => {
     try {
       const json = await exportBackupApi();
       const blob = new Blob([json], { type: "application/json" });
@@ -439,9 +453,9 @@ export function useHomeState() {
         variant: "destructive",
       });
     }
-  }
+  }, [toast]);
 
-  async function handleExportCsv() {
+  const handleExportCsv = useCallback(async () => {
     setCsvExporting(true);
     setCsvProgress({ received: 0, total: 0 });
     try {
@@ -464,26 +478,9 @@ export function useHomeState() {
     } finally {
       setCsvExporting(false);
     }
-  }
+  }, [toast]);
 
-  async function handleImportBackup(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      const json = evt.target?.result as string;
-      if (kesimAlanlari.length > 0) {
-        setPendingImportJson(json);
-        setImportModeOpen(true);
-      } else {
-        await executeImport(json, "replace");
-      }
-    };
-    reader.readAsText(file);
-    if (backupInputRef.current) backupInputRef.current.value = "";
-  }
-
-  async function executeImport(json: string, mode: "replace" | "merge") {
+  const executeImport = useCallback(async (json: string, mode: "replace" | "merge") => {
     const result = await importBackupApi(json, mode);
     if (result.success) {
       const ka = await fetchKesimAlanlari();
@@ -505,25 +502,45 @@ export function useHomeState() {
     }
     setPendingImportJson(null);
     setImportModeOpen(false);
-  }
+  }, [toast]);
 
-  function toggleProjectCollapse(projectId: string) {
+  const kesimAlanlariRef = useRef(kesimAlanlari);
+  kesimAlanlariRef.current = kesimAlanlari;
+
+  const handleImportBackup = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const json = evt.target?.result as string;
+      if (kesimAlanlariRef.current.length > 0) {
+        setPendingImportJson(json);
+        setImportModeOpen(true);
+      } else {
+        await executeImport(json, "replace");
+      }
+    };
+    reader.readAsText(file);
+    if (backupInputRef.current) backupInputRef.current.value = "";
+  }, [executeImport]);
+
+  const toggleProjectCollapse = useCallback((projectId: string) => {
     setCollapsedProjects(prev => {
       const next = new Set(prev);
       if (next.has(projectId)) next.delete(projectId);
       else next.add(projectId);
       return next;
     });
-  }
+  }, []);
 
-  function openMoveDialog(k: KesimAlani) {
+  const openMoveDialog = useCallback((k: KesimAlani) => {
     setMovingKesim({ id: k.id, name: k.name, currentProjectId: k.projectId || null });
     setMoveTargetProjectId(k.projectId || "__none__");
     setMoveDialogOpen(true);
-  }
+  }, []);
 
 
-  async function handleIntegrityCheck() {
+  const handleIntegrityCheck = useCallback(async () => {
     setIntegrityChecking(true);
     try {
       const report = await runIntegrityCheck();
@@ -536,9 +553,9 @@ export function useHomeState() {
     } finally {
       setIntegrityChecking(false);
     }
-  }
+  }, [toast]);
 
-  async function handleIntegrityRepair() {
+  const handleIntegrityRepair = useCallback(async () => {
     setIntegrityRepairing(true);
     try {
       const result = await repairIntegrity();
@@ -556,9 +573,12 @@ export function useHomeState() {
     } finally {
       setIntegrityRepairing(false);
     }
-  }
+  }, [toast]);
 
-  const unassignedKesimAlanlari = kesimAlanlari.filter(k => !k.projectId);
+  const unassignedKesimAlanlari = useMemo(
+    () => kesimAlanlari.filter(k => !k.projectId),
+    [kesimAlanlari]
+  );
 
   return {
     setLocation,

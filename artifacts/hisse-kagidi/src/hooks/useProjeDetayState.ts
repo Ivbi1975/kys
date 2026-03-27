@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useMinLoadingTime } from "@/hooks/useMinLoadingTime";
@@ -46,36 +46,14 @@ export function useProjeDetayState() {
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [showConflicts, setShowConflicts] = useState(false);
 
-  const kesimActions = useKesimAlaniActions({
-    onTokenGenerated: (kesimId, token) => {
-      setKesimAlanlari(prev => prev.map(ka => ka.id === kesimId ? { ...ka, trackingToken: token } : ka));
-    },
-    onDeleted: async () => {
-      await loadData();
-      if (showConflicts) await loadConflicts();
-    },
-    findKesimAlani: (id) => kesimAlanlari.find(k => k.id === id),
-  });
+  const showConflictsRef = useRef(showConflicts);
+  showConflictsRef.current = showConflicts;
 
-  const [transferLog, setTransferLog] = useState<DonationTransferEntry[]>([]);
-  const [transferLogLoading, setTransferLogLoading] = useState(false);
-  const [showTransferLog, setShowTransferLog] = useState(false);
+  const onTokenGenerated = useCallback((kesimId: string, token: string) => {
+    setKesimAlanlari(prev => prev.map(ka => ka.id === kesimId ? { ...ka, trackingToken: token } : ka));
+  }, []);
 
-  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
-
-  const [pendingEditCount, setPendingEditCount] = useState(0);
-  const [pendingEditRequests, setPendingEditRequests] = useState<PendingEditRequest[]>([]);
-  const [pendingEditLoading, setPendingEditLoading] = useState(false);
-
-  const [transferDialog, setTransferDialog] = useState<{
-    entry: ConflictEntry;
-    conflict: Conflict;
-  } | null>(null);
-  const [targetKesimAlaniId, setTargetKesimAlaniId] = useState("");
-  const [transferAnimal, setTransferAnimal] = useState(false);
-  const [transferring, setTransferring] = useState(false);
-
-  async function loadData() {
+  const loadDataFn = useCallback(async () => {
     setRawLoading(true);
     try {
       const [projectsRes, kaRes] = await Promise.all([
@@ -98,9 +76,9 @@ export function useProjeDetayState() {
     } finally {
       setRawLoading(false);
     }
-  }
+  }, [projectId, toast]);
 
-  async function loadConflicts() {
+  const loadConflicts = useCallback(async () => {
     setConflictLoading(true);
     try {
       const result = await fetchCatismaTespiti(projectId);
@@ -115,9 +93,42 @@ export function useProjeDetayState() {
     } finally {
       setConflictLoading(false);
     }
-  }
+  }, [projectId, toast]);
 
-  async function loadPendingEditRequests() {
+  const onDeleted = useCallback(async () => {
+    await loadDataFn();
+    if (showConflictsRef.current) await loadConflicts();
+  }, [loadDataFn, loadConflicts]);
+
+  const findKesimAlani = useCallback((id: string) => {
+    return kesimAlanlari.find(k => k.id === id);
+  }, [kesimAlanlari]);
+
+  const kesimActions = useKesimAlaniActions({
+    onTokenGenerated,
+    onDeleted,
+    findKesimAlani,
+  });
+
+  const [transferLog, setTransferLog] = useState<DonationTransferEntry[]>([]);
+  const [transferLogLoading, setTransferLogLoading] = useState(false);
+  const [showTransferLog, setShowTransferLog] = useState(false);
+
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
+
+  const [pendingEditCount, setPendingEditCount] = useState(0);
+  const [pendingEditRequests, setPendingEditRequests] = useState<PendingEditRequest[]>([]);
+  const [pendingEditLoading, setPendingEditLoading] = useState(false);
+
+  const [transferDialog, setTransferDialog] = useState<{
+    entry: ConflictEntry;
+    conflict: Conflict;
+  } | null>(null);
+  const [targetKesimAlaniId, setTargetKesimAlaniId] = useState("");
+  const [transferAnimal, setTransferAnimal] = useState(false);
+  const [transferring, setTransferring] = useState(false);
+
+  const loadPendingEditRequests = useCallback(async () => {
     if (!projectId) return;
     setPendingEditLoading(true);
     try {
@@ -128,9 +139,9 @@ export function useProjeDetayState() {
     } finally {
       setPendingEditLoading(false);
     }
-  }
+  }, [projectId]);
 
-  async function loadTransferLog() {
+  const loadTransferLog = useCallback(async () => {
     if (!projectId) return;
     setTransferLogLoading(true);
     try {
@@ -140,26 +151,26 @@ export function useProjeDetayState() {
     } finally {
       setTransferLogLoading(false);
     }
-  }
+  }, [projectId]);
 
   useEffect(() => {
-    loadData();
+    loadDataFn();
     loadPendingEditRequests();
-  }, [projectId]);
+  }, [projectId, loadDataFn, loadPendingEditRequests]);
 
   useEffect(() => {
     if (showConflicts) {
       loadConflicts();
     }
-  }, [showConflicts, projectId]);
+  }, [showConflicts, projectId, loadConflicts]);
 
   useEffect(() => {
     if (showTransferLog) {
       loadTransferLog();
     }
-  }, [showTransferLog, projectId]);
+  }, [showTransferLog, projectId, loadTransferLog]);
 
-  async function handleCreateKesimAlani() {
+  const handleCreateKesimAlani = useCallback(async () => {
     if (!newKesimAdi.trim()) return;
     try {
       const newKA: KesimAlani = {
@@ -174,7 +185,7 @@ export function useProjeDetayState() {
       setNewKesimAdi("");
       setDialogOpen(false);
       toast({ title: "Kesim alanı oluşturuldu" });
-      await loadData();
+      await loadDataFn();
     } catch (err) {
       toast({
         title: "Oluşturma hatası",
@@ -182,15 +193,15 @@ export function useProjeDetayState() {
         variant: "destructive",
       });
     }
-  }
+  }, [newKesimAdi, projectId, toast, loadDataFn]);
 
-  async function handleUpdateProject() {
+  const handleUpdateProject = useCallback(async () => {
     if (!editProjectName.trim() || !projectId) return;
     try {
       await updateProject(projectId, editProjectName.trim());
       setEditProjectDialogOpen(false);
       toast({ title: "Proje güncellendi" });
-      await loadData();
+      await loadDataFn();
     } catch (err) {
       toast({
         title: "Güncelleme hatası",
@@ -198,9 +209,9 @@ export function useProjeDetayState() {
         variant: "destructive",
       });
     }
-  }
+  }, [editProjectName, projectId, toast, loadDataFn]);
 
-  async function handleDeleteProject() {
+  const handleDeleteProject = useCallback(async () => {
     if (!projectId) return;
     try {
       await deleteProject(projectId);
@@ -214,9 +225,9 @@ export function useProjeDetayState() {
       });
     }
     setDeleteProjectConfirm(false);
-  }
+  }, [projectId, toast, setLocation]);
 
-  async function handleArchiveProject() {
+  const handleArchiveProject = useCallback(async () => {
     setArchiving(true);
     try {
       await archiveProject(projectId);
@@ -228,37 +239,37 @@ export function useProjeDetayState() {
       setArchiving(false);
       setArchiveConfirm(false);
     }
-  }
+  }, [projectId, toast, setLocation]);
 
 
-  function toggleExpand(key: string) {
+  const toggleExpand = useCallback((key: string) => {
     setExpandedKeys(prev => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
-  }
+  }, []);
 
-  const filteredConflicts = conflicts.filter(c => {
+  const filteredConflicts = useMemo(() => {
     const q = conflictSearchQuery.toLowerCase();
-    if (!q) return true;
-    return (
+    if (!q) return conflicts;
+    return conflicts.filter(c =>
       c.displayName.toLowerCase().includes(q) ||
       c.entries.some(e =>
         e.kesimAlaniName.toLowerCase().includes(q) ||
         e.donationDescription.toLowerCase().includes(q)
       )
     );
-  });
+  }, [conflicts, conflictSearchQuery]);
 
-  function openTransferDialog(entry: ConflictEntry, conflict: Conflict) {
+  const openTransferDialog = useCallback((entry: ConflictEntry, conflict: Conflict) => {
     setTransferDialog({ entry, conflict });
     setTargetKesimAlaniId("");
     setTransferAnimal(false);
-  }
+  }, []);
 
-  async function executeTransfer() {
+  const executeTransfer = useCallback(async () => {
     if (!transferDialog || !targetKesimAlaniId) return;
     setTransferring(true);
     try {
@@ -272,7 +283,7 @@ export function useProjeDetayState() {
       });
       toast({ title: "Taşıma başarılı", description: `${entry.donationName} başarıyla taşındı.` });
       setTransferDialog(null);
-      await loadData();
+      await loadDataFn();
       await loadConflicts();
     } catch (err) {
       toast({
@@ -283,33 +294,40 @@ export function useProjeDetayState() {
     } finally {
       setTransferring(false);
     }
-  }
+  }, [transferDialog, targetKesimAlaniId, transferAnimal, toast, loadDataFn, loadConflicts]);
 
 
-  const totals = kesimAlanlari.reduce(
-    (acc, k) => {
-      const shares = getTotalShares(k.donations);
-      const animals = getRequiredAnimals(k.donations);
-      const activeDonors = k.donations.filter(d => !d.excluded).length;
-      const totalSlots = k.animalGroups.length * 7;
-      const filledSlots = k.animalGroups.reduce(
-        (s, g) => s + g.donations.filter(d => d.name.trim() !== "").length,
-        0
-      );
-      const kesildi = k.animalGroups.filter(g => g.kesildi).length;
-      return {
-        donors: acc.donors + activeDonors,
-        shares: acc.shares + shares,
-        animals: acc.animals + animals,
-        grouped: acc.grouped + k.animalGroups.length,
-        totalSlots: acc.totalSlots + totalSlots,
-        filledSlots: acc.filledSlots + filledSlots,
-        kesildi: acc.kesildi + kesildi,
-      };
-    },
-    { donors: 0, shares: 0, animals: 0, grouped: 0, totalSlots: 0, filledSlots: 0, kesildi: 0 }
+  const totals = useMemo(() =>
+    kesimAlanlari.reduce(
+      (acc, k) => {
+        const shares = getTotalShares(k.donations);
+        const animals = getRequiredAnimals(k.donations);
+        const activeDonors = k.donations.filter(d => !d.excluded).length;
+        const totalSlots = k.animalGroups.length * 7;
+        const filledSlots = k.animalGroups.reduce(
+          (s, g) => s + g.donations.filter(d => d.name.trim() !== "").length,
+          0
+        );
+        const kesildi = k.animalGroups.filter(g => g.kesildi).length;
+        return {
+          donors: acc.donors + activeDonors,
+          shares: acc.shares + shares,
+          animals: acc.animals + animals,
+          grouped: acc.grouped + k.animalGroups.length,
+          totalSlots: acc.totalSlots + totalSlots,
+          filledSlots: acc.filledSlots + filledSlots,
+          kesildi: acc.kesildi + kesildi,
+        };
+      },
+      { donors: 0, shares: 0, animals: 0, grouped: 0, totalSlots: 0, filledSlots: 0, kesildi: 0 }
+    ),
+    [kesimAlanlari]
   );
-  const occupancy = totals.totalSlots > 0 ? Math.round((totals.filledSlots / totals.totalSlots) * 100) : 0;
+
+  const occupancy = useMemo(
+    () => totals.totalSlots > 0 ? Math.round((totals.filledSlots / totals.totalSlots) * 100) : 0,
+    [totals.totalSlots, totals.filledSlots]
+  );
 
   return {
     projectId,
