@@ -154,8 +154,16 @@ export function useImportExport({ kesim, save, toast }: UseImportExportParams) {
         if (mapping === "skip" || !cellValue) continue;
         if (mapping === "shareCount") {
           donation.shareCount = Math.max(1, Math.min(7, parseInt(cellValue, 10) || 1));
-        } else {
-          (donation as any)[mapping] = cellValue;
+        } else if (mapping === "name") {
+          donation.name = cellValue;
+        } else if (mapping === "description") {
+          donation.description = cellValue;
+        } else if (mapping === "donationType") {
+          donation.donationType = cellValue;
+        } else if (mapping === "vekalet") {
+          donation.vekalet = cellValue;
+        } else if (mapping === "notes") {
+          donation.notes = cellValue;
         }
       }
 
