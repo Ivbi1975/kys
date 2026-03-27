@@ -558,7 +558,7 @@ router.put("/kesim-alanlari/:id/move", asyncHandler(async (req, res) => {
   if (projectId) {
     const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!proj) {
-      res.status(404).json({ error: "Hedef proje bulunamadı" });
+      res.status(404).json({ error: ERROR_MESSAGES.TARGET_PROJECT_NOT_FOUND });
       return;
     }
   }
@@ -639,7 +639,7 @@ router.post("/kesim-alanlari/:id/restore", asyncHandler(async (req, res) => {
   }
 
   if (!existing.deletedAt) {
-    res.status(400).json({ error: "Bu kesim alanı zaten aktif" });
+    res.status(400).json({ error: ERROR_MESSAGES.ALREADY_ACTIVE });
     return;
   }
 
@@ -728,7 +728,7 @@ router.get("/kesim-alanlari/:id/donations", asyncHandler(async (req, res) => {
         );
       }
     } catch {
-      res.status(400).json({ error: "Geçersiz cursor" });
+      res.status(400).json({ error: ERROR_MESSAGES.INVALID_CURSOR });
       return;
     }
   }
@@ -862,7 +862,7 @@ router.get("/kesim-alanlari/:id/groups", asyncHandler(async (req, res) => {
         );
       }
     } catch {
-      res.status(400).json({ error: "Geçersiz cursor" });
+      res.status(400).json({ error: ERROR_MESSAGES.INVALID_CURSOR });
       return;
     }
   }
@@ -951,7 +951,7 @@ router.get("/kesim-alanlari/:id/groups/:groupId", asyncHandler(async (req, res) 
   const [group] = await db.select().from(animalGroupsTable)
     .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, kesimAlaniId)));
   if (!group) {
-    res.status(404).json({ error: "Hayvan grubu bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.ANIMAL_GROUP_NOT_FOUND });
     return;
   }
 
@@ -1024,7 +1024,7 @@ router.post("/kesim-alanlari/:id/groups/bulk-lock", asyncHandler(async (req, res
   const { groupIds, filter, locked } = parsed.data;
 
   if (!groupIds?.length && !filter) {
-    res.status(400).json({ error: "groupIds veya filter gerekli" });
+    res.status(400).json({ error: ERROR_MESSAGES.GROUP_IDS_OR_FILTER_REQUIRED });
     return;
   }
 
@@ -1117,7 +1117,7 @@ router.put("/kesim-alanlari/:id/donations/:donationId", asyncHandler(async (req,
   const [existing] = await db.select().from(donationsTable)
     .where(eq(donationsTable.id, donationId));
   if (!existing || existing.kesimAlaniId !== kesimAlaniId) {
-    res.status(404).json({ error: "Bağışçı bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.DONOR_NOT_FOUND });
     return;
   }
 
@@ -1161,7 +1161,7 @@ router.delete("/kesim-alanlari/:id/donations/:donationId", asyncHandler(async (r
   }
   const [existing] = await db.select().from(donationsTable).where(eq(donationsTable.id, donationId));
   if (!existing || existing.kesimAlaniId !== kesimAlaniId) {
-    res.status(404).json({ error: "Bağışçı bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.DONOR_NOT_FOUND });
     return;
   }
   if (permanent) {
@@ -1179,11 +1179,11 @@ router.post("/kesim-alanlari/:id/donations/:donationId/restore", asyncHandler(as
   const { id: kesimAlaniId, donationId } = req.params;
   const [existing] = await db.select().from(donationsTable).where(eq(donationsTable.id, donationId));
   if (!existing || existing.kesimAlaniId !== kesimAlaniId) {
-    res.status(404).json({ error: "Bağışçı bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.DONOR_NOT_FOUND });
     return;
   }
   if (!existing.deletedAt) {
-    res.status(400).json({ error: "Bu bağışçı zaten aktif" });
+    res.status(400).json({ error: ERROR_MESSAGES.DONOR_ALREADY_ACTIVE });
     return;
   }
   await db.update(donationsTable)
@@ -1344,7 +1344,7 @@ router.put("/kesim-alanlari/:id/animal-groups/:groupId", asyncHandler(async (req
   const [existing] = await db.select().from(animalGroupsTable)
     .where(eq(animalGroupsTable.id, groupId));
   if (!existing || existing.kesimAlaniId !== kesimAlaniId) {
-    res.status(404).json({ error: "Hayvan grubu bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.ANIMAL_GROUP_NOT_FOUND });
     return;
   }
 
@@ -1395,7 +1395,7 @@ router.delete("/kesim-alanlari/:id/animal-groups/:groupId", asyncHandler(async (
   }
   const [existing] = await db.select().from(animalGroupsTable).where(eq(animalGroupsTable.id, groupId));
   if (!existing || existing.kesimAlaniId !== kesimAlaniId) {
-    res.status(404).json({ error: "Hayvan grubu bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.ANIMAL_GROUP_NOT_FOUND });
     return;
   }
   await db.delete(animalGroupsTable).where(eq(animalGroupsTable.id, groupId));
@@ -1718,7 +1718,7 @@ router.post("/catisma-tespiti/transfer", asyncHandler(async (req, res) => {
   const { donationId, sourceKesimAlaniId, targetKesimAlaniId, transferAnimal, animalGroupId } = parsed.data;
 
   if (sourceKesimAlaniId === targetKesimAlaniId) {
-    res.status(400).json({ error: "Kaynak ve hedef kesim alanı aynı olamaz" });
+    res.status(400).json({ error: ERROR_MESSAGES.SAME_SOURCE_TARGET });
     return;
   }
 
@@ -1728,17 +1728,17 @@ router.post("/catisma-tespiti/transfer", asyncHandler(async (req, res) => {
   ]);
 
   if (!sourceKA[0] || sourceKA[0].deletedAt) {
-    res.status(404).json({ error: "Kaynak kesim alanı bulunamadı veya silinmiş" });
+    res.status(404).json({ error: ERROR_MESSAGES.SOURCE_KESIM_NOT_FOUND_OR_DELETED });
     return;
   }
   if (!targetKA[0] || targetKA[0].deletedAt) {
-    res.status(404).json({ error: "Hedef kesim alanı bulunamadı veya silinmiş" });
+    res.status(404).json({ error: ERROR_MESSAGES.TARGET_KESIM_NOT_FOUND_OR_DELETED });
     return;
   }
 
   const [donation] = await db.select().from(donationsTable).where(eq(donationsTable.id, donationId));
   if (!donation || donation.kesimAlaniId !== sourceKesimAlaniId) {
-    res.status(404).json({ error: "Bağışçı bulunamadı veya kaynak kesim alanına ait değil" });
+    res.status(404).json({ error: ERROR_MESSAGES.DONOR_NOT_IN_SOURCE });
     return;
   }
 
@@ -2225,7 +2225,7 @@ router.post("/kesim-alanlari/move-donations", asyncHandler(async (req, res) => {
   const { donationIds, sourceKesimAlaniId, targetKesimAlaniId } = parsed.data;
 
   if (sourceKesimAlaniId === targetKesimAlaniId) {
-    res.status(400).json({ error: "Kaynak ve hedef kesim alanı aynı olamaz" });
+    res.status(400).json({ error: ERROR_MESSAGES.SAME_SOURCE_TARGET });
     return;
   }
 
@@ -2235,16 +2235,16 @@ router.post("/kesim-alanlari/move-donations", asyncHandler(async (req, res) => {
   ]);
 
   if (!sourceKA || sourceKA.deletedAt) {
-    res.status(404).json({ error: "Kaynak kesim alanı bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.SOURCE_KESIM_NOT_FOUND });
     return;
   }
   if (!targetKA || targetKA.deletedAt) {
-    res.status(404).json({ error: "Hedef kesim alanı bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.TARGET_KESIM_NOT_FOUND });
     return;
   }
 
   if (sourceKA.projectId !== targetKA.projectId) {
-    res.status(400).json({ error: "Kaynak ve hedef kesim alanları aynı projede olmalıdır" });
+    res.status(400).json({ error: ERROR_MESSAGES.MUST_BE_SAME_PROJECT });
     return;
   }
 
@@ -2258,7 +2258,7 @@ router.post("/kesim-alanlari/move-donations", asyncHandler(async (req, res) => {
   const validIds = sourceDonations.map(d => d.id);
 
   if (validIds.length === 0) {
-    res.status(400).json({ error: "Aktarılacak geçerli bağışçı bulunamadı" });
+    res.status(400).json({ error: ERROR_MESSAGES.NO_VALID_DONORS });
     return;
   }
 
@@ -2302,7 +2302,7 @@ router.get("/tracking/:token", asyncHandler(async (req, res) => {
   const [ka] = await db.select().from(kesimAlanlariTable)
     .where(eq(kesimAlanlariTable.trackingToken, token));
   if (!ka || ka.deletedAt) {
-    res.status(404).json({ error: "Takip linki bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.TRACKING_LINK_NOT_FOUND });
     return;
   }
 
@@ -2374,19 +2374,19 @@ router.get("/tracking/:token/delta", asyncHandler(async (req, res) => {
   const { token } = req.params;
   const sinceParam = req.query.since as string | undefined;
   if (!sinceParam) {
-    res.status(400).json({ error: "since parametresi gerekli" });
+    res.status(400).json({ error: ERROR_MESSAGES.SINCE_PARAM_REQUIRED });
     return;
   }
   const sinceDate = new Date(sinceParam);
   if (isNaN(sinceDate.getTime())) {
-    res.status(400).json({ error: "Geçersiz since tarihi" });
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_SINCE_DATE });
     return;
   }
 
   const [ka] = await db.select().from(kesimAlanlariTable)
     .where(eq(kesimAlanlariTable.trackingToken, token));
   if (!ka || ka.deletedAt) {
-    res.status(404).json({ error: "Takip linki bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.TRACKING_LINK_NOT_FOUND });
     return;
   }
 
@@ -2550,14 +2550,14 @@ router.put("/tracking/:token/group/:groupId/kesildi", asyncHandler(async (req, r
   const [ka] = await db.select().from(kesimAlanlariTable)
     .where(eq(kesimAlanlariTable.trackingToken, token));
   if (!ka || ka.deletedAt) {
-    res.status(404).json({ error: "Takip linki bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.TRACKING_LINK_NOT_FOUND });
     return;
   }
 
   const [group] = await db.select().from(animalGroupsTable)
     .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
   if (!group) {
-    res.status(404).json({ error: "Hayvan grubu bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.ANIMAL_GROUP_NOT_FOUND });
     return;
   }
 
@@ -2602,7 +2602,7 @@ router.get("/tracking/:token/notes", asyncHandler(async (req, res) => {
   const [ka] = await db.select().from(kesimAlanlariTable)
     .where(eq(kesimAlanlariTable.trackingToken, token));
   if (!ka || ka.deletedAt) {
-    res.status(404).json({ error: "Takip linki bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.TRACKING_LINK_NOT_FOUND });
     return;
   }
 
@@ -2618,7 +2618,7 @@ router.post("/tracking/:token/notes", asyncHandler(async (req, res) => {
   const [ka] = await db.select().from(kesimAlanlariTable)
     .where(eq(kesimAlanlariTable.trackingToken, token));
   if (!ka || ka.deletedAt) {
-    res.status(404).json({ error: "Takip linki bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.TRACKING_LINK_NOT_FOUND });
     return;
   }
 
@@ -2644,7 +2644,7 @@ router.post("/tracking/:token/notes", asyncHandler(async (req, res) => {
       .from(animalGroupsTable)
       .where(and(eq(animalGroupsTable.id, animalGroupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
     if (!group) {
-      res.status(400).json({ error: "Geçersiz hayvan grubu" });
+      res.status(400).json({ error: ERROR_MESSAGES.INVALID_ANIMAL_GROUP });
       return;
     }
   }
@@ -2782,7 +2782,7 @@ router.get("/tracking/:token/group/:groupId/photos/:photoId", asyncHandler(async
     mimeType: animalGroupPhotosTable.mimeType,
   }).from(animalGroupPhotosTable)
     .where(and(eq(animalGroupPhotosTable.id, photoId), eq(animalGroupPhotosTable.animalGroupId, groupId)));
-  if (!photo) { res.status(404).json({ error: "Fotoğraf bulunamadı" }); return; }
+  if (!photo) { res.status(404).json({ error: ERROR_MESSAGES.PHOTO_NOT_FOUND }); return; }
 
   const sourceData = (size === "thumb" && photo.thumbnail) ? photo.thumbnail : photo.data;
   const base64Data = sourceData.replace(/^data:[^;]+;base64,/, "");
@@ -2810,7 +2810,7 @@ router.post("/tracking/:token/group/:groupId/photos", asyncHandler(async (req, r
   const base64Part = data.replace(/^data:[^;]+;base64,/, "");
   const sizeBytes = Math.ceil(base64Part.length * 3 / 4);
   if (sizeBytes > MAX_PHOTO_SIZE) {
-    res.status(400).json({ error: "Fotoğraf çok büyük (max 5MB)" }); return;
+    res.status(400).json({ error: ERROR_MESSAGES.PHOTO_TOO_LARGE }); return;
   }
 
   const [ka] = await db.select().from(kesimAlanlariTable)
@@ -2898,7 +2898,7 @@ router.get("/kesim-alanlari/:id/group/:groupId/photos/:photoId", asyncHandler(as
     mimeType: animalGroupPhotosTable.mimeType,
   }).from(animalGroupPhotosTable)
     .where(and(eq(animalGroupPhotosTable.id, photoId), eq(animalGroupPhotosTable.animalGroupId, groupId)));
-  if (!photo) { res.status(404).json({ error: "Fotoğraf bulunamadı" }); return; }
+  if (!photo) { res.status(404).json({ error: ERROR_MESSAGES.PHOTO_NOT_FOUND }); return; }
 
   const sourceData = (size === "thumb" && photo.thumbnail) ? photo.thumbnail : photo.data;
   const base64Data = sourceData.replace(/^data:[^;]+;base64,/, "");
@@ -2934,12 +2934,12 @@ router.get("/kesim-alanlari/:id/photos/counts", asyncHandler(async (req, res) =>
 router.post("/photos/backfill-thumbnails", asyncHandler(async (req, res) => {
   const expectedKey = process.env["ADMIN_KEY"];
   if (!expectedKey) {
-    res.status(403).json({ error: "ADMIN_KEY ortam değişkeni ayarlanmamış" });
+    res.status(403).json({ error: ERROR_MESSAGES.ADMIN_KEY_NOT_SET });
     return;
   }
   const adminKey = req.headers["x-admin-key"] || req.query.key;
   if (!adminKey || adminKey !== expectedKey) {
-    res.status(403).json({ error: "Yetkisiz erişim" });
+    res.status(403).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
     return;
   }
 
@@ -3002,7 +3002,7 @@ router.put("/kesim-alanlari/:id/teams/:teamId", asyncHandler(async (req, res) =>
   const { id, teamId } = req.params;
   const [team] = await db.select().from(teamsTable)
     .where(and(eq(teamsTable.id, teamId), eq(teamsTable.kesimAlaniId, id)));
-  if (!team) { res.status(404).json({ error: "Ekip bulunamadı" }); return; }
+  if (!team) { res.status(404).json({ error: ERROR_MESSAGES.TEAM_NOT_FOUND }); return; }
   const updates: Record<string, string> = {};
   if (parsed.data.name !== undefined) updates.name = parsed.data.name;
   if (parsed.data.color !== undefined) updates.color = parsed.data.color;
@@ -3014,7 +3014,7 @@ router.delete("/kesim-alanlari/:id/teams/:teamId", asyncHandler(async (req, res)
   const { id, teamId } = req.params;
   const [team] = await db.select().from(teamsTable)
     .where(and(eq(teamsTable.id, teamId), eq(teamsTable.kesimAlaniId, id)));
-  if (!team) { res.status(404).json({ error: "Ekip bulunamadı" }); return; }
+  if (!team) { res.status(404).json({ error: ERROR_MESSAGES.TEAM_NOT_FOUND }); return; }
   await db.update(animalGroupsTable)
     .set({ teamId: null })
     .where(and(eq(animalGroupsTable.kesimAlaniId, id), eq(animalGroupsTable.teamId, teamId)));
@@ -3037,7 +3037,7 @@ router.put("/kesim-alanlari/:id/groups/:groupId/team", asyncHandler(async (req, 
   if (teamId) {
     const [team] = await db.select().from(teamsTable)
       .where(and(eq(teamsTable.id, teamId), eq(teamsTable.kesimAlaniId, id)));
-    if (!team) { res.status(404).json({ error: "Ekip bulunamadı" }); return; }
+    if (!team) { res.status(404).json({ error: ERROR_MESSAGES.TEAM_NOT_FOUND }); return; }
   }
   await db.update(animalGroupsTable)
     .set({ teamId: teamId || null })
@@ -3063,7 +3063,7 @@ router.put("/tracking/:token/group/:groupId/team", asyncHandler(async (req, res)
   if (teamId) {
     const [team] = await db.select().from(teamsTable)
       .where(and(eq(teamsTable.id, teamId), eq(teamsTable.kesimAlaniId, ka.id)));
-    if (!team) { res.status(404).json({ error: "Ekip bulunamadı" }); return; }
+    if (!team) { res.status(404).json({ error: ERROR_MESSAGES.TEAM_NOT_FOUND }); return; }
   }
   await db.update(animalGroupsTable)
     .set({ teamId: teamId || null })
@@ -3108,7 +3108,7 @@ router.get("/tracking/:token/notification-logs", asyncHandler(async (req, res) =
   const [ka] = await db.select().from(kesimAlanlariTable)
     .where(eq(kesimAlanlariTable.trackingToken, token));
   if (!ka || ka.deletedAt) {
-    res.status(404).json({ error: "Takip linki bulunamadı" });
+    res.status(404).json({ error: ERROR_MESSAGES.TRACKING_LINK_NOT_FOUND });
     return;
   }
 
