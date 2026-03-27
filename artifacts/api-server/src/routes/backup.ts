@@ -226,10 +226,10 @@ router.post("/backup/import", asyncHandler(async (req, res) => {
         const existing = await tx.select({ id: kesimAlanlariTable.id }).from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, kaId));
         if (existing.length > 0) {
           importLog.kesimAlanlariSkipped++;
-        } else {
-          await tx.insert(kesimAlanlariTable).values(kaValues);
-          importLog.kesimAlanlari++;
+          continue;
         }
+        await tx.insert(kesimAlanlariTable).values(kaValues);
+        importLog.kesimAlanlari++;
       } else {
         await tx.insert(kesimAlanlariTable).values(kaValues);
         importLog.kesimAlanlari++;
@@ -308,10 +308,10 @@ router.post("/backup/import", asyncHandler(async (req, res) => {
                 logger.warn({ groupId, existingKaId: existing[0].kesimAlaniId, importKaId: kaId }, "Import group ID collision: belongs to different kesim alanı");
               }
               importLog.groupsSkipped++;
-            } else {
-              await tx.insert(animalGroupsTable).values(gValues);
-              importLog.groups++;
+              continue;
             }
+            await tx.insert(animalGroupsTable).values(gValues);
+            importLog.groups++;
           } else {
             await tx.insert(animalGroupsTable).values(gValues);
             importLog.groups++;
