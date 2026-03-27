@@ -1,0 +1,77 @@
+import { Card } from "@/components/ui/card";
+import { FolderOpen, ChevronRight } from "lucide-react";
+import type { KesimAlani } from "@/lib/types";
+import type { Project } from "@/lib/types";
+import { getTotalShares } from "@/lib/grouping";
+
+interface ProjectCardProps {
+  project: Project;
+  kesimAlanlari: KesimAlani[];
+  onNavigate: (projectId: string) => void;
+}
+
+export function ProjectCard({ project, kesimAlanlari, onNavigate }: ProjectCardProps) {
+  const projectKesimAlanlari = kesimAlanlari.filter(k => k.projectId === project.id);
+
+  const projTotals = projectKesimAlanlari.reduce((acc, k) => {
+    const shares = getTotalShares(k.donations);
+    const activeDonors = k.donations.filter(d => !d.excluded).length;
+    const kesildi = k.animalGroups.filter(g => g.kesildi).length;
+    const kesildiTimes = k.animalGroups.filter(g => g.kesildiAt).map(g => g.kesildiAt!);
+    return {
+      donors: acc.donors + activeDonors,
+      shares: acc.shares + shares,
+      areas: acc.areas + 1,
+      groups: acc.groups + k.animalGroups.length,
+      kesildi: acc.kesildi + kesildi,
+      kesildiTimes: [...acc.kesildiTimes, ...kesildiTimes],
+    };
+  }, { donors: 0, shares: 0, areas: 0, groups: 0, kesildi: 0, kesildiTimes: [] as string[] });
+
+  const projKesildiPercent = projTotals.groups > 0 ? Math.round((projTotals.kesildi / projTotals.groups) * 100) : 0;
+  const projLastKesildiAt = projTotals.kesildiTimes.sort().pop();
+
+  return (
+    <div className="mb-6">
+      <Card className="p-3 bg-muted/30 border-primary/10">
+        <div
+          className="flex items-center gap-2 cursor-pointer"
+          onClick={() => onNavigate(project.id)}
+        >
+          <FolderOpen className="w-5 h-5 text-primary" />
+          <div className="flex-1 min-w-0">
+            <h2 className="font-semibold text-foreground text-lg">{project.name}</h2>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+              <span>{projTotals.areas} kesim alanı</span>
+              <span>{projTotals.donors} bağışçı</span>
+              <span>{projTotals.shares} hisse</span>
+              <span>{projTotals.groups} grup</span>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </div>
+        {projTotals.groups > 0 && (
+          <div className="mt-2 pt-2 border-t">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] text-muted-foreground font-medium">Kesim Durumu</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-emerald-600">{projTotals.kesildi}/{projTotals.groups} (%{projKesildiPercent})</span>
+                {projLastKesildiAt && (
+                  <span className="text-[9px] text-muted-foreground">
+                    (son: {new Date(projLastKesildiAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })})
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                style={{ width: `${projKesildiPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
