@@ -434,6 +434,11 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
       <div
         className={`flex items-center justify-between ${compact ? "p-2" : "p-3"} ${group.locked ? "bg-amber-500/10" : "bg-primary/10"} cursor-pointer`}
         onClick={() => onToggleCollapse(group.id)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggleCollapse(group.id); } }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={!isCollapsed}
+        aria-label={`Hayvan ${group.animalNo} grubunu ${isCollapsed ? "genişlet" : "daralt"}`}
       >
         <div className="flex items-center gap-2">
           <button

@@ -376,6 +376,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
             <Button
               size="sm"
               variant="outline"
+              aria-label="Takip Linki"
               onClick={async () => {
                 try {
                   let token = kesim.trackingToken;
@@ -397,6 +398,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
             <Button
               size="sm"
               variant="outline"
+              aria-label="QR Kod"
               onClick={async () => {
                 try {
                   let token = kesim.trackingToken;
@@ -418,6 +420,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
             <Button
               size="sm"
               variant="outline"
+              aria-label="Saha Notları"
               onClick={async () => {
                 setTrackingNotesOpen(true);
                 setTrackingNotesLoading(true);
@@ -435,6 +438,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
             <Button
               size="sm"
               variant="outline"
+              aria-label="Ekipler"
               onClick={() => setTeamDialogOpen(true)}
             >
               <UserCog className="w-4 h-4" />
@@ -443,6 +447,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
             <Button
               size="sm"
               variant="outline"
+              aria-label="Bildirimler"
               onClick={async () => {
                 setNotificationLogsOpen(true);
                 setNotificationLogsLoading(true);
@@ -467,6 +472,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
               className="shrink-0"
               onClick={() => saveToApi(kesim)}
               disabled={saveStatus === "saving"}
+              aria-label="Kaydet"
             >
               {saveStatus === "saving" ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -524,7 +530,7 @@ import { generateTrackingToken, fetchKesimAlaniTrackingNotes, fetchNotificationL
             <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hidden sm:flex" onClick={toggleFullscreen} title="Tam Ekran (F11)" aria-label={isFullscreen ? "Tam Ekrandan Çık" : "Tam Ekran"}>
               {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
             </Button>
-            <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={exportDonorsExcel} title="Bağışçı Listesi Excel">
+            <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={exportDonorsExcel} title="Bağışçı Listesi Excel" aria-label="Bağışçı Listesi Excel">
               <FileSpreadsheet className="w-3.5 h-3.5" />
             </Button>
             {kesim.animalGroups.length > 0 && (
