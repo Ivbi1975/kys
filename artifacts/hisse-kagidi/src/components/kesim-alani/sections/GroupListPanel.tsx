@@ -18,7 +18,7 @@ import {
 import { useKesimAlaniContext } from "../KesimAlaniContext";
 import { GroupMinimap } from "./GroupMinimap";
 import { GroupConflictPanel } from "./GroupConflictPanel";
-import { GroupFindDeleteDialog } from "./GroupFindDeleteDialog";
+import { GroupFindDeleteDialog } from "../dialogs/GroupFindDeleteDialog";
 import { GroupBulkLockPopover } from "./GroupBulkLockPopover";
 
 export function GroupListPanel() {

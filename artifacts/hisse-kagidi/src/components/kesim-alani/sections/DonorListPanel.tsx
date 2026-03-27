@@ -11,9 +11,9 @@ import {
   FileText, Filter, Scissors, Search, ShoppingBag, Tag, Trash2, UserCog, Wand2, X,
 } from "lucide-react";
 import { useKesimAlaniContext } from "../KesimAlaniContext";
-import { BulkImportDialog } from "./BulkImportDialog";
-import { FindDeleteDialog } from "./FindDeleteDialog";
-import { AddDonorDialog } from "./AddDonorDialog";
+import { BulkImportDialog } from "../dialogs/BulkImportDialog";
+import { FindDeleteDialog } from "../dialogs/FindDeleteDialog";
+import { AddDonorDialog } from "../dialogs/AddDonorDialog";
 import { DonorAdvancedFilter } from "./DonorAdvancedFilter";
 import { DonorBulkActions } from "./DonorBulkActions";
 
