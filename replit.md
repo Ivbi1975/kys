@@ -101,7 +101,7 @@ Data model (AnimalGroup):
 
 Key files:
 - `src/lib/types.ts` - TypeScript types (Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag, Project, ProjectStats)
-- `src/lib/api.ts` - API client functions for all CRUD operations (PostgreSQL backend), including project CRUD (fetchProjects, createProject, updateProject, deleteProject, restoreProject, fetchDeletedProjects) and moveKesimAlani
+- `src/lib/api/` - API client modules split by domain: `core.ts` (apiFetch, getApiKey), `projects.ts`, `kesim-alanlari.ts`, `tracking.ts`, `ai-notes.ts`, `settings.ts`, `misc.ts`; barrel `index.ts` re-exports all
 - `src/lib/storage.ts` - Print preferences (localStorage, UI-only settings)
 - `src/lib/grouping.ts` - Mod 7 smart grouping algorithm (pre-splits into full 7-share animals, then pairs/triples remainders)
 - `src/lib/useHistory.ts` - Snapshot-based undo/redo hook (80 steps, structuredClone)
@@ -130,8 +130,8 @@ Key files:
 - `src/components/kesim-alani/sections/StatsCards.tsx` - Stats grid, share distribution, group compositions
 - `src/components/kesim-alani/sections/DonorListPanel.tsx` - Left panel: search, filters, bulk import, virtual donor table
 - `src/components/kesim-alani/sections/GroupListPanel.tsx` - Right panel: group toolbar, minimap, conflict display, virtualized group cards
-- `src/components/kesim-alani/KesimAlaniDialogs.tsx` - All dialog/modal components for kesim-alani (~1400 lines)
-- `src/pages/print.tsx` - Print-optimized A4 landscape view matching Excel design
+- `src/components/kesim-alani/KesimAlaniDialogs.tsx` - Thin dialog orchestrator (~300 lines), delegates to sub-components in `dialogs/` directory: `SwapDialogs`, `SplitDialogs`, `SmartPlaceDialog`, `TeamDialog`, `BasketPanel`, `DonorListReport`, `JumpDialog`
+- `src/pages/print/` - Print page split into: `PrintPage.tsx` (state+toolbar), `templates.tsx` (5 template renderers), `excelExport.ts`, `printHelpers.ts`; barrel `index.ts`
 - `src/pages/kesim-takip.tsx` - Public kesim tracking page (no auth), shows animal groups with kesildi toggle, offline mode with IndexedDB + Service Worker
 - `src/pages/kesim-rapor.tsx` - Kesim report page (`/rapor/:id`), print-optimized PDF with stats, timeline, team breakdown, notes; accessible from kesim-alani "Rapor" button
 - `src/lib/offlineStore.ts` - IndexedDB wrapper for offline tracking data cache and change queue
