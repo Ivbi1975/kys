@@ -6,13 +6,24 @@ interface PhotoToken {
 }
 
 let cachedToken: PhotoToken | null = null;
+let fetchInProgress: Promise<PhotoToken> | null = null;
 
 export async function fetchPhotoToken(): Promise<PhotoToken> {
   if (cachedToken && cachedToken.expiresAt > Math.floor(Date.now() / 1000) + 60) {
     return cachedToken;
   }
-  cachedToken = await apiFetch<PhotoToken>("/photo-token");
-  return cachedToken;
+  if (fetchInProgress) return fetchInProgress;
+  fetchInProgress = apiFetch<PhotoToken>("/photo-token")
+    .then((result) => {
+      cachedToken = result;
+      fetchInProgress = null;
+      return result;
+    })
+    .catch((err) => {
+      fetchInProgress = null;
+      throw err;
+    });
+  return fetchInProgress;
 }
 
 export function getCachedPhotoToken(): PhotoToken | null {
@@ -28,6 +39,8 @@ export function buildSignedPhotoUrl(basePath: string, extraParams?: URLSearchPar
   if (token) {
     params.set("ptoken", token.token);
     params.set("exp", String(token.expiresAt));
+  } else {
+    fetchPhotoToken().catch(() => {});
   }
   const qs = params.toString();
   return qs ? `${API_BASE}${basePath}?${qs}` : `${API_BASE}${basePath}`;
@@ -35,4 +48,5 @@ export function buildSignedPhotoUrl(basePath: string, extraParams?: URLSearchPar
 
 export function clearPhotoTokenCache(): void {
   cachedToken = null;
+  fetchInProgress = null;
 }
