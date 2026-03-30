@@ -7,16 +7,20 @@
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "pnpm -r --if-present run test"
   },
   "private": true,
   "type": "module",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/supertest": "^7.2.0",
     "eslint": "^10.1.0",
     "eslint-plugin-react-hooks": "^7.0.1",
     "prettier": "^3.8.1",
+    "supertest": "^7.2.2",
     "typescript": "~5.9.2",
-    "typescript-eslint": "^8.57.2"
+    "typescript-eslint": "^8.57.2",
+    "vitest": "^4.1.2"
   }
 }
