@@ -203,7 +203,12 @@ export const DonorRow = React.memo(DonorRowInner, (prev, next) => {
   if (prev.editField !== next.editField) return false;
   if (prev.isEditing && prev.editDraft !== next.editDraft) return false;
   if (prev.isInBasket !== next.isInBasket) return false;
+  if (prev.isGrouped !== next.isGrouped) return false;
   if (prev.descCount !== next.descCount) return false;
+  if (prev.effectiveShare !== next.effectiveShare) return false;
+  if (prev.canSplit !== next.canSplit) return false;
+  if (prev.splitShares !== next.splitShares) return false;
   if (prev.tagPopoverOpen !== next.tagPopoverOpen) return false;
+  if (prev.globalTags !== next.globalTags) return false;
   return true;
 });

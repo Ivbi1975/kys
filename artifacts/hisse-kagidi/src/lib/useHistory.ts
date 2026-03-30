@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef } from "react";
-import { freeze } from "immer";
 import type { KesimAlani } from "./types";
 
 export interface HistoryEntry {
@@ -25,10 +24,6 @@ interface UseHistoryReturn {
 
 const MAX_HISTORY = 80;
 
-function snapshot(state: KesimAlani): KesimAlani {
-  return freeze(structuredClone(state), true);
-}
-
 export function useHistory(): UseHistoryReturn {
   const entriesRef = useRef<HistoryEntry[]>([]);
   const indexRef = useRef<number>(-1);
@@ -39,7 +34,7 @@ export function useHistory(): UseHistoryReturn {
   const initialize = useCallback(
     (state: KesimAlani) => {
       entriesRef.current = [
-        { state: snapshot(state), description: "Başlangıç durumu", timestamp: Date.now() },
+        { state: structuredClone(state), description: "Başlangıç durumu", timestamp: Date.now() },
       ];
       indexRef.current = 0;
       rerender();
@@ -57,7 +52,7 @@ export function useHistory(): UseHistoryReturn {
       }
 
       entries.push({
-        state: snapshot(state),
+        state: structuredClone(state),
         description,
         timestamp: Date.now(),
       });
