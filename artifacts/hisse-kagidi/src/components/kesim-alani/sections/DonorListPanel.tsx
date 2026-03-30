@@ -1,15 +1,14 @@
-import React, { useState, useCallback } from "react";
+import React, { Profiler, useState, useCallback } from "react";
 import type { Donation } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TableVirtuoso } from "react-virtuoso";
 import {
-  AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Eye, EyeOff,
-  FileText, Filter, Scissors, Search, ShoppingBag, Tag, Trash2, UserCog, Wand2, X,
+  ArrowDown, ArrowUp, ArrowUpDown,
+  FileText, Filter, Search, Trash2, X,
 } from "lucide-react";
+import { DonorRow } from "./DonorRow";
 import { useKesimAlaniContext } from "../KesimAlaniContext";
 import { BulkImportDialog } from "../dialogs/BulkImportDialog";
 import { FindDeleteDialog } from "../dialogs/FindDeleteDialog";
@@ -33,6 +32,14 @@ export function DonorListPanel() {
     toggleSelect, toggleSelectAll, updateDonationField, virtuosoTableComponents,
   } = ctx;
 
+  const onRenderCallback: React.ProfilerOnRenderCallback = useCallback(
+    (id, phase, actualDuration, baseDuration) => {
+      if (import.meta.env.DEV && actualDuration > 16) {
+        console.debug(`[Profiler] ${id} ${phase}: actual=${actualDuration.toFixed(1)}ms base=${baseDuration.toFixed(1)}ms`);
+      }
+    }, []
+  );
+
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleDonorSearch = useCallback(() => {
@@ -47,7 +54,7 @@ export function DonorListPanel() {
   if (!kesim) return null;
 
   return (
-    <>
+    <Profiler id="DonorListPanel" onRender={onRenderCallback}>
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           <h2 className="text-lg font-semibold whitespace-nowrap">Bağışçı Listesi</h2>
@@ -128,107 +135,40 @@ export function DonorListPanel() {
             itemContent={(idx, d) => {
               const descCount = d.excluded ? 0 : (descCountMap.get(d.description.trim().toLowerCase()) || 1);
               const effectiveShare = descCount > 1 ? descCount : d.shareCount;
-              return (<>
-                <td className="p-2"><input type="checkbox" checked={selectedIds.has(d.id)} onChange={() => toggleSelect(d.id)} className="rounded" /></td>
-                <td className="p-2 text-muted-foreground">{idx + 1}</td>
-                <td className="p-2">
-                  {editingCell?.donationId === d.id && editingCell?.field === "vekalet" ? (
-                    <Input className="h-7 text-sm ring-2 ring-primary/40 bg-primary/5" value={editDraft} onChange={(e) => setEditDraft(e.target.value)} onBlur={() => commitEdit()} onKeyDown={(e) => handleDonorCellKeyDown(e, d.id, "vekalet")} autoFocus />
-                  ) : (
-                    <span className="cursor-text block px-1 py-0.5 rounded hover:bg-muted/50 transition-colors" onClick={() => startEditing(d.id, "vekalet")}>{d.vekalet || "—"}</span>
-                  )}
-                </td>
-                <td className="p-2">
-                  {editingCell?.donationId === d.id && editingCell?.field === "description" ? (
-                    <Input className="h-7 text-sm ring-2 ring-primary/40 bg-primary/5" value={editDraft} onChange={(e) => setEditDraft(e.target.value)} onBlur={() => commitEdit()} onKeyDown={(e) => handleDonorCellKeyDown(e, d.id, "description")} autoFocus />
-                  ) : (
-                    <div className="flex items-center gap-1">
-                      <span className="cursor-text flex-1 block px-1 py-0.5 rounded hover:bg-muted/50 transition-colors" onClick={() => startEditing(d.id, "description")}>{d.description || "—"}</span>
-                      {d.description && descCount > 1 && (
-                        <Button variant="ghost" size="sm" className="h-5 w-5 p-0 shrink-0" title="Bu kişinin tüm kayıtlarını düzenle" aria-label="Bu kişinin tüm kayıtlarını düzenle" onClick={() => setPersonEditDesc(d.description)}><UserCog className="w-3 h-3 text-muted-foreground" /></Button>
-                      )}
-                    </div>
-                  )}
-                </td>
-                <td className="p-2">
-                  {editingCell?.donationId === d.id && editingCell?.field === "name" ? (
-                    <Input className="h-7 text-sm ring-2 ring-primary/40 bg-primary/5" value={editDraft} onChange={(e) => setEditDraft(e.target.value)} onBlur={() => commitEdit()} onKeyDown={(e) => handleDonorCellKeyDown(e, d.id, "name")} autoFocus />
-                  ) : (
-                    <span className="cursor-text block px-1 py-0.5 rounded hover:bg-muted/50 transition-colors" onClick={() => startEditing(d.id, "name")}>{d.name || "—"}</span>
-                  )}
-                </td>
-                <td className="p-2">
-                  {editingCell?.donationId === d.id && editingCell?.field === "donationType" ? (
-                    <Input className="h-7 text-sm ring-2 ring-primary/40 bg-primary/5" value={editDraft} onChange={(e) => setEditDraft(e.target.value)} onBlur={() => commitEdit()} onKeyDown={(e) => handleDonorCellKeyDown(e, d.id, "donationType")} autoFocus />
-                  ) : (
-                    <span className="cursor-text block px-1 py-0.5 rounded hover:bg-muted/50 transition-colors" onClick={() => startEditing(d.id, "donationType")}>{d.donationType || "—"}</span>
-                  )}
-                </td>
-                <td className="p-2">
-                  {editingCell?.donationId === d.id && editingCell?.field === "notes" ? (
-                    <Input className="h-7 text-sm ring-2 ring-primary/40 bg-primary/5" value={editDraft} onChange={(e) => setEditDraft(e.target.value)} onBlur={() => commitEdit()} onKeyDown={(e) => handleDonorCellKeyDown(e, d.id, "notes")} autoFocus />
-                  ) : (
-                    <div className="flex flex-col gap-0.5">
-                      <span className="cursor-text block px-1 py-0.5 rounded hover:bg-muted/50 transition-colors" onClick={() => startEditing(d.id, "notes")}>{d.notes || "—"}</span>
-                      {((d.aiCategories && d.aiCategories.length > 0) || (d.aiWarnings && d.aiWarnings.trim())) && (
-                        <div className="flex gap-0.5 flex-wrap px-1">
-                          {(d.aiCategories || []).map(cat => (<span key={cat} className="px-1.5 py-0 rounded-full text-[9px] font-medium bg-violet-100 dark:bg-violet-900 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">{cat}</span>))}
-                          {d.aiWarnings && d.aiWarnings.trim() && (<span className="px-1.5 py-0 rounded-full text-[9px] font-medium bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 flex items-center gap-0.5" title={d.aiWarnings}><AlertTriangle className="w-2.5 h-2.5" /> uyarı</span>)}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </td>
-                <td className="p-2 text-center">
-                  {descCount > 1 ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">{effectiveShare}</span>
-                  ) : (
-                    <Select value={String(d.shareCount)} onValueChange={(v) => updateDonationField(d.id, "shareCount", parseInt(v))}>
-                      <SelectTrigger className="h-7 w-16 text-sm mx-auto"><SelectValue /></SelectTrigger>
-                      <SelectContent>{[1, 2, 3, 4, 5, 6, 7].map((n) => (<SelectItem key={n} value={String(n)}>{n}</SelectItem>))}</SelectContent>
-                    </Select>
-                  )}
-                </td>
-                <td className="p-2">
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {(d.tags || []).length > 0 && globalTags.length > 0 && (
-                      <div className="flex gap-0.5 flex-wrap mr-1">
-                        {(d.tags || []).map(tagId => { const tag = globalTags.find(t => t.id === tagId); if (!tag) return null; return (<span key={tagId} className="px-1.5 py-0 rounded-full text-[9px] font-medium text-white leading-4" style={{ backgroundColor: tag.color }}>{tag.name}</span>); })}
-                      </div>
-                    )}
-                    {globalTags.length > 0 && (
-                      <Popover open={tagPopoverDonorId === d.id} onOpenChange={(open) => setTagPopoverDonorId(open ? d.id : null)}>
-                        <PopoverTrigger asChild><Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Etiket ata" aria-label="Etiket ata"><Tag className="w-3 h-3 text-muted-foreground" /></Button></PopoverTrigger>
-                        <PopoverContent className="w-48 p-2" align="end">
-                          <div className="space-y-1">
-                            <p className="text-xs font-medium text-muted-foreground mb-2">Etiket Ata</p>
-                            {globalTags.map(tag => { const isActive = (d.tags || []).includes(tag.id); return (<button key={tag.id} className={`w-full flex items-center gap-2 px-2 py-1 rounded text-xs hover:bg-muted transition-colors ${isActive ? "bg-muted" : ""}`} onClick={() => toggleDonationTag(d.id, tag.id)}><span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} /><span className="flex-1 text-left">{tag.name}</span>{isActive && <span className="text-primary">✓</span>}</button>); })}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    )}
-                    {!d.excluded && (
-                      <Button variant="ghost" size="sm" className={`h-7 w-7 p-0 ${basketItemIds.has(d.id) ? "bg-emerald-100 dark:bg-emerald-900" : ""}`} title={basketItemIds.has(d.id) ? "Sepetten Çıkar" : "Sepete Ekle"} aria-label={basketItemIds.has(d.id) ? "Sepetten Çıkar" : "Sepete Ekle"} onClick={() => basketItemIds.has(d.id) ? removeFromBasket(d.id) : addDonorToBasket(d.id)}>
-                        <ShoppingBag className={`w-3 h-3 ${basketItemIds.has(d.id) ? "text-emerald-600" : "text-muted-foreground"}`} />
-                      </Button>
-                    )}
-                    {!d.excluded && !groupedDonorIds.has(d.id) && (
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Akıllı Yerleştir" aria-label="Akıllı Yerleştir" onClick={() => setSmartPlacePopover(d.id)}><Wand2 className="w-3 h-3 text-primary" /></Button>
-                    )}
-                    {(effectiveShareMap.get(d.id) || d.shareCount) > 7 && (
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Hisse Böl" aria-label="Hisse Böl" onClick={() => setSplitShareDialog({ donationId: d.id, totalShares: effectiveShareMap.get(d.id) || d.shareCount })}><Scissors className="w-3 h-3 text-amber-600" /></Button>
-                    )}
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title={d.excluded ? "Dahil et" : "Hariç tut"} aria-label={d.excluded ? "Dahil et" : "Hariç tut"} onClick={() => updateDonationField(d.id, "excluded", !d.excluded)}>
-                      {d.excluded ? <Eye className="w-3 h-3 text-green-600" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" aria-label="Bağışçıyı sil" onClick={() => deleteDonation(d.id)}><Trash2 className="w-3 h-3 text-destructive" /></Button>
-                  </div>
-                </td>
-              </>);
+              const splitShares = effectiveShareMap.get(d.id) || d.shareCount;
+              return (
+                <DonorRow
+                  d={d} idx={idx} descCount={descCount} effectiveShare={effectiveShare}
+                  isSelected={selectedIds.has(d.id)}
+                  isEditing={editingCell?.donationId === d.id}
+                  editField={editingCell?.donationId === d.id ? editingCell.field : null}
+                  editDraft={editDraft}
+                  isInBasket={basketItemIds.has(d.id)}
+                  isGrouped={groupedDonorIds.has(d.id)}
+                  canSplit={splitShares > 7}
+                  splitShares={splitShares}
+                  globalTags={globalTags}
+                  tagPopoverOpen={tagPopoverDonorId === d.id}
+                  onToggleSelect={toggleSelect}
+                  onStartEditing={startEditing}
+                  onSetEditDraft={setEditDraft}
+                  onCommitEdit={commitEdit}
+                  onKeyDown={handleDonorCellKeyDown}
+                  onSetPersonEditDesc={setPersonEditDesc}
+                  onUpdateField={updateDonationField}
+                  onToggleTag={toggleDonationTag}
+                  onSetTagPopover={setTagPopoverDonorId}
+                  onAddToBasket={addDonorToBasket}
+                  onRemoveFromBasket={removeFromBasket}
+                  onSmartPlace={setSmartPlacePopover}
+                  onSplitShare={setSplitShareDialog}
+                  onDelete={deleteDonation}
+                />
+              );
             }}
           />
         )}
       </Card>
-    </>
+    </Profiler>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { Profiler, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -66,10 +66,18 @@ export function GroupListPanel() {
     setGroupSearchMatchIdx(0);
   }, [setGroupSearchQuery, setGroupSearchMatchIdx]);
 
+  const onRenderCallback: React.ProfilerOnRenderCallback = useCallback(
+    (id, phase, actualDuration, baseDuration) => {
+      if (import.meta.env.DEV && actualDuration > 16) {
+        console.debug(`[Profiler] ${id} ${phase}: actual=${actualDuration.toFixed(1)}ms base=${baseDuration.toFixed(1)}ms`);
+      }
+    }, []
+  );
+
   if (!kesim) return null;
 
   return (
-    <>
+    <Profiler id="GroupListPanel" onRender={onRenderCallback}>
       <div ref={groupsHeaderRef} className="flex items-center justify-between mb-4 flex-wrap gap-2 sticky top-0 z-20 bg-background py-2 -mt-2 border-b border-transparent" style={{ backdropFilter: "blur(8px)" }}>
         <div className="flex items-center gap-2 flex-wrap">
           {!fullscreenMode && !isMobile && (
@@ -267,7 +275,7 @@ export function GroupListPanel() {
               ref={groupsVirtuosoRef} {...virtuosoProps} data={groupRows} overscan={5}
               defaultItemHeight={collapsedGroups.size > 0 ? 60 : 350}
               initialScrollTop={groupsScrollTopRef.current}
-              onScroll={(e) => { if (e && typeof (e as any).scrollTop === "number") { groupsScrollTopRef.current = (e as any).scrollTop; } }}
+              onScroll={(e) => { const el = e?.target as HTMLElement | null; if (el && typeof el.scrollTop === "number") { groupsScrollTopRef.current = el.scrollTop; } }}
               itemContent={(_index, row) => (<div className={`${gridClassName} pb-4`}>{row.map(renderGroupCard)}</div>)}
             />
           );
@@ -275,6 +283,6 @@ export function GroupListPanel() {
 
         return (<div className={gridClassName}>{filteredGroupItems.map(renderGroupCard)}</div>);
       })()}
-    </>
+    </Profiler>
   );
 }
