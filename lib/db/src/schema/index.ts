@@ -158,7 +158,7 @@ export const trackingNotesTable = pgTable("tracking_notes", {
 }, (table) => [
   index("idx_tracking_notes_kesim_alani_id").on(table.kesimAlaniId),
   index("idx_tracking_notes_animal_group_id").on(table.animalGroupId),
-  index("idx_tracking_notes_ag_active").on(table.animalGroupId).where(sql`deleted_at IS NULL`),
+  index("idx_tracking_notes_ag_active").on(table.animalGroupId, table.deletedAt),
 ]);
 
 export const insertTrackingNoteSchema = createInsertSchema(trackingNotesTable);
