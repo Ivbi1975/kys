@@ -15,8 +15,9 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
-- **API Auth**: API key middleware (`X-API-Key` header, env var `API_KEY`)
-- **Error handling**: Central `asyncHandler` wrapper + `errorHandler` middleware (`src/middleware/error-handler.ts`); route handlers should use `asyncHandler` instead of local try-catch
+- **API Auth**: API key middleware (`X-API-Key` header, env var `API_KEY`); timing-safe comparisons via `crypto.timingSafeEqual`; photo endpoints use HMAC-signed session tokens (`ptoken` + `exp` query params) instead of raw API key in URLs; `X-Request-ID` UUID header on all requests (validated format); pino logger redacts `x-api-key` header
+- **Rate limiting**: Global 200 req/min + tracking-specific 30 req/min (`/api/tracking` prefix)
+- **Error handling**: Central `asyncHandler` wrapper + `errorHandler` middleware (`src/middleware/error-handler.ts`); route handlers should use `asyncHandler` instead of local try-catch; generic "Sunucu hatası" in production (no stack traces); request ID included in error responses
 
 ## Structure
 

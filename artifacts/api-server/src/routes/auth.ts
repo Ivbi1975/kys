@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { ERROR_MESSAGES } from "../lib/constants";
+import { timingSafeCompare, generatePhotoToken } from "../lib/signed-url";
 
 const router = Router();
 
@@ -22,12 +23,23 @@ router.post("/auth/login", (req, res) => {
     return;
   }
 
-  if (parsed.data.password !== apiKey) {
+  if (!timingSafeCompare(parsed.data.password, apiKey)) {
     res.status(401).json({ error: ERROR_MESSAGES.WRONG_PASSWORD });
     return;
   }
 
   res.json({ success: true, apiKey });
+});
+
+router.get("/photo-token", (req, res) => {
+  const apiKey = process.env.API_KEY || "";
+  if (!apiKey) {
+    res.status(503).json({ error: ERROR_MESSAGES.SERVER_CONFIG_ERROR });
+    return;
+  }
+
+  const { token, expiresAt } = generatePhotoToken(apiKey);
+  res.json({ token, expiresAt });
 });
 
 export default router;

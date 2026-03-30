@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { logger } from "../lib/logger";
+import { timingSafeCompare, verifyPhotoToken } from "../lib/signed-url";
 
 const API_KEY = process.env.API_KEY || "";
 const ADMIN_KEY = process.env.ADMIN_KEY || "";
@@ -22,6 +23,13 @@ function isPhotoServeGet(req: Request): boolean {
   return req.method === "GET" && PHOTO_SERVE_PATTERN.test(req.path);
 }
 
+function verifyPhotoAuth(req: Request): boolean {
+  const ptoken = req.query["ptoken"] as string | undefined;
+  const exp = req.query["exp"] as string | undefined;
+  if (!ptoken || !exp || !API_KEY) return false;
+  return verifyPhotoToken(ptoken, exp, API_KEY).valid;
+}
+
 export function apiKeyAuth(req: Request, res: Response, next: NextFunction): void {
   if (isPublicPath(req.path)) {
     next();
@@ -39,21 +47,23 @@ export function apiKeyAuth(req: Request, res: Response, next: NextFunction): voi
   }
 
   const headerKey = req.headers["x-api-key"] as string | undefined;
-  const queryKey = isPhotoServeGet(req) ? (req.query["apiKey"] as string | undefined) : undefined;
-  const providedKey = headerKey || queryKey;
 
-  if (!providedKey) {
-    res.status(401).json({ error: "Kimlik doğrulama gerekli. X-API-Key header eksik." });
+  if (headerKey) {
+    if (!timingSafeCompare(headerKey, API_KEY)) {
+      logger.warn({ path: req.path, ip: req.ip }, "Invalid API key attempt");
+      res.status(401).json({ error: "Geçersiz API anahtarı." });
+      return;
+    }
+    next();
     return;
   }
 
-  if (providedKey !== API_KEY) {
-    logger.warn({ path: req.path, ip: req.ip }, "Invalid API key attempt");
-    res.status(401).json({ error: "Geçersiz API anahtarı." });
+  if (isPhotoServeGet(req) && verifyPhotoAuth(req)) {
+    next();
     return;
   }
 
-  next();
+  res.status(401).json({ error: "Kimlik doğrulama gerekli. X-API-Key header eksik." });
 }
 
 const ADMIN_ONLY_PATHS = [
@@ -83,7 +93,7 @@ export function adminKeyAuth(req: Request, res: Response, next: NextFunction): v
 
   const providedKey = req.headers["x-admin-key"] as string | undefined;
 
-  if (!providedKey || providedKey !== ADMIN_KEY) {
+  if (!providedKey || !timingSafeCompare(providedKey, ADMIN_KEY)) {
     logger.warn({ path: req.path, ip: req.ip }, "Unauthorized admin endpoint access attempt");
     res.status(403).json({ error: "Bu işlem için yönetici yetkisi gerekli." });
     return;

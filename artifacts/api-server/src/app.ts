@@ -8,6 +8,7 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 import { apiKeyAuth, adminKeyAuth } from "./middleware/auth";
 import { errorHandler } from "./middleware/error-handler";
+import { sanitizeRequestId } from "./lib/signed-url";
 
 const COMPRESSION_THRESHOLD = 1024;
 
@@ -65,15 +66,25 @@ function compressionMiddleware(req: Request, res: Response, next: NextFunction) 
   next();
 }
 
+function requestIdMiddleware(req: Request, res: Response, next: NextFunction) {
+  const requestId = sanitizeRequestId(req.headers["x-request-id"] as string | undefined);
+  req.headers["x-request-id"] = requestId;
+  res.setHeader("X-Request-ID", requestId);
+  next();
+}
+
 const app: Express = express();
 
 app.set("trust proxy", 1);
+
+app.use(requestIdMiddleware);
 
 app.use(compressionMiddleware);
 
 app.use(
   pinoHttp({
     logger,
+    genReqId: (req) => req.headers["x-request-id"] as string,
     serializers: {
       req(req) {
         return {
@@ -112,17 +123,27 @@ app.use(
   }),
 );
 
-app.use(
-  rateLimit({
-    windowMs: 60 * 1000,
-    limit: 200,
-    standardHeaders: "draft-7",
-    legacyHeaders: false,
-    message: {
-      error: "Çok fazla istek gönderildi. Lütfen bir süre bekleyip tekrar deneyin.",
-    },
-  }),
-);
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 200,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: {
+    error: "Çok fazla istek gönderildi. Lütfen bir süre bekleyip tekrar deneyin.",
+  },
+});
+
+const trackingLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: {
+    error: "Takip sayfası için çok fazla istek. Lütfen bekleyin.",
+  },
+});
+
+app.use(globalLimiter);
 
 const IS_DEV = process.env.NODE_ENV === "development";
 const allowedOrigins = process.env.ALLOWED_ORIGINS
@@ -158,6 +179,8 @@ app.use(cors({
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+app.use("/api/tracking", trackingLimiter);
 
 app.use("/api", apiKeyAuth, adminKeyAuth, router);
 

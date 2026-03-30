@@ -20,12 +20,15 @@ export function errorHandler(
     || (err as { statusCode?: number }).statusCode
     || 500;
 
+  const requestId = req.headers["x-request-id"] as string | undefined;
+
   logger.error(
     {
       err: error,
       method: req.method,
       url: req.originalUrl,
       status,
+      requestId,
     },
     `${req.method} ${req.originalUrl} error`,
   );
@@ -35,9 +38,13 @@ export function errorHandler(
     return;
   }
 
-  const body: { error: string; stack?: string } = {
+  const body: { error: string; requestId?: string; stack?: string } = {
     error: status >= 500 ? "Sunucu hatası" : error.message,
   };
+
+  if (requestId) {
+    body.requestId = requestId;
+  }
 
   if (process.env.NODE_ENV === "development") {
     body.error = error.message;

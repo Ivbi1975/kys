@@ -1,5 +1,6 @@
 import type { KesimAlani } from "../types";
-import { apiFetch, API_BASE, getApiKey } from "./core";
+import { apiFetch } from "./core";
+import { buildSignedPhotoUrl } from "./signed-url";
 
 export async function fetchKesimAlanlari(): Promise<KesimAlani[]> {
   return apiFetch<KesimAlani[]>("/kesim-alanlari");
@@ -144,11 +145,7 @@ export async function fetchGroupPhotosAdmin(kesimAlaniId: string, groupId: strin
 }
 
 export function getGroupPhotoUrlAdmin(kesimAlaniId: string, groupId: string, photoId: string, size?: "thumb"): string {
-  const base = `${API_BASE}/kesim-alanlari/${kesimAlaniId}/group/${groupId}/photos/${photoId}`;
-  const apiKey = getApiKey();
-  const params = new URLSearchParams();
-  if (size) params.set("size", size);
-  if (apiKey) params.set("apiKey", apiKey);
-  const qs = params.toString();
-  return qs ? `${base}?${qs}` : base;
+  const path = `/kesim-alanlari/${kesimAlaniId}/group/${groupId}/photos/${photoId}`;
+  const extraParams = size ? new URLSearchParams({ size }) : undefined;
+  return buildSignedPhotoUrl(path, extraParams);
 }

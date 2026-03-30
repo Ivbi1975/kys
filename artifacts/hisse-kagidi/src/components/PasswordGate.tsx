@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { fetchPhotoToken } from "@/lib/api";
 
 const API_BASE = import.meta.env.BASE_URL
   ? `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/").replace(/\/$/, "")
@@ -76,6 +77,7 @@ export default function PasswordGate({ children }: { children: React.ReactNode }
       const data = await res.json();
       sessionStorage.setItem("app_unlocked", "true");
       sessionStorage.setItem("app_api_key", data.apiKey);
+      fetchPhotoToken().catch(() => {});
       setUnlocked(true);
     } catch {
       setError("Sunucuya bağlanılamadı. Lütfen tekrar deneyin.");
@@ -83,6 +85,12 @@ export default function PasswordGate({ children }: { children: React.ReactNode }
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (unlocked) {
+      fetchPhotoToken().catch(() => {});
+    }
+  }, [unlocked]);
 
   if (unlocked) {
     return <>{children}</>;
