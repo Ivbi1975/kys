@@ -109,7 +109,21 @@ Key files:
 - `src/lib/useWorkspacePreferences.ts` - Workspace layout preferences hook (columnCount, hiddenColumns, compactMode, columnOrder, splitRatio) with localStorage persistence
 - `src/pages/home.tsx` - Home page with project cards (collapsible), kesim alanı list grouped by project, project CRUD, move kesim alanı between projects, settings (logo, backup, theme selector, tag management)
 - `src/pages/kesim-alani.tsx` - Main editing page entry point (imports hook + content + dialogs components)
-- `src/components/kesim-alani/useKesimAlaniState.tsx` - All state, hooks, handlers, effects for kesim-alani page (~3800 lines)
+- `src/components/kesim-alani/useKesimAlaniState.tsx` - Orchestrator hook (~900 lines) wiring domain hooks together, holding UI state, computing memos
+- `src/components/kesim-alani/hooks/` - Domain hooks directory:
+  - `types.ts` - Shared types (BasketItem, SortField, SaveFn, KesimDeps, generateId, basket storage helpers)
+  - `useSaveManager.ts` - Save/debounce/API calls, error description builder
+  - `useDonations.ts` - Donor CRUD, selection, inline editing, bulk edit, find-delete, sort
+  - `useAnimalGroups.ts` - Group CRUD, collapse/select, split/merge, lock, column drag, group find-delete
+  - `useGroupingEngine.ts` - Auto-grouping, conflicts, swap mode, auto-resolve
+  - `useBasket.ts` - Basket + cross-KA transfer
+  - `useTeams.ts` - Team CRUD + assign
+  - `useTrash.ts` - Trash operations (soft delete restore, permanent delete)
+  - `useKeyboardShortcuts.ts` - Keyboard event handler (Ctrl+Z/Y/S/F/G, F11, ?)
+  - `useUndoRedo.ts` - Undo/redo with history panel
+  - `useDragAndDrop.ts` - Drag-and-drop between groups
+  - `useImportExport.ts` - Bulk import, Excel export
+  - `useKesimAlaniFilters.ts` - Donor list filtering and search index
 - `src/components/kesim-alani/KesimAlaniContent.tsx` - Thin orchestrator (~140 lines) wrapping sub-components via KesimAlaniContext
 - `src/components/kesim-alani/KesimAlaniContext.tsx` - React Context provider eliminating 250+ prop drilling
 - `src/components/kesim-alani/sections/KesimAlaniHeader.tsx` - Breadcrumb, action buttons, save status, undo/redo, export

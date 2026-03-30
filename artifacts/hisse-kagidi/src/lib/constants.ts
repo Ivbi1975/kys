@@ -31,3 +31,6 @@ export const NoteStatus = {
   REJECTED: "rejected",
 } as const;
 export type NoteStatus = (typeof NoteStatus)[keyof typeof NoteStatus];
+
+export const MAX_SHARES_PER_ANIMAL = 7;
+export const HISTORY_LIMIT = 80;
