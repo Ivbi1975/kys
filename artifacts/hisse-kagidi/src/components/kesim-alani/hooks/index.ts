@@ -10,4 +10,5 @@ export { useBasket } from "./useBasket";
 export { useTeams } from "./useTeams";
 export { useTrash } from "./useTrash";
 export { useKeyboardShortcuts } from "./useKeyboardShortcuts";
+export { useSmartPlacement } from "./useSmartPlacement";
 export type { BasketItem, SortField, SaveFn, KesimDeps } from "./types";

@@ -308,7 +308,7 @@ export function useDonations({
     if (!kesim) return;
     const donation = kesim.donations.find((d) => d.id === donationId);
     if (!donation) return;
-    const currentVal = String((donation as any)[field] || "");
+    const currentVal = String(donation[field as keyof Donation] ?? "");
     setEditDraft(currentVal);
     setEditingCell({ donationId, field });
   }
@@ -323,7 +323,7 @@ export function useDonations({
       setEditingCell(null);
       return;
     }
-    const currentVal = String((donation as any)[editingCell.field] || "");
+    const currentVal = String(donation[editingCell.field as keyof Donation] ?? "");
     if (editDraft !== currentVal) {
       updateDonationField(editingCell.donationId, editingCell.field as keyof Donation, editDraft);
     }
@@ -351,7 +351,7 @@ export function useDonations({
     if (e.key === "Tab") {
       e.preventDefault();
       commitEdit();
-      const currentFieldIdx = DONOR_EDITABLE_FIELDS.indexOf(field as any);
+      const currentFieldIdx = DONOR_EDITABLE_FIELDS.indexOf(field as typeof DONOR_EDITABLE_FIELDS[number]);
       if (currentFieldIdx < 0) return;
       const matchedTabIds = debouncedSearchQuery.trim() ? searchIndex.search(debouncedSearchQuery) : null;
       const donations = matchedTabIds ? kesim!.donations.filter((d) => matchedTabIds.has(d.id)) : kesim!.donations;

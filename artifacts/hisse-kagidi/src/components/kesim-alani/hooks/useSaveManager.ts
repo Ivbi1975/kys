@@ -3,7 +3,7 @@ import type { KesimAlani } from "@/lib/types";
 import { apiUpdateKesimAlani, apiUpdateBulkAnimalGroups } from "@/lib/api";
 
 interface UseSaveManagerDeps {
-  toast: (opts: { title: string; description?: any; variant?: "default" | "destructive" }) => void;
+  toast: (opts: { title: string; description?: string | React.ReactNode; variant?: "default" | "destructive" }) => void;
   scrollToAnimalGroupRef: React.RefObject<((animalNo: number) => void) | undefined>;
 }
 

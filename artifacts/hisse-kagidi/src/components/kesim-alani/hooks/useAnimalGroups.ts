@@ -14,7 +14,7 @@ interface UseAnimalGroupsDeps extends KesimDeps {
     prefs: { columnOrder: ColumnKey[] };
     setColumnOrder: (order: ColumnKey[]) => void;
   };
-  setConflicts: React.Dispatch<React.SetStateAction<any[]>>;
+  setConflicts: React.Dispatch<React.SetStateAction<import("@/lib/grouping").ConflictInfo[]>>;
 }
 
 export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspace, setConflicts }: UseAnimalGroupsDeps) {
@@ -79,7 +79,7 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
       if (isGroupLocked(groupIdx)) return;
       const donation = kesim.animalGroups[groupIdx]?.donations[donationIdx];
       if (!donation) return;
-      if ((donation as any)[field] === value) return;
+      if (donation[field] === value) return;
 
       const updated = {
         ...kesim,
