@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
+import { produce } from "immer";
 import type { Donation, AnimalGroup, KesimAlani } from "@/lib/types";
 import { computeEffectiveShares } from "@/lib/grouping";
 import { moveDonationsToKesimAlani, fetchKesimAlani, createDonationTransfers } from "@/lib/api";
@@ -194,8 +195,11 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
       return;
     }
     const movedDonorCount = groupedBasketIds.size + ungroupedBasketDonors.length;
+    const updated = produce(kesim, (draft) => {
+      draft.animalGroups = groups;
+    });
     save(
-      { ...kesim, animalGroups: groups },
+      updated,
       `Sepetten ${movedDonorCount} bağışçı (${transferredIds.size} slot) Hayvan ${groups[targetGroupIdx].animalNo}'e aktarıldı`,
       false,
       "groups"
@@ -338,8 +342,10 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
       }
     }
 
-    const renumbered = groups.map((g, i) => ({ ...g, animalNo: i + 1 }));
-    save({ ...kesim, animalGroups: renumbered }, `Sepet otomatik dağıtıldı: ${placed} bağışçı`, false, "groups");
+    const updated = produce(kesim, (draft) => {
+      draft.animalGroups = groups.map((g, i) => ({ ...g, animalNo: i + 1 }));
+    });
+    save(updated, `Sepet otomatik dağıtıldı: ${placed} bağışçı`, false, "groups");
     const remaining = basketItems.filter(
       (b) => lockedGroupDonorIds.has(b.donationId) || b.kesimAlaniId !== kesim.id
     );

@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { produce } from "immer";
 import type { Donation, KesimAlani } from "@/lib/types";
 import { computeEffectiveShares } from "@/lib/grouping";
 import { generateId } from "./types";
@@ -81,7 +82,8 @@ export function useSmartPlacement({ kesim, save, isGroupLocked, setSmartPlacePop
         placed++;
       }
     }
-    save({ ...kesim, animalGroups: groups }, `${donor.description || donor.name}: Hayvan ${groups[groupIdx].animalNo}'e takas ile yerleştirildi`, false, "groups");
+    const updated = produce(kesim, (draft) => { draft.animalGroups = groups; });
+    save(updated, `${donor.description || donor.name}: Hayvan ${groups[groupIdx].animalNo}'e takas ile yerleştirildi`, false, "groups");
     setSmartPlacePopover(null);
   }
 
@@ -101,7 +103,8 @@ export function useSmartPlacement({ kesim, save, isGroupLocked, setSmartPlacePop
       }
     }
     if (placed === 0) return;
-    save({ ...kesim, animalGroups: groups }, `${donor.description || donor.name} (${placed} hisse) Hayvan ${groups[targetGroupIdx].animalNo}'e yerleştirildi`, false, "groups");
+    const updated2 = produce(kesim, (draft) => { draft.animalGroups = groups; });
+    save(updated2, `${donor.description || donor.name} (${placed} hisse) Hayvan ${groups[targetGroupIdx].animalNo}'e yerleştirildi`, false, "groups");
     setSmartPlacePopover(null);
   }
 

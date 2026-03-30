@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { produce } from "immer";
 import type { KesimAlani, Donation } from "@/lib/types";
 
 interface UseDragAndDropParams {
@@ -60,7 +61,8 @@ export function useDragAndDrop({ kesim, save, toast, isGroupLocked, scrollContai
       groups[groupIdx].donations.push(...overflow);
     }
 
-    save({ ...kesim, animalGroups: groups }, `Grup içi taşıma yapıldı`, false, 'groups');
+    const updated = produce(kesim, (draft) => { draft.animalGroups = groups; });
+    save(updated, `Grup içi taşıma yapıldı`, false, 'groups');
   }
 
   const handleDragStart = useCallback((groupIdx: number, donationIdx: number, e?: React.DragEvent) => {

@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { produce } from "immer";
 import type { Donation, AnimalGroup, KesimAlani } from "@/lib/types";
 import { checkGroupConflicts, computeEffectiveShares } from "@/lib/grouping";
 import type { GroupingProgress, ConflictInfo } from "@/lib/grouping";
@@ -170,8 +171,10 @@ export function useGroupingEngine({
         }
       }
       const lockedCount = lockedIndices.length;
-      const mergedDonations = [...kesim.donations, ...newDonations];
-      const updated = { ...kesim, donations: mergedDonations, animalGroups: finalGroups };
+      const updated = produce(kesim, (draft) => {
+        draft.donations.push(...newDonations);
+        draft.animalGroups = finalGroups;
+      });
       const modeLabel = useIncremental ? "Artımlı gruplama" : "Otomatik gruplama";
       if (newDonations.length > 0) {
         save(updated, `${modeLabel} yapıldı: ${finalGroups.length} hayvan (${lockedCount} kilitli korundu)`, true);
@@ -235,8 +238,10 @@ export function useGroupingEngine({
           }
         }
       }
-      const mergedDonations = [...kesim.donations, ...newDonations];
-      const updated = { ...kesim, donations: mergedDonations, animalGroups: allGroups };
+      const updated = produce(kesim, (draft) => {
+        draft.donations.push(...newDonations);
+        draft.animalGroups = allGroups;
+      });
       if (newDonations.length > 0) {
         save(
           updated,
@@ -309,8 +314,9 @@ export function useGroupingEngine({
     };
     groups[swapTarget.groupIdx].donations[swapTarget.donationIdx] = temp;
 
+    const swapUpdated = produce(kesim, (draft) => { draft.animalGroups = groups; });
     save(
-      { ...kesim, animalGroups: groups },
+      swapUpdated,
       `Takas yapıldı: Hayvan ${groups[swapSelection.groupIdx].animalNo} ↔ Hayvan ${groups[swapTarget.groupIdx].animalNo}`,
       false,
       "groups"
@@ -472,8 +478,9 @@ export function useGroupingEngine({
       return;
     }
 
+    const resolveUpdated = produce(kesim, (draft) => { draft.animalGroups = groups; });
     save(
-      { ...kesim, animalGroups: groups },
+      resolveUpdated,
       `Otomatik çakışma çözümü: ${appliedCount} takas uygulandı (${resolveResults.length} kişi)`,
       false,
       "groups"

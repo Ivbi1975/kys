@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { produce } from "immer";
 import type { KesimAlani, Donation } from "@/lib/types";
 import { downloadCsvExport } from "@/lib/api";
 
@@ -172,7 +173,10 @@ export function useImportExport({ kesim, save, toast }: UseImportExportParams) {
       }
     }
 
-    save({ ...kesim, donations: [...kesim.donations, ...newDonations] }, `${newDonations.length} bağışçı toplu eklendi`, true);
+    const updated = produce(kesim, (draft) => {
+      draft.donations.push(...newDonations);
+    });
+    save(updated, `${newDonations.length} bağışçı toplu eklendi`, true);
     resetBulkDialog();
   }
 

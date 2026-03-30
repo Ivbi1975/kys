@@ -80,10 +80,17 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
       if (!donation) return;
       if (donation[field] === value) return;
 
+      type StringField = "name" | "description" | "donationType" | "vekalet" | "notes";
       const updated = produce(kesim, (draft) => {
-        const donorIdx = draft.donations.findIndex((d) => d.id === donation.id);
-        if (donorIdx >= 0) (draft.donations[donorIdx] as any)[field] = value;
-        (draft.animalGroups[groupIdx].donations[donationIdx] as any)[field] = value;
+        const targets = [
+          draft.donations.find((d) => d.id === donation.id),
+          draft.animalGroups[groupIdx].donations[donationIdx],
+        ];
+        for (const t of targets) {
+          if (!t) continue;
+          if (field === "shareCount" && typeof value === "number") t.shareCount = value;
+          else if (typeof value === "string") t[field as StringField] = value;
+        }
       });
       setKesim(updated);
       history.push(updated, `Grup bağışçısı güncellendi`);

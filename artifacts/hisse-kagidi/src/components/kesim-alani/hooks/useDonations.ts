@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { produce } from "immer";
 import type { Donation, KesimAlani } from "@/lib/types";
 import { turkishNormalize } from "@/lib/utils";
 import { apiSoftDeleteDonation, apiUpdateSingleDonation } from "@/lib/api";
@@ -89,10 +90,10 @@ export function useDonations({
       notes: donationData.notes.trim(),
       phone: donationData.phone?.trim() || "",
     };
-    save(
-      { ...kesim, donations: [...kesim.donations, donation] },
-      `Bağışçı eklendi: ${donation.description || donation.name}`
-    );
+    const updated = produce(kesim, (draft) => {
+      draft.donations.push(donation);
+    });
+    save(updated, `Bağışçı eklendi: ${donation.description || donation.name}`);
     setAddDialogOpen(false);
   }
 
@@ -101,14 +102,12 @@ export function useDonations({
     const target = kesim.donations.find((d) => d.id === id);
     try {
       await apiSoftDeleteDonation(kesim.id, id);
-      const updated = {
-        ...kesim,
-        donations: kesim.donations.filter((d) => d.id !== id),
-        animalGroups: kesim.animalGroups.map((g) => ({
-          ...g,
-          donations: g.donations.filter((d) => d.id !== id),
-        })),
-      };
+      const updated = produce(kesim, (draft) => {
+        draft.donations = draft.donations.filter((d) => d.id !== id);
+        for (const g of draft.animalGroups) {
+          g.donations = g.donations.filter((d) => d.id !== id);
+        }
+      });
       setKesim(updated);
       history.push(updated, `Bağışçı silindi: ${target?.description || target?.name || ""}`);
       setSelectedIds((prev) => {
@@ -134,14 +133,12 @@ export function useDonations({
     const ids = Array.from(selectedIds);
     try {
       await Promise.all(ids.map((id) => apiSoftDeleteDonation(kesim.id, id)));
-      const updated = {
-        ...kesim,
-        donations: kesim.donations.filter((d) => !selectedIds.has(d.id)),
-        animalGroups: kesim.animalGroups.map((g) => ({
-          ...g,
-          donations: g.donations.filter((d) => !selectedIds.has(d.id)),
-        })),
-      };
+      const updated = produce(kesim, (draft) => {
+        draft.donations = draft.donations.filter((d) => !selectedIds.has(d.id));
+        for (const g of draft.animalGroups) {
+          g.donations = g.donations.filter((d) => !selectedIds.has(d.id));
+        }
+      });
       setKesim(updated);
       history.push(updated, `${ids.length} bağışçı silindi`);
       setSelectedIds(new Set());
@@ -176,44 +173,30 @@ export function useDonations({
     }
   }
 
+  type WritableField = "name" | "description" | "donationType" | "vekalet" | "notes" | "phone";
+
   function updateDonationField(id: string, field: keyof Donation, value: string | number | boolean) {
     if (!kesim) return;
-    if (field === "excluded" && value === true) {
+    if (field === "excluded" && typeof value === "boolean") {
       const target = kesim.donations.find((d) => d.id === id);
       if (target && target.description.trim()) {
         const key = target.description.trim().toLocaleLowerCase("tr");
-        save(
-          {
-            ...kesim,
-            donations: kesim.donations.map((d) =>
-              d.description.trim().toLocaleLowerCase("tr") === key ? { ...d, excluded: true } : d
-            ),
-          },
-          `Hariç tutuldu: ${target.description}`
-        );
+        const updated = produce(kesim, (draft) => {
+          for (const d of draft.donations) {
+            if (d.description.trim().toLocaleLowerCase("tr") === key) d.excluded = value;
+          }
+        });
+        save(updated, value ? `Hariç tutuldu: ${target.description}` : `Dahil edildi: ${target.description}`);
         return;
       }
     }
-    if (field === "excluded" && value === false) {
-      const target = kesim.donations.find((d) => d.id === id);
-      if (target && target.description.trim()) {
-        const key = target.description.trim().toLocaleLowerCase("tr");
-        save(
-          {
-            ...kesim,
-            donations: kesim.donations.map((d) =>
-              d.description.trim().toLocaleLowerCase("tr") === key ? { ...d, excluded: false } : d
-            ),
-          },
-          `Dahil edildi: ${target.description}`
-        );
-        return;
-      }
-    }
-    const updated = {
-      ...kesim,
-      donations: kesim.donations.map((d) => (d.id === id ? { ...d, [field]: value } : d)),
-    };
+    const updated = produce(kesim, (draft) => {
+      const d = draft.donations.find((d) => d.id === id);
+      if (!d) return;
+      if (field === "excluded" && typeof value === "boolean") d.excluded = value;
+      else if (field === "shareCount" && typeof value === "number") d.shareCount = value;
+      else if (typeof value === "string") d[field as WritableField] = value;
+    });
     setKesim(updated);
     history.push(updated, `Bağışçı güncellendi`);
     saveSingleDonationField(id, { [field]: value });
@@ -221,37 +204,30 @@ export function useDonations({
 
   function toggleDonationTag(donationId: string, tagId: string) {
     if (!kesim) return;
-    const updateTags = (d: Donation) => {
-      if (d.id !== donationId) return d;
-      const existing = d.tags || [];
-      const has = existing.includes(tagId);
-      return { ...d, tags: has ? existing.filter((t) => t !== tagId) : [...existing, tagId] };
-    };
-    save(
-      {
-        ...kesim,
-        donations: kesim.donations.map(updateTags),
-        animalGroups: kesim.animalGroups.map((g) => ({
-          ...g,
-          donations: g.donations.map(updateTags),
-        })),
-      },
-      `Etiket güncellendi`
-    );
+    const updated = produce(kesim, (draft) => {
+      const toggle = (d: { id: string; tags?: string[] }) => {
+        if (d.id !== donationId) return;
+        const existing = d.tags || [];
+        const has = existing.includes(tagId);
+        d.tags = has ? existing.filter((t) => t !== tagId) : [...existing, tagId];
+      };
+      draft.donations.forEach(toggle);
+      for (const g of draft.animalGroups) {
+        g.donations.forEach(toggle);
+      }
+    });
+    save(updated, `Etiket güncellendi`);
   }
 
   function bulkExcludeByDesc(description: string, excluded: boolean) {
     if (!kesim) return;
     const key = description.trim().toLocaleLowerCase("tr");
-    save(
-      {
-        ...kesim,
-        donations: kesim.donations.map((d) =>
-          d.description.trim().toLocaleLowerCase("tr") === key ? { ...d, excluded } : d
-        ),
-      },
-      excluded ? `Toplu hariç tutuldu: ${description}` : `Toplu dahil edildi: ${description}`
-    );
+    const updated = produce(kesim, (draft) => {
+      for (const d of draft.donations) {
+        if (d.description.trim().toLocaleLowerCase("tr") === key) d.excluded = excluded;
+      }
+    });
+    save(updated, excluded ? `Toplu hariç tutuldu: ${description}` : `Toplu dahil edildi: ${description}`);
   }
 
   async function bulkDeleteByDesc(description: string) {
@@ -262,14 +238,12 @@ export function useDonations({
     try {
       await Promise.all(toDelete.map((d) => apiSoftDeleteDonation(kesim.id, d.id)));
       const deleteIds = new Set(toDelete.map((d) => d.id));
-      const updated = {
-        ...kesim,
-        donations: kesim.donations.filter((d) => !deleteIds.has(d.id)),
-        animalGroups: kesim.animalGroups.map((g) => ({
-          ...g,
-          donations: g.donations.filter((d) => !deleteIds.has(d.id)),
-        })),
-      };
+      const updated = produce(kesim, (draft) => {
+        draft.donations = draft.donations.filter((d) => !deleteIds.has(d.id));
+        for (const g of draft.animalGroups) {
+          g.donations = g.donations.filter((d) => !deleteIds.has(d.id));
+        }
+      });
       setKesim(updated);
       history.push(updated, `Toplu silindi: ${description}`);
       setPersonEditDesc(null);
@@ -288,17 +262,16 @@ export function useDonations({
 
   function applyBulkEdit() {
     if (!kesim || selectedIds.size === 0) return;
-    const updated = {
-      ...kesim,
-      donations: kesim.donations.map((d) => {
-        if (!selectedIds.has(d.id)) return d;
+    const updated = produce(kesim, (draft) => {
+      for (const d of draft.donations) {
+        if (!selectedIds.has(d.id)) continue;
         if (bulkEditField === "shareCount") {
-          const val = Math.max(1, Math.min(MAX_SHARES_PER_ANIMAL, parseInt(bulkEditValue) || 1));
-          return { ...d, shareCount: val };
+          d.shareCount = Math.max(1, Math.min(MAX_SHARES_PER_ANIMAL, parseInt(bulkEditValue) || 1));
+        } else {
+          d[bulkEditField as WritableField] = bulkEditValue;
         }
-        return { ...d, [bulkEditField]: bulkEditValue };
-      }),
-    };
+      }
+    });
     save(updated, `${selectedIds.size} bağışçı toplu düzenlendi`);
     setBulkEditOpen(false);
     setBulkEditValue("");
@@ -406,7 +379,10 @@ export function useDonations({
       }
       return dir * trCollator.compare(ka[field], kb[field]);
     });
-    save({ ...kesim, donations: sorted }, `Sıralama değiştirildi`, true);
+    const updated = produce(kesim, (draft) => {
+      draft.donations = sorted;
+    });
+    save(updated, `Sıralama değiştirildi`, true);
   }
 
   function getFindDeleteMatches() {
@@ -425,14 +401,12 @@ export function useDonations({
     const matchIds = new Set(matches.map((d) => d.id));
     try {
       await Promise.all(matches.map((d) => apiSoftDeleteDonation(kesim.id, d.id)));
-      const updated = {
-        ...kesim,
-        donations: kesim.donations.filter((d) => !matchIds.has(d.id)),
-        animalGroups: kesim.animalGroups.map((g) => ({
-          ...g,
-          donations: g.donations.filter((d) => !matchIds.has(d.id)),
-        })),
-      };
+      const updated = produce(kesim, (draft) => {
+        draft.donations = draft.donations.filter((d) => !matchIds.has(d.id));
+        for (const g of draft.animalGroups) {
+          g.donations = g.donations.filter((d) => !matchIds.has(d.id));
+        }
+      });
       setKesim(updated);
       history.push(
         updated,
@@ -459,22 +433,21 @@ export function useDonations({
     const donor = kesim.donations.find((d) => d.id === donationId);
     if (!donor) return;
     const baseName = donor.description || donor.name;
-    const updatedDonations = kesim.donations.map((d) => {
-      if (d.id === donationId)
-        return { ...d, shareCount: splitA, description: `${baseName} (1/${splitA + splitB})` };
-      return d;
-    });
     const newDonor: Donation = {
       ...donor,
       id: generateId(),
       shareCount: splitB,
       description: `${baseName} (2/${splitA + splitB})`,
     };
-    updatedDonations.push(newDonor);
-    save(
-      { ...kesim, donations: updatedDonations },
-      `${baseName}: ${splitA + splitB} hisse → ${splitA}+${splitB} olarak bölündü`
-    );
+    const updated = produce(kesim, (draft) => {
+      const idx = draft.donations.findIndex((d) => d.id === donationId);
+      if (idx >= 0) {
+        draft.donations[idx].shareCount = splitA;
+        draft.donations[idx].description = `${baseName} (1/${splitA + splitB})`;
+      }
+      draft.donations.push(newDonor);
+    });
+    save(updated, `${baseName}: ${splitA + splitB} hisse → ${splitA}+${splitB} olarak bölündü`);
   }
 
   function getSplitOptions(totalShares: number): Array<[number, number]> {
