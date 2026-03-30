@@ -141,6 +141,30 @@ function splitDonorUnit(unit: DonorUnit, shares: number): [DonorUnit, DonorUnit 
   return [first, second];
 }
 
+function normalizeDonationType(t: string): string {
+  return (t || "").trim().toUpperCase();
+}
+
+function getDominantDonationType(unit: DonorUnit): string {
+  if (unit.donations.length === 0) {
+    return normalizeDonationType(unit.templateDonation.donationType);
+  }
+  const typeCounts = new Map<string, number>();
+  for (const d of unit.donations) {
+    const t = normalizeDonationType(d.donationType);
+    typeCounts.set(t, (typeCounts.get(t) || 0) + 1);
+  }
+  let maxCount = 0;
+  let dominant = "";
+  for (const [t, c] of typeCounts) {
+    if (c > maxCount) {
+      maxCount = c;
+      dominant = t;
+    }
+  }
+  return dominant;
+}
+
 interface Mod7Result {
   fullAnimals: GroupedSegment[][];
   remainders: DonorUnit[];
@@ -289,11 +313,28 @@ function mod7GroupDonations(donations: Donation[]): GroupedSegment[][] {
 
   const { fullAnimals, remainders } = applyMod7PreSplit(unitsDeep);
 
-  const { animals: matchedAnimals, leftover: afterMatch } = tryFlexibleMatch(remainders);
+  const typeGroups = new Map<string, DonorUnit[]>();
+  for (const u of remainders) {
+    const dtype = getDominantDonationType(u);
+    if (!typeGroups.has(dtype)) typeGroups.set(dtype, []);
+    typeGroups.get(dtype)!.push(u);
+  }
 
-  const leftoverAnimals = packLeftovers(afterMatch);
+  const sameTypeAnimals: GroupedSegment[][] = [];
+  const allTypeLeftovers: DonorUnit[] = [];
 
-  return [...fullAnimals, ...matchedAnimals, ...leftoverAnimals];
+  const sortedTypes = Array.from(typeGroups.entries()).sort((a, b) => b[1].length - a[1].length);
+  for (const [, typeUnits] of sortedTypes) {
+    const { animals, leftover } = tryFlexibleMatch(typeUnits);
+    sameTypeAnimals.push(...animals);
+    allTypeLeftovers.push(...leftover);
+  }
+
+  const { animals: mixedAnimals, leftover: afterMixed } = tryFlexibleMatch(allTypeLeftovers);
+
+  const leftoverAnimals = packLeftovers(afterMixed);
+
+  return [...fullAnimals, ...sameTypeAnimals, ...mixedAnimals, ...leftoverAnimals];
 }
 
 export function autoGroupDonations(donations: Donation[]): AnimalGroup[] {
