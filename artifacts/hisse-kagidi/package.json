@@ -56,6 +56,7 @@
   },
   "dependencies": {
     "idb": "^8.0.3",
+    "immer": "^11.1.4",
     "qrcode.react": "^4.2.0",
     "react-virtuoso": "^4.18.3",
     "vite-plugin-pwa": "^1.2.0",

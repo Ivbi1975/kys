@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { produce } from "immer";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag } from "@/lib/types";
 import { turkishNormalize } from "@/lib/utils";
 import { apiSoftDeleteDonation, apiUpdateSingleGroup, apiUpdateSingleDonation } from "@/lib/api";
@@ -56,21 +57,19 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
   function removeFromGroup(groupIdx: number, donationIdx: number) {
     if (!kesim) return;
     if (isGroupLocked(groupIdx)) return;
-    const groups = kesim.animalGroups.map((g) => ({
-      ...g,
-      donations: [...g.donations],
-    }));
-    groups[groupIdx].donations.splice(donationIdx, 1);
-    groups[groupIdx].donations.push({
-      id: generateId(),
-      name: "",
-      description: "",
-      donationType: "",
-      shareCount: 1,
-      vekalet: "",
-      notes: "",
+    const updated = produce(kesim, (draft) => {
+      draft.animalGroups[groupIdx].donations.splice(donationIdx, 1);
+      draft.animalGroups[groupIdx].donations.push({
+        id: generateId(),
+        name: "",
+        description: "",
+        donationType: "",
+        shareCount: 1,
+        vekalet: "",
+        notes: "",
+      });
     });
-    save({ ...kesim, animalGroups: groups }, `Gruptan çıkarıldı`, false, "groups");
+    save(updated, `Gruptan çıkarıldı`, false, "groups");
   }
 
   const updateGroupDonation = useCallback(
@@ -81,18 +80,11 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
       if (!donation) return;
       if (donation[field] === value) return;
 
-      const updated = {
-        ...kesim,
-        donations: kesim.donations.map((d) => (d.id === donation.id ? { ...d, [field]: value } : d)),
-        animalGroups: kesim.animalGroups.map((g, gi) =>
-          gi === groupIdx
-            ? {
-                ...g,
-                donations: g.donations.map((d, di) => (di === donationIdx ? { ...d, [field]: value } : d)),
-              }
-            : g
-        ),
-      };
+      const updated = produce(kesim, (draft) => {
+        const donorIdx = draft.donations.findIndex((d) => d.id === donation.id);
+        if (donorIdx >= 0) (draft.donations[donorIdx] as any)[field] = value;
+        (draft.animalGroups[groupIdx].donations[donationIdx] as any)[field] = value;
+      });
       setKesim(updated);
       history.push(updated, `Grup bağışçısı güncellendi`);
 
@@ -107,10 +99,11 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
   function setGroupColorTag(groupIdx: number, tag: ColorTag) {
     if (!kesim) return;
     const group = kesim.animalGroups[groupIdx];
-    const groups = kesim.animalGroups.map((g, i) => (i === groupIdx ? { ...g, colorTag: tag } : g));
-    const updated = { ...kesim, animalGroups: groups };
+    const updated = produce(kesim, (draft) => {
+      draft.animalGroups[groupIdx].colorTag = tag;
+    });
     setKesim(updated);
-    history.push(updated, `Grup rengi değiştirildi: Hayvan ${groups[groupIdx].animalNo}`);
+    history.push(updated, `Grup rengi değiştirildi: Hayvan ${group.animalNo}`);
     saveSingleGroupField(group.id, { colorTag: tag });
   }
 
@@ -119,10 +112,9 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
       if (!kesim) return;
       const group = kesim.animalGroups[groupIdx];
       if (!group) return;
-      const updated = {
-        ...kesim,
-        animalGroups: kesim.animalGroups.map((g, i) => (i === groupIdx ? { ...g, notes } : g)),
-      };
+      const updated = produce(kesim, (draft) => {
+        draft.animalGroups[groupIdx].notes = notes;
+      });
       setKesim(updated);
       history.push(updated, `Grup notu güncellendi: Hayvan ${group.animalNo}`);
       saveSingleGroupField(group.id, { notes });
@@ -134,8 +126,9 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
     if (!kesim) return;
     const group = kesim.animalGroups[groupIdx];
     const newLocked = !group.locked;
-    const groups = kesim.animalGroups.map((g, i) => (i === groupIdx ? { ...g, locked: newLocked } : g));
-    const updated = { ...kesim, animalGroups: groups };
+    const updated = produce(kesim, (draft) => {
+      draft.animalGroups[groupIdx].locked = newLocked;
+    });
     setKesim(updated);
     history.push(updated, `Grup ${newLocked ? "kilitlendi" : "kilidi açıldı"}: Hayvan ${group.animalNo}`);
     saveSingleGroupField(group.id, { locked: newLocked });
@@ -170,9 +163,13 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
     const validNos = targetNos.filter((n) => existingNos.has(n));
     if (validNos.length === 0) return;
     const targetSet = new Set(validNos);
-    const groups = kesim.animalGroups.map((g) => (targetSet.has(g.animalNo) ? { ...g, locked: lock } : g));
+    const updated = produce(kesim, (draft) => {
+      for (const g of draft.animalGroups) {
+        if (targetSet.has(g.animalNo)) g.locked = lock;
+      }
+    });
     save(
-      { ...kesim, animalGroups: groups },
+      updated,
       `${validNos.length} grup ${lock ? "kilitlendi" : "kilidi açıldı"}: ${rangeLockInput}`,
       false,
       "groups"
@@ -182,29 +179,38 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
 
   function lockAllGroups() {
     if (!kesim) return;
-    const groups = kesim.animalGroups.map((g) => ({ ...g, locked: true }));
-    save({ ...kesim, animalGroups: groups }, `Tüm gruplar kilitlendi`, false, "groups");
+    const updated = produce(kesim, (draft) => {
+      for (const g of draft.animalGroups) g.locked = true;
+    });
+    save(updated, `Tüm gruplar kilitlendi`, false, "groups");
   }
 
   function unlockAllGroups() {
     if (!kesim) return;
-    const groups = kesim.animalGroups.map((g) => ({ ...g, locked: false }));
-    save({ ...kesim, animalGroups: groups }, `Tüm grupların kilidi açıldı`, false, "groups");
+    const updated = produce(kesim, (draft) => {
+      for (const g of draft.animalGroups) g.locked = false;
+    });
+    save(updated, `Tüm grupların kilidi açıldı`, false, "groups");
   }
 
   function deleteAnimalGroup(groupIdx: number) {
     if (!kesim) return;
     const group = kesim.animalGroups[groupIdx];
     if (!group || group.locked) return;
-    const newGroups = kesim.animalGroups.filter((_, i) => i !== groupIdx);
-    const renumbered = newGroups.map((g, i) => ({ ...g, animalNo: i + 1 }));
+    const filledCount = group.donations.filter((d) => d.name.trim()).length;
+    const updated = produce(kesim, (draft) => {
+      draft.animalGroups.splice(groupIdx, 1);
+      for (let i = 0; i < draft.animalGroups.length; i++) {
+        draft.animalGroups[i].animalNo = i + 1;
+      }
+    });
     save(
-      { ...kesim, animalGroups: renumbered },
-      `Grup silindi: Hayvan ${group.animalNo} (${group.donations.filter((d) => d.name.trim()).length} bağışçı grupsuz kaldı)`,
+      updated,
+      `Grup silindi: Hayvan ${group.animalNo} (${filledCount} bağışçı grupsuz kaldı)`,
       true,
       "groups"
     );
-    const found = checkGroupConflicts(renumbered);
+    const found = checkGroupConflicts(updated.animalGroups);
     setConflicts(found);
   }
 
@@ -242,22 +248,20 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
     while (firstHalf.length < MAX_SHARES_PER_ANIMAL) firstHalf.push(emptyDonation());
     while (secondHalf.length < MAX_SHARES_PER_ANIMAL) secondHalf.push(emptyDonation());
 
-    const newGroups = [...kesim.animalGroups];
-    newGroups[groupIdx] = {
-      ...group,
-      donations: firstHalf.slice(0, MAX_SHARES_PER_ANIMAL),
-    };
-
-    const newGroup: AnimalGroup = {
-      id: generateId(),
-      animalNo: kesim.animalGroups.length + 1,
-      donations: secondHalf.slice(0, MAX_SHARES_PER_ANIMAL),
-    };
-
-    newGroups.splice(groupIdx + 1, 0, newGroup);
-    const renumbered = newGroups.map((g, i) => ({ ...g, animalNo: i + 1 }));
+    const updated = produce(kesim, (draft) => {
+      draft.animalGroups[groupIdx].donations = firstHalf.slice(0, MAX_SHARES_PER_ANIMAL);
+      const newGroup: AnimalGroup = {
+        id: generateId(),
+        animalNo: draft.animalGroups.length + 1,
+        donations: secondHalf.slice(0, MAX_SHARES_PER_ANIMAL),
+      };
+      draft.animalGroups.splice(groupIdx + 1, 0, newGroup);
+      for (let i = 0; i < draft.animalGroups.length; i++) {
+        draft.animalGroups[i].animalNo = i + 1;
+      }
+    });
     save(
-      { ...kesim, animalGroups: renumbered },
+      updated,
       `Grup bölündü: Hayvan ${group.animalNo} → ${splitAt}/${filled.length - splitAt}`,
       false,
       "groups"
@@ -317,11 +321,15 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
     }
 
     const firstMergedIdx = kesim.animalGroups.findIndex((g) => selectedGroupIds.has(g.id));
-    const finalGroups = [...remainingGroups];
-    finalGroups.splice(firstMergedIdx, 0, ...newGroups);
-    const renumbered = finalGroups.map((g, i) => ({ ...g, animalNo: i + 1 }));
+    const updated = produce(kesim, (draft) => {
+      draft.animalGroups = draft.animalGroups.filter((g) => !selectedGroupIds.has(g.id));
+      draft.animalGroups.splice(firstMergedIdx, 0, ...newGroups);
+      for (let i = 0; i < draft.animalGroups.length; i++) {
+        draft.animalGroups[i].animalNo = i + 1;
+      }
+    });
 
-    save({ ...kesim, animalGroups: renumbered }, `${groupsToMerge.length} grup birleştirildi`, false, "groups");
+    save(updated, `${groupsToMerge.length} grup birleştirildi`, false, "groups");
     setSelectedGroupIds(new Set());
   }
 
@@ -346,30 +354,26 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
   function bulkRemoveFromGroups() {
     if (!kesim || selectedGroupDonations.size === 0) return;
     const removedIds = new Set<string>();
-    const groups = kesim.animalGroups.map((g) => ({
-      ...g,
-      donations: g.donations.map((d) => {
-        if (selectedGroupDonations.has(d.id) && d.name.trim()) {
-          removedIds.add(d.id);
-          return {
-            id: generateId(),
-            name: "",
-            description: "",
-            donationType: "",
-            shareCount: 1,
-            vekalet: "",
-            notes: "",
-          };
+    const updated = produce(kesim, (draft) => {
+      for (const g of draft.animalGroups) {
+        for (let di = 0; di < g.donations.length; di++) {
+          const d = g.donations[di];
+          if (selectedGroupDonations.has(d.id) && d.name.trim()) {
+            removedIds.add(d.id);
+            g.donations[di] = {
+              id: generateId(), name: "", description: "",
+              donationType: "", shareCount: 1, vekalet: "", notes: "",
+            };
+          }
         }
-        return { ...d };
-      }),
-    }));
+      }
+    });
     setRemovedFromGroupIds((prev) => {
       const next = new Set(prev);
       removedIds.forEach((id) => next.add(id));
       return next;
     });
-    save({ ...kesim, animalGroups: groups }, `${selectedGroupDonations.size} bağışçı gruplardan çıkarıldı`, false, "groups");
+    save(updated, `${selectedGroupDonations.size} bağışçı gruplardan çıkarıldı`, false, "groups");
     setSelectedGroupDonations(new Set());
     toast({
       title: "Gruptan Çıkarıldı",
@@ -380,16 +384,11 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
   function bulkMoveToGroup(targetGroupIdx: number) {
     if (!kesim || selectedGroupDonations.size === 0 || targetGroupIdx < 0) return;
     if (isGroupLocked(targetGroupIdx)) return;
-    const groups = kesim.animalGroups.map((g) => ({
-      ...g,
-      donations: g.donations.map((d) => ({ ...d })),
-    }));
-    const emptySlotCount = groups[targetGroupIdx].donations.filter((d) => !d.name.trim()).length;
+    const emptySlotCount = kesim.animalGroups[targetGroupIdx].donations.filter((d) => !d.name.trim()).length;
     const candidateIds: string[] = [];
-    for (let gi = 0; gi < groups.length; gi++) {
+    for (let gi = 0; gi < kesim.animalGroups.length; gi++) {
       if (isGroupLocked(gi) || gi === targetGroupIdx) continue;
-      for (let di = 0; di < groups[gi].donations.length; di++) {
-        const d = groups[gi].donations[di];
+      for (const d of kesim.animalGroups[gi].donations) {
         if (selectedGroupDonations.has(d.id) && d.name.trim()) {
           candidateIds.push(d.id);
         }
@@ -402,33 +401,30 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
     }
     const idsToMove = new Set(candidateIds.slice(0, moveCount));
     const itemsToMove: Donation[] = [];
-    for (let gi = 0; gi < groups.length; gi++) {
-      if (isGroupLocked(gi) || gi === targetGroupIdx) continue;
-      for (let di = groups[gi].donations.length - 1; di >= 0; di--) {
-        const d = groups[gi].donations[di];
-        if (idsToMove.has(d.id)) {
-          itemsToMove.push(d);
-          groups[gi].donations[di] = {
-            id: generateId(),
-            name: "",
-            description: "",
-            donationType: "",
-            shareCount: 1,
-            vekalet: "",
-            notes: "",
-          };
+    const updated = produce(kesim, (draft) => {
+      for (let gi = 0; gi < draft.animalGroups.length; gi++) {
+        if (isGroupLocked(gi) || gi === targetGroupIdx) continue;
+        for (let di = draft.animalGroups[gi].donations.length - 1; di >= 0; di--) {
+          const d = draft.animalGroups[gi].donations[di];
+          if (idsToMove.has(d.id)) {
+            itemsToMove.push({ ...d });
+            draft.animalGroups[gi].donations[di] = {
+              id: generateId(), name: "", description: "",
+              donationType: "", shareCount: 1, vekalet: "", notes: "",
+            };
+          }
         }
       }
-    }
-    for (const item of itemsToMove) {
-      const emptyIdx = groups[targetGroupIdx].donations.findIndex((d) => !d.name.trim());
-      if (emptyIdx >= 0) {
-        groups[targetGroupIdx].donations[emptyIdx] = item;
+      for (const item of itemsToMove) {
+        const emptyIdx = draft.animalGroups[targetGroupIdx].donations.findIndex((d) => !d.name.trim());
+        if (emptyIdx >= 0) {
+          draft.animalGroups[targetGroupIdx].donations[emptyIdx] = item;
+        }
       }
-    }
+    });
     save(
-      { ...kesim, animalGroups: groups },
-      `${itemsToMove.length} bağışçı Hayvan ${groups[targetGroupIdx].animalNo}'e taşındı`,
+      updated,
+      `${itemsToMove.length} bağışçı Hayvan ${updated.animalGroups[targetGroupIdx].animalNo}'e taşındı`,
       false,
       "groups"
     );
@@ -445,17 +441,17 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
 
   function bulkChangeGroupDonationType() {
     if (!kesim || selectedGroupDonations.size === 0) return;
-    const groups = kesim.animalGroups.map((g) => ({
-      ...g,
-      donations: g.donations.map((d) => {
-        if (selectedGroupDonations.has(d.id)) {
-          if (bulkGroupEditField === "donationType") return { ...d, donationType: bulkGroupEditValue };
-          if (bulkGroupEditField === "notes") return { ...d, notes: bulkGroupEditValue };
+    const updated = produce(kesim, (draft) => {
+      for (const g of draft.animalGroups) {
+        for (const d of g.donations) {
+          if (selectedGroupDonations.has(d.id)) {
+            if (bulkGroupEditField === "donationType") d.donationType = bulkGroupEditValue;
+            if (bulkGroupEditField === "notes") d.notes = bulkGroupEditValue;
+          }
         }
-        return { ...d };
-      }),
-    }));
-    save({ ...kesim, animalGroups: groups }, `${selectedGroupDonations.size} bağışçı toplu düzenlendi`, false, "groups");
+      }
+    });
+    save(updated, `${selectedGroupDonations.size} bağışçı toplu düzenlendi`, false, "groups");
     setSelectedGroupDonations(new Set());
     setBulkGroupEditOpen(false);
     setBulkGroupEditValue("");
@@ -483,60 +479,59 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
   function addEmptyGroup() {
     if (!kesim) return;
     const emptyDonation = (): Donation => ({
-      id: generateId(),
-      name: "",
-      description: "",
-      donationType: "",
-      shareCount: 1,
-      vekalet: "",
-      notes: "",
+      id: generateId(), name: "", description: "",
+      donationType: "", shareCount: 1, vekalet: "", notes: "",
     });
     const newGroup: AnimalGroup = {
       id: generateId(),
       animalNo: kesim.animalGroups.length + 1,
       donations: Array.from({ length: MAX_SHARES_PER_ANIMAL }, emptyDonation),
     };
-    save(
-      { ...kesim, animalGroups: [...kesim.animalGroups, newGroup] },
-      `Boş hayvan grubu eklendi: #${newGroup.animalNo}`,
-      false,
-      "groups"
-    );
+    const updated = produce(kesim, (draft) => {
+      draft.animalGroups.push(newGroup);
+    });
+    save(updated, `Boş hayvan grubu eklendi: #${newGroup.animalNo}`, false, "groups");
   }
 
   function cleanEmptyGroups() {
     if (!kesim) return;
-    const nonEmpty = kesim.animalGroups.filter((g) => g.donations.some((d) => d.name.trim()));
-    if (nonEmpty.length === kesim.animalGroups.length) return;
-    const removed = kesim.animalGroups.length - nonEmpty.length;
-    const renumbered = nonEmpty.map((g, i) => ({ ...g, animalNo: i + 1 }));
-    save({ ...kesim, animalGroups: renumbered }, `${removed} boş grup temizlendi`, false, "groups");
+    const emptyCount = kesim.animalGroups.filter((g) => !g.donations.some((d) => d.name.trim())).length;
+    if (emptyCount === 0) return;
+    const updated = produce(kesim, (draft) => {
+      draft.animalGroups = draft.animalGroups.filter((g) => g.donations.some((d) => d.name.trim()));
+      for (let i = 0; i < draft.animalGroups.length; i++) {
+        draft.animalGroups[i].animalNo = i + 1;
+      }
+    });
+    save(updated, `${emptyCount} boş grup temizlendi`, false, "groups");
   }
 
   function moveGroupUp(groupIdx: number) {
     if (!kesim || groupIdx <= 0) return;
-    const groups = [...kesim.animalGroups];
-    [groups[groupIdx - 1], groups[groupIdx]] = [groups[groupIdx], groups[groupIdx - 1]];
-    const renumbered = groups.map((g, i) => ({ ...g, animalNo: i + 1 }));
-    save(
-      { ...kesim, animalGroups: renumbered },
-      `Hayvan ${kesim.animalGroups[groupIdx].animalNo} yukarı taşındı`,
-      false,
-      "groups"
-    );
+    const animalNo = kesim.animalGroups[groupIdx].animalNo;
+    const updated = produce(kesim, (draft) => {
+      const temp = draft.animalGroups[groupIdx - 1];
+      draft.animalGroups[groupIdx - 1] = draft.animalGroups[groupIdx];
+      draft.animalGroups[groupIdx] = temp;
+      for (let i = 0; i < draft.animalGroups.length; i++) {
+        draft.animalGroups[i].animalNo = i + 1;
+      }
+    });
+    save(updated, `Hayvan ${animalNo} yukarı taşındı`, false, "groups");
   }
 
   function moveGroupDown(groupIdx: number) {
     if (!kesim || groupIdx >= kesim.animalGroups.length - 1) return;
-    const groups = [...kesim.animalGroups];
-    [groups[groupIdx], groups[groupIdx + 1]] = [groups[groupIdx + 1], groups[groupIdx]];
-    const renumbered = groups.map((g, i) => ({ ...g, animalNo: i + 1 }));
-    save(
-      { ...kesim, animalGroups: renumbered },
-      `Hayvan ${kesim.animalGroups[groupIdx].animalNo} aşağı taşındı`,
-      false,
-      "groups"
-    );
+    const animalNo = kesim.animalGroups[groupIdx].animalNo;
+    const updated = produce(kesim, (draft) => {
+      const temp = draft.animalGroups[groupIdx];
+      draft.animalGroups[groupIdx] = draft.animalGroups[groupIdx + 1];
+      draft.animalGroups[groupIdx + 1] = temp;
+      for (let i = 0; i < draft.animalGroups.length; i++) {
+        draft.animalGroups[i].animalNo = i + 1;
+      }
+    });
+    save(updated, `Hayvan ${animalNo} aşağı taşındı`, false, "groups");
   }
 
   const EDITABLE_COLUMN_KEYS: ColumnKey[] = ["vekalet", "description", "name", "donationType", "notes"];
@@ -701,14 +696,12 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
     };
     try {
       await Promise.all(matches.map((d) => apiSoftDeleteDonation(kesim.id, d.id)));
-      const updated = {
-        ...kesim,
-        donations: kesim.donations.filter((d) => !matchIds.has(d.id)),
-        animalGroups: kesim.animalGroups.map((g) => ({
-          ...g,
-          donations: g.donations.filter((d) => !matchIds.has(d.id)),
-        })),
-      };
+      const updated = produce(kesim, (draft) => {
+        draft.donations = draft.donations.filter((d) => !matchIds.has(d.id));
+        for (const g of draft.animalGroups) {
+          g.donations = g.donations.filter((d) => !matchIds.has(d.id));
+        }
+      });
       setKesim(updated);
       history.push(
         updated,
