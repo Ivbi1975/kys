@@ -16,10 +16,16 @@ paths:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
+      description: Returns server health status including DB connectivity and pool stats
       responses:
         "200":
           description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+        "503":
+          description: Degraded — DB unreachable
           content:
             application/json:
               schema:
@@ -31,6 +37,30 @@ components:
       properties:
         status:
           type: string
+          enum: [ok, degraded]
+        db:
+          type: object
+          properties:
+            connected:
+              type: boolean
+            latencyMs:
+              type: integer
+            pool:
+              type: object
+              properties:
+                total:
+                  type: integer
+                idle:
+                  type: integer
+                active:
+                  type: integer
+                waiting:
+                  type: integer
+              required: [total, idle, active, waiting]
+          required: [connected, latencyMs, pool]
+        uptime:
+          type: integer
       required:
         - status
-
+        - db
+        - uptime

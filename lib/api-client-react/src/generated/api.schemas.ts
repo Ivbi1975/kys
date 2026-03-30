@@ -5,6 +5,29 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type HealthStatusStatus =
+  (typeof HealthStatusStatus)[keyof typeof HealthStatusStatus];
+
+export const HealthStatusStatus = {
+  ok: "ok",
+  degraded: "degraded",
+} as const;
+
+export type HealthStatusDbPool = {
+  total: number;
+  idle: number;
+  active: number;
+  waiting: number;
+};
+
+export type HealthStatusDb = {
+  connected: boolean;
+  latencyMs: number;
+  pool: HealthStatusDbPool;
+};
+
 export interface HealthStatus {
-  status: string;
+  status: HealthStatusStatus;
+  db: HealthStatusDb;
+  uptime: number;
 }

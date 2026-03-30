@@ -7,3 +7,6 @@
  */
 
 export * from "./healthStatus";
+export * from "./healthStatusDb";
+export * from "./healthStatusDbPool";
+export * from "./healthStatusStatus";

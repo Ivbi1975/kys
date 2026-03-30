@@ -98,6 +98,7 @@ export const animalGroupsTable = pgTable("animal_groups", {
   index("idx_animal_groups_kesim_alani_id").on(table.kesimAlaniId),
   index("idx_ag_ka_sort").on(table.kesimAlaniId, table.sortOrder),
   index("idx_ag_ka_animal_no").on(table.kesimAlaniId, table.animalNo),
+  index("idx_ag_team_id").on(table.teamId),
 ]);
 
 export const insertAnimalGroupSchema = createInsertSchema(animalGroupsTable);
@@ -157,6 +158,7 @@ export const trackingNotesTable = pgTable("tracking_notes", {
 }, (table) => [
   index("idx_tracking_notes_kesim_alani_id").on(table.kesimAlaniId),
   index("idx_tracking_notes_animal_group_id").on(table.animalGroupId),
+  index("idx_tracking_notes_ag_active").on(table.animalGroupId, table.createdAt).where(sql`deleted_at IS NULL`),
 ]);
 
 export const insertTrackingNoteSchema = createInsertSchema(trackingNotesTable);
@@ -215,6 +217,9 @@ export const donationTransfersTable = pgTable("donation_transfers", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("idx_donation_transfers_project_id").on(table.projectId),
+  index("idx_donation_transfers_donation_id").on(table.donationId),
+  index("idx_donation_transfers_from_ka").on(table.fromKesimAlaniId),
+  index("idx_donation_transfers_to_ka").on(table.toKesimAlaniId),
 ]);
 
 export const insertDonationTransferSchema = createInsertSchema(donationTransfersTable);

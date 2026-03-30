@@ -8,9 +8,20 @@
 import * as zod from "zod";
 
 /**
- * Returns server health status
+ * Returns server health status including DB connectivity and pool stats
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
-  status: zod.string(),
+  status: zod.enum(["ok", "degraded"]),
+  db: zod.object({
+    connected: zod.boolean(),
+    latencyMs: zod.number(),
+    pool: zod.object({
+      total: zod.number(),
+      idle: zod.number(),
+      active: zod.number(),
+      waiting: zod.number(),
+    }),
+  }),
+  uptime: zod.number(),
 });
