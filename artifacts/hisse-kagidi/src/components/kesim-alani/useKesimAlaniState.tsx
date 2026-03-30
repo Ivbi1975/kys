@@ -517,13 +517,12 @@ export function useKesimAlaniState() {
 
   const sortedDonorList = useMemo(() => {
     const active = donations.filter((d) => !d.excluded);
-    return [...active].sort((a, b) => {
-      const aDesc = (a.description || "").trim();
-      const bDesc = (b.description || "").trim();
-      const aSurname = aDesc.split(/\s+/).pop() || aDesc;
-      const bSurname = bDesc.split(/\s+/).pop() || bDesc;
-      return trCollator.compare(aSurname, bSurname);
+    const decorated = active.map((d) => {
+      const desc = (d.description || "").trim();
+      return { d, key: desc.split(/\s+/).pop() || desc };
     });
+    decorated.sort((a, b) => trCollator.compare(a.key, b.key));
+    return decorated.map((item) => item.d);
   }, [donations]);
 
   const virtuosoTableComponents = useMemo(

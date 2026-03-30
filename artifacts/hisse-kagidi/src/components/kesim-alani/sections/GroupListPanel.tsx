@@ -74,7 +74,52 @@ export function GroupListPanel() {
     }, []
   );
 
+  const renderGroupCard = useCallback(({ group, groupIdx }: { group: (typeof kesim)extends null ? never : NonNullable<typeof kesim>["animalGroups"][0]; groupIdx: number }) => {
+    if (!kesim) return null;
+    return (
+      <AnimalGroupCard
+        key={group.id} group={group} groupIdx={groupIdx} kesimName={kesim.name} kesimId={kesim.id}
+        isCollapsed={collapsedGroups.has(group.id)} isSelected={selectedGroupIds.has(group.id)}
+        compact={workspace.prefs.compactMode} visibleColumns={workspace.visibleColumns}
+        totalGroupCount={kesim.animalGroups.length} photoCounts={photoCounts}
+        teams={kesim.teams || []} basketItemIds={basketItemIds}
+        selectedGroupDonations={selectedGroupDonations} swapSelection={swapSelection}
+        highlightIncomplete={highlightIncomplete} dragItem={dragItem}
+        dragOverGroup={dragOverGroup} dragOverItem={dragOverItem}
+        groupSearchQuery={groupSearchQuery}
+        onToggleCollapse={toggleGroupCollapse} onToggleSelect={toggleGroupSelect}
+        onSetColorTag={handleSetGroupColorTag} onMoveUp={moveGroupUp} onMoveDown={moveGroupDown}
+        onSplit={openSplitGroupDialog} onAddGroupToBasket={addGroupToBasket}
+        onToggleLock={toggleGroupLock} onDelete={deleteAnimalGroup}
+        onAssignTeam={handleAssignTeam} onViewPhotos={handleViewPhotos}
+        onUpdateGroupDonation={updateGroupDonation} onHandleGroupCellTab={handleGroupCellTab}
+        onToggleBasketItem={handleToggleBasketItem} onSwapSelect={handleSwapSelect}
+        onRemoveFromGroup={enhancedRemoveFromGroup} onUpdateGroupNotes={updateGroupNotes}
+        onDragStart={handleDragStart} onDragOver={handleDragOver} onDrop={handleDrop}
+        onDragEnd={handleDragEnd} onDragOverCard={handleDragOverCard} onDragLeaveCard={handleDragLeave}
+        onToggleGroupDonationSelect={toggleGroupDonationSelect}
+        onSelectAllGroupDonations={handleSelectAllGroupDonations}
+        columnHeaderLabel={columnHeaderLabel} columnHeaderWidth={columnHeaderWidth}
+      />
+    );
+  }, [
+    kesim, collapsedGroups, selectedGroupIds, workspace.prefs.compactMode, workspace.visibleColumns,
+    photoCounts, basketItemIds, selectedGroupDonations, swapSelection, highlightIncomplete,
+    dragItem, dragOverGroup, dragOverItem, groupSearchQuery,
+    toggleGroupCollapse, toggleGroupSelect, handleSetGroupColorTag, moveGroupUp, moveGroupDown,
+    openSplitGroupDialog, addGroupToBasket, toggleGroupLock, deleteAnimalGroup,
+    handleAssignTeam, handleViewPhotos, updateGroupDonation, handleGroupCellTab,
+    handleToggleBasketItem, handleSwapSelect, enhancedRemoveFromGroup, updateGroupNotes,
+    handleDragStart, handleDragOver, handleDrop, handleDragEnd, handleDragOverCard, handleDragLeave,
+    toggleGroupDonationSelect, handleSelectAllGroupDonations, columnHeaderLabel, columnHeaderWidth,
+  ]);
+
   if (!kesim) return null;
+
+  const gridClassName = `grid gap-4 ${
+    effectiveColumnCount === 3 ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" :
+    effectiveColumnCount === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+  }`;
 
   return (
     <Profiler id="GroupListPanel" onRender={onRenderCallback}>
@@ -233,56 +278,22 @@ export function GroupListPanel() {
           <Wand2 className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
           <p className="text-muted-foreground">Bağışçı listesini doldurup "Otomatik Grupla" butonuna tıklayın</p>
         </Card>
-      ) : (() => {
-        const renderGroupCard = ({ group, groupIdx }: { group: typeof kesim.animalGroups[0]; groupIdx: number }) => (
-          <AnimalGroupCard
-            key={group.id} group={group} groupIdx={groupIdx} kesimName={kesim.name} kesimId={kesim.id}
-            isCollapsed={collapsedGroups.has(group.id)} isSelected={selectedGroupIds.has(group.id)}
-            compact={workspace.prefs.compactMode} visibleColumns={workspace.visibleColumns}
-            totalGroupCount={kesim.animalGroups.length} photoCounts={photoCounts}
-            teams={kesim.teams || []} basketItemIds={basketItemIds}
-            selectedGroupDonations={selectedGroupDonations} swapSelection={swapSelection}
-            highlightIncomplete={highlightIncomplete} dragItem={dragItem}
-            dragOverGroup={dragOverGroup} dragOverItem={dragOverItem}
-            groupSearchQuery={groupSearchQuery}
-            onToggleCollapse={toggleGroupCollapse} onToggleSelect={toggleGroupSelect}
-            onSetColorTag={handleSetGroupColorTag} onMoveUp={moveGroupUp} onMoveDown={moveGroupDown}
-            onSplit={openSplitGroupDialog} onAddGroupToBasket={addGroupToBasket}
-            onToggleLock={toggleGroupLock} onDelete={deleteAnimalGroup}
-            onAssignTeam={handleAssignTeam} onViewPhotos={handleViewPhotos}
-            onUpdateGroupDonation={updateGroupDonation} onHandleGroupCellTab={handleGroupCellTab}
-            onToggleBasketItem={handleToggleBasketItem} onSwapSelect={handleSwapSelect}
-            onRemoveFromGroup={enhancedRemoveFromGroup} onUpdateGroupNotes={updateGroupNotes}
-            onDragStart={handleDragStart} onDragOver={handleDragOver} onDrop={handleDrop}
-            onDragEnd={handleDragEnd} onDragOverCard={handleDragOverCard} onDragLeaveCard={handleDragLeave}
-            onToggleGroupDonationSelect={toggleGroupDonationSelect}
-            onSelectAllGroupDonations={handleSelectAllGroupDonations}
-            columnHeaderLabel={columnHeaderLabel} columnHeaderWidth={columnHeaderWidth}
+      ) : filteredGroupItems.length > 20 ? (() => {
+        const virtuosoProps = fullscreenMode && scrollContainerRef.current
+          ? { customScrollParent: scrollContainerRef.current }
+          : { useWindowScroll: true as const };
+        return (
+          <Virtuoso
+            ref={groupsVirtuosoRef} {...virtuosoProps} data={groupRows} overscan={5}
+            defaultItemHeight={collapsedGroups.size > 0 ? 60 : 350}
+            initialScrollTop={groupsScrollTopRef.current}
+            onScroll={(e) => { const el = e?.target as HTMLElement | null; if (el && typeof el.scrollTop === "number") { groupsScrollTopRef.current = el.scrollTop; } }}
+            itemContent={(_index, row) => (<div className={`${gridClassName} pb-4`}>{row.map(renderGroupCard)}</div>)}
           />
         );
-
-        const gridClassName = `grid gap-4 ${
-          effectiveColumnCount === 3 ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" :
-          effectiveColumnCount === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
-        }`;
-
-        if (filteredGroupItems.length > 20) {
-          const virtuosoProps = fullscreenMode && scrollContainerRef.current
-            ? { customScrollParent: scrollContainerRef.current }
-            : { useWindowScroll: true as const };
-          return (
-            <Virtuoso
-              ref={groupsVirtuosoRef} {...virtuosoProps} data={groupRows} overscan={5}
-              defaultItemHeight={collapsedGroups.size > 0 ? 60 : 350}
-              initialScrollTop={groupsScrollTopRef.current}
-              onScroll={(e) => { const el = e?.target as HTMLElement | null; if (el && typeof el.scrollTop === "number") { groupsScrollTopRef.current = el.scrollTop; } }}
-              itemContent={(_index, row) => (<div className={`${gridClassName} pb-4`}>{row.map(renderGroupCard)}</div>)}
-            />
-          );
-        }
-
-        return (<div className={gridClassName}>{filteredGroupItems.map(renderGroupCard)}</div>);
-      })()}
+      })() : (
+        <div className={gridClassName}>{filteredGroupItems.map(renderGroupCard)}</div>
+      )}
     </Profiler>
   );
 }
