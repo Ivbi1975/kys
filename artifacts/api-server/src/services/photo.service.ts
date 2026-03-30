@@ -8,6 +8,7 @@ import { eq, inArray, isNull, and } from "drizzle-orm";
 import crypto from "crypto";
 import { serviceError, serviceOk, type ServiceResult } from "./result";
 import { generateThumbnail } from "../lib/thumbnail";
+import { logger } from "../lib/logger";
 
 const MAX_PHOTOS_PER_GROUP = 5;
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
@@ -128,7 +129,7 @@ export async function uploadPhoto(params: {
   try {
     thumbnail = await generateThumbnail(fullData);
   } catch (e) {
-    console.warn("Thumbnail generation failed, storing without thumbnail:", e);
+    logger.warn({ err: e }, "Thumbnail generation failed, storing without thumbnail");
   }
 
   await db.insert(animalGroupPhotosTable).values({

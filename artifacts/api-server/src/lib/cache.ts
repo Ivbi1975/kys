@@ -1,3 +1,5 @@
+import { logger } from "./logger";
+
 interface CacheEntry<T> {
   data: T;
   expiresAt: number;
@@ -42,13 +44,20 @@ export function cacheInvalidatePrefix(prefix: string): void {
 }
 
 export function cacheStats() {
-  return { hits, misses, size: store.size, hitRate: hits + misses > 0 ? Math.round((hits / (hits + misses)) * 100) : 0 };
+  return {
+    hits,
+    misses,
+    size: store.size,
+    hitRate: hits + misses > 0 ? Math.round((hits / (hits + misses)) * 100) : 0,
+  };
 }
+
+const CACHE_LOG_INTERVAL = 60_000;
 
 setInterval(() => {
   const total = hits + misses;
   if (total > 0) {
     const rate = Math.round((hits / total) * 100);
-    console.log(`[cache] hit-rate=${rate}% hits=${hits} misses=${misses} entries=${store.size}`);
+    logger.info({ hitRate: rate, hits, misses, entries: store.size }, "Cache stats");
   }
-}, 60_000);
+}, CACHE_LOG_INTERVAL).unref();

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import crypto from "crypto";
 import { asyncHandler } from "../middleware/error-handler";
+import { logger } from "../lib/logger";
 import { TX_BATCH_SIZE, AiJobStatus, STALE_JOB_CUTOFF_MS, STALE_JOB_CLEANUP_INTERVAL_MS, ERROR_MESSAGES } from "../lib/constants";
 
 const router: IRouter = Router();
@@ -176,7 +177,7 @@ router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
   res.status(202).json({ jobId, status: AiJobStatus.PENDING, totalDonations: donations.length });
 
   processClassifyJob(jobId, donations).catch(err => {
-    console.error(`[ai-job:${jobId}] Unhandled error:`, err);
+    logger.error({ err, jobId }, "AI job unhandled error");
   });
 }));
 
@@ -228,7 +229,7 @@ async function processClassifyJob(
         } catch (err) {
           retries--;
           if (retries === 0) {
-            console.error(`[ai-job:${jobId}] Chunk ${i / CHUNK_SIZE + 1} failed after 3 retries:`, err);
+            logger.error({ err, jobId, chunk: i / CHUNK_SIZE + 1 }, "AI job chunk failed after 3 retries");
             chunkResults = chunk.map(d => ({
               donationId: d.id,
               categories: [],
@@ -262,10 +263,10 @@ async function processClassifyJob(
       })
       .where(eq(aiJobsTable.id, jobId));
 
-    console.log(`[ai-job:${jobId}] Completed: ${donations.length} donations processed`);
+    logger.info({ jobId, count: donations.length }, "AI job completed");
   } catch (err) {
     const message = err instanceof Error ? err.message : ERROR_MESSAGES.UNKNOWN_ERROR;
-    console.error(`[ai-job:${jobId}] Failed:`, message);
+    logger.error({ jobId, error: message }, "AI job failed");
 
     await db.update(aiJobsTable)
       .set({ status: AiJobStatus.FAILED, error: message, updatedAt: new Date() })
@@ -381,9 +382,9 @@ router.put("/ai-notes/bulk-update", asyncHandler(async (req, res) => {
     await db.update(aiJobsTable)
       .set({ status: AiJobStatus.FAILED, error: ERROR_MESSAGES.SERVER_RESTARTED, updatedAt: new Date() })
       .where(staleCondition!);
-    console.log("[ai-jobs] Startup: marked stale jobs as failed");
+    logger.info("[ai-jobs] Startup: marked stale jobs as failed");
   } catch (err) {
-    console.error("[ai-jobs] Startup cleanup error:", err);
+    logger.error({ err }, "[ai-jobs] Startup cleanup error");
   }
 })();
 
@@ -392,7 +393,7 @@ setInterval(async () => {
     const cutoff = new Date(Date.now() - STALE_JOB_CUTOFF_MS);
     await db.delete(aiJobsTable).where(lt(aiJobsTable.createdAt, cutoff));
   } catch (err) {
-    console.error("[ai-jobs] Cleanup error:", err);
+    logger.error({ err }, "[ai-jobs] Cleanup error");
   }
 }, STALE_JOB_CLEANUP_INTERVAL_MS);
 

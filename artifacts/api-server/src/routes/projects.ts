@@ -10,6 +10,7 @@ import { z } from "zod";
 import { cacheGet, cacheSet, cacheInvalidate, cacheInvalidatePrefix } from "../lib/cache";
 import { asyncHandler } from "../middleware/error-handler";
 import { ERROR_MESSAGES } from "../lib/constants";
+import { logger } from "../lib/logger";
 
 const idParamSchema = z.object({
   id: z.string().min(1),
@@ -24,7 +25,7 @@ const updateProjectSchema = z.object({
 });
 
 const PROJECTS_CACHE_KEY = "projects:list";
-const PROJECTS_TTL = 30_000;
+const PROJECTS_TTL = 60_000;
 
 const router: IRouter = Router();
 
@@ -43,7 +44,7 @@ export async function refreshProjectStats() {
     await db.execute(sql`REFRESH MATERIALIZED VIEW CONCURRENTLY project_stats_view`);
     cacheInvalidate(PROJECTS_CACHE_KEY);
   } catch (err) {
-    console.error("Failed to refresh project_stats_view:", err);
+    logger.error({ err }, "Failed to refresh project_stats_view");
   } finally {
     refreshInProgress = false;
     if (refreshQueued) {

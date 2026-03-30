@@ -15,6 +15,7 @@ import {
 } from "@workspace/db/schema";
 import { eq, inArray, isNull, and, sql } from "drizzle-orm";
 import { cacheGet, cacheSet, cacheInvalidatePrefix } from "../lib/cache";
+import { logger } from "../lib/logger";
 import { BATCH_SIZE } from "../lib/constants";
 
 export const KA_LIST_CACHE_KEY = "kesim-alanlari:list";
@@ -771,6 +772,6 @@ export async function createNotificationLogs(kesimAlaniId: string, groupId: stri
       await db.insert(notificationLogsTable).values(logRows);
     }
   } catch (err) {
-    console.error("createNotificationLogs error:", err);
+    logger.error({ err }, "createNotificationLogs error");
   }
 }

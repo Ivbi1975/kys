@@ -4,6 +4,14 @@ import * as schema from "./schema";
 
 const { Pool } = pg;
 
+const logLevel = process.env.LOG_LEVEL || (process.env.NODE_ENV === "production" ? "info" : "debug");
+const dbLog = {
+  debug: logLevel === "debug" ? (...a: unknown[]) => process.stdout.write(`[DB Pool] ${a.join(" ")}\n`) : () => {},
+  info: (...a: unknown[]) => process.stdout.write(`[DB Pool] ${a.join(" ")}\n`),
+  warn: (...a: unknown[]) => process.stderr.write(`[DB Pool] WARN ${a.join(" ")}\n`),
+  error: (...a: unknown[]) => process.stderr.write(`[DB Pool] ERROR ${a.join(" ")}\n`),
+};
+
 if (!process.env.DATABASE_URL) {
   throw new Error(
     "DATABASE_URL must be set. Did you forget to provision a database?",
@@ -40,7 +48,7 @@ export const pool = new Pool({
 });
 
 pool.on("error", (err) => {
-  console.error("Unexpected pool error:", err.message);
+  dbLog.error("Unexpected pool error:", err.message);
   ensureMinConnections().catch(() => {});
 });
 
@@ -57,22 +65,50 @@ async function ensureMinConnections() {
 }
 
 let poolLogInterval: ReturnType<typeof setInterval> | null = null;
+const POOL_WARN_THRESHOLD = 3;
+let consecutiveWaiting = 0;
 
 export function startPoolMonitoring(intervalMs = 20_000) {
   if (poolLogInterval) return;
   const sslLabel = sslConfig === false ? "disabled" : typeof sslConfig === "object" && !sslConfig.rejectUnauthorized ? "enabled (insecure)" : "enabled (verified)";
-  console.log(`[DB Pool] Configured max=${poolMax}, ssl=${sslLabel}`);
+  dbLog.info(`Configured max=${poolMax}, ssl=${sslLabel}`);
   ensureMinConnections().catch((err) =>
-    console.error("Pool warm-up failed:", err.message),
+    dbLog.error("Warm-up failed:", err.message),
   );
   poolLogInterval = setInterval(() => {
     ensureMinConnections().catch(() => {});
     const active = pool.totalCount - pool.idleCount;
-    console.log(
-      `[DB Pool] total=${pool.totalCount} active=${active} idle=${pool.idleCount} waiting=${pool.waitingCount}`,
+    const waiting = pool.waitingCount;
+
+    if (waiting > 0) {
+      consecutiveWaiting++;
+      if (consecutiveWaiting >= POOL_WARN_THRESHOLD) {
+        dbLog.warn(
+          `Pool exhaustion detected! waiting=${waiting} for ${consecutiveWaiting} consecutive checks. total=${pool.totalCount} active=${active} idle=${pool.idleCount}`,
+        );
+      }
+    } else {
+      consecutiveWaiting = 0;
+    }
+
+    const utilization = poolMax > 0 ? Math.round((active / poolMax) * 100) : 0;
+    dbLog.debug(
+      `total=${pool.totalCount} active=${active} idle=${pool.idleCount} waiting=${waiting} utilization=${utilization}%`,
     );
   }, intervalMs);
   poolLogInterval.unref();
+}
+
+export function getPoolStats() {
+  const active = pool.totalCount - pool.idleCount;
+  return {
+    total: pool.totalCount,
+    idle: pool.idleCount,
+    active,
+    waiting: pool.waitingCount,
+    max: poolMax,
+    utilization: poolMax > 0 ? Math.round((active / poolMax) * 100) : 0,
+  };
 }
 
 export async function shutdownPool(): Promise<void> {

@@ -2,12 +2,16 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../../middleware/error-handler";
 import { ERROR_MESSAGES } from "../../lib/constants";
+import { cacheGet, cacheSet, cacheInvalidate } from "../../lib/cache";
 import {
   getNotificationLogs,
   getNotificationTemplate,
   updateNotificationTemplate,
   getTrackingNotificationLogs,
 } from "../../services/notification.service";
+
+const NOTIF_TEMPLATE_KEY = "settings:notif-template";
+const NOTIF_TEMPLATE_TTL = 300_000;
 
 const notificationTemplateSchema = z.object({
   template: z.string().trim().min(1, "Şablon metni gerekli"),
@@ -25,8 +29,15 @@ router.get("/kesim-alanlari/:id/notification-logs", asyncHandler(async (req, res
 }));
 
 router.get("/settings/notification-template", asyncHandler(async (_req, res) => {
+  const cached = cacheGet<{ template: string }>(NOTIF_TEMPLATE_KEY);
+  if (cached) {
+    res.json(cached);
+    return;
+  }
   const result = await getNotificationTemplate();
-  res.json({ template: result.template });
+  const data = { template: result.template };
+  cacheSet(NOTIF_TEMPLATE_KEY, data, NOTIF_TEMPLATE_TTL);
+  res.json(data);
 }));
 
 router.put("/settings/notification-template", asyncHandler(async (req, res) => {
@@ -36,6 +47,7 @@ router.put("/settings/notification-template", asyncHandler(async (req, res) => {
     return;
   }
   const result = await updateNotificationTemplate(parsed.data.template);
+  cacheInvalidate(NOTIF_TEMPLATE_KEY);
   res.json({ success: result.success, template: result.template });
 }));
 

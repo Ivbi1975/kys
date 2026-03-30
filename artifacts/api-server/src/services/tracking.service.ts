@@ -16,6 +16,7 @@ import crypto from "crypto";
 import { cacheInvalidatePrefix } from "../lib/cache";
 import { NoteType } from "../lib/constants";
 import { serviceError, serviceOk } from "./result";
+import { logger } from "../lib/logger";
 import { KA_LIST_CACHE_KEY, requireActiveKesimAlani, createNotificationLogs } from "./kesim-alani.service";
 
 export async function generateTrackingToken(kesimAlaniId: string) {
@@ -321,7 +322,7 @@ export async function approveEditRequest(kesimAlaniId: string, noteId: string, s
       const siraIndex = siraMatch ? parseInt(siraMatch[1], 10) - 1 : -1;
 
       if (siraIndex < 0 || siraIndex >= 7) {
-        console.warn(`Edit request approval: could not parse slot index from content "${note.content}" (noteId=${noteId})`);
+        logger.warn({ noteId, content: note.content }, "Edit request approval: could not parse slot index");
       }
 
       if (siraIndex >= 0 && siraIndex < 7) {

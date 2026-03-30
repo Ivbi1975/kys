@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { cacheStats } from "../lib/cache";
-import { pool } from "@workspace/db";
+import { pool, getPoolStats } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -16,13 +16,8 @@ router.get("/healthz", async (_req, res) => {
     dbOk = false;
   }
 
-  const poolStats = {
-    total: pool.totalCount,
-    idle: pool.idleCount,
-    active: pool.totalCount - pool.idleCount,
-    waiting: pool.waitingCount,
-  };
-
+  const poolStats = getPoolStats();
+  const cache = cacheStats();
   const status = dbOk ? "ok" : "degraded";
   const statusCode = dbOk ? 200 : 503;
 
@@ -33,7 +28,9 @@ router.get("/healthz", async (_req, res) => {
       latencyMs: dbLatencyMs,
       pool: poolStats,
     },
+    cache,
     uptime: Math.floor(process.uptime()),
+    memoryMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
   });
 });
 

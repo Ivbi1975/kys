@@ -8,7 +8,7 @@ import { asyncHandler } from "../middleware/error-handler";
 import { ERROR_MESSAGES } from "../lib/constants";
 
 const TAGS_CACHE_KEY = "tags:list";
-const TAGS_TTL = 60_000;
+const TAGS_TTL = 300_000;
 
 const router: IRouter = Router();
 

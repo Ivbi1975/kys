@@ -7,7 +7,7 @@ import { cacheGet, cacheSet, cacheInvalidate } from "../lib/cache";
 import { asyncHandler } from "../middleware/error-handler";
 
 const LOGO_CACHE_KEY = "settings:logo";
-const LOGO_TTL = 120_000;
+const LOGO_TTL = 600_000;
 
 const router: IRouter = Router();
 
