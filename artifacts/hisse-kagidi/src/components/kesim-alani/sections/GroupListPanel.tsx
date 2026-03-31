@@ -31,7 +31,7 @@ export function GroupListPanel() {
     currentGroupMatches, deleteAnimalGroup, donorListVisible,
     dragItem, dragOverGroup, dragOverItem, effectiveColumnCount, enhancedRemoveFromGroup,
     expandAll, filteredGroupItems,
-    fullscreenMode, groupRows,
+    fullscreenMode, groupCinsFilter, groupRows,
     groupSearchMatchIdx, groupSearchQuery, groupsHeaderRef, groupsScrollTopRef,
     groupsVirtuosoRef, handleAssignTeam, handleColumnDragEnd,
     handleColumnDragOver, handleColumnDragStart, handleColumnDrop,
@@ -44,11 +44,12 @@ export function GroupListPanel() {
     scrollContainerRef, scrollToAnimalGroup, selectedGroupDonations,
     selectedGroupIds, setBulkGroupEditField, setBulkGroupEditOpen,
     setBulkGroupEditValue, setBulkMoveTargetGroup, setColorTagFilter, setConflicts,
-    setDonorListVisible, setFullscreenMode,
+    setDonorListVisible, setFullscreenMode, setGroupCinsFilter,
     setGroupSearchMatchIdx, setGroupSearchQuery, setHighlightIncomplete,
     setJumpDialogOpen, setPersonEditDesc,
     setSelectedGroupDonations, setSelectedGroupIds, setShowConflicts, setShowOnlyIncomplete,
     showOnlyIncomplete, startFilterTransition, swapSelection,
+    uniqueGroupDonationTypes,
     toggleGroupCollapse, toggleGroupDonationSelect, toggleGroupLock, toggleGroupSelect,
     updateGroupDonation, updateGroupNotes, workspace, addGroupToBasket,
     addWholeAnimalToBasket, basketAnimalGroupIds,
@@ -220,6 +221,32 @@ export function GroupListPanel() {
             <Button variant={showOnlyIncomplete ? "default" : "outline"} size="sm" className="h-7 text-xs" onClick={() => startFilterTransition(() => setShowOnlyIncomplete(!showOnlyIncomplete))} title="Sadece eksik grupları göster"><Filter className="w-3 h-3 mr-1" />Eksik</Button>
             <Button variant={highlightIncomplete ? "default" : "outline"} size="sm" className="h-7 text-xs" onClick={() => startFilterTransition(() => setHighlightIncomplete(!highlightIncomplete))} title="Eksik grupları vurgula"><AlertTriangle className="w-3 h-3 mr-1" />Vurgula</Button>
           </div>
+          {uniqueGroupDonationTypes.length > 0 && (
+            <div className="flex items-center gap-1 border-l pl-2 ml-1 flex-wrap">
+              <span className="text-xs text-muted-foreground mr-0.5">Cins:</span>
+              <button
+                onClick={() => startFilterTransition(() => setGroupCinsFilter(new Set()))}
+                className={`text-xs px-2 py-0.5 rounded border ${groupCinsFilter.size === 0 ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+              >Tümü</button>
+              {uniqueGroupDonationTypes.map(t => {
+                const isActive = groupCinsFilter.has(t);
+                return (
+                  <button
+                    key={t}
+                    onClick={() => startFilterTransition(() => {
+                      setGroupCinsFilter(prev => {
+                        const next = new Set(prev);
+                        if (next.has(t)) next.delete(t);
+                        else next.add(t);
+                        return next;
+                      });
+                    })}
+                    className={`text-xs px-2 py-0.5 rounded border ${isActive ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                  >{t}</button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

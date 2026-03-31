@@ -50,6 +50,7 @@ export function useKesimAlaniState() {
   const { runGrouping, runIncrementalGrouping, cancelGrouping } = useGroupingWorker();
 
   const [colorTagFilter, setColorTagFilter] = useState<ColorTag | "all">("all");
+  const [groupCinsFilter, setGroupCinsFilter] = useState<Set<string>>(new Set());
   const [jumpDialogOpen, setJumpDialogOpen] = useState(false);
   const [jumpToAnimal, setJumpToAnimal] = useState("");
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
@@ -443,6 +444,18 @@ export function useKesimAlaniState() {
 
   const currentGroupMatches = useMemo(() => animalGroupsHook.groupSearchMatches(), [animalGroupsHook.groupSearchMatches]);
 
+  const uniqueGroupDonationTypes = useMemo(() => {
+    if (!kesim) return [];
+    const types = new Set<string>();
+    for (const group of kesim.animalGroups) {
+      for (const d of group.donations) {
+        const t = d.donationType?.trim();
+        if (t) types.add(t);
+      }
+    }
+    return Array.from(types).sort((a, b) => trCollator.compare(a, b));
+  }, [kesim?.animalGroups]);
+
   const filteredGroupItems = useMemo(() => {
     if (!kesim) return [];
     return kesim.animalGroups
@@ -457,9 +470,16 @@ export function useKesimAlaniState() {
           const filled = group.donations.filter((d) => d.name.trim() !== "").length;
           if (filled >= MAX_SHARES_PER_ANIMAL) return false;
         }
+        if (groupCinsFilter.size > 0) {
+          const hasMatchingType = group.donations.some(d => {
+            const t = d.donationType?.trim();
+            return t && groupCinsFilter.has(t);
+          });
+          if (!hasMatchingType) return false;
+        }
         return true;
       });
-  }, [kesim?.animalGroups, colorTagFilter, filterTeam, showOnlyIncomplete]);
+  }, [kesim?.animalGroups, colorTagFilter, filterTeam, showOnlyIncomplete, groupCinsFilter]);
 
   const effectiveColumnCount = workspace?.prefs?.columnCount ?? 1;
 
@@ -627,6 +647,7 @@ export function useKesimAlaniState() {
     filteredDonations,
     filteredGroupItems,
     fullscreenMode,
+    groupCinsFilter,
     getAvailableGroupsForDonor,
     getSwapSuggestions,
     globalTags,
@@ -710,6 +731,7 @@ export function useKesimAlaniState() {
     setBulkReviewRows,
     setBulkStep,
     setColorTagFilter,
+    setGroupCinsFilter,
     setColumnMappings,
     setCsvExporting,
     setDebouncedSearchQuery,
@@ -800,6 +822,7 @@ export function useKesimAlaniState() {
     ungroupedDonors,
     ungroupedShareCount,
     uniqueDonationTypes,
+    uniqueGroupDonationTypes,
     virtuosoTableComponents,
     workspace,
     COLUMN_OPTIONS,
