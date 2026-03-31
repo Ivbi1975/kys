@@ -314,9 +314,18 @@ function packLeftoversByType(remainders: DonorUnit[]): GroupedSegment[][] {
     typeGroups.get(dtype)!.push(u);
   }
 
-  const sortedTypes = Array.from(typeGroups.entries()).sort(
-    (a, b) => getDonationTypePriority(a[0]) - getDonationTypePriority(b[0])
-  );
+  const typeShareCounts = new Map<string, number>();
+  for (const [dtype, typeUnits] of typeGroups) {
+    let total = 0;
+    for (const u of typeUnits) total += u.totalShares;
+    typeShareCounts.set(dtype, total);
+  }
+
+  const sortedTypes = Array.from(typeGroups.entries()).sort((a, b) => {
+    const countDiff = (typeShareCounts.get(b[0]) || 0) - (typeShareCounts.get(a[0]) || 0);
+    if (countDiff !== 0) return countDiff;
+    return getDonationTypePriority(a[0]) - getDonationTypePriority(b[0]);
+  });
 
   const allQueue: { unit: DonorUnit; type: string }[] = [];
   for (const [dtype, typeUnits] of sortedTypes) {
