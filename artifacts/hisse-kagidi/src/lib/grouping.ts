@@ -170,11 +170,11 @@ function getDonationTypePriority(t: string): number {
 
 function getDominantDonationType(unit: DonorUnit): string {
   if (unit.donations.length === 0) {
-    return normalizeDonationType(unit.templateDonation.donationType);
+    return canonicalizeDonationType(unit.templateDonation.donationType);
   }
   const typeCounts = new Map<string, number>();
   for (const d of unit.donations) {
-    const t = normalizeDonationType(d.donationType);
+    const t = canonicalizeDonationType(d.donationType);
     typeCounts.set(t, (typeCounts.get(t) || 0) + 1);
   }
   let maxCount = 0;
@@ -276,12 +276,12 @@ function getSegmentGroupDominantType(segments: GroupedSegment[]): string {
   const typeCounts = new Map<string, number>();
   for (const seg of segments) {
     for (const d of seg.donations) {
-      const t = normalizeDonationType(d.donationType);
+      const t = canonicalizeDonationType(d.donationType);
       typeCounts.set(t, (typeCounts.get(t) || 0) + 1);
     }
     const extraSlots = seg.shares - seg.donations.length;
     if (extraSlots > 0) {
-      const t = normalizeDonationType(seg.templateDonation.donationType);
+      const t = canonicalizeDonationType(seg.templateDonation.donationType);
       typeCounts.set(t, (typeCounts.get(t) || 0) + extraSlots);
     }
   }
