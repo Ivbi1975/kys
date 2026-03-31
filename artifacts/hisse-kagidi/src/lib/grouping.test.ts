@@ -249,3 +249,85 @@ describe("checkGroupConflicts", () => {
     expect(conflicts[0].totalShares).toBe(8);
   });
 });
+
+describe("donation type based grouping and sorting", () => {
+  it("sorts donors within an animal by donationType priority then surname", () => {
+    const donations = [
+      makeDonation({ description: "Zeynep Ak", donationType: "Adak" }),
+      makeDonation({ description: "Ali Bal", donationType: "Vacip" }),
+      makeDonation({ description: "Can Dere", donationType: "Akika" }),
+      makeDonation({ description: "Deniz Yıl", donationType: "Vacip" }),
+      makeDonation({ description: "Elif Su", donationType: "Adak" }),
+    ];
+    const groups = autoGroupDonations(donations);
+    expect(groups.length).toBe(1);
+    const filled = groups[0].donations.filter(d => d.description.trim());
+    const types = filled.map(d => d.donationType);
+    const vacipIdx = types.indexOf("Vacip");
+    const adakIdx = types.indexOf("Adak");
+    const akikaIdx = types.indexOf("Akika");
+    expect(vacipIdx).toBeLessThan(adakIdx);
+    expect(adakIdx).toBeLessThan(akikaIdx);
+  });
+
+  it("groups same-type donors together in animals when possible", () => {
+    const donations = [
+      ...Array.from({ length: 5 }, (_, i) => makeDonation({ description: `Vacip Kişi ${i}`, donationType: "Vacip" })),
+      ...Array.from({ length: 5 }, (_, i) => makeDonation({ description: `Adak Kişi ${i}`, donationType: "Adak" })),
+      ...Array.from({ length: 4 }, (_, i) => makeDonation({ description: `Akika Kişi ${i}`, donationType: "Akika" })),
+    ];
+    const groups = autoGroupDonations(donations);
+    expect(groups.length).toBe(2);
+
+    const firstFilled = groups[0].donations.filter(d => d.description.trim());
+    const vacipInFirst = firstFilled.filter(d => d.donationType === "Vacip").length;
+    expect(vacipInFirst).toBeGreaterThanOrEqual(4);
+
+    const secondFilled = groups[1].donations.filter(d => d.description.trim());
+    const adakInSecond = secondFilled.filter(d => d.donationType === "Adak").length;
+    const akikaInSecond = secondFilled.filter(d => d.donationType === "Akika").length;
+    expect(adakInSecond + akikaInSecond).toBeGreaterThanOrEqual(5);
+  });
+
+  it("sorts animals by dominant donation type priority", () => {
+    const donations = [
+      ...Array.from({ length: 7 }, (_, i) => makeDonation({ description: `Adak Kişi ${i}`, donationType: "Adak" })),
+      ...Array.from({ length: 7 }, (_, i) => makeDonation({ description: `Vacip Kişi ${i}`, donationType: "Vacip" })),
+    ];
+    const groups = autoGroupDonations(donations);
+    expect(groups.length).toBe(2);
+
+    const firstGroupTypes = groups[0].donations.filter(d => d.description.trim()).map(d => d.donationType);
+    const secondGroupTypes = groups[1].donations.filter(d => d.description.trim()).map(d => d.donationType);
+
+    expect(firstGroupTypes.every(t => t === "Vacip")).toBe(true);
+    expect(secondGroupTypes.every(t => t === "Adak")).toBe(true);
+  });
+
+  it("keeps partial same-type donors together instead of mixing", () => {
+    const donations = [
+      ...Array.from({ length: 5 }, (_, i) => makeDonation({ description: `Vacip ${i}`, donationType: "Vacip" })),
+      makeDonation({ description: "Adak 1", donationType: "Adak" }),
+      makeDonation({ description: "Mevta 1", donationType: "Mevta" }),
+    ];
+    const groups = autoGroupDonations(donations);
+    expect(groups.length).toBe(1);
+
+    const filled = groups[0].donations.filter(d => d.description.trim());
+    const vacipCount = filled.filter(d => d.donationType === "Vacip").length;
+    expect(vacipCount).toBe(5);
+  });
+
+  it("handles mixed types with vacip dominant correctly", () => {
+    const donations = [
+      ...Array.from({ length: 4 }, (_, i) => makeDonation({ description: `Vacip ${i}`, donationType: "Vacip" })),
+      ...Array.from({ length: 4 }, (_, i) => makeDonation({ description: `Adak ${i}`, donationType: "Adak" })),
+      ...Array.from({ length: 3 }, (_, i) => makeDonation({ description: `Akika ${i}`, donationType: "Akika" })),
+      makeDonation({ description: "Mevta 1", donationType: "Mevta" }),
+      ...Array.from({ length: 2 }, (_, i) => makeDonation({ description: `Mevta Ek ${i}`, donationType: "Mevta" })),
+    ];
+    const groups = autoGroupDonations(donations);
+    expect(groups.length).toBe(2);
+    groups.forEach(g => expect(g.donations.length).toBe(7));
+  });
+});

@@ -73,8 +73,12 @@ function buildGroupDonations(segments: GroupedSegment[]): Donation[] {
   const filledKeys = filled.map(d => ({
     d,
     surname: getSurname(d.description || d.name),
+    typePriority: getDonationTypePriority(d.donationType),
   }));
-  filledKeys.sort((a, b) => trCollator.compare(a.surname, b.surname));
+  filledKeys.sort((a, b) => {
+    if (a.typePriority !== b.typePriority) return a.typePriority - b.typePriority;
+    return trCollator.compare(a.surname, b.surname);
+  });
   const sorted: Donation[] = [...filledKeys.map(k => k.d), ...empty];
 
   while (sorted.length < 7) {
@@ -145,6 +149,19 @@ function normalizeDonationType(t: string): string {
   return (t || "").trim().toUpperCase();
 }
 
+const DONATION_TYPE_PRIORITY: string[] = [
+  "VACİP", "VACIP", "VACİB", "VACIB",
+  "ADAK",
+  "AKİKA", "AKIKA",
+  "MEVTA", "MEVTA KURBANI",
+];
+
+function getDonationTypePriority(t: string): number {
+  const normalized = normalizeDonationType(t);
+  const idx = DONATION_TYPE_PRIORITY.indexOf(normalized);
+  return idx >= 0 ? idx : DONATION_TYPE_PRIORITY.length;
+}
+
 function getDominantDonationType(unit: DonorUnit): string {
   if (unit.donations.length === 0) {
     return normalizeDonationType(unit.templateDonation.donationType);
@@ -157,7 +174,7 @@ function getDominantDonationType(unit: DonorUnit): string {
   let maxCount = 0;
   let dominant = "";
   for (const [t, c] of typeCounts) {
-    if (c > maxCount) {
+    if (c > maxCount || (c === maxCount && getDonationTypePriority(t) < getDonationTypePriority(dominant))) {
       maxCount = c;
       dominant = t;
     }
@@ -305,6 +322,117 @@ function packLeftovers(remainders: DonorUnit[]): GroupedSegment[][] {
   return animals;
 }
 
+function getSegmentGroupDominantType(segments: GroupedSegment[]): string {
+  const typeCounts = new Map<string, number>();
+  for (const seg of segments) {
+    for (const d of seg.donations) {
+      const t = normalizeDonationType(d.donationType);
+      typeCounts.set(t, (typeCounts.get(t) || 0) + 1);
+    }
+    const extraSlots = seg.shares - seg.donations.length;
+    if (extraSlots > 0) {
+      const t = normalizeDonationType(seg.templateDonation.donationType);
+      typeCounts.set(t, (typeCounts.get(t) || 0) + extraSlots);
+    }
+  }
+  let maxCount = 0;
+  let dominant = "";
+  for (const [t, c] of typeCounts) {
+    if (c > maxCount || (c === maxCount && getDonationTypePriority(t) < getDonationTypePriority(dominant))) {
+      maxCount = c;
+      dominant = t;
+    }
+  }
+  return dominant;
+}
+
+function sortAnimalsByDominantType(animals: GroupedSegment[][]): GroupedSegment[][] {
+  return [...animals].sort((a, b) => {
+    const typeA = getSegmentGroupDominantType(a);
+    const typeB = getSegmentGroupDominantType(b);
+    return getDonationTypePriority(typeA) - getDonationTypePriority(typeB);
+  });
+}
+
+function packLeftoversByType(remainders: DonorUnit[]): GroupedSegment[][] {
+  if (remainders.length === 0) return [];
+
+  const typeGroups = new Map<string, DonorUnit[]>();
+  for (const u of remainders) {
+    const dtype = getDominantDonationType(u);
+    if (!typeGroups.has(dtype)) typeGroups.set(dtype, []);
+    typeGroups.get(dtype)!.push(u);
+  }
+
+  const sortedTypes = Array.from(typeGroups.entries()).sort(
+    (a, b) => getDonationTypePriority(a[0]) - getDonationTypePriority(b[0])
+  );
+
+  const allQueue: { unit: DonorUnit; type: string }[] = [];
+  for (const [dtype, typeUnits] of sortedTypes) {
+    for (const u of typeUnits) {
+      allQueue.push({ unit: { ...u, donations: [...u.donations] }, type: dtype });
+    }
+  }
+
+  const animals: GroupedSegment[][] = [];
+
+  while (allQueue.length > 0) {
+    const anchorType = allQueue[0].type;
+
+    const segments: GroupedSegment[] = [];
+    let remaining = 7;
+
+    let i = 0;
+    while (i < allQueue.length && remaining > 0) {
+      if (allQueue[i].type === anchorType) {
+        const entry = allQueue[i];
+        if (entry.unit.totalShares <= remaining) {
+          segments.push({ templateDonation: entry.unit.templateDonation, donations: entry.unit.donations, shares: entry.unit.totalShares });
+          remaining -= entry.unit.totalShares;
+          allQueue.splice(i, 1);
+        } else {
+          const splitShares = remaining;
+          const splitDonationCount = Math.min(entry.unit.donations.length, splitShares);
+          segments.push({ templateDonation: entry.unit.templateDonation, donations: entry.unit.donations.slice(0, splitDonationCount), shares: splitShares });
+          entry.unit.donations = entry.unit.donations.slice(splitDonationCount);
+          entry.unit.totalShares -= splitShares;
+          remaining = 0;
+        }
+      } else {
+        i++;
+      }
+    }
+
+    if (remaining > 0) {
+      let j = 0;
+      while (j < allQueue.length && remaining > 0) {
+        const entry = allQueue[j];
+        if (entry.unit.totalShares <= remaining) {
+          segments.push({ templateDonation: entry.unit.templateDonation, donations: entry.unit.donations, shares: entry.unit.totalShares });
+          remaining -= entry.unit.totalShares;
+          allQueue.splice(j, 1);
+        } else {
+          const splitShares = remaining;
+          const splitDonationCount = Math.min(entry.unit.donations.length, splitShares);
+          segments.push({ templateDonation: entry.unit.templateDonation, donations: entry.unit.donations.slice(0, splitDonationCount), shares: splitShares });
+          entry.unit.donations = entry.unit.donations.slice(splitDonationCount);
+          entry.unit.totalShares -= splitShares;
+          remaining = 0;
+        }
+      }
+    }
+
+    if (segments.length > 0) {
+      animals.push(segments);
+    } else {
+      break;
+    }
+  }
+
+  return animals;
+}
+
 function mod7GroupDonations(donations: Donation[]): GroupedSegment[][] {
   const units = prepareDonorUnits(donations);
   if (units.length === 0) return [];
@@ -323,7 +451,9 @@ function mod7GroupDonations(donations: Donation[]): GroupedSegment[][] {
   const sameTypeAnimals: GroupedSegment[][] = [];
   const allTypeLeftovers: DonorUnit[] = [];
 
-  const sortedTypes = Array.from(typeGroups.entries()).sort((a, b) => b[1].length - a[1].length);
+  const sortedTypes = Array.from(typeGroups.entries()).sort(
+    (a, b) => getDonationTypePriority(a[0]) - getDonationTypePriority(b[0])
+  );
   for (const [, typeUnits] of sortedTypes) {
     const { animals, leftover } = tryFlexibleMatch(typeUnits);
     sameTypeAnimals.push(...animals);
@@ -332,9 +462,11 @@ function mod7GroupDonations(donations: Donation[]): GroupedSegment[][] {
 
   const { animals: mixedAnimals, leftover: afterMixed } = tryFlexibleMatch(allTypeLeftovers);
 
-  const leftoverAnimals = packLeftovers(afterMixed);
+  const leftoverAnimals = packLeftoversByType(afterMixed);
 
-  return [...fullAnimals, ...sameTypeAnimals, ...mixedAnimals, ...leftoverAnimals];
+  const allAnimals = [...fullAnimals, ...sameTypeAnimals, ...mixedAnimals, ...leftoverAnimals];
+
+  return sortAnimalsByDominantType(allAnimals);
 }
 
 export function autoGroupDonations(donations: Donation[]): AnimalGroup[] {
