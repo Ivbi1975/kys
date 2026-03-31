@@ -115,13 +115,18 @@ export function useKesimAlaniState() {
     [saveToApi, debouncedSaveToApi, discardPendingSave, history]
   );
 
-  const importExport = useImportExport({ kesim, save, toast });
+  const addSelectedToBasketRef = useRef<((ids: Set<string>) => void) | undefined>(undefined);
+  const importExport = useImportExport({ kesim, save, toast, siblingKesimAlanlari, addSelectedToBasket: (...args) => addSelectedToBasketRef.current?.(...args) });
   const {
     bulkDialogOpen, setBulkDialogOpen, bulkMode, setBulkMode, pasteText, setPasteText,
     previewData, setPreviewData, columnMappings, setColumnMappings, hasHeaderRow, setHasHeaderRow,
     bulkStep, setBulkStep, bulkReviewRows, setBulkReviewRows, bulkReviewExpanded, setBulkReviewExpanded,
-    csvExporting, setCsvExporting, donorListReportOpen, setDonorListReportOpen, fileInputRef,
-    handleFileUpload, handlePasteData, processRawData, applyBulkImport, resetBulkDialog,
+    csvExporting, setCsvExporting, donorListReportOpen, setDonorListReportOpen,
+    bulkReviewTransferTarget, setBulkReviewTransferTarget, bulkReviewTransferring,
+    fileInputRef,
+    handleFileUpload, handlePasteData, processRawData, applyBulkImport,
+    addReviewRowsToBasket, transferReviewRowsToKesimAlani,
+    resetBulkDialog,
     exportDonorsExcel, exportGroupsExcel, handleExportKaCsv, displayPreviewRows, headerRow,
     COLUMN_OPTIONS,
   } = importExport;
@@ -296,6 +301,8 @@ export function useKesimAlaniState() {
     isGroupLocked,
     siblingKesimAlanlari,
   });
+
+  addSelectedToBasketRef.current = basket.addSelectedToBasket;
 
   const teams = useTeams({ kesim, setKesim, toast, setFilterTeam });
   const trash = useTrash({ kesim, setKesim, toast, history });
@@ -606,12 +613,15 @@ export function useKesimAlaniState() {
     removedFromGroupIds,
     isGroupLocked,
     addSelectedToBasket: () => basket.addSelectedToBasket(selectedIds),
+    addReviewRowsToBasket,
     applyBulkImport,
     availableAiCategories,
     bulkDialogOpen,
     bulkMode,
     bulkReviewExpanded,
     bulkReviewRows,
+    bulkReviewTransferTarget,
+    bulkReviewTransferring,
     bulkStep,
     cancelGrouping,
     clearAdvancedFilters,
@@ -729,6 +739,7 @@ export function useKesimAlaniState() {
     setBulkMode,
     setBulkReviewExpanded,
     setBulkReviewRows,
+    setBulkReviewTransferTarget,
     setBulkStep,
     setColorTagFilter,
     setGroupCinsFilter,
@@ -816,6 +827,7 @@ export function useKesimAlaniState() {
     toggleFullscreen,
     toggleTheme,
     totalShares,
+    transferReviewRowsToKesimAlani,
     trackingNotes,
     trackingNotesLoading,
     trackingNotesOpen,

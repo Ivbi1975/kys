@@ -2,18 +2,22 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, ClipboardPaste, FileSpreadsheet, Settings2, Upload } from "lucide-react";
+import { AlertTriangle, ClipboardPaste, FileSpreadsheet, Loader2, MoveRight, Settings2, ShoppingBag, Upload } from "lucide-react";
 import type { ColumnMapping } from "../hooks/useImportExport";
 import { useKesimAlaniContext } from "../KesimAlaniContext";
 
 export function BulkImportDialog() {
   const {
-    applyBulkImport, bulkDialogOpen, bulkMode, bulkReviewExpanded, bulkReviewRows,
+    addReviewRowsToBasket, applyBulkImport, bulkDialogOpen, bulkMode, bulkReviewExpanded, bulkReviewRows,
+    bulkReviewTransferTarget, bulkReviewTransferring, setBulkReviewTransferTarget,
     bulkStep, COLUMN_OPTIONS, columnMappings, displayPreviewRows, fileInputRef,
     handleFileUpload, handlePasteData, hasHeaderRow, headerRow, pasteText,
     resetBulkDialog, setBulkDialogOpen, setBulkMode, setBulkReviewExpanded,
     setBulkReviewRows, setBulkStep, setColumnMappings, setHasHeaderRow, setPasteText,
+    siblingKesimAlanlari, transferReviewRowsToKesimAlani,
   } = useKesimAlaniContext();
+
+  const selectedCount = bulkReviewRows.filter(r => r.selected).length;
 
   return (
     <Dialog open={bulkDialogOpen} onOpenChange={(open) => { if (!open) resetBulkDialog(); else setBulkDialogOpen(true); }}>
@@ -122,6 +126,42 @@ export function BulkImportDialog() {
                   })}
                 </div>
               </div>
+
+              {selectedCount > 0 && (
+                <div className="border rounded-lg p-3 mt-3 bg-muted/30 flex-shrink-0 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">{selectedCount} seçili satır için işlem:</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button variant="outline" size="sm" onClick={addReviewRowsToBasket}>
+                      <ShoppingBag className="w-3.5 h-3.5 mr-1" />
+                      Sepete Ekle
+                    </Button>
+                    {siblingKesimAlanlari.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <Select value={bulkReviewTransferTarget} onValueChange={setBulkReviewTransferTarget}>
+                          <SelectTrigger className="h-8 text-xs flex-1 min-w-[160px]">
+                            <SelectValue placeholder="Kesim listesi seçin..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {siblingKesimAlanlari.map(ka => (
+                              <SelectItem key={ka.id} value={ka.id}>{ka.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={transferReviewRowsToKesimAlani}
+                          disabled={!bulkReviewTransferTarget || bulkReviewTransferring}
+                        >
+                          {bulkReviewTransferring ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <MoveRight className="w-3.5 h-3.5 mr-1" />}
+                          Listeye Aktar
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-2 pt-4 flex-shrink-0">
                 <Button variant="outline" onClick={() => setBulkStep("mapping")} className="flex-1">Geri</Button>
                 <Button onClick={applyBulkImport} className="flex-1">

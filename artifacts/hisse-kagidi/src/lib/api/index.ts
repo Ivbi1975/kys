@@ -22,6 +22,7 @@ export {
   createKesimAlani,
   apiUpdateKesimAlani,
   apiUpdateBulkAnimalGroups,
+  apiCreateDonation,
   apiUpdateSingleDonation,
   apiUpdateSingleGroup,
   apiDeleteAnimalGroup,

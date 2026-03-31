@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { produce } from "immer";
 import type { KesimAlani, Donation } from "@/lib/types";
-import { downloadCsvExport } from "@/lib/api";
+import { downloadCsvExport, apiCreateDonation } from "@/lib/api";
 
 export type ColumnMapping = "name" | "description" | "donationType" | "shareCount" | "vekalet" | "notes" | "skip";
 
@@ -25,9 +25,11 @@ interface UseImportExportParams {
   kesim: KesimAlani | null;
   save: (data: KesimAlani, label?: string, forceImmediate?: boolean, saveType?: "full" | "donations" | "groups") => void;
   toast: (opts: { title: string; description?: string; variant?: "destructive" }) => void;
+  siblingKesimAlanlari: { id: string; name: string }[];
+  addSelectedToBasket?: (ids: Set<string>) => void;
 }
 
-export function useImportExport({ kesim, save, toast }: UseImportExportParams) {
+export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addSelectedToBasket }: UseImportExportParams) {
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [bulkMode, setBulkMode] = useState<"upload" | "paste">("upload");
   const [pasteText, setPasteText] = useState("");
@@ -39,6 +41,9 @@ export function useImportExport({ kesim, save, toast }: UseImportExportParams) {
   const [bulkReviewExpanded, setBulkReviewExpanded] = useState<Set<string>>(new Set());
   const [csvExporting, setCsvExporting] = useState(false);
   const [donorListReportOpen, setDonorListReportOpen] = useState(false);
+  const [bulkReviewTransferTarget, setBulkReviewTransferTarget] = useState("");
+  const [bulkReviewTransferring, setBulkReviewTransferring] = useState(false);
+  const [bulkReviewHandledIdxs, setBulkReviewHandledIdxs] = useState<Set<number>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -133,7 +138,10 @@ export function useImportExport({ kesim, save, toast }: UseImportExportParams) {
       }
     }
 
-    const excludedIdxs = new Set(bulkReviewRows.filter(r => r.selected).map(r => r.idx));
+    const excludedIdxs = new Set([
+      ...bulkReviewRows.filter(r => r.selected).map(r => r.idx),
+      ...bulkReviewHandledIdxs,
+    ]);
 
     const newDonations: Donation[] = [];
     for (let r = startRow; r < previewData.length; r++) {
@@ -180,6 +188,130 @@ export function useImportExport({ kesim, save, toast }: UseImportExportParams) {
     resetBulkDialog();
   }
 
+  function buildDonationFromRow(row: string[]): Donation {
+    const donation: Partial<Donation> = {
+      id: generateId(),
+      name: "",
+      description: "",
+      donationType: "",
+      shareCount: 1,
+      vekalet: "",
+      notes: "",
+    };
+    for (let c = 0; c < columnMappings.length; c++) {
+      const mapping = columnMappings[c];
+      const cellValue = String(row[c] ?? "").trim();
+      if (mapping === "skip" || !cellValue) continue;
+      if (mapping === "shareCount") {
+        donation.shareCount = Math.max(1, Math.min(7, parseInt(cellValue, 10) || 1));
+      } else if (mapping === "name") {
+        donation.name = cellValue;
+      } else if (mapping === "description") {
+        donation.description = cellValue;
+      } else if (mapping === "donationType") {
+        donation.donationType = cellValue;
+      } else if (mapping === "vekalet") {
+        donation.vekalet = cellValue;
+      } else if (mapping === "notes") {
+        donation.notes = cellValue;
+      }
+    }
+    return donation as Donation;
+  }
+
+  function addReviewRowsToBasket() {
+    if (!kesim || !addSelectedToBasket) return;
+    const selectedRows = bulkReviewRows.filter(r => r.selected);
+    if (selectedRows.length === 0) {
+      toast({ title: "Seçili satır yok", description: "Sepete eklemek için satır seçin.", variant: "destructive" });
+      return;
+    }
+    const newDonations: Donation[] = [];
+    for (const item of selectedRows) {
+      const donation = buildDonationFromRow(item.row);
+      if (donation.name) newDonations.push(donation);
+    }
+    if (newDonations.length === 0) {
+      toast({ title: "Geçerli satır yok", description: "Seçilen satırlarda isim bulunamadı.", variant: "destructive" });
+      return;
+    }
+    const updated = produce(kesim, (draft) => {
+      draft.donations.push(...newDonations);
+    });
+    save(updated, `${newDonations.length} bağışçı eklendi (sepete)`, true, "donations");
+    const newIds = new Set(newDonations.map(d => d.id));
+    addSelectedToBasket(newIds);
+    const handledIdxs = selectedRows.map(r => r.idx);
+    setBulkReviewHandledIdxs(prev => {
+      const next = new Set(prev);
+      for (const idx of handledIdxs) next.add(idx);
+      return next;
+    });
+    setBulkReviewRows(prev => prev.filter(r => !handledIdxs.includes(r.idx)));
+    toast({ title: `${newDonations.length} satır sepete eklendi` });
+  }
+
+  async function transferReviewRowsToKesimAlani() {
+    if (!bulkReviewTransferTarget) {
+      toast({ title: "Hedef kesim listesi seçin", variant: "destructive" });
+      return;
+    }
+    const selectedRows = bulkReviewRows.filter(r => r.selected);
+    if (selectedRows.length === 0) {
+      toast({ title: "Seçili satır yok", description: "Aktarmak için satır seçin.", variant: "destructive" });
+      return;
+    }
+    const newDonations: Donation[] = [];
+    for (const item of selectedRows) {
+      const donation = buildDonationFromRow(item.row);
+      if (donation.name) newDonations.push(donation);
+    }
+    if (newDonations.length === 0) {
+      toast({ title: "Geçerli satır yok", description: "Seçilen satırlarda isim bulunamadı.", variant: "destructive" });
+      return;
+    }
+    setBulkReviewTransferring(true);
+    const successIdxs: number[] = [];
+    try {
+      for (let i = 0; i < newDonations.length; i++) {
+        const d = newDonations[i];
+        try {
+          await apiCreateDonation(bulkReviewTransferTarget, {
+            id: d.id,
+            name: d.name,
+            description: d.description,
+            donationType: d.donationType,
+            shareCount: d.shareCount,
+            vekalet: d.vekalet,
+            notes: d.notes,
+          });
+          successIdxs.push(selectedRows[i].idx);
+        } catch (err) {
+          toast({
+            title: `"${d.name}" aktarılamadı`,
+            description: err instanceof Error ? err.message : "Bilinmeyen hata",
+            variant: "destructive",
+          });
+        }
+      }
+      if (successIdxs.length > 0) {
+        setBulkReviewHandledIdxs(prev => {
+          const next = new Set(prev);
+          for (const idx of successIdxs) next.add(idx);
+          return next;
+        });
+        setBulkReviewRows(prev => prev.filter(r => !successIdxs.includes(r.idx)));
+        const targetName = siblingKesimAlanlari.find(ka => ka.id === bulkReviewTransferTarget)?.name || "";
+        toast({ title: `${successIdxs.length} satır "${targetName}" listesine aktarıldı` });
+      }
+      if (successIdxs.length === newDonations.length) {
+        setBulkReviewTransferTarget("");
+      }
+    } finally {
+      setBulkReviewTransferring(false);
+    }
+  }
+
   function resetBulkDialog() {
     setBulkDialogOpen(false);
     setBulkStep("input");
@@ -190,6 +322,9 @@ export function useImportExport({ kesim, save, toast }: UseImportExportParams) {
     setHasHeaderRow(true);
     setBulkReviewRows([]);
     setBulkReviewExpanded(new Set());
+    setBulkReviewTransferTarget("");
+    setBulkReviewTransferring(false);
+    setBulkReviewHandledIdxs(new Set());
   }
 
   async function exportDonorsExcel() {
@@ -318,11 +453,16 @@ export function useImportExport({ kesim, save, toast }: UseImportExportParams) {
     setCsvExporting,
     donorListReportOpen,
     setDonorListReportOpen,
+    bulkReviewTransferTarget,
+    setBulkReviewTransferTarget,
+    bulkReviewTransferring,
     fileInputRef,
     handleFileUpload,
     handlePasteData,
     processRawData,
     applyBulkImport,
+    addReviewRowsToBasket,
+    transferReviewRowsToKesimAlani,
     resetBulkDialog,
     exportDonorsExcel,
     exportGroupsExcel,
@@ -330,5 +470,6 @@ export function useImportExport({ kesim, save, toast }: UseImportExportParams) {
     displayPreviewRows,
     headerRow,
     COLUMN_OPTIONS,
+    siblingKesimAlanlari,
   };
 }

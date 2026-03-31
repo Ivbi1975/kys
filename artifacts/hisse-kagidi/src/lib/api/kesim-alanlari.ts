@@ -115,6 +115,16 @@ export async function apiPermanentDeleteDonation(kesimAlaniId: string, donationI
   return apiFetch<{ success: boolean }>(`/kesim-alanlari/${kesimAlaniId}/donations/${donationId}?permanent=true`, { method: "DELETE" });
 }
 
+export async function apiCreateDonation(
+  kesimAlaniId: string,
+  donation: { id: string; name: string; description: string; donationType: string; shareCount: number; vekalet: string; notes: string }
+): Promise<unknown> {
+  return apiFetch(`/kesim-alanlari/${kesimAlaniId}/donations`, {
+    method: "POST",
+    body: JSON.stringify(donation),
+  });
+}
+
 export async function moveDonationsToKesimAlani(donationIds: string[], sourceKesimAlaniId: string, targetKesimAlaniId: string): Promise<{ success: boolean; count: number; skipped: number; movedIds: string[] }> {
   return apiFetch<{ success: boolean; count: number; skipped: number; movedIds: string[] }>("/kesim-alanlari/move-donations", {
     method: "POST",
