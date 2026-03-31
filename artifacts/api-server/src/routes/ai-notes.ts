@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { appSettingsTable, donationsTable, aiJobsTable } from "@workspace/db/schema";
-import { eq, inArray, lt, or } from "drizzle-orm";
+import { eq, lt, or, desc, and } from "drizzle-orm";
 import { z } from "zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import crypto from "crypto";
@@ -22,6 +22,14 @@ Notları analiz ederken:
 Kategoriler:
 {{CATEGORIES}}
 
+Kategori kuralları:
+- "3.gün": Notta "üçüncü gün kesilsin", "üçüncü gün", "3.gün", "seferi olacağım üçüncü gün kesilsin" gibi ifadeler varsa bu etiketi ata.
+- "2.gün": Notta "mutlaka 2.gün kesilecek", "2.gün", "ikinci gün", "3.gün seferi olacağım" (yani 3.gün seferi = 2.gün kesilmeli) gibi ifadeler varsa bu etiketi ata.
+- "erken_kesim": Notta "seferi olacağım ilk hayvanda kesilsin", "ilk hayvan", "birinci hayvan", "ılk hayvan", "erken kesim", "erkenden kesim", "yola çıkacağım", "mümkünse erkenden kesilsin", "sabah erken saatte kesilsin", "öğleden önce kesilsin", "geç kesim", "erken saat", "seferi" gibi ifadeler varsa bu etiketi ata. Zaman hassasiyeti olan tüm istekleri kapsar.
+- "özel_kesim": Notta belirli bir saat belirtiliyorsa (ör: "saat 10'da", "14:00'te"), özel zaman talebi varsa (ör: "öğleden sonra kesilsin", "akşama doğru") bu etiketi ata.
+- "Şafi": Notta "şafi", "şafi mezhebindeyim", "şafii", "safi", "safı" gibi ifadeler varsa bu etiketi ata VE uyarı olarak "Şafi mezhebine göre kesim gerekiyor" yaz. Bu önemli bir uyarıdır.
+- "Sünnet" bağış cinsi: Notta "sünnet", "sunnet" ifadesi geçerse, categories listesine "sünnet" ekle. Bu bir donationType (bağış cinsi) olarak değerlendirilmeli.
+
 Her bağışçı için JSON formatında yanıt ver:
 {
   "donationId": "...",
@@ -41,6 +49,12 @@ const DEFAULT_CATEGORIES = [
   "akika",
   "vacip",
   "nafile",
+  "3.gün",
+  "2.gün",
+  "erken_kesim",
+  "özel_kesim",
+  "Şafi",
+  "sünnet",
 ];
 
 async function getAiSettings(): Promise<{ prompt: string; categories: string[] }> {
@@ -157,14 +171,25 @@ router.post("/ai-notes/classify", asyncHandler(async (req, res) => {
   res.json({ results });
 }));
 
+const classifyAsyncSchema = z.object({
+  donations: z.array(z.object({
+    id: z.string(),
+    name: z.string().optional().default(""),
+    donationType: z.string().optional().default(""),
+    vekalet: z.string().optional().default(""),
+    notes: z.string().optional().default(""),
+  })).min(1).max(5000),
+  kesimAlaniId: z.string().optional(),
+});
+
 router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
-  const parsed = classifySchema.safeParse(req.body);
+  const parsed = classifyAsyncSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
 
-  const { donations } = parsed.data;
+  const { donations, kesimAlaniId } = parsed.data;
   const jobId = crypto.randomUUID();
 
   await db.insert(aiJobsTable).values({
@@ -172,6 +197,7 @@ router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
     status: AiJobStatus.PENDING,
     totalDonations: donations.length,
     processedDonations: 0,
+    ...(kesimAlaniId ? { kesimAlaniId } : {}),
   });
 
   res.status(202).json({ jobId, status: AiJobStatus.PENDING, totalDonations: donations.length });
@@ -182,6 +208,59 @@ router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
 }));
 
 const CHUNK_SIZE = 50;
+const PARALLEL_CHUNKS = 3;
+
+async function isJobCancelled(jobId: string): Promise<boolean> {
+  const [job] = await db.select({ status: aiJobsTable.status }).from(aiJobsTable).where(eq(aiJobsTable.id, jobId));
+  return !job || job.status === AiJobStatus.CANCELLED;
+}
+
+async function processOneChunk(
+  systemPrompt: string,
+  chunk: Array<{ id: string; name: string; donationType: string; vekalet: string; notes: string }>,
+  jobId: string,
+  chunkIndex: number,
+): Promise<unknown[]> {
+  const userContent = chunk.map(d => ({
+    donationId: d.id,
+    isim: d.name,
+    cinsi: d.donationType,
+    vekalet: d.vekalet,
+    not: d.notes,
+  }));
+
+  let retries = 3;
+  while (retries > 0) {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-5-mini",
+        max_completion_tokens: 8192,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: JSON.stringify(userContent) },
+        ],
+        response_format: { type: "json_object" },
+      });
+      const content = response.choices[0]?.message?.content || "{}";
+      return parseAiResults(content);
+    } catch (err) {
+      retries--;
+      if (retries === 0) {
+        logger.error({ err, jobId, chunk: chunkIndex + 1 }, "AI job chunk failed after 3 retries");
+        return chunk.map(d => ({
+          donationId: d.id,
+          categories: [],
+          requests: "",
+          warnings: "AI işlemi başarısız oldu",
+          summary: "",
+        }));
+      }
+      const delay = (4 - retries) * 2000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  return [];
+}
 
 async function processClassifyJob(
   jobId: string,
@@ -196,72 +275,53 @@ async function processClassifyJob(
     const systemPrompt = prompt.replace("{{CATEGORIES}}", categories.join(", "));
 
     const allResults: unknown[] = [];
-
+    const chunks: Array<{ id: string; name: string; donationType: string; vekalet: string; notes: string }>[] = [];
     for (let i = 0; i < donations.length; i += CHUNK_SIZE) {
-      const chunk = donations.slice(i, i + CHUNK_SIZE);
+      chunks.push(donations.slice(i, i + CHUNK_SIZE));
+    }
 
-      const userContent = chunk.map(d => ({
-        donationId: d.id,
-        isim: d.name,
-        cinsi: d.donationType,
-        vekalet: d.vekalet,
-        not: d.notes,
-      }));
+    let processedCount = 0;
 
-      let retries = 3;
-      let chunkResults: unknown[] = [];
-
-      while (retries > 0) {
-        try {
-          const response = await openai.chat.completions.create({
-            model: "gpt-5-mini",
-            max_completion_tokens: 8192,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: JSON.stringify(userContent) },
-            ],
-            response_format: { type: "json_object" },
-          });
-
-          const content = response.choices[0]?.message?.content || "{}";
-          chunkResults = parseAiResults(content);
-          break;
-        } catch (err) {
-          retries--;
-          if (retries === 0) {
-            logger.error({ err, jobId, chunk: i / CHUNK_SIZE + 1 }, "AI job chunk failed after 3 retries");
-            chunkResults = chunk.map(d => ({
-              donationId: d.id,
-              categories: [],
-              requests: "",
-              warnings: "AI işlemi başarısız oldu",
-              summary: "",
-            }));
-          } else {
-            const delay = (4 - retries) * 2000;
-            await new Promise(resolve => setTimeout(resolve, delay));
-          }
-        }
+    for (let i = 0; i < chunks.length; i += PARALLEL_CHUNKS) {
+      if (await isJobCancelled(jobId)) {
+        logger.info({ jobId }, "AI job cancelled by user");
+        return;
       }
 
-      allResults.push(...chunkResults);
+      const parallelChunks = chunks.slice(i, i + PARALLEL_CHUNKS);
+      const parallelResults = await Promise.all(
+        parallelChunks.map((chunk, idx) => processOneChunk(systemPrompt, chunk, jobId, i + idx))
+      );
+
+      for (const results of parallelResults) {
+        allResults.push(...results);
+      }
+
+      processedCount += parallelChunks.reduce((sum, c) => sum + c.length, 0);
+      processedCount = Math.min(processedCount, donations.length);
 
       await db.update(aiJobsTable)
         .set({
-          processedDonations: Math.min(i + chunk.length, donations.length),
+          processedDonations: processedCount,
+          result: JSON.stringify(allResults),
           updatedAt: new Date(),
         })
         .where(eq(aiJobsTable.id, jobId));
     }
 
-    await db.update(aiJobsTable)
+    const updateResult = await db.update(aiJobsTable)
       .set({
         status: AiJobStatus.COMPLETED,
         processedDonations: donations.length,
         result: JSON.stringify(allResults),
         updatedAt: new Date(),
       })
-      .where(eq(aiJobsTable.id, jobId));
+      .where(and(eq(aiJobsTable.id, jobId), or(eq(aiJobsTable.status, AiJobStatus.PENDING), eq(aiJobsTable.status, AiJobStatus.PROCESSING))));
+
+    if (updateResult.rowCount === 0) {
+      logger.info({ jobId }, "AI job was cancelled before completion could be written");
+      return;
+    }
 
     logger.info({ jobId, count: donations.length }, "AI job completed");
   } catch (err) {
@@ -292,7 +352,7 @@ router.get("/ai-notes/jobs/:jobId", asyncHandler(async (req, res) => {
     updatedAt: job.updatedAt,
   };
 
-  if (job.status === AiJobStatus.COMPLETED && job.result) {
+  if ((job.status === AiJobStatus.COMPLETED || job.status === AiJobStatus.PROCESSING || job.status === AiJobStatus.CANCELLED) && job.result) {
     try {
       response.results = JSON.parse(job.result);
     } catch {
@@ -308,7 +368,61 @@ router.get("/ai-notes/jobs/:jobId", asyncHandler(async (req, res) => {
   res.json(response);
 }));
 
+router.post("/ai-notes/jobs/:jobId/cancel", asyncHandler(async (req, res) => {
+  const { jobId } = req.params;
+  const [job] = await db.select().from(aiJobsTable).where(eq(aiJobsTable.id, jobId));
 
+  if (!job) {
+    res.status(404).json({ error: ERROR_MESSAGES.JOB_NOT_FOUND });
+    return;
+  }
+
+  if (job.status !== AiJobStatus.PENDING && job.status !== AiJobStatus.PROCESSING) {
+    res.status(400).json({ error: ERROR_MESSAGES.JOB_NOT_CANCELLABLE });
+    return;
+  }
+
+  await db.update(aiJobsTable)
+    .set({ status: AiJobStatus.CANCELLED, updatedAt: new Date() })
+    .where(eq(aiJobsTable.id, jobId));
+
+  res.json({ success: true, jobId, status: AiJobStatus.CANCELLED });
+}));
+
+router.get("/ai-notes/active-job", asyncHandler(async (req, res) => {
+  const { kesimAlaniId } = req.query;
+  if (!kesimAlaniId || typeof kesimAlaniId !== "string") {
+    res.json({ job: null });
+    return;
+  }
+
+  const jobs = await db.select().from(aiJobsTable)
+    .where(
+      and(
+        eq(aiJobsTable.kesimAlaniId, kesimAlaniId),
+        or(eq(aiJobsTable.status, AiJobStatus.PENDING), eq(aiJobsTable.status, AiJobStatus.PROCESSING))
+      )
+    )
+    .orderBy(desc(aiJobsTable.createdAt))
+    .limit(1);
+
+  const job = jobs[0];
+  if (!job) {
+    res.json({ job: null });
+    return;
+  }
+
+  res.json({
+    job: {
+      jobId: job.id,
+      status: job.status,
+      totalDonations: job.totalDonations,
+      processedDonations: job.processedDonations,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+    },
+  });
+}));
 
 router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
   const parsed = z.object({

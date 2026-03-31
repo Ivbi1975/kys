@@ -22,8 +22,13 @@ import {
   fetchKesimAlani,
   fetchProjects,
   bulkUpdateNotes,
-  classifyNotes,
+  classifyNotesAsync,
+  fetchJobStatus,
+  cancelJob,
+  fetchActiveJob,
   saveAiClassifications,
+  API_BASE,
+  getApiKey,
 } from "@/lib/api";
 import {
   AlertDialog,
@@ -39,6 +44,8 @@ import type { LocalDonation, AiResult } from "./types";
 import { MAX_HISTORY } from "./types";
 import { AiClassification } from "./AiClassification";
 import { DonationsTable } from "./DonationsTable";
+
+const AUTO_SAVE_DEBOUNCE_MS = 5000;
 
 export default function NotDuzenlemePage() {
   const params = useParams<{ id: string }>();
@@ -73,7 +80,6 @@ export default function NotDuzenlemePage() {
 
   const [aiRunning, setAiRunning] = useState(false);
   const [aiStopped, setAiStopped] = useState(false);
-  const aiStopRef = useRef(false);
   const [aiResults, setAiResults] = useState<Map<string, AiResult>>(new Map());
   const [aiProgress, setAiProgress] = useState({ done: 0, total: 0 });
   const [aiSaveStatus, setAiSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -86,6 +92,8 @@ export default function NotDuzenlemePage() {
   const [showAiReport, setShowAiReport] = useState(false);
   const [aiReportCollapsed, setAiReportCollapsed] = useState(false);
   const [aiCategoryFilter, setAiCategoryFilter] = useState<string | null>(null);
+  const activeJobIdRef = useRef<string | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const pushHistory = useCallback((newDonations: LocalDonation[]) => {
     const trimmed = historyRef.current.slice(0, historyIndexRef.current + 1);
@@ -124,6 +132,97 @@ export default function NotDuzenlemePage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undo, redo]);
 
+  const kesimRef = useRef<KesimAlani | null>(null);
+  const donationsRef = useRef<LocalDonation[]>([]);
+  const dirtyRef = useRef(false);
+  const savingRef = useRef(false);
+
+  useEffect(() => { kesimRef.current = kesim; }, [kesim]);
+  useEffect(() => { donationsRef.current = donations; }, [donations]);
+  useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
+  useEffect(() => { savingRef.current = saving; }, [saving]);
+
+  const computeUpdates = useCallback(() => {
+    const currentKesim = kesimRef.current;
+    const currentDonations = donationsRef.current;
+    if (!currentKesim) return null;
+    const updates: { donationId: string; notes?: string; description?: string }[] = [];
+    for (const d of currentDonations) {
+      const orig = currentKesim.donations.find(x => x.id === d.id) || currentKesim.animalGroups.flatMap(g => g.donations).find(x => x.id === d.id);
+      if (!orig) continue;
+      const entry: { donationId: string; notes?: string; description?: string } = { donationId: d.id };
+      if (orig.notes !== d.notes) entry.notes = d.notes;
+      if ((orig.description || "") !== (d.description || "")) entry.description = d.description;
+      if (entry.notes !== undefined || entry.description !== undefined) updates.push(entry);
+    }
+    return updates.length > 0 ? { kesimAlaniId: currentKesim.id, updates } : null;
+  }, []);
+
+  const performAutoSave = useCallback(async () => {
+    if (!dirtyRef.current || savingRef.current) return;
+    const data = computeUpdates();
+    if (!data) { setDirty(false); return; }
+
+    setSaving(true);
+    try {
+      await bulkUpdateNotes(data.kesimAlaniId, data.updates);
+      setKesim(prev => {
+        if (!prev) return prev;
+        const updateMap = new Map(data.updates.map(u => [u.donationId, u]));
+        const applyUpdate = <T extends { id: string; notes: string; description: string }>(d: T): T => {
+          const u = updateMap.get(d.id);
+          if (!u) return d;
+          return { ...d, ...(u.notes !== undefined ? { notes: u.notes } : {}), ...(u.description !== undefined ? { description: u.description } : {}) };
+        };
+        return { ...prev, donations: prev.donations.map(applyUpdate), animalGroups: prev.animalGroups.map(g => ({ ...g, donations: g.donations.map(applyUpdate) })) };
+      });
+      setDirty(false);
+    } catch {
+    } finally { setSaving(false); }
+  }, [computeUpdates]);
+
+  const autoSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoSaveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (dirty) {
+      if (autoSaveDebounceRef.current) clearTimeout(autoSaveDebounceRef.current);
+      autoSaveDebounceRef.current = setTimeout(() => { performAutoSave(); }, AUTO_SAVE_DEBOUNCE_MS);
+    }
+    return () => { if (autoSaveDebounceRef.current) clearTimeout(autoSaveDebounceRef.current); };
+  }, [dirty, donations, performAutoSave]);
+
+  useEffect(() => {
+    autoSaveIntervalRef.current = setInterval(() => {
+      if (dirtyRef.current && !savingRef.current) {
+        performAutoSave();
+      }
+    }, AUTO_SAVE_DEBOUNCE_MS * 2);
+    return () => { if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current); };
+  }, [performAutoSave]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (dirtyRef.current) {
+        e.preventDefault();
+        e.returnValue = "";
+        const data = computeUpdates();
+        if (data) {
+          try {
+            const xhr = new XMLHttpRequest();
+            xhr.open("PUT", `${API_BASE}/ai-notes/bulk-update`, false);
+            xhr.setRequestHeader("Content-Type", "application/json");
+            const apiKey = getApiKey();
+            if (apiKey) xhr.setRequestHeader("X-API-Key", apiKey);
+            xhr.send(JSON.stringify({ kesimAlaniId: data.kesimAlaniId, updates: data.updates }));
+          } catch {}
+        }
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [computeUpdates]);
+
   useEffect(() => {
     if (!params.id) return;
     setLoading(true);
@@ -159,11 +258,96 @@ export default function NotDuzenlemePage() {
       historyIndexRef.current = 0;
       updateHistoryState();
       setLoading(false);
+
+      try {
+        const { job } = await fetchActiveJob(data.id);
+        if (job) {
+          activeJobIdRef.current = job.jobId;
+          setAiRunning(true);
+          setAiProgress({ done: job.processedDonations, total: job.totalDonations });
+          setShowAiPanel(true);
+          startPolling(job.jobId, allDonations);
+        }
+      } catch {}
     }).catch((err) => {
       setLoadError(err instanceof Error ? err.message : "Veriler yüklenirken bir hata oluştu");
       setLoading(false);
     });
   }, [params.id]);
+
+  const stopPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => { return () => { stopPolling(); }; }, [stopPolling]);
+
+  const startPolling = useCallback((jobId: string, donationsList?: LocalDonation[]) => {
+    stopPolling();
+
+    const poll = async () => {
+      try {
+        const status = await fetchJobStatus(jobId);
+        setAiProgress({ done: status.processedDonations, total: status.totalDonations });
+
+        if (status.results && status.results.length > 0) {
+          const currentDonations = donationsList || donationsRef.current;
+          setAiResults(prev => {
+            const next = new Map(prev);
+            for (const r of status.results!) {
+              const donor = currentDonations.find(d => d.id === r.donationId);
+              const donationType = donor?.donationType || "";
+              let warnings = r.warnings || "";
+              if (warnings && donationType && r.categories) {
+                const dtLower = donationType.toLocaleLowerCase("tr");
+                const catsLower = r.categories.map(c => c.toLocaleLowerCase("tr"));
+                if (catsLower.includes(dtLower)) {
+                  warnings = warnings
+                    .split(/[.;]\s*/)
+                    .filter(s => !s.toLocaleLowerCase("tr").includes(dtLower) || s.toLocaleLowerCase("tr").includes("tutarsız"))
+                    .join(". ")
+                    .trim();
+                  if (warnings === "." || warnings === ",") warnings = "";
+                }
+              }
+              next.set(r.donationId, { ...r, warnings, donationType });
+            }
+            return next;
+          });
+        }
+
+        if (status.status === "completed" || status.status === "failed" || status.status === "cancelled") {
+          stopPolling();
+          setAiRunning(false);
+          activeJobIdRef.current = null;
+
+          if (status.status === "cancelled") {
+            setAiStopped(true);
+          }
+
+          if (status.results && status.results.length > 0) {
+            try {
+              setAiSaveStatus("saving");
+              await saveAiClassifications(status.results.map(r => ({ donationId: r.donationId, categories: r.categories || [], warnings: r.warnings || "" })));
+              setAiSaveStatus("saved");
+            } catch { setAiSaveStatus("error"); }
+          }
+
+          setShowAiReport(true);
+          setAiReportCollapsed(false);
+
+          if (status.status === "failed") {
+            toast({ title: "AI İşlemi Başarısız", description: status.error || "Bilinmeyen hata", variant: "destructive" });
+          }
+        }
+      } catch {}
+    };
+
+    poll();
+    pollIntervalRef.current = setInterval(poll, 3000);
+  }, [stopPolling, toast]);
 
   const filteredDonations = donations.filter(d => {
     const notes = d.notes || "";
@@ -288,7 +472,6 @@ export default function NotDuzenlemePage() {
 
   const startAiClassification = async (resume = false) => {
     if (!kesim) return;
-    aiStopRef.current = false;
     setAiRunning(true); setAiStopped(false); setAiSaveStatus("idle"); setAiErrorBatches(0); setShowAiReport(false); setAiReportCollapsed(false);
     if (!resume) { setAiResults(new Map()); }
     let toProcess: LocalDonation[];
@@ -301,51 +484,29 @@ export default function NotDuzenlemePage() {
     const previouslyDone = resume ? aiResults.size : 0;
     const totalToProcess = previouslyDone + withNotes.length;
     setAiProgress({ done: previouslyDone, total: totalToProcess });
-    const batches: LocalDonation[][] = [];
-    for (let i = 0; i < withNotes.length; i += batchSize) batches.push(withNotes.slice(i, i + batchSize));
-    let done = previouslyDone; let errorCount = 0;
-    for (const batch of batches) {
-      if (aiStopRef.current) { setAiStopped(true); break; }
-      try {
-        const { results } = await classifyNotes(batch.map(d => ({ id: d.id, name: d.name || d.description, donationType: d.donationType, vekalet: d.vekalet, notes: d.notes })));
-        const normalizedResults = results.map(r => {
-          const donor = batch.find(d => d.id === r.donationId);
-          const donationType = donor?.donationType || "";
-          let warnings = r.warnings || "";
-          if (warnings && donationType && r.categories) {
-            const dtLower = donationType.toLocaleLowerCase("tr");
-            const catsLower = r.categories.map(c => c.toLocaleLowerCase("tr"));
-            if (catsLower.includes(dtLower)) {
-              warnings = warnings
-                .split(/[.;]\s*/)
-                .filter(s => !s.toLocaleLowerCase("tr").includes(dtLower) || s.toLocaleLowerCase("tr").includes("tutarsız"))
-                .join(". ")
-                .trim();
-              if (warnings === "." || warnings === ",") warnings = "";
-            }
-          }
-          return { ...r, warnings, donationType };
-        });
-        setAiResults(prev => {
-          const next = new Map(prev);
-          for (const nr of normalizedResults) next.set(nr.donationId, nr);
-          return next;
-        });
-        try { setAiSaveStatus("saving"); await saveAiClassifications(normalizedResults.map(r => ({ donationId: r.donationId, categories: r.categories || [], warnings: r.warnings || "" }))); setAiSaveStatus("saved"); } catch { setAiSaveStatus("error"); }
-        done += batch.length; setAiProgress({ done, total: totalToProcess });
-        if (batch !== batches[batches.length - 1] && !aiStopRef.current) await new Promise(res => setTimeout(res, 1000));
-      } catch (err) {
-        errorCount++; setAiErrorBatches(errorCount);
-        toast({ title: "AI Batch Hatası", description: `Batch ${Math.floor(done / batchSize) + 1} hata verdi: ${err instanceof Error ? err.message : "Sınıflandırma hatası"}. Diğer batch'lere devam ediliyor.`, variant: "destructive" });
-        done += batch.length; setAiProgress({ done, total: totalToProcess });
-        if (batch !== batches[batches.length - 1] && !aiStopRef.current) await new Promise(res => setTimeout(res, 1000));
-      }
+
+    try {
+      const { jobId } = await classifyNotesAsync(
+        withNotes.map(d => ({ id: d.id, name: d.name || d.description, donationType: d.donationType, vekalet: d.vekalet, notes: d.notes })),
+        kesim.id
+      );
+      activeJobIdRef.current = jobId;
+      startPolling(jobId);
+    } catch (err) {
+      setAiRunning(false);
+      toast({ title: "AI Başlatılamadı", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
     }
-    if (errorCount > 0 && !aiStopRef.current) toast({ title: "AI Tamamlandı (Hatalarla)", description: `${errorCount} batch hata verdi, geri kalanı başarıyla işlendi.`, variant: "destructive" });
-    setAiRunning(false); setShowAiReport(true); setAiReportCollapsed(false);
   };
 
-  const stopAiClassification = () => { aiStopRef.current = true; setAiStopped(true); };
+  const stopAiClassification = async () => {
+    const jobId = activeJobIdRef.current;
+    if (jobId) {
+      try {
+        await cancelJob(jobId);
+      } catch {}
+    }
+    setAiStopped(true);
+  };
 
   const scrollToDonation = (donationId: string) => {
     let row = document.querySelector(`[data-donation-id="${donationId}"]`);
@@ -391,7 +552,11 @@ export default function NotDuzenlemePage() {
           <div className="flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <h1 className="text-base font-semibold truncate">Not Düzenleme</h1>
-              <p className="text-xs text-muted-foreground truncate">{kesim?.name} — {donations.length} bağışçı, {notesWithContent.length} notu olan</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {kesim?.name} — {donations.length} bağışçı, {notesWithContent.length} notu olan
+                {saving && <span className="ml-2 text-primary">Kaydediliyor...</span>}
+                {!saving && !dirty && <span className="ml-2 text-green-600">Kaydedildi</span>}
+              </p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <Button variant="ghost" size="sm" onClick={undo} disabled={!historyState.canUndo} title="Geri Al (Ctrl+Z)"><Undo2 className="w-4 h-4" /></Button>

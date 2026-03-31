@@ -21,6 +21,17 @@ export interface AiSettings {
   categories: string[];
 }
 
+export interface AiJobStatus {
+  jobId: string;
+  status: "pending" | "processing" | "completed" | "failed" | "cancelled";
+  totalDonations: number;
+  processedDonations: number;
+  results?: AiClassificationResult[];
+  error?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export async function fetchAiSettings(): Promise<AiSettings> {
   return apiFetch<AiSettings>("/ai-notes/settings");
 }
@@ -37,6 +48,27 @@ export async function classifyNotes(donations: AiDonationInput[]): Promise<{ res
     method: "POST",
     body: JSON.stringify({ donations }),
   });
+}
+
+export async function classifyNotesAsync(donations: AiDonationInput[], kesimAlaniId?: string): Promise<{ jobId: string; status: string; totalDonations: number }> {
+  return apiFetch<{ jobId: string; status: string; totalDonations: number }>("/ai-notes/classify-async", {
+    method: "POST",
+    body: JSON.stringify({ donations, kesimAlaniId }),
+  });
+}
+
+export async function fetchJobStatus(jobId: string): Promise<AiJobStatus> {
+  return apiFetch<AiJobStatus>(`/ai-notes/jobs/${jobId}`);
+}
+
+export async function cancelJob(jobId: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/ai-notes/jobs/${jobId}/cancel`, {
+    method: "POST",
+  });
+}
+
+export async function fetchActiveJob(kesimAlaniId: string): Promise<{ job: AiJobStatus | null }> {
+  return apiFetch<{ job: AiJobStatus | null }>(`/ai-notes/active-job?kesimAlaniId=${encodeURIComponent(kesimAlaniId)}`);
 }
 
 export async function saveAiClassifications(classifications: { donationId: string; categories: string[]; warnings: string }[]): Promise<{ success: boolean }> {

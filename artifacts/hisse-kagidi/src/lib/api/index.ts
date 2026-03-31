@@ -73,6 +73,10 @@ export {
   fetchAiSettings,
   saveAiSettings,
   classifyNotes,
+  classifyNotesAsync,
+  fetchJobStatus,
+  cancelJob,
+  fetchActiveJob,
   saveAiClassifications,
   bulkUpdateNotes,
 } from "./ai-notes";
@@ -80,6 +84,7 @@ export type {
   AiDonationInput,
   AiClassificationResult,
   AiSettings,
+  AiJobStatus,
 } from "./ai-notes";
 
 export {

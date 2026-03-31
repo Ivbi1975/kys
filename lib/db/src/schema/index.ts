@@ -250,6 +250,7 @@ export const aiJobsTable = pgTable("ai_jobs", {
   processedDonations: integer("processed_donations").notNull().default(0),
   result: text("result"),
   error: text("error"),
+  kesimAlaniId: text("kesim_alani_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

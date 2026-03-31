@@ -22,6 +22,7 @@ export const AiJobStatus = {
   PROCESSING: "processing",
   COMPLETED: "completed",
   FAILED: "failed",
+  CANCELLED: "cancelled",
 } as const;
 export type AiJobStatus = (typeof AiJobStatus)[keyof typeof AiJobStatus];
 
@@ -43,6 +44,7 @@ export const ERROR_MESSAGES = {
   INVALID_STATUS: "Geçersiz durum",
   GROUP_NOT_FOUND: "Grup bulunamadı",
   JOB_NOT_FOUND: "İş bulunamadı",
+  JOB_NOT_CANCELLABLE: "Bu iş iptal edilemez",
   RESULT_PARSE_ERROR: "Sonuç ayrıştırılamadı",
   TARGET_PROJECT_NOT_FOUND: "Hedef proje bulunamadı",
   ALREADY_ACTIVE: "Bu kesim alanı zaten aktif",

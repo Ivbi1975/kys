@@ -22,9 +22,18 @@ Notları analiz ederken:
 1. Belirtilen kategorilere göre tespit et
 2. Bağışçının cinsi (donationType) ile notları karşılaştır ve tutarsızlıkları bildir
 3. Önemli istekler veya uyarılar varsa belirt
+4. Büyük/küçük harf farkını görmezden gel. "vacip", "vacib", "VACİP", "VACİB" gibi yazımlar aynı anlama gelir, uyarı verme. Benzer şekilde "adak", "Adak", "ADAK" aynıdır
 
 Kategoriler:
 {{CATEGORIES}}
+
+Kategori kuralları:
+- "3.gün": Notta "üçüncü gün kesilsin", "üçüncü gün", "3.gün", "seferi olacağım üçüncü gün kesilsin" gibi ifadeler varsa bu etiketi ata.
+- "2.gün": Notta "mutlaka 2.gün kesilecek", "2.gün", "ikinci gün", "3.gün seferi olacağım" (yani 3.gün seferi = 2.gün kesilmeli) gibi ifadeler varsa bu etiketi ata.
+- "erken_kesim": Notta "seferi olacağım ilk hayvanda kesilsin", "ilk hayvan", "birinci hayvan", "ılk hayvan", "erken kesim", "erkenden kesim", "yola çıkacağım", "mümkünse erkenden kesilsin", "sabah erken saatte kesilsin", "öğleden önce kesilsin", "geç kesim", "erken saat", "seferi" gibi ifadeler varsa bu etiketi ata. Zaman hassasiyeti olan tüm istekleri kapsar.
+- "özel_kesim": Notta belirli bir saat belirtiliyorsa (ör: "saat 10'da", "14:00'te"), özel zaman talebi varsa (ör: "öğleden sonra kesilsin", "akşama doğru") bu etiketi ata.
+- "Şafi": Notta "şafi", "şafi mezhebindeyim", "şafii", "safi", "safı" gibi ifadeler varsa bu etiketi ata VE uyarı olarak "Şafi mezhebine göre kesim gerekiyor" yaz. Bu önemli bir uyarıdır.
+- "Sünnet" bağış cinsi: Notta "sünnet", "sunnet" ifadesi geçerse, categories listesine "sünnet" ekle. Bu bir donationType (bağış cinsi) olarak değerlendirilmeli.
 
 Her bağışçı için JSON formatında yanıt ver:
 {
@@ -45,6 +54,12 @@ const DEFAULT_CATEGORIES = [
   "akika",
   "vacip",
   "nafile",
+  "3.gün",
+  "2.gün",
+  "erken_kesim",
+  "özel_kesim",
+  "Şafi",
+  "sünnet",
 ];
 
 export default function AiPromptAyarlariPage() {

@@ -120,6 +120,13 @@
       "when": 1774945356743,
       "tag": "0016_transfer_type_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1774946000000,
+      "tag": "0017_ai_jobs_kesim_alani_id",
+      "breakpoints": true
     }
   ]
 }
