@@ -149,17 +149,23 @@ function normalizeDonationType(t: string): string {
   return (t || "").trim().toUpperCase();
 }
 
-const DONATION_TYPE_PRIORITY: string[] = [
-  "VACİP", "VACIP", "VACİB", "VACIB",
-  "ADAK",
-  "AKİKA", "AKIKA",
-  "MEVTA", "MEVTA KURBANI",
-];
+const DONATION_TYPE_ALIASES: Record<string, string> = {
+  "VACİP": "VACIP", "VACİB": "VACIP", "VACIB": "VACIP",
+  "AKİKA": "AKIKA",
+  "MEVTA KURBANI": "MEVTA",
+};
+
+const DONATION_TYPE_PRIORITY_ORDER: string[] = ["VACIP", "ADAK", "AKIKA", "MEVTA"];
+
+function canonicalizeDonationType(t: string): string {
+  const normalized = normalizeDonationType(t);
+  return DONATION_TYPE_ALIASES[normalized] ?? normalized;
+}
 
 function getDonationTypePriority(t: string): number {
-  const normalized = normalizeDonationType(t);
-  const idx = DONATION_TYPE_PRIORITY.indexOf(normalized);
-  return idx >= 0 ? idx : DONATION_TYPE_PRIORITY.length;
+  const canonical = canonicalizeDonationType(t);
+  const idx = DONATION_TYPE_PRIORITY_ORDER.indexOf(canonical);
+  return idx >= 0 ? idx : DONATION_TYPE_PRIORITY_ORDER.length;
 }
 
 function getDominantDonationType(unit: DonorUnit): string {
@@ -264,62 +270,6 @@ function tryFlexibleMatch(remainders: DonorUnit[]): { animals: GroupedSegment[][
   }
 
   return { animals, leftover };
-}
-
-function packLeftovers(remainders: DonorUnit[]): GroupedSegment[][] {
-  if (remainders.length === 0) return [];
-
-  const animals: GroupedSegment[][] = [];
-  const queue = remainders.map(u => ({ ...u, donations: [...u.donations] }));
-
-  while (queue.length > 0) {
-    const segments: GroupedSegment[] = [];
-    let remaining = 7;
-    let i = 0;
-
-    while (i < queue.length && remaining > 0) {
-      const unit = queue[i];
-      if (unit.totalShares <= remaining) {
-        segments.push({
-          templateDonation: unit.templateDonation,
-          donations: unit.donations,
-          shares: unit.totalShares,
-        });
-        remaining -= unit.totalShares;
-        queue.splice(i, 1);
-      } else {
-        i++;
-      }
-    }
-
-    if (remaining > 0 && queue.length > 0) {
-      const unit = queue[0];
-      const splitShares = remaining;
-      const splitDonationCount = Math.min(unit.donations.length, splitShares);
-      const splitDonations = unit.donations.slice(0, splitDonationCount);
-
-      segments.push({
-        templateDonation: unit.templateDonation,
-        donations: splitDonations,
-        shares: splitShares,
-      });
-
-      unit.donations = unit.donations.slice(splitDonationCount);
-      unit.totalShares -= splitShares;
-
-      if (unit.totalShares <= 0) {
-        queue.splice(0, 1);
-      }
-    }
-
-    if (segments.length > 0) {
-      animals.push(segments);
-    } else {
-      break;
-    }
-  }
-
-  return animals;
 }
 
 function getSegmentGroupDominantType(segments: GroupedSegment[]): string {
