@@ -15,6 +15,19 @@ export interface BasketItem {
   colorTag?: string;
   donationIds?: string[];
   groupUpdatedAt?: string;
+  donationType?: string;
+  donorShareCount?: number;
+  vekalet?: string;
+  donorNotes?: string;
+  donationSnapshots?: Array<{
+    id: string;
+    name: string;
+    description: string;
+    donationType: string;
+    shareCount: number;
+    vekalet: string;
+    notes: string;
+  }>;
 }
 
 export type SaveFn = (

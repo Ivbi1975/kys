@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { KesimAlani, Donation } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronUp, Loader2, Package, Send, ShoppingBag, UserPlus, Wand2, X } from "lucide-react";
+import { ChevronUp, ListPlus, Loader2, MoveRight, Package, Send, ShoppingBag, UserPlus, Wand2, X } from "lucide-react";
 import { COLOR_MAP } from "@/lib/constants";
 import { computeEffectiveShares } from "@/lib/grouping";
 import type { BasketItem } from "../hooks/types";
@@ -32,6 +32,8 @@ interface BasketPanelProps {
   emptyGroupsAfterTransfer: Array<{ id: string; animalNo: number }>;
   cleanupEmptyGroups: () => void;
   dismissEmptyGroupsCleanup: () => void;
+  returnSelectedToDonorList: (selectedIds: Set<string>) => boolean;
+  transferSelectedToGroup: (selectedIds: Set<string>, targetGroupIdx: number) => boolean;
 }
 
 export function BasketPanel({
@@ -43,8 +45,11 @@ export function BasketPanel({
   transferToDonorListConfirm, setTransferToDonorListConfirm,
   transferToDonorListRemoving, transferForeignToCurrentDonorList,
   emptyGroupsAfterTransfer, cleanupEmptyGroups, dismissEmptyGroupsCleanup,
+  returnSelectedToDonorList, transferSelectedToGroup,
 }: BasketPanelProps) {
   const [crossKAConfirmOpen, setCrossKAConfirmOpen] = useState(false);
+  const [selectedBasketIds, setSelectedBasketIds] = useState<Set<string>>(new Set());
+  const [retrieveTargetGroup, setRetrieveTargetGroup] = useState<number>(-1);
 
   if (basketItems.length === 0 && emptyGroupsAfterTransfer.length === 0) return null;
 
@@ -65,6 +70,40 @@ export function BasketPanel({
     basketTotalShares += (b.filledCount || 0);
   }
   const basketAnimals = Math.ceil(basketTotalShares / 7);
+
+  const toggleBasketSelect = (donationId: string) => {
+    setSelectedBasketIds(prev => {
+      const next = new Set(prev);
+      if (next.has(donationId)) next.delete(donationId);
+      else next.add(donationId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedBasketIds.size === localBasketItems.length) {
+      setSelectedBasketIds(new Set());
+    } else {
+      setSelectedBasketIds(new Set(localBasketItems.map(b => b.donationId)));
+    }
+  };
+
+  const handleReturnToDonorList = () => {
+    if (selectedBasketIds.size === 0) return;
+    const success = returnSelectedToDonorList(selectedBasketIds);
+    if (success) {
+      setSelectedBasketIds(new Set());
+    }
+  };
+
+  const handleTransferToGroup = () => {
+    if (selectedBasketIds.size === 0 || retrieveTargetGroup < 0) return;
+    const success = transferSelectedToGroup(selectedBasketIds, retrieveTargetGroup);
+    if (success) {
+      setSelectedBasketIds(new Set());
+      setRetrieveTargetGroup(-1);
+    }
+  };
 
   return (
     <>
@@ -97,6 +136,24 @@ export function BasketPanel({
         </button>
         {basketOpen && (
           <div className="px-4 pb-3 space-y-2">
+            {localBasketItems.length > 0 && (
+              <div className="flex items-center gap-2 mb-1">
+                <label className="flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="rounded w-3 h-3"
+                    checked={selectedBasketIds.size === localBasketItems.length && localBasketItems.length > 0}
+                    onChange={toggleSelectAll}
+                  />
+                  Tümünü Seç
+                </label>
+                {selectedBasketIds.size > 0 && (
+                  <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                    {selectedBasketIds.size} seçili
+                  </span>
+                )}
+              </div>
+            )}
             {localAnimalGroupItems.length > 0 && (
               <div className="flex items-center gap-1 text-xs text-orange-700 dark:text-orange-300 flex-wrap">
                 <span className="text-[10px] font-semibold mr-1">
@@ -106,11 +163,19 @@ export function BasketPanel({
                 {localAnimalGroupItems.map(b => (
                   <span
                     key={b.animalGroupId}
-                    className="px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900 rounded text-[10px] inline-flex items-center gap-0.5"
+                    className={`px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900 rounded text-[10px] inline-flex items-center gap-0.5 cursor-pointer transition-colors ${selectedBasketIds.has(b.donationId) ? "ring-2 ring-orange-500 bg-orange-200 dark:bg-orange-800" : ""}`}
                     style={b.colorTag && b.colorTag in COLOR_MAP ? { borderLeft: `3px solid ${COLOR_MAP[b.colorTag as keyof typeof COLOR_MAP]}` } : {}}
+                    onClick={() => toggleBasketSelect(b.donationId)}
                   >
+                    <input
+                      type="checkbox"
+                      className="rounded w-2.5 h-2.5"
+                      checked={selectedBasketIds.has(b.donationId)}
+                      onChange={() => toggleBasketSelect(b.donationId)}
+                      onClick={e => e.stopPropagation()}
+                    />
                     Hayvan {b.animalNo} ({b.filledCount} bağışçı)
-                    <button onClick={(e) => { e.stopPropagation(); removeFromBasket(b.donationId); }} className="hover:text-red-500">
+                    <button onClick={(e) => { e.stopPropagation(); removeFromBasket(b.donationId); setSelectedBasketIds(prev => { const next = new Set(prev); next.delete(b.donationId); return next; }); }} className="hover:text-red-500">
                       <X className="w-2.5 h-2.5" />
                     </button>
                   </span>
@@ -133,15 +198,40 @@ export function BasketPanel({
               return (
                 <div className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300 flex-wrap">
                   <span className="text-[10px] font-semibold mr-1">Bu KA:</span>
-                  {grouped.slice(0, 6).map(g => (
-                    <span key={g.key} className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900 rounded text-[10px] inline-flex items-center gap-0.5">
-                      {g.label}
-                      {g.items.length > 1 && <span className="text-emerald-500">×{g.items.length}</span>}
-                      <button onClick={(e) => { e.stopPropagation(); g.items.forEach(item => removeFromBasket(item.donationId)); }} className="hover:text-red-500">
-                        <X className="w-2.5 h-2.5" />
-                      </button>
-                    </span>
-                  ))}
+                  {grouped.slice(0, 6).map(g => {
+                    const allSelected = g.items.every(item => selectedBasketIds.has(item.donationId));
+                    const toggleGroup = () => {
+                      setSelectedBasketIds(prev => {
+                        const next = new Set(prev);
+                        if (allSelected) {
+                          g.items.forEach(item => next.delete(item.donationId));
+                        } else {
+                          g.items.forEach(item => next.add(item.donationId));
+                        }
+                        return next;
+                      });
+                    };
+                    return (
+                      <span
+                        key={g.key}
+                        className={`px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900 rounded text-[10px] inline-flex items-center gap-0.5 cursor-pointer transition-colors ${allSelected ? "ring-2 ring-emerald-500 bg-emerald-200 dark:bg-emerald-800" : ""}`}
+                        onClick={toggleGroup}
+                      >
+                        <input
+                          type="checkbox"
+                          className="rounded w-2.5 h-2.5"
+                          checked={allSelected}
+                          onChange={toggleGroup}
+                          onClick={e => e.stopPropagation()}
+                        />
+                        {g.label}
+                        {g.items.length > 1 && <span className="text-emerald-500">×{g.items.length}</span>}
+                        <button onClick={(e) => { e.stopPropagation(); g.items.forEach(item => { removeFromBasket(item.donationId); setSelectedBasketIds(prev => { const next = new Set(prev); next.delete(item.donationId); return next; }); }); }} className="hover:text-red-500">
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </span>
+                    );
+                  })}
                   {grouped.length > 6 && (
                     <span className="text-[10px] text-emerald-500">+{grouped.length - 6} daha</span>
                   )}
@@ -174,6 +264,58 @@ export function BasketPanel({
                 </Button>
               </div>
             )}
+
+            {selectedBasketIds.size > 0 && (
+              <div className="flex items-center gap-1 flex-wrap p-1.5 bg-emerald-100 dark:bg-emerald-900 rounded-lg border border-emerald-300 dark:border-emerald-700">
+                <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-200 mr-1">
+                  Sepetten Al ({selectedBasketIds.size} seçili):
+                </span>
+                <Select value={retrieveTargetGroup < 0 ? "" : String(retrieveTargetGroup)} onValueChange={(v) => setRetrieveTargetGroup(parseInt(v))}>
+                  <SelectTrigger className="h-6 w-32 text-[10px]">
+                    <SelectValue placeholder="Hedef grup..." />
+                  </SelectTrigger>
+                  <SelectContent side="top">
+                    {kesim.animalGroups.map((g, i) => {
+                      const empty = g.donations.filter(d => !d.name.trim()).length;
+                      return (
+                        <SelectItem key={g.id} value={String(i)} disabled={g.locked || empty === 0}>
+                          Hayvan {g.animalNo} ({empty} boş)
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="h-6 text-[10px] px-2"
+                  onClick={handleTransferToGroup}
+                  disabled={retrieveTargetGroup < 0}
+                >
+                  <MoveRight className="w-3 h-3 mr-0.5" />
+                  Gruba Aktar
+                </Button>
+                <div className="w-px h-4 bg-emerald-300 dark:bg-emerald-700 mx-0.5" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-[10px] px-2 border-emerald-400 text-emerald-700 dark:text-emerald-300"
+                  onClick={handleReturnToDonorList}
+                >
+                  <ListPlus className="w-3 h-3 mr-0.5" />
+                  Bağışçı Listesine Ekle
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-[10px] px-1 text-emerald-600"
+                  onClick={() => setSelectedBasketIds(new Set())}
+                >
+                  Seçimi Kaldır
+                </Button>
+              </div>
+            )}
+
             <div className="flex items-center gap-1 flex-wrap">
               {localDonationItems.length > 0 && (
                 <>
