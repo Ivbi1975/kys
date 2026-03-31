@@ -51,6 +51,8 @@ export interface KesimAlani {
   trackingToken?: string | null;
   kesimListeId?: string | null;
   teams?: Team[];
+  parentKesimAlaniId?: string | null;
+  splitStatus?: string | null;
 }
 
 export interface ProjectStats {

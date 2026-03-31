@@ -125,6 +125,8 @@ export function assembleKesimAlani(
     projectId: ka.projectId || null,
     trackingToken: ka.trackingToken || null,
     kesimListeId: ka.kesimListeId || null,
+    parentKesimAlaniId: ka.parentKesimAlaniId || null,
+    splitStatus: ka.splitStatus || null,
     donations: mappedDonations,
     animalGroups: mappedGroups,
     teams: teams.map(t => ({ id: t.id, name: t.name, color: t.color })),
@@ -261,6 +263,7 @@ export async function getFullKesimAlani(id: string) {
     SELECT
       ka.id AS ka_id, ka.name, ka.created_at, ka.deleted_at,
       ka.project_id, ka.tracking_token, ka.kesim_liste_id,
+      ka.parent_kesim_alani_id, ka.split_status,
       COALESCE((
         SELECT json_agg(d ORDER BY d.sort_order)
         FROM (
@@ -309,6 +312,7 @@ export async function getFullKesimAlani(id: string) {
   type SingleRawRow = {
     ka_id: string; name: string; created_at: string; deleted_at: string | null;
     project_id: string | null; tracking_token: string | null; kesim_liste_id: string | null;
+    parent_kesim_alani_id: string | null; split_status: string | null;
     donations: SingleRawDonation[];
     groups: SingleRawGroup[];
     teams: SingleRawTeam[];
@@ -324,6 +328,8 @@ export async function getFullKesimAlani(id: string) {
     projectId: rawRow.project_id,
     trackingToken: rawRow.tracking_token,
     kesimListeId: rawRow.kesim_liste_id,
+    parentKesimAlaniId: rawRow.parent_kesim_alani_id,
+    splitStatus: rawRow.split_status,
   };
 
   const tagsByDonation: Record<string, string[]> = {};

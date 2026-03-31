@@ -64,6 +64,7 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - Share distribution panel (bar chart showing count of 1-7 share donors)
 - Group composition panel (shows share combinations per group like "3+2+1+1")
 - Ungrouped donor tracking (clickable orange counter filters donor list to show only unassigned donors)
+- Kesim listesi parçalama (split): split large lists into smaller sub-lists, distributing donors across new child lists. Parent lists show "Parçalandı" badge with amber border, children show "Alt Liste" badge with hierarchical indent. Modal form supports dynamic row add/remove with even-distribution helper and total validation.
 - JSON backup/restore for all data
 - Print A4 landscape pages matching Excel "Kesim Kağıdı" format with columns: HAYVAN (merged vertically), SIRA, VEKALET, VEKALETİ VEREN, ADINA KESİLEN, CİNSİ, NOTLAR
 - Flexible workspace layout: multi-column grid (1/2/3 columns), column hide/show popover, compact mode, fullscreen mode (ESC to exit), collapse all/expand all, column drag-and-drop reorder, resizable split pane between donor list and animal groups — all preferences saved to localStorage via `useWorkspacePreferences` hook

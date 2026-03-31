@@ -13,6 +13,7 @@ import {
   deleteKesimAlani,
   restoreKesimAlani,
 } from "../../services/core.service";
+import { splitKesimAlani } from "../../services/split.service";
 
 const donationPayloadSchema = z.object({
   id: z.string().min(1),
@@ -147,6 +148,36 @@ router.post("/kesim-alanlari/:id/restore", asyncHandler(async (req, res) => {
     return;
   }
   res.json(result.data);
+  refreshProjectStats();
+}));
+
+const splitSchema = z.object({
+  targets: z.array(z.object({
+    name: z.string().min(1),
+    kesimListeId: z.string().optional().default(""),
+    hayvanSayisi: z.number().int().min(1),
+  })).min(2),
+});
+
+router.post("/kesim-alanlari/:id/split", asyncHandler(async (req, res) => {
+  const parsed = splitSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
+    return;
+  }
+  const result = await splitKesimAlani(req.params.id, parsed.data.targets);
+  if (!result.ok) {
+    const errorMap: Record<string, string> = {
+      not_found: ERROR_MESSAGES.KESIM_ALANI_NOT_FOUND,
+      already_split: "Bu kesim alanı zaten parçalanmış",
+      is_child: "Alt listeler tekrar parçalanamaz",
+      count_mismatch: "Toplam hayvan sayısı kapasite ile uyuşmuyor",
+      min_two_targets: "En az 2 alt listeye parçalanmalı",
+    };
+    res.status(result.status).json({ error: errorMap[result.error] || result.error });
+    return;
+  }
+  res.json({ parent: result.parent, children: result.children });
   refreshProjectStats();
 }));
 

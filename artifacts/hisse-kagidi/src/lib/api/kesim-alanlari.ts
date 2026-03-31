@@ -140,6 +140,24 @@ export async function updateTrackingNoteStatus(kesimAlaniId: string, noteId: str
   });
 }
 
+export interface SplitTarget {
+  name: string;
+  kesimListeId: string;
+  hayvanSayisi: number;
+}
+
+export interface SplitResult {
+  parent: KesimAlani;
+  children: KesimAlani[];
+}
+
+export async function splitKesimAlani(id: string, targets: SplitTarget[]): Promise<SplitResult> {
+  return apiFetch<SplitResult>(`/kesim-alanlari/${id}/split`, {
+    method: "POST",
+    body: JSON.stringify({ targets }),
+  });
+}
+
 export async function fetchGroupPhotosAdmin(kesimAlaniId: string, groupId: string): Promise<import("./tracking").GroupPhoto[]> {
   return apiFetch<import("./tracking").GroupPhoto[]>(`/kesim-alanlari/${kesimAlaniId}/group/${groupId}/photos`);
 }

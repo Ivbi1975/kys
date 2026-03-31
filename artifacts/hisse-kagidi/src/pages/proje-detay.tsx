@@ -16,6 +16,7 @@ import { useProjeDetayState } from "@/hooks/useProjeDetayState";
 import { ProjectSummaryCard } from "@/components/proje-detay/ProjectSummaryCard";
 import { PendingEditRequestsCard } from "@/components/proje-detay/PendingEditRequestsCard";
 import { KesimAlaniList } from "@/components/proje-detay/KesimAlaniList";
+import { SplitModal } from "@/components/proje-detay/SplitModal";
 import { ConflictSection } from "@/components/proje-detay/ConflictSection";
 import { TransferLogSection } from "@/components/proje-detay/TransferLogSection";
 import { ProjeDetayDialogs } from "@/components/proje-detay/ProjeDetayDialogs";
@@ -133,6 +134,7 @@ export default function ProjeDetayPage() {
           onOpenTrackingPage={state.handleOpenTrackingPage}
           onShowQrCode={state.handleShowQrCode}
           onDelete={state.requestDelete}
+          onSplit={state.openSplitModal}
         />
 
         <ConflictSection
@@ -188,6 +190,15 @@ export default function ProjeDetayPage() {
         allKesimAlanlari={state.allKesimAlanlari}
         projectName={state.project.name}
       />
+
+      {state.splitTarget && (
+        <SplitModal
+          open={state.splitModalOpen}
+          onOpenChange={state.setSplitModalOpen}
+          kesimAlani={state.splitTarget}
+          onSplit={state.handleSplit}
+        />
+      )}
 
       <QrCodeModal
         open={state.qrModalOpen}

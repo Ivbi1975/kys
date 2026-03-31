@@ -39,8 +39,9 @@ export {
   updateTrackingNoteStatus,
   fetchGroupPhotosAdmin,
   getGroupPhotoUrlAdmin,
+  splitKesimAlani,
 } from "./kesim-alanlari";
-export type { DeletedDonation } from "./kesim-alanlari";
+export type { DeletedDonation, SplitTarget, SplitResult } from "./kesim-alanlari";
 
 export {
   fetchTrackingData,

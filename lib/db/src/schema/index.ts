@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, index, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, index, unique, foreignKey } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -30,11 +30,15 @@ export const kesimAlanlariTable = pgTable("kesim_alanlari", {
   projectId: text("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
   trackingToken: text("tracking_token"),
   kesimListeId: text("kesim_liste_id"),
+  parentKesimAlaniId: text("parent_kesim_alani_id"),
+  splitStatus: text("split_status"),
 }, (table) => [
   index("idx_ka_project_deleted").on(table.projectId, table.deletedAt),
   index("idx_ka_deleted_created").on(table.deletedAt, table.createdAt),
   index("idx_ka_active_created").on(table.createdAt).where(sql`deleted_at IS NULL`),
   index("idx_ka_active_project").on(table.projectId).where(sql`deleted_at IS NULL`),
+  index("idx_ka_parent").on(table.parentKesimAlaniId),
+  foreignKey({ columns: [table.parentKesimAlaniId], foreignColumns: [table.id] }).onDelete("set null"),
 ]);
 
 export const insertKesimAlaniSchema = createInsertSchema(kesimAlanlariTable);

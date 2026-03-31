@@ -15,6 +15,7 @@ import {
   transferDonation,
   fetchTransferLog,
   fetchPendingEditRequests,
+  splitKesimAlani,
 } from "@/lib/api";
 import type { PendingEditRequest, Conflict, ConflictEntry, DonationTransferEntry } from "@/lib/api";
 import { getTotalShares, getRequiredAnimals } from "@/lib/grouping";
@@ -119,6 +120,9 @@ export function useProjeDetayState() {
   const [pendingEditCount, setPendingEditCount] = useState(0);
   const [pendingEditRequests, setPendingEditRequests] = useState<PendingEditRequest[]>([]);
   const [pendingEditLoading, setPendingEditLoading] = useState(false);
+
+  const [splitModalOpen, setSplitModalOpen] = useState(false);
+  const [splitTarget, setSplitTarget] = useState<KesimAlani | null>(null);
 
   const [transferDialog, setTransferDialog] = useState<{
     entry: ConflictEntry;
@@ -241,6 +245,29 @@ export function useProjeDetayState() {
     }
   }, [projectId, toast, setLocation]);
 
+
+  const openSplitModal = useCallback((ka: KesimAlani) => {
+    setSplitTarget(ka);
+    setSplitModalOpen(true);
+  }, []);
+
+  const handleSplit = useCallback(async (targets: { name: string; kesimListeId: string; hayvanSayisi: number }[]) => {
+    if (!splitTarget) return;
+    try {
+      await splitKesimAlani(splitTarget.id, targets);
+      toast({ title: "Liste parçalandı", description: `${splitTarget.name} başarıyla ${targets.length} alt listeye parçalandı.` });
+      setSplitModalOpen(false);
+      setSplitTarget(null);
+      await loadDataFn();
+    } catch (err) {
+      toast({
+        title: "Parçalama hatası",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+      throw err;
+    }
+  }, [splitTarget, toast, loadDataFn]);
 
   const toggleExpand = useCallback((key: string) => {
     setExpandedKeys(prev => {
@@ -394,6 +421,14 @@ export function useProjeDetayState() {
     handleCopyTrackingLink: kesimActions.handleCopyTrackingLink,
     handleOpenTrackingPage: kesimActions.handleOpenTrackingPage,
     handleShowQrCode: kesimActions.handleShowQrCode,
+    splitModalOpen,
+    setSplitModalOpen: (open: boolean) => {
+      setSplitModalOpen(open);
+      if (!open) setSplitTarget(null);
+    },
+    splitTarget,
+    openSplitModal,
+    handleSplit,
   };
 }
 
