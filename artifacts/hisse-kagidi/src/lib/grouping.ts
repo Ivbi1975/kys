@@ -410,20 +410,27 @@ function mod7GroupDonations(donations: Donation[]): GroupedSegment[][] {
   const sameTypeAnimals: GroupedSegment[][] = [];
   const allTypeLeftovers: DonorUnit[] = [];
 
-  const sortedTypes = Array.from(typeGroups.entries()).sort(
-    (a, b) => getDonationTypePriority(a[0]) - getDonationTypePriority(b[0])
-  );
+  const typeShareCounts = new Map<string, number>();
+  for (const [dtype, typeUnits] of typeGroups) {
+    let total = 0;
+    for (const u of typeUnits) total += u.totalShares;
+    typeShareCounts.set(dtype, total);
+  }
+
+  const sortedTypes = Array.from(typeGroups.entries()).sort((a, b) => {
+    const countDiff = (typeShareCounts.get(b[0]) || 0) - (typeShareCounts.get(a[0]) || 0);
+    if (countDiff !== 0) return countDiff;
+    return getDonationTypePriority(a[0]) - getDonationTypePriority(b[0]);
+  });
   for (const [, typeUnits] of sortedTypes) {
     const { animals, leftover } = tryFlexibleMatch(typeUnits);
     sameTypeAnimals.push(...animals);
     allTypeLeftovers.push(...leftover);
   }
 
-  const { animals: mixedAnimals, leftover: afterMixed } = tryFlexibleMatch(allTypeLeftovers);
+  const leftoverAnimals = packLeftoversByType(allTypeLeftovers);
 
-  const leftoverAnimals = packLeftoversByType(afterMixed);
-
-  const allAnimals = [...fullAnimals, ...sameTypeAnimals, ...mixedAnimals, ...leftoverAnimals];
+  const allAnimals = [...fullAnimals, ...sameTypeAnimals, ...leftoverAnimals];
 
   return sortAnimalsByDominantType(allAnimals);
 }

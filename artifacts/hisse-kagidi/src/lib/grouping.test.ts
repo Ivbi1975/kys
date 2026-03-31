@@ -318,6 +318,28 @@ describe("donation type based grouping and sorting", () => {
     expect(vacipCount).toBe(5);
   });
 
+  it("packs leftovers starting from the type with most shares", () => {
+    const donations = [
+      ...Array.from({ length: 6 }, (_, i) => makeDonation({ description: `Adak ${i}`, donationType: "Adak" })),
+      ...Array.from({ length: 5 }, (_, i) => makeDonation({ description: `Vacip ${i}`, donationType: "Vacip" })),
+      ...Array.from({ length: 3 }, (_, i) => makeDonation({ description: `Akika ${i}`, donationType: "Akika" })),
+    ];
+    const groups = autoGroupDonations(donations);
+    expect(groups.length).toBe(2);
+
+    const group1Filled = groups[0].donations.filter(d => d.description.trim());
+    const group2Filled = groups[1].donations.filter(d => d.description.trim());
+
+    const totalAdak = [...group1Filled, ...group2Filled].filter(d => d.donationType === "Adak").length;
+    const totalVacip = [...group1Filled, ...group2Filled].filter(d => d.donationType === "Vacip").length;
+    expect(totalAdak).toBe(6);
+    expect(totalVacip).toBe(5);
+
+    const adakInFirst = groups[0].donations.filter(d => d.donationType === "Adak").length;
+    const adakInSecond = groups[1].donations.filter(d => d.donationType === "Adak").length;
+    expect(Math.max(adakInFirst, adakInSecond)).toBeGreaterThanOrEqual(5);
+  });
+
   it("handles mixed types with vacip dominant correctly", () => {
     const donations = [
       ...Array.from({ length: 4 }, (_, i) => makeDonation({ description: `Vacip ${i}`, donationType: "Vacip" })),
