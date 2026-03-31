@@ -5,6 +5,7 @@ import { asyncHandler } from "../../middleware/error-handler";
 import { ERROR_MESSAGES } from "../../lib/constants";
 import {
   moveDonations,
+  moveAnimalGroup,
   saveDonationTransfers,
   getTransferLog,
   getPendingEditRequests,
@@ -37,12 +38,58 @@ router.post("/kesim-alanlari/move-donations", asyncHandler(async (req, res) => {
       target_not_found: ERROR_MESSAGES.TARGET_KESIM_NOT_FOUND,
       different_project: ERROR_MESSAGES.MUST_BE_SAME_PROJECT,
       no_valid_donors: ERROR_MESSAGES.NO_VALID_DONORS,
+      all_donors_in_locked_groups: "Tüm bağışçılar kilitli veya kesilmiş gruplara ait. Transfer yapılamaz.",
     };
     res.status(result.status).json({ error: errorMap[result.error] || result.error });
     return;
   }
 
-  res.json({ success: true, count: result.count, skipped: result.skipped });
+  res.json({ success: true, count: result.count, skipped: result.skipped, movedIds: result.movedIds });
+  refreshProjectStats();
+}));
+
+router.post("/kesim-alanlari/move-animal-group", asyncHandler(async (req, res) => {
+  const parsed = z.object({
+    animalGroupId: z.string().min(1),
+    sourceKesimAlaniId: z.string().min(1),
+    targetKesimAlaniId: z.string().min(1),
+    lastUpdatedAt: z.string().optional(),
+  }).safeParse(req.body);
+
+  if (!parsed.success) {
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
+    return;
+  }
+
+  const { sourceKesimAlaniId, targetKesimAlaniId } = parsed.data;
+  if (sourceKesimAlaniId === targetKesimAlaniId) {
+    res.status(400).json({ error: ERROR_MESSAGES.SAME_SOURCE_TARGET });
+    return;
+  }
+
+  try {
+    const result = await moveAnimalGroup(parsed.data);
+    if (!result.ok) {
+      const errorMap: Record<string, string> = {
+        source_not_found: ERROR_MESSAGES.SOURCE_KESIM_NOT_FOUND,
+        target_not_found: ERROR_MESSAGES.TARGET_KESIM_NOT_FOUND,
+        different_project: ERROR_MESSAGES.MUST_BE_SAME_PROJECT,
+        group_not_in_source: ERROR_MESSAGES.GROUP_NOT_IN_SOURCE,
+        group_locked: ERROR_MESSAGES.GROUP_LOCKED,
+        group_kesildi: ERROR_MESSAGES.GROUP_KESILDI,
+      };
+      res.status(result.status).json({ error: errorMap[result.error] || result.error });
+      return;
+    }
+
+    res.json({ success: true, animalGroupId: result.animalGroupId, newAnimalNo: result.newAnimalNo });
+  } catch (err: any) {
+    if (err?.message === "concurrent_modification") {
+      res.status(409).json({ error: "Bu hayvan grubu başka biri tarafından değiştirilmiş. Lütfen sayfayı yenileyip tekrar deneyin." });
+      return;
+    }
+    throw err;
+  }
   refreshProjectStats();
 }));
 
@@ -60,6 +107,9 @@ router.post("/donation-transfers", asyncHandler(async (req, res) => {
       toKesimAlaniName: z.string(),
       removedFromSource: z.boolean(),
       shareCount: z.number().int().min(1),
+      transferType: z.enum(["donation", "animalGroup"]).default("donation"),
+      animalGroupId: z.string().optional(),
+      animalNo: z.number().int().optional(),
       createdAt: z.string(),
     })).min(1),
   });

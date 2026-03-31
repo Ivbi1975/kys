@@ -3,11 +3,18 @@ import type { KesimAlani, Donation } from "@/lib/types";
 export type SortField = "name" | "description" | "donationType" | "shareCount";
 
 export interface BasketItem {
+  type: "donation" | "animalGroup";
   donationId: string;
   kesimAlaniId: string;
   kesimAlaniName: string;
   name: string;
   description: string;
+  animalGroupId?: string;
+  animalNo?: number;
+  filledCount?: number;
+  colorTag?: string;
+  donationIds?: string[];
+  groupUpdatedAt?: string;
 }
 
 export type SaveFn = (
@@ -36,7 +43,11 @@ export function loadBasketFromStorage(projectId: string | null | undefined): Bas
     const key = projectId ? `${BASKET_STORAGE_KEY}-${projectId}` : BASKET_STORAGE_KEY;
     const raw = localStorage.getItem(key);
     if (!raw) return [];
-    return JSON.parse(raw);
+    const items = JSON.parse(raw) as BasketItem[];
+    return items.map(item => ({
+      ...item,
+      type: item.type || "donation",
+    }));
   } catch {
     return [];
   }

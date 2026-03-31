@@ -146,6 +146,9 @@ export interface DonationTransferEntry {
   toKesimAlaniName: string;
   removedFromSource: boolean;
   shareCount: number;
+  transferType?: "donation" | "animalGroup";
+  animalGroupId?: string;
+  animalNo?: number;
   createdAt: string;
 }
 

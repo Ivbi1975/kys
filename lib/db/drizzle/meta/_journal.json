@@ -113,6 +113,13 @@
       "when": 1774945976900,
       "tag": "0015_kesim_alani_split",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1774945356743,
+      "tag": "0016_transfer_type_columns",
+      "breakpoints": true
     }
   ]
 }

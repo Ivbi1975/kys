@@ -37,6 +37,7 @@ export interface AnimalGroup {
   kesildi?: boolean;
   kesildiAt?: string | null;
   teamId?: string | null;
+  updatedAt?: string;
 }
 
 export interface KesimAlani {

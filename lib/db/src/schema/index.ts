@@ -217,6 +217,9 @@ export const donationTransfersTable = pgTable("donation_transfers", {
   toKesimAlaniName: text("to_kesim_alani_name").notNull().default(""),
   removedFromSource: boolean("removed_from_source").notNull().default(true),
   shareCount: integer("share_count").notNull().default(1),
+  transferType: text("transfer_type").notNull().default("donation"),
+  animalGroupId: text("animal_group_id"),
+  animalNo: integer("animal_no"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [

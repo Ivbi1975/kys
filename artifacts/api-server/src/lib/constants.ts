@@ -68,6 +68,9 @@ export const ERROR_MESSAGES = {
   ADMIN_KEY_NOT_SET: "ADMIN_KEY ortam değişkeni ayarlanmamış",
   UNAUTHORIZED: "Yetkisiz erişim",
   TEAM_NOT_FOUND: "Ekip bulunamadı",
+  GROUP_LOCKED: "Kilitli hayvan grubu transfer edilemez",
+  GROUP_KESILDI: "Kesilmiş hayvan grubu transfer edilemez",
+  GROUP_NOT_IN_SOURCE: "Hayvan grubu kaynak kesim alanında bulunamadı",
 } as const;
 
 export const NOTE_WARNING_KEYWORDS = [

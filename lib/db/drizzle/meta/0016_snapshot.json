@@ -750,6 +750,25 @@
           "notNull": true,
           "default": 1
         },
+        "transfer_type": {
+          "name": "transfer_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'donation'"
+        },
+        "animal_group_id": {
+          "name": "animal_group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "animal_no": {
+          "name": "animal_no",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",

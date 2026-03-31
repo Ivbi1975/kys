@@ -20,6 +20,7 @@ import {
   CheckSquare,
   Square,
   Camera,
+  Package,
 } from "lucide-react";
 
 interface AnimalGroupCardProps {
@@ -50,6 +51,8 @@ interface AnimalGroupCardProps {
   onMoveDown: (groupIdx: number) => void;
   onSplit: (groupIdx: number) => void;
   onAddGroupToBasket: (groupIdx: number) => void;
+  onAddWholeAnimalToBasket: (groupIdx: number) => void;
+  basketAnimalGroupIds: Set<string>;
   onToggleLock: (groupIdx: number) => void;
   onDelete: (groupIdx: number) => void;
   onAssignTeam: (groupId: string, teamId: string | null) => void;
@@ -366,6 +369,8 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
     onMoveDown,
     onSplit,
     onAddGroupToBasket,
+    onAddWholeAnimalToBasket,
+    basketAnimalGroupIds,
     onToggleLock,
     onDelete,
     onAssignTeam,
@@ -532,12 +537,40 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
               e.stopPropagation();
               onAddGroupToBasket(groupIdx);
             }}
-            className={`p-0.5 rounded transition-colors ${group.locked || filledCount === 0 ? "opacity-30 cursor-not-allowed" : "text-emerald-500/60 hover:text-emerald-600"}`}
-            title={group.locked ? "Kilitli grup sepete eklenemez" : filledCount === 0 ? "Grupta bağışçı yok" : `Tümünü Sepete Ekle (${filledCount})`}
-            aria-label={group.locked ? "Kilitli grup sepete eklenemez" : filledCount === 0 ? "Grupta bağışçı yok" : `Tümünü Sepete Ekle (${filledCount})`}
-            disabled={group.locked || filledCount === 0}
+            className={`p-0.5 rounded transition-colors ${group.locked || group.kesildi || filledCount === 0 ? "opacity-30 cursor-not-allowed" : "text-emerald-500/60 hover:text-emerald-600"}`}
+            title={group.locked ? "Kilitli grup sepete eklenemez" : group.kesildi ? "Kesilmiş grup sepete eklenemez" : filledCount === 0 ? "Grupta bağışçı yok" : `Bağışçıları Sepete Ekle (${filledCount})`}
+            aria-label={group.locked ? "Kilitli grup sepete eklenemez" : group.kesildi ? "Kesilmiş grup sepete eklenemez" : filledCount === 0 ? "Grupta bağışçı yok" : `Bağışçıları Sepete Ekle (${filledCount})`}
+            disabled={group.locked || group.kesildi || filledCount === 0}
           >
             <ShoppingBag className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddWholeAnimalToBasket(groupIdx);
+            }}
+            className={`p-0.5 rounded transition-colors ${
+              group.locked || group.kesildi || filledCount === 0
+                ? "opacity-30 cursor-not-allowed"
+                : basketAnimalGroupIds.has(group.id)
+                ? "text-orange-500 bg-orange-100 dark:bg-orange-900/30"
+                : "text-orange-400/60 hover:text-orange-500"
+            }`}
+            title={
+              group.locked ? "Kilitli grup taşınamaz"
+                : group.kesildi ? "Kesilmiş grup taşınamaz"
+                : filledCount === 0 ? "Grupta bağışçı yok"
+                : basketAnimalGroupIds.has(group.id) ? "Komple hayvan zaten sepette"
+                : `Komple Hayvanı Sepete Ekle (hayvan + ${filledCount} bağışçı)`
+            }
+            aria-label={
+              group.locked ? "Kilitli grup taşınamaz"
+                : group.kesildi ? "Kesilmiş grup taşınamaz"
+                : `Komple Hayvanı Sepete Ekle (${filledCount} bağışçı)`
+            }
+            disabled={group.locked || group.kesildi || filledCount === 0 || basketAnimalGroupIds.has(group.id)}
+          >
+            <Package className="w-3.5 h-3.5" />
           </button>
           {(photoCounts[group.id] ?? 0) > 0 && (
             <button
@@ -699,6 +732,9 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
 
   const gId = prev.group.id;
   if ((prev.photoCounts[gId] ?? 0) !== (next.photoCounts[gId] ?? 0)) return false;
+
+  const gId2 = prev.group.id;
+  if (prev.basketAnimalGroupIds.has(gId2) !== next.basketAnimalGroupIds.has(gId2)) return false;
 
   if (prev.basketItemIds !== next.basketItemIds) {
     for (const d of prev.group.donations) {

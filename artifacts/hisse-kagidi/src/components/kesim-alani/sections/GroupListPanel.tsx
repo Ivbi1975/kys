@@ -51,6 +51,7 @@ export function GroupListPanel() {
     showOnlyIncomplete, startFilterTransition, swapSelection,
     toggleGroupCollapse, toggleGroupDonationSelect, toggleGroupLock, toggleGroupSelect,
     updateGroupDonation, updateGroupNotes, workspace, addGroupToBasket,
+    addWholeAnimalToBasket, basketAnimalGroupIds,
   } = ctx;
 
   const [groupSearchInput, setGroupSearchInput] = useState("");
@@ -90,6 +91,7 @@ export function GroupListPanel() {
         onToggleCollapse={toggleGroupCollapse} onToggleSelect={toggleGroupSelect}
         onSetColorTag={handleSetGroupColorTag} onMoveUp={moveGroupUp} onMoveDown={moveGroupDown}
         onSplit={openSplitGroupDialog} onAddGroupToBasket={addGroupToBasket}
+        onAddWholeAnimalToBasket={addWholeAnimalToBasket} basketAnimalGroupIds={basketAnimalGroupIds}
         onToggleLock={toggleGroupLock} onDelete={deleteAnimalGroup}
         onAssignTeam={handleAssignTeam} onViewPhotos={handleViewPhotos}
         onUpdateGroupDonation={updateGroupDonation} onHandleGroupCellTab={handleGroupCellTab}
@@ -107,7 +109,7 @@ export function GroupListPanel() {
     photoCounts, basketItemIds, selectedGroupDonations, swapSelection, highlightIncomplete,
     dragItem, dragOverGroup, dragOverItem, groupSearchQuery,
     toggleGroupCollapse, toggleGroupSelect, handleSetGroupColorTag, moveGroupUp, moveGroupDown,
-    openSplitGroupDialog, addGroupToBasket, toggleGroupLock, deleteAnimalGroup,
+    openSplitGroupDialog, addGroupToBasket, addWholeAnimalToBasket, basketAnimalGroupIds, toggleGroupLock, deleteAnimalGroup,
     handleAssignTeam, handleViewPhotos, updateGroupDonation, handleGroupCellTab,
     handleToggleBasketItem, handleSwapSelect, enhancedRemoveFromGroup, updateGroupNotes,
     handleDragStart, handleDragOver, handleDrop, handleDragEnd, handleDragOverCard, handleDragLeave,

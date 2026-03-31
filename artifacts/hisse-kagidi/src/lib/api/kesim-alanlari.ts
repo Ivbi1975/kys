@@ -62,6 +62,10 @@ export async function apiUpdateSingleGroup(
   });
 }
 
+export async function apiDeleteAnimalGroup(kesimAlaniId: string, groupId: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/kesim-alanlari/${kesimAlaniId}/animal-groups/${groupId}`, { method: "DELETE" });
+}
+
 export async function apiDeleteKesimAlani(id: string): Promise<{ success: boolean }> {
   return apiFetch<{ success: boolean }>(`/kesim-alanlari/${id}`, { method: "DELETE" });
 }
@@ -111,10 +115,17 @@ export async function apiPermanentDeleteDonation(kesimAlaniId: string, donationI
   return apiFetch<{ success: boolean }>(`/kesim-alanlari/${kesimAlaniId}/donations/${donationId}?permanent=true`, { method: "DELETE" });
 }
 
-export async function moveDonationsToKesimAlani(donationIds: string[], sourceKesimAlaniId: string, targetKesimAlaniId: string): Promise<{ success: boolean }> {
-  return apiFetch<{ success: boolean }>("/kesim-alanlari/move-donations", {
+export async function moveDonationsToKesimAlani(donationIds: string[], sourceKesimAlaniId: string, targetKesimAlaniId: string): Promise<{ success: boolean; count: number; skipped: number; movedIds: string[] }> {
+  return apiFetch<{ success: boolean; count: number; skipped: number; movedIds: string[] }>("/kesim-alanlari/move-donations", {
     method: "POST",
     body: JSON.stringify({ donationIds, sourceKesimAlaniId, targetKesimAlaniId }),
+  });
+}
+
+export async function moveAnimalGroupToKesimAlani(animalGroupId: string, sourceKesimAlaniId: string, targetKesimAlaniId: string, lastUpdatedAt?: string): Promise<{ success: boolean; animalGroupId: string; newAnimalNo: number }> {
+  return apiFetch<{ success: boolean; animalGroupId: string; newAnimalNo: number }>("/kesim-alanlari/move-animal-group", {
+    method: "POST",
+    body: JSON.stringify({ animalGroupId, sourceKesimAlaniId, targetKesimAlaniId, lastUpdatedAt }),
   });
 }
 

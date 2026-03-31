@@ -1,7 +1,9 @@
+import { useState } from "react";
 import type { KesimAlani, Donation } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronUp, Loader2, Package, Send, ShoppingBag, UserPlus, Wand2, X } from "lucide-react";
+import { COLOR_MAP } from "@/lib/constants";
 import { computeEffectiveShares } from "@/lib/grouping";
 import type { BasketItem } from "../hooks/types";
 
@@ -27,6 +29,9 @@ interface BasketPanelProps {
   setTransferToDonorListConfirm: (v: boolean) => void;
   transferToDonorListRemoving: boolean;
   transferForeignToCurrentDonorList: (removeFromSource: boolean) => void;
+  emptyGroupsAfterTransfer: Array<{ id: string; animalNo: number }>;
+  cleanupEmptyGroups: () => void;
+  dismissEmptyGroupsCleanup: () => void;
 }
 
 export function BasketPanel({
@@ -37,18 +42,27 @@ export function BasketPanel({
   siblingKesimAlanlari,
   transferToDonorListConfirm, setTransferToDonorListConfirm,
   transferToDonorListRemoving, transferForeignToCurrentDonorList,
+  emptyGroupsAfterTransfer, cleanupEmptyGroups, dismissEmptyGroupsCleanup,
 }: BasketPanelProps) {
-  if (basketItems.length === 0) return null;
+  const [crossKAConfirmOpen, setCrossKAConfirmOpen] = useState(false);
+
+  if (basketItems.length === 0 && emptyGroupsAfterTransfer.length === 0) return null;
+
+  const localDonationItems = localBasketItems.filter(b => b.type !== "animalGroup");
+  const localAnimalGroupItems = localBasketItems.filter(b => b.type === "animalGroup");
 
   const sharesMap = computeEffectiveShares(kesim.donations);
   let basketTotalShares = 0;
-  for (const b of localBasketItems) {
+  for (const b of localDonationItems) {
     const grouped = kesim.animalGroups.flatMap(g => g.donations).find(d => d.id === b.donationId);
     if (grouped) {
       basketTotalShares += 1;
     } else {
       basketTotalShares += sharesMap.get(b.donationId) || 1;
     }
+  }
+  for (const b of localAnimalGroupItems) {
+    basketTotalShares += (b.filledCount || 0);
   }
   const basketAnimals = Math.ceil(basketTotalShares / 7);
 
@@ -61,7 +75,8 @@ export function BasketPanel({
         >
           <ShoppingBag className="w-4 h-4 text-emerald-600 shrink-0" />
           <span className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
-            Sepet: {basketItems.length} bağışçı
+            Sepet: {basketItems.filter(b => b.type !== "animalGroup").length} bağışçı
+            {basketItems.filter(b => b.type === "animalGroup").length > 0 && `, ${basketItems.filter(b => b.type === "animalGroup").length} hayvan`}
           </span>
           {foreignBasketItems.length > 0 && (
             <span className="text-xs text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded-full font-semibold">
@@ -82,10 +97,30 @@ export function BasketPanel({
         </button>
         {basketOpen && (
           <div className="px-4 pb-3 space-y-2">
-            {localBasketItems.length > 0 && (() => {
-              const grouped: { key: string; label: string; items: typeof localBasketItems }[] = [];
+            {localAnimalGroupItems.length > 0 && (
+              <div className="flex items-center gap-1 text-xs text-orange-700 dark:text-orange-300 flex-wrap">
+                <span className="text-[10px] font-semibold mr-1">
+                  <Package className="w-3 h-3 inline mr-0.5" />
+                  Komple Hayvan:
+                </span>
+                {localAnimalGroupItems.map(b => (
+                  <span
+                    key={b.animalGroupId}
+                    className="px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900 rounded text-[10px] inline-flex items-center gap-0.5"
+                    style={b.colorTag && b.colorTag in COLOR_MAP ? { borderLeft: `3px solid ${COLOR_MAP[b.colorTag as keyof typeof COLOR_MAP]}` } : {}}
+                  >
+                    Hayvan {b.animalNo} ({b.filledCount} bağışçı)
+                    <button onClick={(e) => { e.stopPropagation(); removeFromBasket(b.donationId); }} className="hover:text-red-500">
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {localDonationItems.length > 0 && (() => {
+              const grouped: { key: string; label: string; items: typeof localDonationItems }[] = [];
               const seen = new Map<string, number>();
-              for (const b of localBasketItems) {
+              for (const b of localDonationItems) {
                 const label = (b.description || b.name).trim();
                 const existing = seen.get(label);
                 if (existing !== undefined) {
@@ -140,7 +175,7 @@ export function BasketPanel({
               </div>
             )}
             <div className="flex items-center gap-1 flex-wrap">
-              {localBasketItems.length > 0 && (
+              {localDonationItems.length > 0 && (
                 <>
                   <Select value={String(basketTransferTarget)} onValueChange={(v) => setBasketTransferTarget(parseInt(v))}>
                     <SelectTrigger className="h-7 w-36 text-xs">
@@ -186,7 +221,7 @@ export function BasketPanel({
                     variant="outline"
                     size="sm"
                     className="h-7 text-xs"
-                    onClick={() => transferBasketToOtherKA(basketCrossKATarget)}
+                    onClick={() => setCrossKAConfirmOpen(true)}
                     disabled={!basketCrossKATarget || crossKATransferring}
                   >
                     {crossKATransferring ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
@@ -208,7 +243,11 @@ export function BasketPanel({
           <div className="relative bg-background rounded-xl shadow-2xl border p-6 w-[400px] max-w-full" onClick={e => e.stopPropagation()}>
             <h3 className="font-semibold text-base mb-3">Bağışçı Listesine Ekle</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Sepetteki <strong>{basketItems.filter(b => b.kesimAlaniId !== kesim.id).length}</strong> bağışçıyı bu kesim alanının bağışçı listesine eklemek istiyorsunuz.
+              Sepetteki <strong>{basketItems.filter(b => b.kesimAlaniId !== kesim.id && b.type !== "animalGroup").length}</strong> bağışçıyı
+              {basketItems.filter(b => b.kesimAlaniId !== kesim.id && b.type === "animalGroup").length > 0 && (
+                <> ve <strong>{basketItems.filter(b => b.kesimAlaniId !== kesim.id && b.type === "animalGroup").length}</strong> komple hayvanı</>
+              )}
+              {" "}bu kesim alanının bağışçı listesine eklemek istiyorsunuz.
             </p>
             <p className="text-sm text-muted-foreground mb-4">
               Bu bağışçılar eski kesim alanlarından <strong>otomatik olarak kaldırılacaktır</strong>.
@@ -224,6 +263,78 @@ export function BasketPanel({
               >
                 {transferToDonorListRemoving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <UserPlus className="w-3.5 h-3.5 mr-1" />}
                 Ekle ve Kaynaktan Kaldır
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {crossKAConfirmOpen && (() => {
+        const targetKAName = siblingKesimAlanlari.find(ka => ka.id === basketCrossKATarget)?.name || basketCrossKATarget;
+        const donationCount = localBasketItems.filter(b => b.type !== "animalGroup").length;
+        const animalGroupCount = localBasketItems.filter(b => b.type === "animalGroup").length;
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setCrossKAConfirmOpen(false); }}>
+            <div className="absolute inset-0 bg-black/50" />
+            <div className="relative bg-background rounded-xl shadow-2xl border p-6 w-[440px] max-w-full" onClick={e => e.stopPropagation()}>
+              <h3 className="font-semibold text-base mb-3">Başka KA'ya Aktar</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Aşağıdaki öğeleri <strong>{targetKAName}</strong> kesim alanına aktarmak istediğinize emin misiniz?
+              </p>
+              <div className="text-sm space-y-1 mb-4 pl-2 border-l-2 border-emerald-300">
+                {donationCount > 0 && (
+                  <p><strong>{donationCount}</strong> bireysel bağışçı</p>
+                )}
+                {animalGroupCount > 0 && (
+                  <p><strong>{animalGroupCount}</strong> komple hayvan (tüm bağışçıları, notları ve fotoğraflarıyla birlikte)</p>
+                )}
+              </div>
+              <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 rounded p-2 mb-4">
+                Bu işlem geri alınamaz. Aktarılan öğeler bu kesim alanından kaldırılacaktır.
+              </p>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" size="sm" onClick={() => setCrossKAConfirmOpen(false)} disabled={crossKATransferring}>
+                  İptal
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setCrossKAConfirmOpen(false);
+                    transferBasketToOtherKA(basketCrossKATarget);
+                  }}
+                  disabled={crossKATransferring}
+                >
+                  {crossKATransferring ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Send className="w-3.5 h-3.5 mr-1" />}
+                  Onayla ve Aktar
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {emptyGroupsAfterTransfer.length > 0 && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) dismissEmptyGroupsCleanup(); }}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative bg-background rounded-xl shadow-2xl border p-6 w-[420px] max-w-full" onClick={e => e.stopPropagation()}>
+            <h3 className="font-semibold text-base mb-3">Boş Grupları Temizle</h3>
+            <p className="text-sm text-muted-foreground mb-3">
+              Aktarım sonrası <strong>{emptyGroupsAfterTransfer.length}</strong> hayvan grubu boş kaldı:
+            </p>
+            <div className="text-sm space-y-1 mb-4 pl-2 border-l-2 border-amber-300">
+              {emptyGroupsAfterTransfer.map(g => (
+                <p key={g.id}>Hayvan {g.animalNo}</p>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              Bu boş grupları temizlemek ister misiniz?
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={dismissEmptyGroupsCleanup}>
+                Hayır, Kalsın
+              </Button>
+              <Button size="sm" variant="destructive" onClick={cleanupEmptyGroups}>
+                Temizle
               </Button>
             </div>
           </div>

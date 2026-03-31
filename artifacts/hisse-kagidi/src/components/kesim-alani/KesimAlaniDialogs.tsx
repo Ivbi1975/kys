@@ -42,6 +42,7 @@ export function KesimAlaniDialogs(props: KesimAlaniStateReturn) {
     basketCrossKATarget, setBasketCrossKATarget, basketTransferTarget, setBasketTransferTarget,
     addToBasket, removeFromBasket, clearBasket, addDonorToBasket, transferBasketToGroup, autoDistributeBasket,
     crossKATransferring, transferBasketToOtherKA, transferForeignToCurrentDonorList,
+    emptyGroupsAfterTransfer, cleanupEmptyGroups, dismissEmptyGroupsCleanup,
     siblingKesimAlanlari, sortedDonorList, totalShares, filterTeam, setFilterTeam,
     jumpDialogOpen, setJumpDialogOpen,
     donorListReportOpen, setDonorListReportOpen, fullscreenMode, showScrollTop,
@@ -184,6 +185,9 @@ export function KesimAlaniDialogs(props: KesimAlaniStateReturn) {
         setTransferToDonorListConfirm={setTransferToDonorListConfirm}
         transferToDonorListRemoving={transferToDonorListRemoving}
         transferForeignToCurrentDonorList={transferForeignToCurrentDonorList}
+        emptyGroupsAfterTransfer={emptyGroupsAfterTransfer}
+        cleanupEmptyGroups={cleanupEmptyGroups}
+        dismissEmptyGroupsCleanup={dismissEmptyGroupsCleanup}
       />
 
       <JumpDialog

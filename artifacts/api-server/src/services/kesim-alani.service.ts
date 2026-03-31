@@ -113,6 +113,7 @@ export function assembleKesimAlani(
       kesildi: g.kesildi,
       kesildiAt: g.kesildiAt || null,
       teamId: g.teamId || null,
+      updatedAt: g.updatedAt ? g.updatedAt.toISOString() : null,
       donations: links.map(l => donationsById[l.donationId]).filter(Boolean),
     };
   });
