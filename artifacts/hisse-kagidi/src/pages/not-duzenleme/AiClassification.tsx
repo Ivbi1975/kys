@@ -18,6 +18,9 @@ import {
   X,
   FileBarChart,
   AlertTriangle,
+  RotateCcw,
+  FastForward,
+  Tags,
 } from "lucide-react";
 import type { LocalDonation, AiResult } from "./types";
 
@@ -47,7 +50,7 @@ interface AiClassificationProps {
   setRangeEnd: (v: number) => void;
   batchSize: number;
   setBatchSize: (v: number) => void;
-  startAiClassification: () => void;
+  startAiClassification: (resume?: boolean) => void;
   stopAiClassification: () => void;
   showAiReport: boolean;
   setShowAiReport: (v: boolean) => void;
@@ -55,6 +58,9 @@ interface AiClassificationProps {
   setAiReportCollapsed: (v: boolean) => void;
   aiReportStats: AiReportStats;
   scrollToDonation: (donationId: string) => void;
+  aiCategoryFilter: string | null;
+  setAiCategoryFilter: (v: string | null) => void;
+  handleAddLabelsToDescriptions: () => void;
 }
 
 export function AiClassification({
@@ -62,7 +68,8 @@ export function AiClassification({
   showAiPanel, setShowAiPanel, rangeMode, setRangeMode, rangeStart, setRangeStart,
   rangeEnd, setRangeEnd, batchSize, setBatchSize, startAiClassification, stopAiClassification,
   showAiReport, setShowAiReport, aiReportCollapsed, setAiReportCollapsed,
-  aiReportStats, scrollToDonation,
+  aiReportStats, scrollToDonation, aiCategoryFilter, setAiCategoryFilter,
+  handleAddLabelsToDescriptions,
 }: AiClassificationProps) {
   const resultsCount = aiResults.size;
   const warningsCount = Array.from(aiResults.values()).filter(r => r.warnings && r.warnings.trim() !== "").length;
@@ -116,18 +123,34 @@ export function AiClassification({
                 </Select>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               {!aiRunning ? (
-                <Button size="sm" onClick={startAiClassification} disabled={notesWithContent.length === 0}>
-                  <Play className="w-4 h-4 mr-1" />Başlat
-                </Button>
+                aiStopped && aiResults.size > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" onClick={() => startAiClassification(true)}>
+                      <FastForward className="w-4 h-4 mr-1" />Kaldığın Yerden Devam Et
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => startAiClassification(false)}>
+                      <RotateCcw className="w-4 h-4 mr-1" />Yeniden Başla
+                    </Button>
+                  </div>
+                ) : (
+                  <Button size="sm" onClick={() => startAiClassification(false)} disabled={notesWithContent.length === 0}>
+                    <Play className="w-4 h-4 mr-1" />Başlat
+                  </Button>
+                )
               ) : (
                 <Button variant="destructive" size="sm" onClick={stopAiClassification}>
                   <Square className="w-4 h-4 mr-1" />Durdur
                 </Button>
               )}
+              {aiResults.size > 0 && !aiRunning && (
+                <Button variant="outline" size="sm" onClick={handleAddLabelsToDescriptions}>
+                  <Tags className="w-4 h-4 mr-1" />Etiketleri Açıklamalara Ekle
+                </Button>
+              )}
               {(aiRunning || aiProgress.total > 0) && (
-                <div className="flex-1">
+                <div className="flex-1 min-w-[200px]">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs text-muted-foreground">{aiRunning ? "İşleniyor..." : aiStopped ? "Durduruldu" : "Tamamlandı"}</span>
                     <span className="text-xs font-medium">{aiProgress.done} / {aiProgress.total}</span>
@@ -141,6 +164,15 @@ export function AiClassification({
           </div>
         )}
       </Card>
+
+      {aiCategoryFilter && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Kategori filtresi:</span>
+          <Badge variant="default" className="text-xs cursor-pointer" onClick={() => setAiCategoryFilter(null)}>
+            {aiCategoryFilter.replace(/_/g, " ")} <X className="w-3 h-3 ml-1" />
+          </Badge>
+        </div>
+      )}
 
       {showAiReport && (
         <Card className="p-0 overflow-hidden border-primary/20">
@@ -184,7 +216,16 @@ export function AiClassification({
                   <h3 className="text-xs font-semibold text-muted-foreground mb-2">Kategori Dağılımı</h3>
                   <div className="flex flex-wrap gap-1.5">
                     {aiReportStats.categoryDistribution.map(([cat, count]) => (
-                      <Badge key={cat} variant="secondary" className="text-xs">{cat.replace(/_/g, " ")} <span className="ml-1 font-bold">{count}</span></Badge>
+                      <Badge
+                        key={cat}
+                        variant={aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr") ? "default" : "secondary"}
+                        className="text-xs cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => setAiCategoryFilter(
+                          aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr") ? null : cat
+                        )}
+                      >
+                        {cat.replace(/_/g, " ")} <span className="ml-1 font-bold">{count}</span>
+                      </Badge>
                     ))}
                   </div>
                 </div>

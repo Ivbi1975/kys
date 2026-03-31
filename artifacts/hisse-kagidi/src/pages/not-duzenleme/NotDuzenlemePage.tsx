@@ -15,6 +15,7 @@ import {
   Home,
   ChevronRight,
   AlertTriangle,
+  Sparkles,
 } from "lucide-react";
 import type { KesimAlani } from "@/lib/types";
 import {
@@ -84,6 +85,7 @@ export default function NotDuzenlemePage() {
   const [aiErrorBatches, setAiErrorBatches] = useState(0);
   const [showAiReport, setShowAiReport] = useState(false);
   const [aiReportCollapsed, setAiReportCollapsed] = useState(false);
+  const [aiCategoryFilter, setAiCategoryFilter] = useState<string | null>(null);
 
   const pushHistory = useCallback((newDonations: LocalDonation[]) => {
     const trimmed = historyRef.current.slice(0, historyIndexRef.current + 1);
@@ -166,6 +168,10 @@ export default function NotDuzenlemePage() {
   const filteredDonations = donations.filter(d => {
     const notes = d.notes || "";
     if (hideEmptyNotes && notes.trim() === "") return false;
+    if (aiCategoryFilter) {
+      const aiResult = aiResults.get(d.id);
+      if (!aiResult?.categories || !aiResult.categories.some(c => c.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr"))) return false;
+    }
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return notes.toLowerCase().includes(q) || (d.name || "").toLowerCase().includes(q) || (d.description || "").toLowerCase().includes(q);
@@ -200,23 +206,79 @@ export default function NotDuzenlemePage() {
     toast({ title: "Notlar silindi", description: `${targetIds.size} bağışçının notu temizlendi` });
   };
 
+  const handleQuickClean = (pattern: string) => {
+    let count = 0;
+    updateDonationsWithHistory(prev => prev.map(d => {
+      const notes = d.notes || "";
+      if (notes.includes(pattern)) { count++; return { ...d, notes: notes.replaceAll(pattern, "").replace(/\s{2,}/g, " ").trim() }; }
+      return d;
+    }));
+    toast({ title: count > 0 ? "Temizlendi" : "Bulunamadı", description: count > 0 ? `${count} bağışçıda "${pattern}" temizlendi` : `"${pattern}" metni hiçbir notta bulunamadı` });
+  };
+
+  const DONATION_TYPE_LABELS = ["adak", "akika", "vacip", "nafile"];
+
+  const handleAddLabelsToDescriptions = () => {
+    let count = 0;
+    updateDonationsWithHistory(prev => prev.map(d => {
+      const aiResult = aiResults.get(d.id);
+      if (!aiResult?.categories || aiResult.categories.length === 0) return d;
+      const labelsToAdd = aiResult.categories.filter(cat => {
+        const catLower = cat.toLocaleLowerCase("tr");
+        return !DONATION_TYPE_LABELS.some(dt => dt.toLocaleLowerCase("tr") === catLower);
+      });
+      if (labelsToAdd.length === 0) return d;
+      const currentDesc = (d.description || "").trim();
+      const descLower = currentDesc.toLocaleLowerCase("tr");
+      const newLabels = labelsToAdd.filter(l => {
+        const displayForm = l.replace(/_/g, " ").toLocaleLowerCase("tr");
+        const rawForm = l.toLocaleLowerCase("tr");
+        return !descLower.includes(displayForm) && !descLower.includes(rawForm);
+      });
+      if (newLabels.length === 0) return d;
+      count++;
+      const labelStr = newLabels.map(l => l.replace(/_/g, " ")).join(", ");
+      return { ...d, description: currentDesc ? `${currentDesc} [${labelStr}]` : `[${labelStr}]` };
+    }));
+    toast({ title: count > 0 ? "Etiketler Eklendi" : "Eklenecek etiket yok", description: count > 0 ? `${count} bağışçının açıklamasına etiketler eklendi` : "Tüm etiketler zaten mevcut veya donationType ile eşleşiyor" });
+  };
+
   const handleSave = async () => {
     if (!kesim) return;
     setSaving(true);
     try {
-      const updates = donations.filter(d => {
+      const updates: { donationId: string; notes?: string; description?: string }[] = [];
+      for (const d of donations) {
         const orig = kesim.donations.find(x => x.id === d.id) || kesim.animalGroups.flatMap(g => g.donations).find(x => x.id === d.id);
-        return orig && orig.notes !== d.notes;
-      }).map(d => ({ donationId: d.id, notes: d.notes }));
+        if (!orig) continue;
+        const entry: { donationId: string; notes?: string; description?: string } = { donationId: d.id };
+        if (orig.notes !== d.notes) entry.notes = d.notes;
+        if ((orig.description || "") !== (d.description || "")) entry.description = d.description;
+        if (entry.notes !== undefined || entry.description !== undefined) updates.push(entry);
+      }
       if (updates.length === 0) { toast({ title: "Değişiklik yok" }); setSaving(false); setDirty(false); return; }
       await bulkUpdateNotes(kesim.id, updates);
       setKesim(prev => {
         if (!prev) return prev;
-        const noteMap = new Map(updates.map(u => [u.donationId, u.notes]));
-        return { ...prev, donations: prev.donations.map(d => noteMap.has(d.id) ? { ...d, notes: noteMap.get(d.id)! } : d), animalGroups: prev.animalGroups.map(g => ({ ...g, donations: g.donations.map(d => noteMap.has(d.id) ? { ...d, notes: noteMap.get(d.id)! } : d) })) };
+        const updateMap = new Map(updates.map(u => [u.donationId, u]));
+        const applyUpdate = <T extends { id: string; notes: string; description: string }>(d: T): T => {
+          const u = updateMap.get(d.id);
+          if (!u) return d;
+          return {
+            ...d,
+            ...(u.notes !== undefined ? { notes: u.notes } : {}),
+            ...(u.description !== undefined ? { description: u.description } : {}),
+          };
+        };
+        return { ...prev, donations: prev.donations.map(applyUpdate), animalGroups: prev.animalGroups.map(g => ({ ...g, donations: g.donations.map(applyUpdate) })) };
       });
       setDirty(false);
-      toast({ title: "Kaydedildi", description: `${updates.length} bağışçının notu güncellendi` });
+      const noteCount = updates.filter(u => u.notes !== undefined).length;
+      const descCount = updates.filter(u => u.description !== undefined).length;
+      const parts = [];
+      if (noteCount > 0) parts.push(`${noteCount} not`);
+      if (descCount > 0) parts.push(`${descCount} açıklama`);
+      toast({ title: "Kaydedildi", description: `${parts.join(" ve ")} güncellendi` });
     } catch (err) {
       toast({ title: "Hata", description: err instanceof Error ? err.message : "Kaydetme hatası", variant: "destructive" });
     } finally { setSaving(false); }
@@ -224,30 +286,58 @@ export default function NotDuzenlemePage() {
 
   const notesWithContent = donations.filter(d => (d.notes || "").trim() !== "");
 
-  const startAiClassification = async () => {
+  const startAiClassification = async (resume = false) => {
     if (!kesim) return;
     aiStopRef.current = false;
-    setAiRunning(true); setAiStopped(false); setAiResults(new Map()); setAiSaveStatus("idle"); setAiErrorBatches(0); setShowAiReport(false); setAiReportCollapsed(false);
+    setAiRunning(true); setAiStopped(false); setAiSaveStatus("idle"); setAiErrorBatches(0); setShowAiReport(false); setAiReportCollapsed(false);
+    if (!resume) { setAiResults(new Map()); }
     let toProcess: LocalDonation[];
     if (rangeMode === "all") { toProcess = donations; } else { toProcess = donations.slice(Math.max(1, rangeStart) - 1, Math.min(donations.length, rangeEnd)); }
-    const withNotes = toProcess.filter(d => (d.notes || "").trim() !== "");
-    if (withNotes.length === 0) { toast({ title: "İşlenecek not yok", description: "Notu olan bağışçı bulunamadı" }); setAiRunning(false); return; }
-    setAiProgress({ done: 0, total: withNotes.length });
+    let withNotes = toProcess.filter(d => (d.notes || "").trim() !== "");
+    if (resume) {
+      withNotes = withNotes.filter(d => !aiResults.has(d.id));
+    }
+    if (withNotes.length === 0) { toast({ title: resume ? "Devam edilecek not yok" : "İşlenecek not yok", description: resume ? "Tüm bağışçılar zaten işlenmiş" : "Notu olan bağışçı bulunamadı" }); setAiRunning(false); return; }
+    const previouslyDone = resume ? aiResults.size : 0;
+    const totalToProcess = previouslyDone + withNotes.length;
+    setAiProgress({ done: previouslyDone, total: totalToProcess });
     const batches: LocalDonation[][] = [];
     for (let i = 0; i < withNotes.length; i += batchSize) batches.push(withNotes.slice(i, i + batchSize));
-    let done = 0; let errorCount = 0;
+    let done = previouslyDone; let errorCount = 0;
     for (const batch of batches) {
       if (aiStopRef.current) { setAiStopped(true); break; }
       try {
         const { results } = await classifyNotes(batch.map(d => ({ id: d.id, name: d.name || d.description, donationType: d.donationType, vekalet: d.vekalet, notes: d.notes })));
-        setAiResults(prev => { const next = new Map(prev); for (const r of results) next.set(r.donationId, { ...r, donationType: batch.find(d => d.id === r.donationId)?.donationType }); return next; });
-        try { setAiSaveStatus("saving"); await saveAiClassifications(results.map(r => ({ donationId: r.donationId, categories: r.categories || [], warnings: r.warnings || "" }))); setAiSaveStatus("saved"); } catch { setAiSaveStatus("error"); }
-        done += batch.length; setAiProgress({ done, total: withNotes.length });
+        const normalizedResults = results.map(r => {
+          const donor = batch.find(d => d.id === r.donationId);
+          const donationType = donor?.donationType || "";
+          let warnings = r.warnings || "";
+          if (warnings && donationType && r.categories) {
+            const dtLower = donationType.toLocaleLowerCase("tr");
+            const catsLower = r.categories.map(c => c.toLocaleLowerCase("tr"));
+            if (catsLower.includes(dtLower)) {
+              warnings = warnings
+                .split(/[.;]\s*/)
+                .filter(s => !s.toLocaleLowerCase("tr").includes(dtLower) || s.toLocaleLowerCase("tr").includes("tutarsız"))
+                .join(". ")
+                .trim();
+              if (warnings === "." || warnings === ",") warnings = "";
+            }
+          }
+          return { ...r, warnings, donationType };
+        });
+        setAiResults(prev => {
+          const next = new Map(prev);
+          for (const nr of normalizedResults) next.set(nr.donationId, nr);
+          return next;
+        });
+        try { setAiSaveStatus("saving"); await saveAiClassifications(normalizedResults.map(r => ({ donationId: r.donationId, categories: r.categories || [], warnings: r.warnings || "" }))); setAiSaveStatus("saved"); } catch { setAiSaveStatus("error"); }
+        done += batch.length; setAiProgress({ done, total: totalToProcess });
         if (batch !== batches[batches.length - 1] && !aiStopRef.current) await new Promise(res => setTimeout(res, 1000));
       } catch (err) {
         errorCount++; setAiErrorBatches(errorCount);
         toast({ title: "AI Batch Hatası", description: `Batch ${Math.floor(done / batchSize) + 1} hata verdi: ${err instanceof Error ? err.message : "Sınıflandırma hatası"}. Diğer batch'lere devam ediliyor.`, variant: "destructive" });
-        done += batch.length; setAiProgress({ done, total: withNotes.length });
+        done += batch.length; setAiProgress({ done, total: totalToProcess });
         if (batch !== batches[batches.length - 1] && !aiStopRef.current) await new Promise(res => setTimeout(res, 1000));
       }
     }
@@ -272,7 +362,15 @@ export default function NotDuzenlemePage() {
     const withWarnings = results.filter(r => r.warnings && r.warnings.trim() !== "");
     const withRequests = results.filter(r => r.requests && r.requests.trim() !== "");
     const categoryMap = new Map<string, number>();
-    for (const r of results) { if (r.categories) for (const cat of r.categories) categoryMap.set(cat, (categoryMap.get(cat) || 0) + 1); }
+    const categoryCanonical = new Map<string, string>();
+    for (const r of results) {
+      if (r.categories) for (const cat of r.categories) {
+        const key = cat.toLocaleLowerCase("tr");
+        if (!categoryCanonical.has(key)) categoryCanonical.set(key, cat);
+        const canonical = categoryCanonical.get(key)!;
+        categoryMap.set(canonical, (categoryMap.get(canonical) || 0) + 1);
+      }
+    }
     return { totalProcessed: results.length, warningDonors: withWarnings, warningCount: withWarnings.length, requestCount: withRequests.length, categoryDistribution: Array.from(categoryMap.entries()).sort((a, b) => b[1] - a[1]), errorBatches: aiErrorBatches };
   })();
 
@@ -313,6 +411,8 @@ export default function NotDuzenlemePage() {
             <Search className="w-4 h-4 text-muted-foreground shrink-0" />
             <Input placeholder="Notlarda ara..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1" />
             <Button variant="outline" size="sm" onClick={() => setShowReplaceBar(!showReplaceBar)}><Replace className="w-4 h-4 mr-1" />Değiştir</Button>
+            <Button variant="outline" size="sm" onClick={() => handleQuickClean("- kk")} title="Tüm notlardan '- kk' kalıbını temizle"><Sparkles className="w-4 h-4 mr-1" />- kk</Button>
+            <Button variant="outline" size="sm" onClick={() => handleQuickClean("- hvl")} title="Tüm notlardan '- hvl' kalıbını temizle"><Sparkles className="w-4 h-4 mr-1" />- hvl</Button>
             <Button variant="destructive" size="sm" onClick={handleBulkDeleteNotes}><Trash2 className="w-4 h-4 mr-1" />Notları Sil</Button>
           </div>
           {showReplaceBar && (
@@ -333,6 +433,8 @@ export default function NotDuzenlemePage() {
           showAiReport={showAiReport} setShowAiReport={setShowAiReport}
           aiReportCollapsed={aiReportCollapsed} setAiReportCollapsed={setAiReportCollapsed}
           aiReportStats={aiReportStats} scrollToDonation={scrollToDonation}
+          aiCategoryFilter={aiCategoryFilter} setAiCategoryFilter={setAiCategoryFilter}
+          handleAddLabelsToDescriptions={handleAddLabelsToDescriptions}
         />
 
         <DonationsTable
@@ -341,6 +443,7 @@ export default function NotDuzenlemePage() {
           aiRunning={aiRunning} aiResults={aiResults}
           handleNoteChange={handleNoteChange} commitNoteChange={commitNoteChange}
           updateDonationsWithHistory={updateDonationsWithHistory}
+          aiCategoryFilter={aiCategoryFilter} setAiCategoryFilter={setAiCategoryFilter}
         />
       </div>
 

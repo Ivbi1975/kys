@@ -33,11 +33,14 @@ interface DonationsTableProps {
   handleNoteChange: (id: string, value: string) => void;
   commitNoteChange: (id: string) => void;
   updateDonationsWithHistory: (updater: (prev: LocalDonation[]) => LocalDonation[]) => void;
+  aiCategoryFilter: string | null;
+  setAiCategoryFilter: (v: string | null) => void;
 }
 
 export function DonationsTable({
   donations, filteredDonations, searchQuery, hideEmptyNotes, setHideEmptyNotes,
   aiRunning, aiResults, handleNoteChange, commitNoteChange, updateDonationsWithHistory,
+  aiCategoryFilter, setAiCategoryFilter,
 }: DonationsTableProps) {
   return (
     <>
@@ -46,6 +49,7 @@ export function DonationsTable({
           {filteredDonations.length}/{donations.length} bağışçı gösteriliyor
           {searchQuery && ` ("${searchQuery}" araması)`}
           {hideEmptyNotes && " (notu olmayanlar gizli)"}
+          {aiCategoryFilter && ` (${aiCategoryFilter.replace(/_/g, " ")} filtresi)`}
         </div>
         <Button variant={hideEmptyNotes ? "default" : "outline"} size="sm" onClick={() => setHideEmptyNotes(prev => !prev)} className="text-xs h-7">
           {hideEmptyNotes ? "Tümünü Göster" : "Notu Olmayanları Gizle"}
@@ -115,7 +119,14 @@ export function DonationsTable({
                             <div className="flex flex-wrap gap-0.5 min-w-0">
                               {aiResult.categories && aiResult.categories.length > 0 ? (
                                 aiResult.categories.slice(0, 2).map(cat => (
-                                  <Badge key={cat} variant="secondary" className="text-[10px] px-1 py-0">{cat.replace(/_/g, " ")}</Badge>
+                                  <Badge
+                                    key={cat}
+                                    variant={aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr") ? "default" : "secondary"}
+                                    className="text-[10px] px-1 py-0 cursor-pointer"
+                                    onClick={(e) => { e.stopPropagation(); setAiCategoryFilter(aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr") ? null : cat); }}
+                                  >
+                                    {cat.replace(/_/g, " ")}
+                                  </Badge>
                                 ))
                               ) : (
                                 <span className="text-[10px] text-muted-foreground">sonuç var</span>
@@ -132,7 +143,14 @@ export function DonationsTable({
                           {aiResult.categories && aiResult.categories.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {aiResult.categories.map(cat => (
-                                <Badge key={cat} variant="secondary" className="text-xs">{cat.replace(/_/g, " ")}</Badge>
+                                <Badge
+                                  key={cat}
+                                  variant={aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr") ? "default" : "secondary"}
+                                  className="text-xs cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={() => setAiCategoryFilter(aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr") ? null : cat)}
+                                >
+                                  {cat.replace(/_/g, " ")}
+                                </Badge>
                               ))}
                             </div>
                           )}
@@ -161,7 +179,7 @@ export function DonationsTable({
             {filteredDonations.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="text-center text-muted-foreground py-12 text-sm">
-                  {searchQuery ? "Arama sonucu bulunamadı" : "Bağışçı yok"}
+                  {aiCategoryFilter ? `"${aiCategoryFilter.replace(/_/g, " ")}" kategorisinde bağışçı bulunamadı` : searchQuery ? "Arama sonucu bulunamadı" : "Bağışçı yok"}
                 </TableCell>
               </TableRow>
             )}

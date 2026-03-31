@@ -348,7 +348,8 @@ router.put("/ai-notes/bulk-update", asyncHandler(async (req, res) => {
     kesimAlaniId: z.string(),
     updates: z.array(z.object({
       donationId: z.string(),
-      notes: z.string(),
+      notes: z.string().optional(),
+      description: z.string().optional(),
     })).max(2000),
   }).safeParse(req.body);
 
@@ -362,11 +363,15 @@ router.put("/ai-notes/bulk-update", asyncHandler(async (req, res) => {
   await db.transaction(async (tx) => {
     for (let i = 0; i < updates.length; i += TX_BATCH_SIZE) {
       const chunk = updates.slice(i, i + TX_BATCH_SIZE);
-      await Promise.all(chunk.map(u =>
-        tx.update(donationsTable)
-          .set({ notes: u.notes })
-          .where(eq(donationsTable.id, u.donationId))
-      ));
+      await Promise.all(chunk.map(u => {
+        const setFields: Record<string, string> = {};
+        if (u.notes !== undefined) setFields.notes = u.notes;
+        if (u.description !== undefined) setFields.description = u.description;
+        if (Object.keys(setFields).length === 0) return Promise.resolve();
+        return tx.update(donationsTable)
+          .set(setFields)
+          .where(eq(donationsTable.id, u.donationId));
+      }));
     }
   });
 

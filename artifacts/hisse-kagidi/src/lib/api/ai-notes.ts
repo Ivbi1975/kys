@@ -46,7 +46,7 @@ export async function saveAiClassifications(classifications: { donationId: strin
   });
 }
 
-export async function bulkUpdateNotes(kesimAlaniId: string, updates: { donationId: string; notes: string }[]): Promise<{ success: boolean; count: number }> {
+export async function bulkUpdateNotes(kesimAlaniId: string, updates: { donationId: string; notes?: string; description?: string }[]): Promise<{ success: boolean; count: number }> {
   return apiFetch<{ success: boolean; count: number }>("/ai-notes/bulk-update", {
     method: "PUT",
     body: JSON.stringify({ kesimAlaniId, updates }),
