@@ -31,3 +31,6 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
+
+[userenv.production]
+ALLOWED_ORIGINS = "https://kys.gelecekvadisi.org,https://liste.gelecekvadisi.org"
