@@ -15,6 +15,98 @@ export const COLUMN_OPTIONS: { value: ColumnMapping; label: string }[] = [
   { value: "skip", label: "Atla (kullanma)" },
 ];
 
+const COLUMN_KEYWORDS: Record<Exclude<ColumnMapping, "skip">, string[]> = {
+  name: ["adına kesilen", "adina kesilen", "kesilen", "ad", "isim", "bağışçı", "bagisci", "donor", "name", "adı", "adi", "kime", "kimin adına"],
+  description: ["vekaleti veren", "vekalet veren", "veren", "açıklama", "aciklama", "description", "desc", "kimden", "gönderen", "gonderen"],
+  donationType: ["cinsi", "cins", "tür", "tur", "tip", "type", "donation type", "bağış türü", "bagis turu", "kurban türü", "kurban cinsi", "çeşit", "cesit", "nevi"],
+  shareCount: ["hisse sayısı", "hisse sayisi", "hisse", "share", "adet", "miktar", "sayı", "sayi", "count", "pay"],
+  vekalet: ["vekalet no", "vekalet", "vekâlet", "numara", "sıra no", "sira no", "fiş no", "fiş", "fis", "makbuz no", "makbuz"],
+  notes: ["notlar", "not", "note", "notes", "açıklama notu", "ek bilgi", "bilgi", "memo", "yorum"],
+};
+
+function normalizeText(text: string): string {
+  return text
+    .toLocaleLowerCase("tr")
+    .replace(/[^a-zçğıöşü0-9\s]/gi, "")
+    .trim();
+}
+
+function matchColumnHeader(header: string): ColumnMapping {
+  const normalized = normalizeText(header);
+  if (!normalized || normalized.length < 2) return "skip";
+
+  let bestField: ColumnMapping = "skip";
+  let bestScore = 0;
+
+  for (const [field, keywords] of Object.entries(COLUMN_KEYWORDS) as [Exclude<ColumnMapping, "skip">, string[]][]) {
+    for (const keyword of keywords) {
+      let score = 0;
+
+      if (normalized === keyword) {
+        score = 1.0;
+      } else if (normalized.includes(keyword) && keyword.length >= 3) {
+        score = 0.9;
+      } else if (keyword.includes(normalized) && normalized.length >= 4) {
+        score = 0.8;
+      } else if (normalized.length >= 3 && keyword.length >= 3) {
+        const sim = computeSimilarity(normalized, keyword);
+        if (sim >= 0.7) {
+          score = sim * 0.7;
+        }
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestField = field;
+      }
+    }
+  }
+
+  return bestScore >= 0.4 ? bestField : "skip";
+}
+
+function computeSimilarity(a: string, b: string): number {
+  if (a === b) return 1;
+  const longer = a.length > b.length ? a : b;
+  const shorter = a.length > b.length ? b : a;
+  if (longer.length === 0) return 1;
+
+  const costs: number[] = [];
+  for (let i = 0; i <= longer.length; i++) {
+    let lastValue = i;
+    for (let j = 0; j <= shorter.length; j++) {
+      if (i === 0) {
+        costs[j] = j;
+      } else if (j > 0) {
+        let newValue = costs[j - 1];
+        if (longer[i - 1] !== shorter[j - 1]) {
+          newValue = Math.min(newValue, lastValue, costs[j]) + 1;
+        }
+        costs[j - 1] = lastValue;
+        lastValue = newValue;
+      }
+    }
+    if (i > 0) costs[shorter.length] = lastValue;
+  }
+  return (longer.length - costs[shorter.length]) / longer.length;
+}
+
+function autoMapColumns(headers: string[]): ColumnMapping[] {
+  const mappings: ColumnMapping[] = [];
+  const usedFields = new Set<ColumnMapping>();
+
+  for (const header of headers) {
+    const match = matchColumnHeader(header);
+    if (match !== "skip" && match !== "notes" && usedFields.has(match)) {
+      mappings.push("skip");
+    } else {
+      mappings.push(match);
+      if (match !== "skip") usedFields.add(match);
+    }
+  }
+  return mappings;
+}
+
 const getXLSX = () => import("xlsx-js-style");
 
 function generateId(): string {
@@ -79,12 +171,20 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
   function processRawData(rows: string[][]) {
     setPreviewData(rows);
     const colCount = Math.max(...rows.map((r) => r.length));
-    const defaultMappings: ColumnMapping[] = [];
-    const defaults: ColumnMapping[] = ["skip", "skip", "vekalet", "description", "name", "donationType", "notes"];
-    for (let i = 0; i < colCount; i++) {
-      defaultMappings.push(i < defaults.length ? defaults[i] : "skip");
+
+    if (rows.length > 0 && hasHeaderRow) {
+      const headers = rows[0].map((cell) => String(cell ?? "").trim());
+      const smartMappings = autoMapColumns(headers);
+      while (smartMappings.length < colCount) smartMappings.push("skip");
+      setColumnMappings(smartMappings);
+    } else {
+      const defaultMappings: ColumnMapping[] = [];
+      const defaults: ColumnMapping[] = ["skip", "skip", "vekalet", "description", "name", "donationType", "notes"];
+      for (let i = 0; i < colCount; i++) {
+        defaultMappings.push(i < defaults.length ? defaults[i] : "skip");
+      }
+      setColumnMappings(defaultMappings);
     }
-    setColumnMappings(defaultMappings);
     setBulkStep("mapping");
   }
 
@@ -157,6 +257,7 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
         notes: "",
       };
 
+      const notesParts: string[] = [];
       for (let c = 0; c < columnMappings.length; c++) {
         const mapping = columnMappings[c];
         const cellValue = String(row[c] ?? "").trim();
@@ -172,9 +273,10 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
         } else if (mapping === "vekalet") {
           donation.vekalet = cellValue;
         } else if (mapping === "notes") {
-          donation.notes = cellValue;
+          notesParts.push(cellValue);
         }
       }
+      donation.notes = notesParts.join(" | ");
 
       if (donation.name) {
         newDonations.push(donation as Donation);
@@ -198,6 +300,7 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
       vekalet: "",
       notes: "",
     };
+    const notesParts: string[] = [];
     for (let c = 0; c < columnMappings.length; c++) {
       const mapping = columnMappings[c];
       const cellValue = String(row[c] ?? "").trim();
@@ -213,9 +316,10 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
       } else if (mapping === "vekalet") {
         donation.vekalet = cellValue;
       } else if (mapping === "notes") {
-        donation.notes = cellValue;
+        notesParts.push(cellValue);
       }
     }
+    donation.notes = notesParts.join(" | ");
     return donation as Donation;
   }
 
