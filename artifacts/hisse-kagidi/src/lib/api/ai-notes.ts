@@ -27,6 +27,8 @@ export interface AiJobStatus {
   totalDonations: number;
   processedDonations: number;
   results?: AiClassificationResult[];
+  failedBatchCount?: number;
+  totalBatches?: number;
   error?: string;
   createdAt?: string;
   updatedAt?: string;

@@ -90,8 +90,46 @@ function parseAiResults(content: string): unknown[] {
     const firstArrayValue = Object.values(parsed).find(v => Array.isArray(v));
     return (firstArrayValue as unknown[]) || [];
   } catch {
-    return [];
+    return tryRecoverTruncatedJson(content);
   }
+}
+
+function tryRecoverTruncatedJson(content: string): unknown[] {
+  const arrayMatch = content.match(/\[[\s\S]*/);
+  if (!arrayMatch) {
+    const objMatch = content.match(/\{[\s\S]*/);
+    if (!objMatch) return [];
+    const raw = objMatch[0];
+    const objects: unknown[] = [];
+    const objRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+    let m: RegExpExecArray | null;
+    while ((m = objRegex.exec(raw)) !== null) {
+      try {
+        objects.push(JSON.parse(m[0]));
+      } catch { /* skip */ }
+    }
+    return objects;
+  }
+
+  let raw = arrayMatch[0];
+  for (let i = raw.length; i >= 1; i--) {
+    const attempt = raw.slice(0, i);
+    const closed = attempt.endsWith("]") ? attempt : attempt.replace(/,\s*$/, "") + "]";
+    try {
+      const parsed = JSON.parse(closed);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch { /* continue */ }
+  }
+
+  const objects: unknown[] = [];
+  const objRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = objRegex.exec(raw)) !== null) {
+    try {
+      objects.push(JSON.parse(m[0]));
+    } catch { /* skip */ }
+  }
+  return objects;
 }
 
 router.get("/ai-notes/settings", asyncHandler(async (_req, res) => {
@@ -157,7 +195,7 @@ router.post("/ai-notes/classify", asyncHandler(async (req, res) => {
 
   const response = await openai.chat.completions.create({
     model: "gpt-5-mini",
-    max_completion_tokens: 8192,
+    max_completion_tokens: 16384,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: JSON.stringify(userContent) },
@@ -207,7 +245,7 @@ router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
   });
 }));
 
-const CHUNK_SIZE = 50;
+const CHUNK_SIZE = 25;
 const PARALLEL_CHUNKS = 3;
 
 async function isJobCancelled(jobId: string): Promise<boolean> {
@@ -215,13 +253,13 @@ async function isJobCancelled(jobId: string): Promise<boolean> {
   return !job || job.status === AiJobStatus.CANCELLED;
 }
 
-async function processOneChunk(
+async function callAiForDonations(
   systemPrompt: string,
-  chunk: Array<{ id: string; name: string; donationType: string; vekalet: string; notes: string }>,
+  items: Array<{ id: string; name: string; donationType: string; vekalet: string; notes: string }>,
   jobId: string,
   chunkIndex: number,
 ): Promise<unknown[]> {
-  const userContent = chunk.map(d => ({
+  const userContent = items.map(d => ({
     donationId: d.id,
     isim: d.name,
     cinsi: d.donationType,
@@ -234,32 +272,136 @@ async function processOneChunk(
     try {
       const response = await openai.chat.completions.create({
         model: "gpt-5-mini",
-        max_completion_tokens: 8192,
+        max_completion_tokens: 16384,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: JSON.stringify(userContent) },
         ],
         response_format: { type: "json_object" },
       });
+
+      const finishReason = response.choices[0]?.finish_reason;
       const content = response.choices[0]?.message?.content || "{}";
+
+      if (finishReason === "length") {
+        logger.warn({ jobId, chunk: chunkIndex + 1, finishReason }, "AI response truncated (token limit)");
+      }
+
       return parseAiResults(content);
     } catch (err) {
       retries--;
       if (retries === 0) {
-        logger.error({ err, jobId, chunk: chunkIndex + 1 }, "AI job chunk failed after 3 retries");
-        return chunk.map(d => ({
-          donationId: d.id,
-          categories: [],
-          requests: "",
-          warnings: "AI işlemi başarısız oldu",
-          summary: "",
-        }));
+        logger.error({ err, jobId, chunk: chunkIndex + 1 }, "AI call failed after 3 retries");
+        return [];
       }
       const delay = (4 - retries) * 2000;
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
   return [];
+}
+
+function findMissingDonations(
+  chunk: Array<{ id: string; name: string; donationType: string; vekalet: string; notes: string }>,
+  results: unknown[],
+): Array<{ id: string; name: string; donationType: string; vekalet: string; notes: string }> {
+  const returnedIds = new Set<string>();
+  for (const r of results) {
+    if (r && typeof r === "object" && "donationId" in r) {
+      returnedIds.add(String((r as { donationId: string }).donationId));
+    }
+  }
+  return chunk.filter(d => !returnedIds.has(d.id));
+}
+
+async function processOneChunk(
+  systemPrompt: string,
+  chunk: Array<{ id: string; name: string; donationType: string; vekalet: string; notes: string }>,
+  jobId: string,
+  chunkIndex: number,
+): Promise<{ results: unknown[]; hadIssues: boolean }> {
+  const rawResults = await callAiForDonations(systemPrompt, chunk, jobId, chunkIndex);
+  let results = filterValidResults(rawResults);
+  let hadIssues = false;
+
+  let missing = findMissingDonations(chunk, results);
+
+  if (missing.length > 0 && missing.length < chunk.length) {
+    logger.warn(
+      { jobId, chunk: chunkIndex + 1, sent: chunk.length, received: results.length, missing: missing.length },
+      "AI returned incomplete results, retrying missing donations"
+    );
+
+    const retryRaw = await callAiForDonations(systemPrompt, missing, jobId, chunkIndex);
+    results = deduplicateResults([...results, ...filterValidResults(retryRaw)]);
+
+    hadIssues = true;
+    missing = findMissingDonations(chunk, results);
+    if (missing.length > 0) {
+      logger.warn(
+        { jobId, chunk: chunkIndex + 1, stillMissing: missing.length },
+        "Some donations still missing after retry, filling with empty results"
+      );
+      for (const d of missing) {
+        results.push({
+          donationId: d.id,
+          categories: [],
+          requests: "",
+          warnings: "AI bu bağışı sınıflandıramadı",
+          summary: "",
+        });
+      }
+    }
+  } else if (missing.length === chunk.length) {
+    hadIssues = true;
+    logger.error({ jobId, chunk: chunkIndex + 1 }, "AI returned no valid results for chunk, splitting into smaller pieces");
+
+    if (chunk.length > 5) {
+      const mid = Math.ceil(chunk.length / 2);
+      const [firstHalf, secondHalf] = [chunk.slice(0, mid), chunk.slice(mid)];
+      const [r1, r2] = await Promise.all([
+        callAiForDonations(systemPrompt, firstHalf, jobId, chunkIndex),
+        callAiForDonations(systemPrompt, secondHalf, jobId, chunkIndex),
+      ]);
+      results = deduplicateResults([...filterValidResults(r1), ...filterValidResults(r2)]);
+    }
+
+    missing = findMissingDonations(chunk, results);
+    for (const d of missing) {
+      results.push({
+        donationId: d.id,
+        categories: [],
+        requests: "",
+        warnings: "AI işlemi başarısız oldu",
+        summary: "",
+      });
+    }
+  }
+
+  return { results, hadIssues };
+}
+
+function filterValidResults(results: unknown[]): unknown[] {
+  return results.filter(r =>
+    r && typeof r === "object" && "donationId" in r && typeof (r as { donationId: unknown }).donationId === "string"
+  );
+}
+
+function deduplicateResults(results: unknown[]): unknown[] {
+  const seen = new Set<string>();
+  const deduped: unknown[] = [];
+  for (const r of results) {
+    if (r && typeof r === "object" && "donationId" in r) {
+      const id = String((r as { donationId: string }).donationId);
+      if (!seen.has(id)) {
+        seen.add(id);
+        deduped.push(r);
+      }
+    } else {
+      deduped.push(r);
+    }
+  }
+  return deduped;
 }
 
 async function processClassifyJob(
@@ -281,6 +423,7 @@ async function processClassifyJob(
     }
 
     let processedCount = 0;
+    let failedBatchCount = 0;
 
     for (let i = 0; i < chunks.length; i += PARALLEL_CHUNKS) {
       if (await isJobCancelled(jobId)) {
@@ -293,27 +436,30 @@ async function processClassifyJob(
         parallelChunks.map((chunk, idx) => processOneChunk(systemPrompt, chunk, jobId, i + idx))
       );
 
-      for (const results of parallelResults) {
-        allResults.push(...results);
+      for (const chunkResult of parallelResults) {
+        allResults.push(...chunkResult.results);
+        if (chunkResult.hadIssues) failedBatchCount++;
       }
 
       processedCount += parallelChunks.reduce((sum, c) => sum + c.length, 0);
       processedCount = Math.min(processedCount, donations.length);
 
+      const resultPayload = { classifications: allResults, failedBatchCount, totalBatches: chunks.length };
       await db.update(aiJobsTable)
         .set({
           processedDonations: processedCount,
-          result: JSON.stringify(allResults),
+          result: JSON.stringify(resultPayload),
           updatedAt: new Date(),
         })
         .where(eq(aiJobsTable.id, jobId));
     }
 
+    const resultPayload = { classifications: allResults, failedBatchCount, totalBatches: chunks.length };
     const updateResult = await db.update(aiJobsTable)
       .set({
         status: AiJobStatus.COMPLETED,
         processedDonations: donations.length,
-        result: JSON.stringify(allResults),
+        result: JSON.stringify(resultPayload),
         updatedAt: new Date(),
       })
       .where(and(eq(aiJobsTable.id, jobId), or(eq(aiJobsTable.status, AiJobStatus.PENDING), eq(aiJobsTable.status, AiJobStatus.PROCESSING))));
@@ -323,7 +469,7 @@ async function processClassifyJob(
       return;
     }
 
-    logger.info({ jobId, count: donations.length }, "AI job completed");
+    logger.info({ jobId, count: donations.length, failedBatchCount }, "AI job completed");
   } catch (err) {
     const message = err instanceof Error ? err.message : ERROR_MESSAGES.UNKNOWN_ERROR;
     logger.error({ jobId, error: message }, "AI job failed");
@@ -354,7 +500,20 @@ router.get("/ai-notes/jobs/:jobId", asyncHandler(async (req, res) => {
 
   if ((job.status === AiJobStatus.COMPLETED || job.status === AiJobStatus.PROCESSING || job.status === AiJobStatus.CANCELLED) && job.result) {
     try {
-      response.results = JSON.parse(job.result);
+      const parsed = JSON.parse(job.result);
+      if (parsed && typeof parsed === "object" && "classifications" in parsed) {
+        response.results = parsed.classifications;
+        response.failedBatchCount = parsed.failedBatchCount ?? 0;
+        response.totalBatches = parsed.totalBatches ?? 0;
+      } else if (Array.isArray(parsed)) {
+        response.results = parsed;
+        response.failedBatchCount = 0;
+        response.totalBatches = 0;
+      } else {
+        response.results = [];
+        response.failedBatchCount = 0;
+        response.totalBatches = 0;
+      }
     } catch {
       response.results = [];
       response.error = ERROR_MESSAGES.RESULT_PARSE_ERROR;
