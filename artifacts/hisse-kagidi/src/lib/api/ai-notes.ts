@@ -59,6 +59,22 @@ export async function classifyNotesAsync(donations: AiDonationInput[], kesimAlan
   });
 }
 
+export class PartialChunkError extends Error {
+  jobIds: string[];
+  totalDonations: number;
+  totalChunks: number;
+  failedChunk: number;
+  constructor(jobIds: string[], totalDonations: number, totalChunks: number, failedChunk: number, cause: unknown) {
+    super(`${failedChunk + 1}/${totalChunks} parçada hata oluştu, ${jobIds.length} parça başarılı`);
+    this.name = "PartialChunkError";
+    this.jobIds = jobIds;
+    this.totalDonations = totalDonations;
+    this.totalChunks = totalChunks;
+    this.failedChunk = failedChunk;
+    this.cause = cause;
+  }
+}
+
 export async function classifyNotesAsyncChunked(donations: AiDonationInput[], kesimAlaniId?: string): Promise<{ jobIds: string[]; totalDonations: number }> {
   if (donations.length <= AI_CHUNK_SIZE) {
     const result = await classifyNotesAsync(donations, kesimAlaniId);
@@ -67,7 +83,9 @@ export async function classifyNotesAsyncChunked(donations: AiDonationInput[], ke
 
   const jobIds: string[] = [];
   let totalDonations = 0;
+  const totalChunks = Math.ceil(donations.length / AI_CHUNK_SIZE);
   for (let i = 0; i < donations.length; i += AI_CHUNK_SIZE) {
+    const chunkIndex = Math.floor(i / AI_CHUNK_SIZE);
     const chunk = donations.slice(i, i + AI_CHUNK_SIZE);
     try {
       const result = await classifyNotesAsync(chunk, kesimAlaniId);
@@ -75,7 +93,7 @@ export async function classifyNotesAsyncChunked(donations: AiDonationInput[], ke
       totalDonations += result.totalDonations;
     } catch (err) {
       if (jobIds.length > 0) {
-        return { jobIds, totalDonations };
+        throw new PartialChunkError(jobIds, totalDonations, totalChunks, chunkIndex, err);
       }
       throw err;
     }

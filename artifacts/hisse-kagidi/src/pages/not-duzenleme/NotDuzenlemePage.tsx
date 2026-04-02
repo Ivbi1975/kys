@@ -23,6 +23,7 @@ import {
   fetchProjects,
   bulkUpdateNotes,
   classifyNotesAsyncChunked,
+  PartialChunkError,
   fetchJobStatus,
   cancelJob,
   fetchActiveJob,
@@ -628,6 +629,12 @@ export default function NotDuzenlemePage() {
       activeJobIdsRef.current = jobIds;
       startPolling(jobIds);
     } catch (err) {
+      if (err instanceof PartialChunkError && err.jobIds.length > 0) {
+        activeJobIdsRef.current = err.jobIds;
+        startPolling(err.jobIds);
+        toast({ title: "Kısmi başlatma", description: `${err.message}. Başarılı parçalar işlenmeye devam ediyor.`, variant: "destructive" });
+        return;
+      }
       setAiRunning(false);
       const msg = err instanceof Error ? err.message : "Bilinmeyen hata";
       const details = err instanceof ApiFetchError ? err.details : undefined;

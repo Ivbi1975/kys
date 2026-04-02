@@ -76,6 +76,7 @@ export {
   classifyNotes,
   classifyNotesAsync,
   classifyNotesAsyncChunked,
+  PartialChunkError,
   fetchJobStatus,
   cancelJob,
   fetchActiveJob,
