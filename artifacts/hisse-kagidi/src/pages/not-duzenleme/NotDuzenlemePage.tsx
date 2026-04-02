@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -41,10 +41,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { LocalDonation, AiResult } from "./types";
+import type { LocalDonation, AiResult, HistoryDiff } from "./types";
 import { MAX_HISTORY } from "./types";
 import { AiClassification } from "./AiClassification";
-import { DonationsTable } from "./DonationsTable";
+import { DonationsTable, type DonationsTableHandle } from "./DonationsTable";
 
 const AUTO_SAVE_DEBOUNCE_MS = 5000;
 
@@ -61,13 +61,13 @@ export default function NotDuzenlemePage() {
   const [dirty, setDirty] = useState(false);
   const [projectName, setProjectName] = useState<string | null>(null);
 
-  const historyRef = useRef<LocalDonation[][]>([]);
+  const historyRef = useRef<HistoryDiff[]>([]);
   const historyIndexRef = useRef(-1);
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
 
   const updateHistoryState = useCallback(() => {
     setHistoryState({
-      canUndo: historyIndexRef.current > 0,
+      canUndo: historyIndexRef.current >= 0,
       canRedo: historyIndexRef.current < historyRef.current.length - 1,
     });
   }, []);
@@ -96,9 +96,24 @@ export default function NotDuzenlemePage() {
   const activeJobIdRef = useRef<string | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const pushHistory = useCallback((newDonations: LocalDonation[]) => {
+  const pushHistory = useCallback((prevDonations: LocalDonation[], nextDonations: LocalDonation[]) => {
+    const changes = new Map<string, { prevNotes: string; prevDesc: string; nextNotes: string; nextDesc: string }>();
+    for (let i = 0; i < prevDonations.length; i++) {
+      const prev = prevDonations[i];
+      const next = nextDonations[i];
+      if (prev.notes !== next.notes || prev.description !== next.description) {
+        changes.set(prev.id, {
+          prevNotes: prev.notes,
+          prevDesc: prev.description,
+          nextNotes: next.notes,
+          nextDesc: next.description,
+        });
+      }
+    }
+    if (changes.size === 0) return;
+
     const trimmed = historyRef.current.slice(0, historyIndexRef.current + 1);
-    trimmed.push(newDonations);
+    trimmed.push({ changes });
     if (trimmed.length > MAX_HISTORY) trimmed.shift();
     historyRef.current = trimmed;
     historyIndexRef.current = trimmed.length - 1;
@@ -106,9 +121,19 @@ export default function NotDuzenlemePage() {
   }, [updateHistoryState]);
 
   const undo = useCallback(() => {
-    if (historyIndexRef.current <= 0) return;
+    if (historyIndexRef.current < 0) return;
+    const diff = historyRef.current[historyIndexRef.current];
     historyIndexRef.current -= 1;
-    setDonations(historyRef.current[historyIndexRef.current]);
+    setDonations(prev => {
+      const next = [...prev];
+      for (let i = 0; i < next.length; i++) {
+        const change = diff.changes.get(next[i].id);
+        if (change) {
+          next[i] = { ...next[i], notes: change.prevNotes, description: change.prevDesc };
+        }
+      }
+      return next;
+    });
     setDirty(true);
     updateHistoryState();
   }, [updateHistoryState]);
@@ -116,7 +141,17 @@ export default function NotDuzenlemePage() {
   const redo = useCallback(() => {
     if (historyIndexRef.current >= historyRef.current.length - 1) return;
     historyIndexRef.current += 1;
-    setDonations(historyRef.current[historyIndexRef.current]);
+    const diff = historyRef.current[historyIndexRef.current];
+    setDonations(prev => {
+      const next = [...prev];
+      for (let i = 0; i < next.length; i++) {
+        const change = diff.changes.get(next[i].id);
+        if (change) {
+          next[i] = { ...next[i], notes: change.nextNotes, description: change.nextDesc };
+        }
+      }
+      return next;
+    });
     setDirty(true);
     updateHistoryState();
   }, [updateHistoryState]);
@@ -143,17 +178,20 @@ export default function NotDuzenlemePage() {
   useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
   useEffect(() => { savingRef.current = saving; }, [saving]);
 
+  const origDonationMapRef = useRef<Map<string, { notes: string; description: string }>>(new Map());
+
   const computeUpdates = useCallback(() => {
     const currentKesim = kesimRef.current;
     const currentDonations = donationsRef.current;
     if (!currentKesim) return null;
+    const origMap = origDonationMapRef.current;
     const updates: { donationId: string; notes?: string; description?: string }[] = [];
     for (const d of currentDonations) {
-      const orig = currentKesim.donations.find(x => x.id === d.id) || currentKesim.animalGroups.flatMap(g => g.donations).find(x => x.id === d.id);
+      const orig = origMap.get(d.id);
       if (!orig) continue;
       const entry: { donationId: string; notes?: string; description?: string } = { donationId: d.id };
       if (orig.notes !== d.notes) entry.notes = d.notes;
-      if ((orig.description || "") !== (d.description || "")) entry.description = d.description;
+      if (orig.description !== (d.description || "")) entry.description = d.description;
       if (entry.notes !== undefined || entry.description !== undefined) updates.push(entry);
     }
     return updates.length > 0 ? { kesimAlaniId: currentKesim.id, updates } : null;
@@ -177,6 +215,15 @@ export default function NotDuzenlemePage() {
         };
         return { ...prev, donations: prev.donations.map(applyUpdate), animalGroups: prev.animalGroups.map(g => ({ ...g, donations: g.donations.map(applyUpdate) })) };
       });
+      for (const u of data.updates) {
+        const existing = origDonationMapRef.current.get(u.donationId);
+        if (existing) {
+          origDonationMapRef.current.set(u.donationId, {
+            notes: u.notes !== undefined ? u.notes : existing.notes,
+            description: u.description !== undefined ? u.description : existing.description,
+          });
+        }
+      }
       setDirty(false);
     } catch {
     } finally { setSaving(false); }
@@ -209,13 +256,17 @@ export default function NotDuzenlemePage() {
         e.returnValue = "";
         const data = computeUpdates();
         if (data) {
+          const payload = JSON.stringify({ kesimAlaniId: data.kesimAlaniId, updates: data.updates });
+          const headers: Record<string, string> = { "Content-Type": "application/json" };
+          const apiKey = getApiKey();
+          if (apiKey) headers["X-API-Key"] = apiKey;
           try {
-            const xhr = new XMLHttpRequest();
-            xhr.open("PUT", `${API_BASE}/ai-notes/bulk-update`, false);
-            xhr.setRequestHeader("Content-Type", "application/json");
-            const apiKey = getApiKey();
-            if (apiKey) xhr.setRequestHeader("X-API-Key", apiKey);
-            xhr.send(JSON.stringify({ kesimAlaniId: data.kesimAlaniId, updates: data.updates }));
+            fetch(`${API_BASE}/ai-notes/bulk-update`, {
+              method: "PUT",
+              headers,
+              body: payload,
+              keepalive: true,
+            });
           } catch {}
         }
       }
@@ -235,18 +286,17 @@ export default function NotDuzenlemePage() {
         try { const projects = await fetchProjects(); const proj = projects.find(p => p.id === data.projectId); if (proj) setProjectName(proj.name); } catch {}
       }
       const allDonations: LocalDonation[] = [];
-      for (const d of data.donations) {
-        if (!allDonations.find(x => x.id === d.id)) {
-          allDonations.push({ id: d.id, name: d.name || "", description: d.description || "", donationType: d.donationType || "", vekalet: d.vekalet || "", notes: d.notes || "", aiCategories: d.aiCategories, aiWarnings: d.aiWarnings });
-        }
-      }
-      for (const g of data.animalGroups) {
-        for (const d of g.donations) {
-          if (!allDonations.find(x => x.id === d.id)) {
-            allDonations.push({ id: d.id, name: d.name || "", description: d.description || "", donationType: d.donationType || "", vekalet: d.vekalet || "", notes: d.notes || "", aiCategories: d.aiCategories, aiWarnings: d.aiWarnings });
-          }
-        }
-      }
+      const seenIds = new Set<string>();
+      const origMap = new Map<string, { notes: string; description: string }>();
+      const addDonation = (d: typeof data.donations[0]) => {
+        if (seenIds.has(d.id)) return;
+        seenIds.add(d.id);
+        allDonations.push({ id: d.id, name: d.name || "", description: d.description || "", donationType: d.donationType || "", vekalet: d.vekalet || "", notes: d.notes || "", aiCategories: d.aiCategories, aiWarnings: d.aiWarnings });
+        origMap.set(d.id, { notes: d.notes || "", description: d.description || "" });
+      };
+      for (const d of data.donations) addDonation(d);
+      for (const g of data.animalGroups) for (const d of g.donations) addDonation(d);
+      origDonationMapRef.current = origMap;
       setDonations(allDonations);
       const initialAiResults = new Map<string, AiResult>();
       for (const d of allDonations) {
@@ -255,8 +305,8 @@ export default function NotDuzenlemePage() {
         }
       }
       if (initialAiResults.size > 0) setAiResults(initialAiResults);
-      historyRef.current = [allDonations];
-      historyIndexRef.current = 0;
+      historyRef.current = [];
+      historyIndexRef.current = -1;
       updateHistoryState();
       setLoading(false);
 
@@ -350,24 +400,68 @@ export default function NotDuzenlemePage() {
     pollIntervalRef.current = setInterval(poll, 3000);
   }, [stopPolling, toast]);
 
-  const filteredDonations = donations.filter(d => {
-    const notes = d.notes || "";
-    if (hideEmptyNotes && notes.trim() === "") return false;
-    if (aiCategoryFilter) {
-      const aiResult = aiResults.get(d.id);
-      if (!aiResult?.categories || !aiResult.categories.some(c => c.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr"))) return false;
+  const filteredDonations = useMemo(() => {
+    return donations.filter(d => {
+      const notes = d.notes || "";
+      if (hideEmptyNotes && notes.trim() === "") return false;
+      if (aiCategoryFilter) {
+        const aiResult = aiResults.get(d.id);
+        if (!aiResult?.categories || !aiResult.categories.some(c => c.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr"))) return false;
+      }
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return notes.toLowerCase().includes(q) || (d.name || "").toLowerCase().includes(q) || (d.description || "").toLowerCase().includes(q);
+    });
+  }, [donations, hideEmptyNotes, searchQuery, aiCategoryFilter, aiResults]);
+
+  const idToIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < donations.length; i++) {
+      map.set(donations[i].id, i);
     }
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return notes.toLowerCase().includes(q) || (d.name || "").toLowerCase().includes(q) || (d.description || "").toLowerCase().includes(q);
-  });
+    return map;
+  }, [donations]);
+
+  const filteredIdToIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < filteredDonations.length; i++) {
+      map.set(filteredDonations[i].id, i);
+    }
+    return map;
+  }, [filteredDonations]);
+
+  const donationsTableRef = useRef<DonationsTableHandle>(null);
 
   const updateDonationsWithHistory = useCallback((updater: (prev: LocalDonation[]) => LocalDonation[]) => {
-    setDonations(prev => { const next = updater(prev); pushHistory(next); setDirty(true); return next; });
+    setDonations(prev => { const next = updater(prev); pushHistory(prev, next); setDirty(true); return next; });
   }, [pushHistory]);
 
-  const handleNoteChange = (id: string, value: string) => { setDonations(prev => prev.map(d => d.id === id ? { ...d, notes: value } : d)); setDirty(true); };
-  const commitNoteChange = useCallback((_id: string) => { setDonations(prev => { pushHistory(prev); return prev; }); }, [pushHistory]);
+  const noteChangeBufferRef = useRef<LocalDonation[] | null>(null);
+
+  const handleNoteChange = useCallback((id: string, value: string) => {
+    setDonations(prev => {
+      if (!noteChangeBufferRef.current) {
+        noteChangeBufferRef.current = prev;
+      }
+      const idx = idToIndexMap.get(id);
+      if (idx === undefined) return prev;
+      const next = [...prev];
+      next[idx] = { ...prev[idx], notes: value };
+      return next;
+    });
+    setDirty(true);
+  }, [idToIndexMap]);
+
+  const commitNoteChange = useCallback((_id: string) => {
+    setDonations(prev => {
+      const before = noteChangeBufferRef.current;
+      if (before) {
+        pushHistory(before, prev);
+        noteChangeBufferRef.current = null;
+      }
+      return prev;
+    });
+  }, [pushHistory]);
 
   const handleBulkReplace = () => {
     if (!findText.trim()) return;
@@ -432,13 +526,14 @@ export default function NotDuzenlemePage() {
     if (!kesim) return;
     setSaving(true);
     try {
+      const origMap = origDonationMapRef.current;
       const updates: { donationId: string; notes?: string; description?: string }[] = [];
       for (const d of donations) {
-        const orig = kesim.donations.find(x => x.id === d.id) || kesim.animalGroups.flatMap(g => g.donations).find(x => x.id === d.id);
+        const orig = origMap.get(d.id);
         if (!orig) continue;
         const entry: { donationId: string; notes?: string; description?: string } = { donationId: d.id };
         if (orig.notes !== d.notes) entry.notes = d.notes;
-        if ((orig.description || "") !== (d.description || "")) entry.description = d.description;
+        if (orig.description !== (d.description || "")) entry.description = d.description;
         if (entry.notes !== undefined || entry.description !== undefined) updates.push(entry);
       }
       if (updates.length === 0) { toast({ title: "Değişiklik yok" }); setSaving(false); setDirty(false); return; }
@@ -457,6 +552,15 @@ export default function NotDuzenlemePage() {
         };
         return { ...prev, donations: prev.donations.map(applyUpdate), animalGroups: prev.animalGroups.map(g => ({ ...g, donations: g.donations.map(applyUpdate) })) };
       });
+      for (const u of updates) {
+        const existing = origDonationMapRef.current.get(u.donationId);
+        if (existing) {
+          origDonationMapRef.current.set(u.donationId, {
+            notes: u.notes !== undefined ? u.notes : existing.notes,
+            description: u.description !== undefined ? u.description : existing.description,
+          });
+        }
+      }
       setDirty(false);
       const noteCount = updates.filter(u => u.notes !== undefined).length;
       const descCount = updates.filter(u => u.description !== undefined).length;
@@ -469,7 +573,7 @@ export default function NotDuzenlemePage() {
     } finally { setSaving(false); }
   };
 
-  const notesWithContent = donations.filter(d => (d.notes || "").trim() !== "");
+  const notesWithContent = useMemo(() => donations.filter(d => (d.notes || "").trim() !== ""), [donations]);
 
   const startAiClassification = async (resume = false) => {
     if (!kesim) return;
@@ -514,15 +618,43 @@ export default function NotDuzenlemePage() {
     setAiStopped(true);
   };
 
-  const scrollToDonation = (donationId: string) => {
-    let row = document.querySelector(`[data-donation-id="${donationId}"]`);
-    if (!row && searchQuery) {
-      setSearchQuery("");
-      requestAnimationFrame(() => { setTimeout(() => { row = document.querySelector(`[data-donation-id="${donationId}"]`); if (row) { row.scrollIntoView({ behavior: "smooth", block: "center" }); row.classList.add("ring-2", "ring-primary", "ring-offset-2"); setTimeout(() => { row!.classList.remove("ring-2", "ring-primary", "ring-offset-2"); }, 2000); } }, 100); });
+  const highlightRow = useCallback((donationId: string) => {
+    setTimeout(() => {
+      const row = document.querySelector(`[data-donation-id="${donationId}"]`);
+      if (row) {
+        row.classList.add("ring-2", "ring-primary", "ring-offset-2");
+        setTimeout(() => { row.classList.remove("ring-2", "ring-primary", "ring-offset-2"); }, 2000);
+      }
+    }, 100);
+  }, []);
+
+  const pendingScrollRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (pendingScrollRef.current) {
+      const donationId = pendingScrollRef.current;
+      const filteredIdx = filteredIdToIndexMap.get(donationId);
+      if (filteredIdx !== undefined) {
+        pendingScrollRef.current = null;
+        donationsTableRef.current?.scrollToIndex(filteredIdx);
+        highlightRow(donationId);
+      }
+    }
+  }, [filteredIdToIndexMap, highlightRow]);
+
+  const scrollToDonation = useCallback((donationId: string) => {
+    const filteredIdx = filteredIdToIndexMap.get(donationId);
+    if (filteredIdx !== undefined) {
+      donationsTableRef.current?.scrollToIndex(filteredIdx);
+      highlightRow(donationId);
       return;
     }
-    if (row) { row.scrollIntoView({ behavior: "smooth", block: "center" }); row.classList.add("ring-2", "ring-primary", "ring-offset-2"); setTimeout(() => { row!.classList.remove("ring-2", "ring-primary", "ring-offset-2"); }, 2000); }
-  };
+
+    pendingScrollRef.current = donationId;
+    if (searchQuery) setSearchQuery("");
+    if (hideEmptyNotes) setHideEmptyNotes(() => false);
+    if (aiCategoryFilter) setAiCategoryFilter(null);
+  }, [filteredIdToIndexMap, searchQuery, hideEmptyNotes, aiCategoryFilter, highlightRow, setAiCategoryFilter]);
 
   const aiReportStats = (() => {
     const results = Array.from(aiResults.values());
@@ -609,12 +741,14 @@ export default function NotDuzenlemePage() {
         />
 
         <DonationsTable
+          ref={donationsTableRef}
           donations={donations} filteredDonations={filteredDonations} searchQuery={searchQuery}
           hideEmptyNotes={hideEmptyNotes} setHideEmptyNotes={setHideEmptyNotes}
           aiRunning={aiRunning} aiResults={aiResults}
           handleNoteChange={handleNoteChange} commitNoteChange={commitNoteChange}
           updateDonationsWithHistory={updateDonationsWithHistory}
           aiCategoryFilter={aiCategoryFilter} setAiCategoryFilter={setAiCategoryFilter}
+          idToIndexMap={idToIndexMap}
         />
       </div>
 

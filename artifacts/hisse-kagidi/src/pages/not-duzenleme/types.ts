@@ -16,3 +16,7 @@ export interface AiResult extends AiClassificationResult {
 }
 
 export const MAX_HISTORY = 50;
+
+export interface HistoryDiff {
+  changes: Map<string, { prevNotes: string; prevDesc: string; nextNotes: string; nextDesc: string }>;
+}
