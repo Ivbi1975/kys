@@ -10,6 +10,7 @@ import {
   bulkLockGroups,
   createGroup,
   bulkUpdateGroups,
+  bulkUpdateGroupsChunked,
   updateGroup,
   deleteGroup,
 } from "../../services/group.service";
@@ -31,6 +32,7 @@ const donationPayloadSchema = z.object({
 const animalGroupPayloadSchema = z.object({
   id: z.string().min(1),
   animalNo: z.number().int().optional().default(0),
+  sortOrder: z.number().int().optional(),
   colorTag: z.string().optional().default(""),
   locked: z.boolean().optional().default(false),
   notes: z.string().optional().default(""),
@@ -50,6 +52,13 @@ const bulkLockSchema = z.object({
 
 const bulkAnimalGroupsSchema = z.object({
   animalGroups: z.array(animalGroupPayloadSchema),
+});
+
+const bulkAnimalGroupsChunkedSchema = z.object({
+  animalGroups: z.array(animalGroupPayloadSchema),
+  chunkIndex: z.number().int().min(0),
+  totalChunks: z.number().int().min(1),
+  saveSessionId: z.string().min(1),
 });
 
 const router: IRouter = Router();
@@ -147,6 +156,31 @@ router.put("/kesim-alanlari/:id/animal-groups/bulk", asyncHandler(async (req, re
   }
   res.json(result.data);
   refreshProjectStats();
+}));
+
+router.put("/kesim-alanlari/:id/animal-groups/bulk-chunked", asyncHandler(async (req, res) => {
+  const parsed = bulkAnimalGroupsChunkedSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
+    return;
+  }
+  const { chunkIndex, totalChunks, saveSessionId } = parsed.data;
+  const result = await bulkUpdateGroupsChunked(
+    req.params.id,
+    parsed.data.animalGroups as AnimalGroupPayload[],
+    chunkIndex,
+    totalChunks,
+    saveSessionId,
+  );
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error, chunkIndex });
+    return;
+  }
+  const { ok: _ok, ...responseData } = result;
+  res.json(responseData);
+  if (chunkIndex === totalChunks - 1) {
+    refreshProjectStats();
+  }
 }));
 
 router.put("/kesim-alanlari/:id/animal-groups/:groupId", asyncHandler(async (req, res) => {

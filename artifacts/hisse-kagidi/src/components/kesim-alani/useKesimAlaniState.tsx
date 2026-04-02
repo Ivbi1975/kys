@@ -725,6 +725,7 @@ export function useKesimAlaniState() {
     runGrouping,
     runIncrementalGrouping,
     save,
+    saveProgress: saveManagerRest.saveProgress,
     saveStatus: saveManagerRest.saveStatus,
     saveTimeoutRef: saveManagerRest.saveTimeoutRef,
     scrollContainerRef,

@@ -33,11 +33,61 @@ export async function apiUpdateKesimAlani(data: KesimAlani): Promise<KesimAlani>
   });
 }
 
-export async function apiUpdateBulkAnimalGroups(kesimAlaniId: string, animalGroups: KesimAlani["animalGroups"]): Promise<KesimAlani> {
-  return apiFetch<KesimAlani>(`/kesim-alanlari/${kesimAlaniId}/animal-groups/bulk`, {
-    method: "PUT",
-    body: JSON.stringify({ animalGroups }),
-  });
+const CHUNK_SIZE = 500;
+
+export interface ChunkProgress {
+  chunkIndex: number;
+  totalChunks: number;
+  savedCount: number;
+  totalGroups: number;
+}
+
+export async function apiUpdateBulkAnimalGroups(
+  kesimAlaniId: string,
+  animalGroups: KesimAlani["animalGroups"],
+  onChunkProgress?: (progress: ChunkProgress) => void,
+): Promise<KesimAlani> {
+  const groupsWithSortOrder = animalGroups.map((g, i) => ({
+    ...g,
+    sortOrder: i,
+  }));
+
+  if (groupsWithSortOrder.length <= CHUNK_SIZE) {
+    return apiFetch<KesimAlani>(`/kesim-alanlari/${kesimAlaniId}/animal-groups/bulk`, {
+      method: "PUT",
+      body: JSON.stringify({ animalGroups: groupsWithSortOrder }),
+    });
+  }
+
+  const totalChunks = Math.ceil(groupsWithSortOrder.length / CHUNK_SIZE);
+  const saveSessionId = `${kesimAlaniId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  let savedCount = 0;
+  let lastResult: unknown = null;
+
+  for (let i = 0; i < totalChunks; i++) {
+    const chunk = groupsWithSortOrder.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+    try {
+      const result = await apiFetch<{ chunkIndex: number; totalChunks: number; savedCount: number; saveSessionId: string; data?: KesimAlani }>(
+        `/kesim-alanlari/${kesimAlaniId}/animal-groups/bulk-chunked`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ animalGroups: chunk, chunkIndex: i, totalChunks, saveSessionId }),
+        },
+      );
+      savedCount += result.savedCount;
+      lastResult = result;
+      onChunkProgress?.({ chunkIndex: i, totalChunks, savedCount, totalGroups: animalGroups.length });
+    } catch (err) {
+      const baseMsg = err instanceof Error ? err.message : "Bilinmeyen hata";
+      throw new Error(`Kaydetme ${i + 1}/${totalChunks} parçasında başarısız oldu: ${baseMsg}`);
+    }
+  }
+
+  const finalResult = lastResult as { data?: KesimAlani };
+  if (finalResult?.data) {
+    return finalResult.data;
+  }
+  return apiFetch<KesimAlani>(`/kesim-alanlari/${kesimAlaniId}`);
 }
 
 export async function apiUpdateSingleDonation(

@@ -13,7 +13,7 @@ import { useTrackingActions } from "@/hooks/useTrackingActions";
 
 export function KesimAlaniHeader() {
   const {
-    kesim, setKesim, setLocation, projectName, save, saveToApi, saveStatus, lastSavedTime,
+    kesim, setKesim, setLocation, projectName, save, saveToApi, saveStatus, saveProgress, lastSavedTime,
     toast, handleUndo, handleRedo, history, historyPanelOpen,
     setHistoryPanelOpen, setShortcutHelpOpen, toggleFullscreen, isFullscreen,
     exportDonorsExcel, exportGroupsExcel, handleExportKaCsv, csvExporting,
@@ -181,7 +181,9 @@ export function KesimAlaniHeader() {
           {saveStatus === "saving" && (
             <span className="flex items-center gap-1 animate-pulse">
               <Loader2 className="w-3 h-3 animate-spin" />
-              Kaydediliyor...
+              {saveProgress
+                ? `Kaydediliyor... (${saveProgress.chunkIndex + 1}/${saveProgress.totalChunks})`
+                : "Kaydediliyor..."}
             </span>
           )}
           {saveStatus === "saved" && (

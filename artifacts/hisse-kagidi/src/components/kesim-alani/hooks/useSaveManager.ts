@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, createElement } from "react";
 import type { KesimAlani } from "@/lib/types";
 import { apiUpdateKesimAlani, apiUpdateBulkAnimalGroups } from "@/lib/api";
+import type { ChunkProgress } from "@/lib/api/kesim-alanlari";
 
 interface UseSaveManagerDeps {
   toast: (opts: { title: string; description?: string | React.ReactNode; variant?: "default" | "destructive" }) => void;
@@ -9,6 +10,7 @@ interface UseSaveManagerDeps {
 
 export function useSaveManager({ toast, scrollToAnimalGroupRef }: UseSaveManagerDeps) {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveProgress, setSaveProgress] = useState<ChunkProgress | null>(null);
   const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,19 +60,24 @@ export function useSaveManager({ toast, scrollToAnimalGroupRef }: UseSaveManager
   const saveToApi = useCallback(
     (data: KesimAlani, saveType: "full" | "donations" | "groups" = "full") => {
       setSaveStatus("saving");
+      setSaveProgress(null);
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       const apiCall =
         saveType === "groups"
-          ? apiUpdateBulkAnimalGroups(data.id, data.animalGroups)
+          ? apiUpdateBulkAnimalGroups(data.id, data.animalGroups, (progress) => {
+              setSaveProgress(progress);
+            })
           : apiUpdateKesimAlani(data);
       apiCall
         .then(() => {
           setSaveStatus("saved");
+          setSaveProgress(null);
           setLastSavedTime(new Date());
           saveTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
         })
         .catch((err) => {
           setSaveStatus("error");
+          setSaveProgress(null);
           const errMsg = err instanceof Error ? err.message : "Veriler kaydedilemedi";
           toast({
             title: "Kaydetme hatası",
@@ -121,6 +128,7 @@ export function useSaveManager({ toast, scrollToAnimalGroupRef }: UseSaveManager
   return {
     saveStatus,
     setSaveStatus,
+    saveProgress,
     lastSavedTime,
     setLastSavedTime,
     saveTimeoutRef,

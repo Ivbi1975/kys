@@ -309,6 +309,106 @@ export async function bulkUpdateGroups(kesimAlaniId: string, animalGroups: Anima
   return serviceOk({ data: await getFullKesimAlani(kesimAlaniId) });
 }
 
+interface ChunkedSaveSession {
+  saveSessionId: string;
+  totalChunks: number;
+  nextExpectedChunk: number;
+  kesildiMap: Map<string, { kesildi: boolean; kesildiAt: Date | null; teamId: string | null }>;
+  startedAt: number;
+}
+
+const activeSessions = new Map<string, ChunkedSaveSession>();
+const SESSION_TIMEOUT_MS = 5 * 60 * 1000;
+
+function cleanupExpiredSessions() {
+  const now = Date.now();
+  for (const [key, session] of activeSessions) {
+    if (now - session.startedAt > SESSION_TIMEOUT_MS) {
+      activeSessions.delete(key);
+    }
+  }
+}
+
+export async function bulkUpdateGroupsChunked(
+  kesimAlaniId: string,
+  animalGroups: AnimalGroupPayload[],
+  chunkIndex: number,
+  totalChunks: number,
+  saveSessionId: string,
+): Promise<ServiceResult<{ chunkIndex: number; totalChunks: number; savedCount: number; saveSessionId: string; data?: unknown }>> {
+  const kaCheck = await requireActiveKesimAlani(kesimAlaniId);
+  if (kaCheck.error) return serviceError(kaCheck.error, kaCheck.status);
+
+  cleanupExpiredSessions();
+
+  const sessionKey = kesimAlaniId;
+
+  try {
+    if (chunkIndex === 0) {
+      const existingSession = activeSessions.get(sessionKey);
+      if (existingSession && Date.now() - existingSession.startedAt < SESSION_TIMEOUT_MS) {
+        return serviceError("Başka bir kaydetme işlemi devam ediyor. Lütfen bekleyin ve tekrar deneyin.", 409);
+      }
+
+      const existingGroups = await db.select({
+        id: animalGroupsTable.id,
+        kesildi: animalGroupsTable.kesildi,
+        kesildiAt: animalGroupsTable.kesildiAt,
+        teamId: animalGroupsTable.teamId,
+      }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId));
+      const kesildiMap = new Map(existingGroups.map(g => [g.id, { kesildi: g.kesildi, kesildiAt: g.kesildiAt, teamId: g.teamId }]));
+
+      activeSessions.set(sessionKey, {
+        saveSessionId,
+        totalChunks,
+        nextExpectedChunk: 1,
+        kesildiMap,
+        startedAt: Date.now(),
+      });
+
+      await db.transaction(async (tx) => {
+        await tx.delete(animalGroupDonationsTable).where(
+          inArray(animalGroupDonationsTable.groupId,
+            tx.select({ id: animalGroupsTable.id }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId))
+          )
+        );
+        await tx.delete(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId));
+        await saveAnimalGroups(tx, kesimAlaniId, animalGroups, kesildiMap);
+      });
+    } else {
+      const session = activeSessions.get(sessionKey);
+      if (!session) {
+        return serviceError("Kaydetme oturumu bulunamadı. Lütfen baştan deneyin.", 409);
+      }
+      if (session.saveSessionId !== saveSessionId) {
+        return serviceError("Başka bir kaydetme işlemi devam ediyor. Lütfen bekleyin ve tekrar deneyin.", 409);
+      }
+      if (session.nextExpectedChunk !== chunkIndex) {
+        return serviceError(`Beklenen parça ${session.nextExpectedChunk}, ancak ${chunkIndex} alındı. Lütfen baştan deneyin.`, 409);
+      }
+      if (session.totalChunks !== totalChunks) {
+        return serviceError("Parça sayısı uyuşmazlığı. Lütfen baştan deneyin.", 409);
+      }
+
+      await db.transaction(async (tx) => {
+        await saveAnimalGroups(tx, kesimAlaniId, animalGroups, session.kesildiMap);
+      });
+
+      session.nextExpectedChunk = chunkIndex + 1;
+    }
+  } catch (err) {
+    activeSessions.delete(sessionKey);
+    throw err;
+  }
+
+  const isLastChunk = chunkIndex === totalChunks - 1;
+  if (isLastChunk) {
+    activeSessions.delete(sessionKey);
+    return serviceOk({ chunkIndex, totalChunks, savedCount: animalGroups.length, saveSessionId, data: await getFullKesimAlani(kesimAlaniId) });
+  }
+  return serviceOk({ chunkIndex, totalChunks, savedCount: animalGroups.length, saveSessionId });
+}
+
 export async function updateGroup(kesimAlaniId: string, groupId: string, updates: {
   animalNo?: number;
   colorTag?: string;
