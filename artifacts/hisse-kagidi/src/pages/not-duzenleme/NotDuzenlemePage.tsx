@@ -91,6 +91,7 @@ export default function NotDuzenlemePage() {
   const [rangeEnd, setRangeEnd] = useState(50);
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [aiErrorBatches, setAiErrorBatches] = useState(0);
+  const [aiTotalBatches, setAiTotalBatches] = useState(0);
   const [showAiReport, setShowAiReport] = useState(false);
   const [aiReportCollapsed, setAiReportCollapsed] = useState(false);
   const [aiCategoryFilter, setAiCategoryFilter] = useState<string | null>(null);
@@ -340,6 +341,8 @@ export default function NotDuzenlemePage() {
     stopPolling();
     const finishedJobs = new Set<string>();
     const jobProgressMap = new Map<string, { done: number; total: number }>();
+    const jobErrorMap = new Map<string, number>();
+    const jobBatchMap = new Map<string, number>();
     const allCollectedResults: { donationId: string; categories: string[]; warnings: string }[] = [];
     let isPolling = false;
 
@@ -361,12 +364,20 @@ export default function NotDuzenlemePage() {
             total: Math.max(status.totalDonations, prev?.total ?? 0),
           });
 
+          if (status.failedBatchCount !== undefined) {
+            jobErrorMap.set(jid, status.failedBatchCount);
+          }
+          if (status.totalBatches !== undefined) {
+            jobBatchMap.set(jid, status.totalBatches);
+          }
+
           if (status.results && status.results.length > 0) {
             const currentDonations = donationsList || donationsRef.current;
+            const donationMap = new Map(currentDonations.map(d => [d.id, d]));
             setAiResults(prev => {
               const next = new Map(prev);
               for (const r of status.results!) {
-                const donor = currentDonations.find(d => d.id === r.donationId);
+                const donor = donationMap.get(r.donationId);
                 const donationType = donor?.donationType || "";
                 let warnings = r.warnings || "";
                 if (warnings && donationType && r.categories) {
@@ -383,6 +394,7 @@ export default function NotDuzenlemePage() {
                 }
                 next.set(r.donationId, { ...r, warnings, donationType });
               }
+              console.log(`[AI Poll] job=${jid} statusResults=${status.results!.length} mapSize=${next.size}`);
               return next;
             });
           }
@@ -409,10 +421,23 @@ export default function NotDuzenlemePage() {
         }
         setAiProgress({ done: totalDone, total: totalAll });
 
+        let totalErrors = 0;
+        for (const e of jobErrorMap.values()) totalErrors += e;
+        setAiErrorBatches(totalErrors);
+        let totalBatch = 0;
+        for (const b of jobBatchMap.values()) totalBatch += b;
+        setAiTotalBatches(totalBatch);
+
         if (finishedJobs.size === jobIds.length) {
           stopPolling();
           setAiRunning(false);
           activeJobIdsRef.current = [];
+
+          const expectedTotal = Array.from(jobProgressMap.values()).reduce((s, p) => s + p.total, 0);
+          if (allCollectedResults.length > 0 && allCollectedResults.length < expectedTotal) {
+            console.warn(`[AI Reconciliation] Expected ${expectedTotal} results but got ${allCollectedResults.length} — ${expectedTotal - allCollectedResults.length} missing`);
+            toast({ title: "Eksik sonuç", description: `${expectedTotal} bağışçıdan ${allCollectedResults.length} tanesi işlendi. ${expectedTotal - allCollectedResults.length} sonuç eksik.`, variant: "destructive" });
+          }
 
           if (allCollectedResults.length > 0) {
             try {
@@ -612,7 +637,7 @@ export default function NotDuzenlemePage() {
 
   const startAiClassification = async (resume = false) => {
     if (!kesim) return;
-    setAiRunning(true); setAiStopped(false); setAiSaveStatus("idle"); setAiErrorBatches(0); setShowAiReport(false); setAiReportCollapsed(false);
+    setAiRunning(true); setAiStopped(false); setAiSaveStatus("idle"); setAiErrorBatches(0); setAiTotalBatches(0); setShowAiReport(false); setAiReportCollapsed(false);
     if (!resume) { setAiResults(new Map()); }
     let toProcess: LocalDonation[];
     if (rangeMode === "all") { toProcess = donations; } else { toProcess = donations.slice(Math.max(1, rangeStart) - 1, Math.min(donations.length, rangeEnd)); }
@@ -621,6 +646,7 @@ export default function NotDuzenlemePage() {
       withNotes = withNotes.filter(d => !aiResults.has(d.id));
     }
     if (withNotes.length === 0) { toast({ title: resume ? "Devam edilecek not yok" : "İşlenecek not yok", description: resume ? "Tüm bağışçılar zaten işlenmiş" : "Notu olan bağışçı bulunamadı" }); setAiRunning(false); return; }
+    console.log(`[AI Start] totalDonations=${toProcess.length} withNotes=${withNotes.length} resume=${resume}`);
     const previouslyDone = resume ? aiResults.size : 0;
     const totalToProcess = previouslyDone + withNotes.length;
     setAiProgress({ done: previouslyDone, total: totalToProcess });
@@ -709,7 +735,7 @@ export default function NotDuzenlemePage() {
         categoryMap.set(canonical, (categoryMap.get(canonical) || 0) + 1);
       }
     }
-    return { totalProcessed: results.length, warningDonors: withWarnings, warningCount: withWarnings.length, requestCount: withRequests.length, categoryDistribution: Array.from(categoryMap.entries()).sort((a, b) => b[1] - a[1]), errorBatches: aiErrorBatches };
+    return { totalProcessed: results.length, warningDonors: withWarnings, warningCount: withWarnings.length, requestCount: withRequests.length, categoryDistribution: Array.from(categoryMap.entries()).sort((a, b) => b[1] - a[1]), errorBatches: aiErrorBatches, totalBatches: aiTotalBatches };
   })();
 
   if (loading) return <div className="flex items-center justify-center h-screen"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>;

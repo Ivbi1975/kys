@@ -21,6 +21,7 @@ import {
   RotateCcw,
   FastForward,
   Tags,
+  Sparkles,
 } from "lucide-react";
 import type { LocalDonation, AiResult } from "./types";
 
@@ -31,6 +32,7 @@ interface AiReportStats {
   requestCount: number;
   categoryDistribution: [string, number][];
   errorBatches: number;
+  totalBatches: number;
 }
 
 interface AiClassificationProps {
@@ -174,7 +176,33 @@ export function AiClassification({
         </div>
       )}
 
-      {showAiReport && (
+      {aiRunning && aiReportStats.categoryDistribution.length > 0 && (
+        <Card className="p-3 space-y-2 border-primary/20">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-primary animate-pulse" />
+              Canlı Kategori Dağılımı
+              <Badge variant="outline" className="text-[10px] ml-1">{aiReportStats.totalProcessed} işlendi</Badge>
+            </h3>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {aiReportStats.categoryDistribution.map(([cat, count]) => (
+              <Badge
+                key={cat}
+                variant={aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr") ? "default" : "secondary"}
+                className="text-xs cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => setAiCategoryFilter(
+                  aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr") ? null : cat
+                )}
+              >
+                {cat.replace(/_/g, " ")} <span className="ml-1 font-bold">{count}</span>
+              </Badge>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {showAiReport && !aiRunning && (
         <Card className="p-0 overflow-hidden border-primary/20">
           <div className="flex items-center justify-between p-3 bg-primary/5 cursor-pointer" onClick={() => setAiReportCollapsed(!aiReportCollapsed)}>
             <h2 className="text-sm font-semibold flex items-center gap-2">
@@ -207,7 +235,9 @@ export function AiClassification({
                   <div className="text-xs text-muted-foreground mt-1">Özel İstek</div>
                 </div>
                 <div className={`rounded-lg p-3 text-center ${aiReportStats.errorBatches > 0 ? "bg-destructive/10" : "bg-muted/50"}`}>
-                  <div className={`text-2xl font-bold ${aiReportStats.errorBatches > 0 ? "text-destructive" : "text-muted-foreground"}`}>{aiReportStats.errorBatches}</div>
+                  <div className={`text-2xl font-bold ${aiReportStats.errorBatches > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                    {aiReportStats.errorBatches}{aiReportStats.totalBatches > 0 && <span className="text-sm font-normal text-muted-foreground">/{aiReportStats.totalBatches}</span>}
+                  </div>
                   <div className="text-xs text-muted-foreground mt-1">Hatalı Batch</div>
                 </div>
               </div>

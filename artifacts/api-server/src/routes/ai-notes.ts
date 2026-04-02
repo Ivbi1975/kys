@@ -444,6 +444,11 @@ async function processClassifyJob(
       processedCount += parallelChunks.reduce((sum, c) => sum + c.length, 0);
       processedCount = Math.min(processedCount, donations.length);
 
+      logger.info(
+        { jobId, iteration: Math.floor(i / PARALLEL_CHUNKS) + 1, processedCount, totalDonations: donations.length, allResultsCount: allResults.length, failedBatchCount },
+        "AI batch iteration completed"
+      );
+
       const resultPayload = { classifications: allResults, failedBatchCount, totalBatches: chunks.length };
       await db.update(aiJobsTable)
         .set({
