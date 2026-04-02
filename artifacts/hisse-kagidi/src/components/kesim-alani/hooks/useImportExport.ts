@@ -239,7 +239,7 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
     }
 
     const excludedIdxs = new Set([
-      ...bulkReviewRows.filter(r => r.selected).map(r => r.idx),
+      ...bulkReviewRows.filter(r => !r.selected).map(r => r.idx),
       ...bulkReviewHandledIdxs,
     ]);
 
@@ -325,9 +325,9 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
 
   function addReviewRowsToBasket() {
     if (!kesim || !addSelectedToBasket) return;
-    const selectedRows = bulkReviewRows.filter(r => r.selected);
+    const selectedRows = bulkReviewRows.filter(r => !r.selected);
     if (selectedRows.length === 0) {
-      toast({ title: "Seçili satır yok", description: "Sepete eklemek için satır seçin.", variant: "destructive" });
+      toast({ title: "Hariç tutulan satır yok", description: "Sepete eklemek için satırların işaretini kaldırın.", variant: "destructive" });
       return;
     }
     const newDonations: Donation[] = [];
@@ -336,7 +336,7 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
       if (donation.name) newDonations.push(donation);
     }
     if (newDonations.length === 0) {
-      toast({ title: "Geçerli satır yok", description: "Seçilen satırlarda isim bulunamadı.", variant: "destructive" });
+      toast({ title: "Geçerli satır yok", description: "Hariç tutulan satırlarda isim bulunamadı.", variant: "destructive" });
       return;
     }
     const updated = produce(kesim, (draft) => {
@@ -360,9 +360,9 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
       toast({ title: "Hedef kesim listesi seçin", variant: "destructive" });
       return;
     }
-    const selectedRows = bulkReviewRows.filter(r => r.selected);
+    const selectedRows = bulkReviewRows.filter(r => !r.selected);
     if (selectedRows.length === 0) {
-      toast({ title: "Seçili satır yok", description: "Aktarmak için satır seçin.", variant: "destructive" });
+      toast({ title: "Hariç tutulan satır yok", description: "Aktarmak için satırların işaretini kaldırın.", variant: "destructive" });
       return;
     }
     const newDonations: Donation[] = [];
@@ -371,7 +371,7 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
       if (donation.name) newDonations.push(donation);
     }
     if (newDonations.length === 0) {
-      toast({ title: "Geçerli satır yok", description: "Seçilen satırlarda isim bulunamadı.", variant: "destructive" });
+      toast({ title: "Geçerli satır yok", description: "Hariç tutulan satırlarda isim bulunamadı.", variant: "destructive" });
       return;
     }
     setBulkReviewTransferring(true);

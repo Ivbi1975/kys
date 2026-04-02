@@ -17,7 +17,7 @@ export function BulkImportDialog() {
     siblingKesimAlanlari, transferReviewRowsToKesimAlani,
   } = useKesimAlaniContext();
 
-  const selectedCount = bulkReviewRows.filter(r => r.selected).length;
+  const excludedCount = bulkReviewRows.filter(r => !r.selected).length;
 
   return (
     <Dialog open={bulkDialogOpen} onOpenChange={(open) => { if (!open) resetBulkDialog(); else setBulkDialogOpen(true); }}>
@@ -67,17 +67,17 @@ export function BulkImportDialog() {
 
         {bulkStep === "review" && (() => {
           const groupKeys = [...new Set(bulkReviewRows.map(r => r.groupKey))];
-          const selectedGroupCount = groupKeys.filter(gk => bulkReviewRows.filter(r => r.groupKey === gk).every(r => r.selected)).length;
+          const includedGroupCount = groupKeys.filter(gk => bulkReviewRows.filter(r => r.groupKey === gk).some(r => r.selected)).length;
           return (
             <div className="flex flex-col min-h-0 flex-1 pt-4">
               <div className="flex items-center gap-3 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg mb-4 flex-shrink-0">
                 <AlertTriangle className="w-5 h-5 text-orange-500 flex-shrink-0" />
-                <p className="text-sm">Aşağıdaki vekaleti verenlerin toplam hisse sayısı 50'den fazla. Dahil etmek istemediklerinizi işaretli bırakın.</p>
+                <p className="text-sm">Aşağıdaki vekaleti verenlerin toplam hisse sayısı 50'den fazla. Dahil etmek istediklerinizi işaretli bırakın, istemediğinizin işaretini kaldırın.</p>
               </div>
               <div className="flex items-center gap-2 mb-3 flex-shrink-0">
                 <Button variant="outline" size="sm" onClick={() => setBulkReviewRows(prev => prev.map(r => ({ ...r, selected: true })))}>Tümünü Seç</Button>
                 <Button variant="outline" size="sm" onClick={() => setBulkReviewRows(prev => prev.map(r => ({ ...r, selected: false })))}>Tümünü Kaldır</Button>
-                <span className="text-xs text-muted-foreground ml-auto">{selectedGroupCount} / {groupKeys.length} grup dahil edilmeyecek</span>
+                <span className="text-xs text-muted-foreground ml-auto">{includedGroupCount} / {groupKeys.length} grup dahil edilecek</span>
               </div>
               <div className="border rounded-lg overflow-hidden min-h-0 flex-1">
                 <div className="overflow-auto max-h-full divide-y">
@@ -91,7 +91,7 @@ export function BulkImportDialog() {
                     return (
                       <div key={gk} className="px-3 py-2">
                         <div className="flex items-center gap-2">
-                          <input type="checkbox" checked={!allSelected} onChange={() => { const newSel = !allSelected; setBulkReviewRows(prev => prev.map(r => r.groupKey === gk ? { ...r, selected: newSel } : r)); }} className="rounded" />
+                          <input type="checkbox" checked={allSelected} onChange={() => { const newSel = !allSelected; setBulkReviewRows(prev => prev.map(r => r.groupKey === gk ? { ...r, selected: newSel } : r)); }} className="rounded" />
                           <button className="flex-1 text-left text-sm" onClick={() => setBulkReviewExpanded(prev => { const s = new Set(prev); isExpanded ? s.delete(gk) : s.add(gk); return s; })}>
                             <span className="font-semibold">{descLabel}</span>
                             <span className="text-muted-foreground ml-2 text-xs">({groupRows.length} satır, toplam {groupTotal} hisse)</span>
@@ -109,8 +109,8 @@ export function BulkImportDialog() {
                                   const name = nameColIdx >= 0 ? String(item.row[nameColIdx] ?? "").trim() : "";
                                   const dtype = typeColIdx >= 0 ? String(item.row[typeColIdx] ?? "").trim() : "";
                                   return (
-                                    <tr key={item.idx} className={`border-b last:border-0 ${item.selected ? "bg-red-500/5 text-muted-foreground line-through" : ""}`}>
-                                      <td className="p-1.5 pl-10 text-center"><input type="checkbox" checked={!item.selected} onChange={() => { setBulkReviewRows(prev => prev.map((r, ri) => ri === globalIdx ? { ...r, selected: !r.selected } : r)); }} className="rounded" /></td>
+                                    <tr key={item.idx} className={`border-b last:border-0 ${!item.selected ? "bg-red-500/5 text-muted-foreground line-through" : ""}`}>
+                                      <td className="p-1.5 pl-10 text-center"><input type="checkbox" checked={item.selected} onChange={() => { setBulkReviewRows(prev => prev.map((r, ri) => ri === globalIdx ? { ...r, selected: !r.selected } : r)); }} className="rounded" /></td>
                                       <td className="p-1.5 text-sm">{name || "—"}</td>
                                       <td className="p-1.5 text-sm">{dtype || "—"}</td>
                                       <td className="p-1.5 text-sm text-right font-mono">{item.rawShareCount}</td>
@@ -127,13 +127,13 @@ export function BulkImportDialog() {
                 </div>
               </div>
 
-              {selectedCount > 0 && (
+              {excludedCount > 0 && (
                 <div className="border rounded-lg p-3 mt-3 bg-muted/30 flex-shrink-0 space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">{selectedCount} seçili satır için işlem:</p>
+                  <p className="text-xs font-medium text-muted-foreground">{excludedCount} hariç tutulan satır için işlem:</p>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Button variant="outline" size="sm" onClick={addReviewRowsToBasket}>
                       <ShoppingBag className="w-3.5 h-3.5 mr-1" />
-                      Sepete Ekle
+                      Hariç Tutulanları Sepete Ekle
                     </Button>
                     {siblingKesimAlanlari.length > 0 && (
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -165,7 +165,7 @@ export function BulkImportDialog() {
               <div className="flex gap-2 pt-4 flex-shrink-0">
                 <Button variant="outline" onClick={() => setBulkStep("mapping")} className="flex-1">Geri</Button>
                 <Button onClick={applyBulkImport} className="flex-1">
-                  {bulkReviewRows.filter(r => r.selected).length > 0 ? `${bulkReviewRows.filter(r => r.selected).length} Satırı Çıkar ve Devam Et` : "Tümünü Dahil Et ve Devam Et"}
+                  {excludedCount > 0 ? `${excludedCount} Satırı Hariç Tut ve Devam Et` : "Tümünü Dahil Et ve Devam Et"}
                 </Button>
               </div>
             </div>
