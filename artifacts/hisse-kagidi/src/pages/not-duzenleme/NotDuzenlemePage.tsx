@@ -355,7 +355,11 @@ export default function NotDuzenlemePage() {
           if (!status) continue;
           const jid = activeIds[i];
 
-          jobProgressMap.set(jid, { done: status.processedDonations, total: status.totalDonations });
+          const prev = jobProgressMap.get(jid);
+          jobProgressMap.set(jid, {
+            done: status.processedDonations,
+            total: Math.max(status.totalDonations, prev?.total ?? 0),
+          });
 
           if (status.results && status.results.length > 0) {
             const currentDonations = donationsList || donationsRef.current;
