@@ -178,7 +178,7 @@ const classifyAsyncSchema = z.object({
     donationType: z.string().nullable().optional().transform(v => v ?? ""),
     vekalet: z.string().nullable().optional().transform(v => v ?? ""),
     notes: z.string().nullable().optional().transform(v => v ?? ""),
-  })).min(1).max(5000),
+  })).min(1).max(50000),
   kesimAlaniId: z.string().optional(),
 });
 
@@ -430,7 +430,7 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
       donationId: z.string(),
       categories: z.array(z.string()),
       warnings: z.string().optional().default(""),
-    })).max(2000),
+    })).max(50000),
   }).safeParse(req.body);
 
   if (!parsed.success) {

@@ -50,11 +50,37 @@ export async function classifyNotes(donations: AiDonationInput[]): Promise<{ res
   });
 }
 
+const AI_CHUNK_SIZE = 5000;
+
 export async function classifyNotesAsync(donations: AiDonationInput[], kesimAlaniId?: string): Promise<{ jobId: string; status: string; totalDonations: number }> {
   return apiFetch<{ jobId: string; status: string; totalDonations: number }>("/ai-notes/classify-async", {
     method: "POST",
     body: JSON.stringify({ donations, kesimAlaniId }),
   });
+}
+
+export async function classifyNotesAsyncChunked(donations: AiDonationInput[], kesimAlaniId?: string): Promise<{ jobIds: string[]; totalDonations: number }> {
+  if (donations.length <= AI_CHUNK_SIZE) {
+    const result = await classifyNotesAsync(donations, kesimAlaniId);
+    return { jobIds: [result.jobId], totalDonations: result.totalDonations };
+  }
+
+  const jobIds: string[] = [];
+  let totalDonations = 0;
+  for (let i = 0; i < donations.length; i += AI_CHUNK_SIZE) {
+    const chunk = donations.slice(i, i + AI_CHUNK_SIZE);
+    try {
+      const result = await classifyNotesAsync(chunk, kesimAlaniId);
+      jobIds.push(result.jobId);
+      totalDonations += result.totalDonations;
+    } catch (err) {
+      if (jobIds.length > 0) {
+        return { jobIds, totalDonations };
+      }
+      throw err;
+    }
+  }
+  return { jobIds, totalDonations };
 }
 
 export async function fetchJobStatus(jobId: string): Promise<AiJobStatus> {

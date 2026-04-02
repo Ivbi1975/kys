@@ -75,6 +75,7 @@ export {
   saveAiSettings,
   classifyNotes,
   classifyNotesAsync,
+  classifyNotesAsyncChunked,
   fetchJobStatus,
   cancelJob,
   fetchActiveJob,

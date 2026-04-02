@@ -22,7 +22,7 @@ import {
   fetchKesimAlani,
   fetchProjects,
   bulkUpdateNotes,
-  classifyNotesAsync,
+  classifyNotesAsyncChunked,
   fetchJobStatus,
   cancelJob,
   fetchActiveJob,
@@ -93,7 +93,7 @@ export default function NotDuzenlemePage() {
   const [showAiReport, setShowAiReport] = useState(false);
   const [aiReportCollapsed, setAiReportCollapsed] = useState(false);
   const [aiCategoryFilter, setAiCategoryFilter] = useState<string | null>(null);
-  const activeJobIdRef = useRef<string | null>(null);
+  const activeJobIdsRef = useRef<string[]>([]);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const pushHistory = useCallback((prevDonations: LocalDonation[], nextDonations: LocalDonation[]) => {
@@ -313,11 +313,11 @@ export default function NotDuzenlemePage() {
       try {
         const { job } = await fetchActiveJob(data.id);
         if (job) {
-          activeJobIdRef.current = job.jobId;
+          activeJobIdsRef.current = [job.jobId];
           setAiRunning(true);
           setAiProgress({ done: job.processedDonations, total: job.totalDonations });
           setShowAiPanel(true);
-          startPolling(job.jobId, allDonations);
+          startPolling([job.jobId], allDonations);
         }
       } catch {}
     }).catch((err) => {
@@ -335,65 +335,95 @@ export default function NotDuzenlemePage() {
 
   useEffect(() => { return () => { stopPolling(); }; }, [stopPolling]);
 
-  const startPolling = useCallback((jobId: string, donationsList?: LocalDonation[]) => {
+  const startPolling = useCallback((jobIds: string[], donationsList?: LocalDonation[]) => {
     stopPolling();
+    const finishedJobs = new Set<string>();
+    const jobProgressMap = new Map<string, { done: number; total: number }>();
+    const allCollectedResults: { donationId: string; categories: string[]; warnings: string }[] = [];
+    let isPolling = false;
 
     const poll = async () => {
+      if (isPolling) return;
+      isPolling = true;
       try {
-        const status = await fetchJobStatus(jobId);
-        setAiProgress({ done: status.processedDonations, total: status.totalDonations });
+        const activeIds = jobIds.filter(id => !finishedJobs.has(id));
+        const statuses = await Promise.all(activeIds.map(id => fetchJobStatus(id).catch(() => null)));
 
-        if (status.results && status.results.length > 0) {
-          const currentDonations = donationsList || donationsRef.current;
-          setAiResults(prev => {
-            const next = new Map(prev);
-            for (const r of status.results!) {
-              const donor = currentDonations.find(d => d.id === r.donationId);
-              const donationType = donor?.donationType || "";
-              let warnings = r.warnings || "";
-              if (warnings && donationType && r.categories) {
-                const dtLower = donationType.toLocaleLowerCase("tr");
-                const catsLower = r.categories.map(c => c.toLocaleLowerCase("tr"));
-                if (catsLower.includes(dtLower)) {
-                  warnings = warnings
-                    .split(/[.;]\s*/)
-                    .filter(s => !s.toLocaleLowerCase("tr").includes(dtLower) || s.toLocaleLowerCase("tr").includes("tutarsız"))
-                    .join(". ")
-                    .trim();
-                  if (warnings === "." || warnings === ",") warnings = "";
-                }
-              }
-              next.set(r.donationId, { ...r, warnings, donationType });
-            }
-            return next;
-          });
-        }
+        for (let i = 0; i < activeIds.length; i++) {
+          const status = statuses[i];
+          if (!status) continue;
+          const jid = activeIds[i];
 
-        if (status.status === "completed" || status.status === "failed" || status.status === "cancelled") {
-          stopPolling();
-          setAiRunning(false);
-          activeJobIdRef.current = null;
-
-          if (status.status === "cancelled") {
-            setAiStopped(true);
-          }
+          jobProgressMap.set(jid, { done: status.processedDonations, total: status.totalDonations });
 
           if (status.results && status.results.length > 0) {
+            const currentDonations = donationsList || donationsRef.current;
+            setAiResults(prev => {
+              const next = new Map(prev);
+              for (const r of status.results!) {
+                const donor = currentDonations.find(d => d.id === r.donationId);
+                const donationType = donor?.donationType || "";
+                let warnings = r.warnings || "";
+                if (warnings && donationType && r.categories) {
+                  const dtLower = donationType.toLocaleLowerCase("tr");
+                  const catsLower = r.categories.map(c => c.toLocaleLowerCase("tr"));
+                  if (catsLower.includes(dtLower)) {
+                    warnings = warnings
+                      .split(/[.;]\s*/)
+                      .filter(s => !s.toLocaleLowerCase("tr").includes(dtLower) || s.toLocaleLowerCase("tr").includes("tutarsız"))
+                      .join(". ")
+                      .trim();
+                    if (warnings === "." || warnings === ",") warnings = "";
+                  }
+                }
+                next.set(r.donationId, { ...r, warnings, donationType });
+              }
+              return next;
+            });
+          }
+
+          if (status.status === "completed" || status.status === "failed" || status.status === "cancelled") {
+            finishedJobs.add(jid);
+            if (status.results && status.results.length > 0) {
+              allCollectedResults.push(...status.results.map(r => ({ donationId: r.donationId, categories: r.categories || [], warnings: r.warnings || "" })));
+            }
+            if (status.status === "cancelled") {
+              setAiStopped(true);
+            }
+            if (status.status === "failed") {
+              toast({ title: "AI İşlemi Başarısız", description: status.error || "Bilinmeyen hata", variant: "destructive" });
+            }
+          }
+        }
+
+        let totalDone = 0;
+        let totalAll = 0;
+        for (const p of jobProgressMap.values()) {
+          totalDone += p.done;
+          totalAll += p.total;
+        }
+        setAiProgress({ done: totalDone, total: totalAll });
+
+        if (finishedJobs.size === jobIds.length) {
+          stopPolling();
+          setAiRunning(false);
+          activeJobIdsRef.current = [];
+
+          if (allCollectedResults.length > 0) {
             try {
               setAiSaveStatus("saving");
-              await saveAiClassifications(status.results.map(r => ({ donationId: r.donationId, categories: r.categories || [], warnings: r.warnings || "" })));
+              const SAVE_CHUNK = 2000;
+              for (let si = 0; si < allCollectedResults.length; si += SAVE_CHUNK) {
+                await saveAiClassifications(allCollectedResults.slice(si, si + SAVE_CHUNK));
+              }
               setAiSaveStatus("saved");
             } catch { setAiSaveStatus("error"); }
           }
 
           setShowAiReport(true);
           setAiReportCollapsed(false);
-
-          if (status.status === "failed") {
-            toast({ title: "AI İşlemi Başarısız", description: status.error || "Bilinmeyen hata", variant: "destructive" });
-          }
         }
-      } catch {}
+      } catch {} finally { isPolling = false; }
     };
 
     poll();
@@ -591,12 +621,12 @@ export default function NotDuzenlemePage() {
     setAiProgress({ done: previouslyDone, total: totalToProcess });
 
     try {
-      const { jobId } = await classifyNotesAsync(
+      const { jobIds } = await classifyNotesAsyncChunked(
         withNotes.map(d => ({ id: d.id, name: d.name || d.description || "", donationType: d.donationType || "", vekalet: d.vekalet || "", notes: d.notes || "" })),
         kesim.id
       );
-      activeJobIdRef.current = jobId;
-      startPolling(jobId);
+      activeJobIdsRef.current = jobIds;
+      startPolling(jobIds);
     } catch (err) {
       setAiRunning(false);
       const msg = err instanceof Error ? err.message : "Bilinmeyen hata";
@@ -609,11 +639,9 @@ export default function NotDuzenlemePage() {
   };
 
   const stopAiClassification = async () => {
-    const jobId = activeJobIdRef.current;
-    if (jobId) {
-      try {
-        await cancelJob(jobId);
-      } catch {}
+    const jobIds = activeJobIdsRef.current;
+    if (jobIds.length > 0) {
+      await Promise.all(jobIds.map(id => cancelJob(id).catch(() => {})));
     }
     setAiStopped(true);
   };
