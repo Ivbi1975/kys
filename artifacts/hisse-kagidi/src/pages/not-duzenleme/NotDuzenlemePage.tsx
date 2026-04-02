@@ -28,6 +28,7 @@ import {
   fetchActiveJob,
   saveAiClassifications,
   API_BASE,
+  ApiFetchError,
   getApiKey,
 } from "@/lib/api";
 import {
@@ -487,14 +488,19 @@ export default function NotDuzenlemePage() {
 
     try {
       const { jobId } = await classifyNotesAsync(
-        withNotes.map(d => ({ id: d.id, name: d.name || d.description, donationType: d.donationType, vekalet: d.vekalet, notes: d.notes })),
+        withNotes.map(d => ({ id: d.id, name: d.name || d.description || "", donationType: d.donationType || "", vekalet: d.vekalet || "", notes: d.notes || "" })),
         kesim.id
       );
       activeJobIdRef.current = jobId;
       startPolling(jobId);
     } catch (err) {
       setAiRunning(false);
-      toast({ title: "AI Başlatılamadı", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+      const msg = err instanceof Error ? err.message : "Bilinmeyen hata";
+      const details = err instanceof ApiFetchError ? err.details : undefined;
+      const detailStr = details
+        ? details.map(d => `${(d.path || []).join(".")}: ${d.message || ""}`).join(", ")
+        : "";
+      toast({ title: "AI Başlatılamadı", description: detailStr ? `${msg} (${detailStr})` : msg, variant: "destructive" });
     }
   };
 

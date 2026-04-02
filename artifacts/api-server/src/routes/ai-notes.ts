@@ -72,10 +72,10 @@ async function getAiSettings(): Promise<{ prompt: string; categories: string[] }
 const classifySchema = z.object({
   donations: z.array(z.object({
     id: z.string(),
-    name: z.string().optional().default(""),
-    donationType: z.string().optional().default(""),
-    vekalet: z.string().optional().default(""),
-    notes: z.string().optional().default(""),
+    name: z.string().nullable().optional().transform(v => v ?? ""),
+    donationType: z.string().nullable().optional().transform(v => v ?? ""),
+    vekalet: z.string().nullable().optional().transform(v => v ?? ""),
+    notes: z.string().nullable().optional().transform(v => v ?? ""),
   })).min(1).max(500),
 });
 
@@ -174,10 +174,10 @@ router.post("/ai-notes/classify", asyncHandler(async (req, res) => {
 const classifyAsyncSchema = z.object({
   donations: z.array(z.object({
     id: z.string(),
-    name: z.string().optional().default(""),
-    donationType: z.string().optional().default(""),
-    vekalet: z.string().optional().default(""),
-    notes: z.string().optional().default(""),
+    name: z.string().nullable().optional().transform(v => v ?? ""),
+    donationType: z.string().nullable().optional().transform(v => v ?? ""),
+    vekalet: z.string().nullable().optional().transform(v => v ?? ""),
+    notes: z.string().nullable().optional().transform(v => v ?? ""),
   })).min(1).max(5000),
   kesimAlaniId: z.string().optional(),
 });

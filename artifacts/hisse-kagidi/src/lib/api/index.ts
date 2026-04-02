@@ -1,4 +1,4 @@
-export { getApiKey, apiFetch, API_BASE } from "./core";
+export { getApiKey, apiFetch, API_BASE, ApiFetchError } from "./core";
 export { fetchPhotoToken, clearPhotoTokenCache } from "./signed-url";
 
 export {

@@ -7,6 +7,17 @@ interface ApiError {
   details?: unknown;
 }
 
+export class ApiFetchError extends Error {
+  details?: Array<{ path?: (string | number)[]; message?: string }>;
+  constructor(message: string, details?: unknown) {
+    super(message);
+    this.name = "ApiFetchError";
+    if (Array.isArray(details)) {
+      this.details = details;
+    }
+  }
+}
+
 export function getApiKey(): string {
   return sessionStorage.getItem("app_api_key") || "";
 }
@@ -35,7 +46,7 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
       throw new Error("Oturum süresi doldu. Yeniden giriş yapılıyor...");
     }
     const err: ApiError = await res.json().catch(() => ({ error: "Sunucu hatası" }));
-    throw new Error(err.error || `HTTP ${res.status}`);
+    throw new ApiFetchError(err.error || `HTTP ${res.status}`, err.details);
   }
   return res.json() as Promise<T>;
 }
