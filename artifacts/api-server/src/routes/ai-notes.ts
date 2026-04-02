@@ -397,8 +397,6 @@ function deduplicateResults(results: unknown[]): unknown[] {
         seen.add(id);
         deduped.push(r);
       }
-    } else {
-      deduped.push(r);
     }
   }
   return deduped;
@@ -459,7 +457,37 @@ async function processClassifyJob(
         .where(eq(aiJobsTable.id, jobId));
     }
 
-    const resultPayload = { classifications: allResults, failedBatchCount, totalBatches: chunks.length };
+    const inputIdSet = new Set(donations.map(d => d.id));
+    const validatedResults: unknown[] = [];
+    const seenIds = new Set<string>();
+    for (const r of allResults) {
+      if (r && typeof r === "object" && "donationId" in r) {
+        const rid = String((r as { donationId: string }).donationId);
+        if (inputIdSet.has(rid) && !seenIds.has(rid)) {
+          seenIds.add(rid);
+          validatedResults.push(r);
+        }
+      }
+    }
+    for (const d of donations) {
+      if (!seenIds.has(d.id)) {
+        validatedResults.push({
+          donationId: d.id,
+          categories: [],
+          requests: "",
+          warnings: "AI sonuç eşleşmesi bulunamadı",
+          summary: "",
+        });
+      }
+    }
+    if (validatedResults.length !== allResults.length) {
+      logger.warn(
+        { jobId, inputCount: donations.length, rawResultCount: allResults.length, validatedCount: validatedResults.length },
+        "AI result reconciliation adjusted counts"
+      );
+    }
+
+    const resultPayload = { classifications: validatedResults, failedBatchCount, totalBatches: chunks.length };
     const updateResult = await db.update(aiJobsTable)
       .set({
         status: AiJobStatus.COMPLETED,
