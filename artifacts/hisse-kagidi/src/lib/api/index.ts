@@ -6,6 +6,7 @@ export {
   createProject,
   updateProject,
   deleteProject,
+  permanentDeleteProject,
   restoreProject,
   fetchDeletedProjects,
   fetchArchivedProjects,

@@ -37,6 +37,7 @@ type HomeDialogsProps = Pick<HomeState,
   | "moveDialogOpen" | "setMoveDialogOpen" | "movingKesim" | "setMovingKesim" | "moveTargetProjectId" | "setMoveTargetProjectId" | "handleMoveKesimAlani"
   | "deleteConfirm" | "setDeleteConfirm" | "executeDelete"
   | "permanentDeleteConfirm" | "setPermanentDeleteConfirm" | "executePermanentDelete"
+  | "permanentDeleteProjectConfirm" | "setPermanentDeleteProjectConfirm" | "executePermanentDeleteProject"
   | "deleteProjectConfirm" | "setDeleteProjectConfirm" | "handleDeleteProject"
 >;
 
@@ -102,6 +103,12 @@ export function HomeDialogs(props: HomeDialogsProps) {
         permanentDeleteConfirm={props.permanentDeleteConfirm}
         setPermanentDeleteConfirm={props.setPermanentDeleteConfirm}
         executePermanentDelete={props.executePermanentDelete}
+      />
+
+      <PermanentDeleteProjectAlert
+        permanentDeleteProjectConfirm={props.permanentDeleteProjectConfirm}
+        setPermanentDeleteProjectConfirm={props.setPermanentDeleteProjectConfirm}
+        executePermanentDeleteProject={props.executePermanentDeleteProject}
       />
 
       <DeleteProjectAlert
@@ -410,6 +417,34 @@ function PermanentDeleteAlert({
         <AlertDialogFooter>
           <AlertDialogCancel>İptal</AlertDialogCancel>
           <AlertDialogAction onClick={executePermanentDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            Kalıcı Sil
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function PermanentDeleteProjectAlert({
+  permanentDeleteProjectConfirm, setPermanentDeleteProjectConfirm, executePermanentDeleteProject,
+}: {
+  permanentDeleteProjectConfirm: { id: string; name: string } | null;
+  setPermanentDeleteProjectConfirm: (confirm: { id: string; name: string } | null) => void;
+  executePermanentDeleteProject: () => void;
+}) {
+  return (
+    <AlertDialog open={permanentDeleteProjectConfirm !== null} onOpenChange={(open) => { if (!open) setPermanentDeleteProjectConfirm(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Projeyi Kalıcı Olarak Sil</AlertDialogTitle>
+          <AlertDialogDescription>
+            <strong>&quot;{permanentDeleteProjectConfirm?.name}&quot;</strong> projesi ve altındaki tüm kesim listeleri kalıcı olarak silinecek.
+            Bu işlem geri alınamaz!
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>İptal</AlertDialogCancel>
+          <AlertDialogAction onClick={executePermanentDeleteProject} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
             Kalıcı Sil
           </AlertDialogAction>
         </AlertDialogFooter>

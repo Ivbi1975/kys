@@ -4,6 +4,14 @@ import {
   projectsTable,
   kesimAlanlariTable,
   animalGroupsTable,
+  donationsTable,
+  animalGroupDonationsTable,
+  trackingNotesTable,
+  notificationLogsTable,
+  animalGroupPhotosTable,
+  teamsTable,
+  donationTagsTable,
+  donationTransfersTable,
 } from "@workspace/db/schema";
 import { eq, isNull, isNotNull, and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -11,6 +19,7 @@ import { cacheGet, cacheSet, cacheInvalidate, cacheInvalidatePrefix } from "../l
 import { asyncHandler } from "../middleware/error-handler";
 import { ERROR_MESSAGES } from "../lib/constants";
 import { logger } from "../lib/logger";
+import { invalidateKACache } from "../services/kesim-alani.service";
 
 const idParamSchema = z.object({
   id: z.string().min(1),
@@ -157,14 +166,60 @@ router.delete("/projects/:id", asyncHandler(async (req, res) => {
     return;
   }
 
+  const permanent = req.query.permanent === "true";
   const { id } = paramsParsed.data;
   const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
   if (!existing) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
 
-  await db.update(projectsTable).set({ deletedAt: new Date() }).where(eq(projectsTable.id, id));
-  await db.update(kesimAlanlariTable).set({ projectId: null }).where(eq(kesimAlanlariTable.projectId, id));
-  await refreshProjectStats();
-  res.json({ success: true });
+  if (permanent) {
+    await db.transaction(async (tx) => {
+      const kesimRows = await tx.select({ id: kesimAlanlariTable.id })
+        .from(kesimAlanlariTable)
+        .where(eq(kesimAlanlariTable.projectId, id));
+      const kaIds = kesimRows.map(k => k.id);
+
+      if (kaIds.length > 0) {
+        const groupRows = await tx.select({ id: animalGroupsTable.id })
+          .from(animalGroupsTable)
+          .where(inArray(animalGroupsTable.kesimAlaniId, kaIds));
+        const groupIds = groupRows.map(g => g.id);
+
+        if (groupIds.length > 0) {
+          await tx.delete(animalGroupPhotosTable).where(inArray(animalGroupPhotosTable.animalGroupId, groupIds));
+          await tx.delete(animalGroupDonationsTable).where(inArray(animalGroupDonationsTable.groupId, groupIds));
+        }
+
+        await tx.delete(animalGroupsTable).where(inArray(animalGroupsTable.kesimAlaniId, kaIds));
+        await tx.delete(trackingNotesTable).where(inArray(trackingNotesTable.kesimAlaniId, kaIds));
+        await tx.delete(notificationLogsTable).where(inArray(notificationLogsTable.kesimAlaniId, kaIds));
+
+        const donationRows = await tx.select({ id: donationsTable.id })
+          .from(donationsTable)
+          .where(inArray(donationsTable.kesimAlaniId, kaIds));
+        const donationIds = donationRows.map(d => d.id);
+        if (donationIds.length > 0) {
+          await tx.delete(donationTagsTable).where(inArray(donationTagsTable.donationId, donationIds));
+        }
+
+        await tx.delete(donationsTable).where(inArray(donationsTable.kesimAlaniId, kaIds));
+        await tx.delete(teamsTable).where(inArray(teamsTable.kesimAlaniId, kaIds));
+        await tx.delete(kesimAlanlariTable).where(inArray(kesimAlanlariTable.id, kaIds));
+      }
+
+      await tx.delete(donationTransfersTable).where(eq(donationTransfersTable.projectId, id));
+      await tx.delete(projectsTable).where(eq(projectsTable.id, id));
+    });
+
+    invalidateKACache();
+    cacheInvalidate(PROJECTS_CACHE_KEY);
+    cacheInvalidatePrefix("kesim-alanlari");
+    await refreshProjectStats();
+    res.json({ success: true });
+  } else {
+    await db.update(projectsTable).set({ deletedAt: new Date() }).where(eq(projectsTable.id, id));
+    await refreshProjectStats();
+    res.json({ success: true });
+  }
 }));
 
 router.post("/projects/:id/restore", asyncHandler(async (req, res) => {

@@ -21,6 +21,7 @@ import {
   createProject,
   updateProject,
   deleteProject,
+  permanentDeleteProject,
   restoreProject,
   fetchDeletedProjects,
   fetchArchivedProjects,
@@ -68,6 +69,7 @@ export function useHomeState() {
   const [editProjectDialogOpen, setEditProjectDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<{ id: string; name: string } | null>(null);
   const [deleteProjectConfirm, setDeleteProjectConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [permanentDeleteProjectConfirm, setPermanentDeleteProjectConfirm] = useState<{ id: string; name: string } | null>(null);
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [movingKesim, setMovingKesim] = useState<{ id: string; name: string; currentProjectId: string | null } | null>(null);
   const [moveTargetProjectId, setMoveTargetProjectId] = useState<string>("__none__");
@@ -282,9 +284,6 @@ export function useHomeState() {
       if (deletedProj) {
         setDeletedProjects(prev => [...prev, { ...deletedProj, deletedAt: new Date().toISOString() }]);
       }
-      setKesimAlanlari(prev => prev.map(k =>
-        k.projectId === deleteProjectConfirm.id ? { ...k, projectId: null } : k
-      ));
       toast({ title: "Proje silindi", description: `"${deleteProjectConfirm.name}" çöp kutusuna taşındı.` });
     } catch (err) {
       toast({
@@ -389,6 +388,33 @@ export function useHomeState() {
     }
     setPermanentDeleteConfirm(null);
   }, [permanentDeleteConfirm, toast]);
+
+  const deletedProjectsRef = useRef(deletedProjects);
+  deletedProjectsRef.current = deletedProjects;
+
+  const requestPermanentDeleteProject = useCallback((id: string) => {
+    const target = deletedProjectsRef.current.find(p => p.id === id);
+    if (!target) return;
+    setPermanentDeleteProjectConfirm({ id, name: target.name });
+  }, []);
+
+  const executePermanentDeleteProject = useCallback(async () => {
+    if (!permanentDeleteProjectConfirm) return;
+    try {
+      await permanentDeleteProject(permanentDeleteProjectConfirm.id);
+      setDeletedProjects(prev => prev.filter(p => p.id !== permanentDeleteProjectConfirm.id));
+      setDeletedKesimAlanlari(prev => prev.filter(k => k.projectId !== permanentDeleteProjectConfirm.id));
+      setKesimAlanlari(prev => prev.filter(k => k.projectId !== permanentDeleteProjectConfirm.id));
+      toast({ title: "Kalıcı olarak silindi", description: `"${permanentDeleteProjectConfirm.name}" projesi ve tüm kesim listeleri tamamen silindi.` });
+    } catch (err) {
+      toast({
+        title: "Kalıcı silme hatası",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    }
+    setPermanentDeleteProjectConfirm(null);
+  }, [permanentDeleteProjectConfirm, toast]);
 
   const handleLogoUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -574,9 +600,14 @@ export function useHomeState() {
     }
   }, [toast]);
 
+  const deletedProjectIds = useMemo(
+    () => new Set(deletedProjects.map(p => p.id)),
+    [deletedProjects]
+  );
+
   const unassignedKesimAlanlari = useMemo(
-    () => kesimAlanlari.filter(k => !k.projectId),
-    [kesimAlanlari]
+    () => kesimAlanlari.filter(k => !k.projectId || deletedProjectIds.has(k.projectId)),
+    [kesimAlanlari, deletedProjectIds]
   );
 
   return {
@@ -631,6 +662,8 @@ export function useHomeState() {
     setEditingProject,
     deleteProjectConfirm,
     setDeleteProjectConfirm,
+    permanentDeleteProjectConfirm,
+    setPermanentDeleteProjectConfirm,
     moveDialogOpen,
     setMoveDialogOpen,
     movingKesim,
@@ -670,6 +703,8 @@ export function useHomeState() {
     handleRestore,
     requestPermanentDelete,
     executePermanentDelete,
+    requestPermanentDeleteProject,
+    executePermanentDeleteProject,
     handleLogoUpload,
     handleDeleteLogo,
     handleExportBackup,

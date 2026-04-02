@@ -121,6 +121,9 @@ export default function Home() {
           permanentDeleteConfirm={state.permanentDeleteConfirm}
           setPermanentDeleteConfirm={state.setPermanentDeleteConfirm}
           executePermanentDelete={state.executePermanentDelete}
+          permanentDeleteProjectConfirm={state.permanentDeleteProjectConfirm}
+          setPermanentDeleteProjectConfirm={state.setPermanentDeleteProjectConfirm}
+          executePermanentDeleteProject={state.executePermanentDeleteProject}
           deleteProjectConfirm={state.deleteProjectConfirm}
           setDeleteProjectConfirm={state.setDeleteProjectConfirm}
           handleDeleteProject={state.handleDeleteProject}
@@ -199,6 +202,7 @@ export default function Home() {
           onRestoreProject={state.handleRestoreProject}
           onRestore={state.handleRestore}
           onPermanentDelete={state.requestPermanentDelete}
+          onPermanentDeleteProject={state.requestPermanentDeleteProject}
         />
       </div>
 

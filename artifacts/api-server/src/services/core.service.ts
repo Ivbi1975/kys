@@ -1,6 +1,6 @@
 import { db } from "@workspace/db";
 import { kesimAlanlariTable, projectsTable } from "@workspace/db/schema";
-import { eq, isNull, isNotNull } from "drizzle-orm";
+import { eq, isNull, isNotNull, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import { serviceError, serviceOk, type ServiceResult } from "./result";
 import {
@@ -43,7 +43,26 @@ export async function listDeletedKesimAlanlari() {
   const rows = await db.select().from(kesimAlanlariTable)
     .where(isNotNull(kesimAlanlariTable.deletedAt))
     .orderBy(kesimAlanlariTable.createdAt);
-  return serviceOk({ data: await getFullKesimAlaniList(rows) });
+  const fullList = await getFullKesimAlaniList(rows);
+
+  const projectIds = [...new Set(rows.map(r => r.projectId).filter(Boolean))] as string[];
+  let projectNameMap: Record<string, string> = {};
+  if (projectIds.length > 0) {
+    const projects = await db.select({ id: projectsTable.id, name: projectsTable.name })
+      .from(projectsTable)
+      .where(inArray(projectsTable.id, projectIds));
+    projectNameMap = Object.fromEntries(projects.map(p => [p.id, p.name]));
+  }
+
+  const enriched = fullList.map((item: Record<string, unknown>, idx: number) => {
+    const row = rows[idx];
+    return {
+      ...item,
+      projectName: row.projectId ? (projectNameMap[row.projectId] || null) : null,
+    };
+  });
+
+  return serviceOk({ data: enriched });
 }
 
 export async function getSingleKesimAlani(id: string): Promise<ServiceResult<{ data: unknown }>> {

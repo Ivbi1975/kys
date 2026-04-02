@@ -23,6 +23,10 @@ export async function deleteProject(id: string): Promise<{ success: boolean }> {
   return apiFetch<{ success: boolean }>(`/projects/${id}`, { method: "DELETE" });
 }
 
+export async function permanentDeleteProject(id: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/projects/${id}?permanent=true`, { method: "DELETE" });
+}
+
 export async function restoreProject(id: string): Promise<Project> {
   return apiFetch<Project>(`/projects/${id}/restore`, { method: "POST" });
 }

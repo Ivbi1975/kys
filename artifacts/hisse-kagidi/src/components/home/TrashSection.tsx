@@ -12,6 +12,7 @@ interface TrashSectionProps {
   onRestoreProject: (id: string) => void;
   onRestore: (id: string) => void;
   onPermanentDelete: (id: string) => void;
+  onPermanentDeleteProject: (id: string) => void;
 }
 
 export function TrashSection({
@@ -22,6 +23,7 @@ export function TrashSection({
   onRestoreProject,
   onRestore,
   onPermanentDelete,
+  onPermanentDeleteProject,
 }: TrashSectionProps) {
   if (deletedKesimAlanlari.length === 0 && deletedProjects.length === 0) return null;
 
@@ -52,6 +54,9 @@ export function TrashSection({
                   <RotateCcw className="w-3 h-3 mr-1" />
                   Geri Al
                 </Button>
+                <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => onPermanentDeleteProject(p.id)}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
               </div>
             </Card>
           ))}
@@ -61,6 +66,7 @@ export function TrashSection({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{k.name}</p>
                   <p className="text-[10px] text-muted-foreground">
+                    {k.projectName && <span>Proje: {k.projectName} · </span>}
                     Silinme: {k.deletedAt ? formatDateTime(k.deletedAt) : "—"}
                   </p>
                 </div>

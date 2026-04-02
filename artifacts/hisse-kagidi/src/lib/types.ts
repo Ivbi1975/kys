@@ -48,6 +48,7 @@ export interface KesimAlani {
   createdAt: string;
   deletedAt?: string | null;
   projectId?: string | null;
+  projectName?: string | null;
   customTags?: CustomTag[];
   trackingToken?: string | null;
   kesimListeId?: string | null;
