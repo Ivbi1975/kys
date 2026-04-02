@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startPoolMonitoring, shutdownPool } from "@workspace/db";
+import { syncAiSettingsToDb } from "./routes/ai-notes";
 import type { Server } from "http";
 
 const rawPort = process.env["PORT"];
@@ -27,6 +28,9 @@ const server: Server = app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
   startPoolMonitoring();
+  syncAiSettingsToDb()
+    .then(() => logger.info("AI settings synced to DB"))
+    .catch((err) => logger.error({ err }, "Failed to sync AI settings to DB"));
 });
 
 function gracefulShutdown(signal: string) {

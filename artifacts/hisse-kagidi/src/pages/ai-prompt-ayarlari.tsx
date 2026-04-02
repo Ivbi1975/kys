@@ -33,7 +33,7 @@ Kategori kuralları:
 - "erken_kesim": Notta "seferi olacağım ilk hayvanda kesilsin", "ilk hayvan", "birinci hayvan", "ılk hayvan", "erken kesim", "erkenden kesim", "yola çıkacağım", "mümkünse erkenden kesilsin", "sabah erken saatte kesilsin", "öğleden önce kesilsin", "geç kesim", "erken saat", "seferi" gibi ifadeler varsa bu etiketi ata. Zaman hassasiyeti olan tüm istekleri kapsar.
 - "özel_kesim": Notta belirli bir saat belirtiliyorsa (ör: "saat 10'da", "14:00'te"), özel zaman talebi varsa (ör: "öğleden sonra kesilsin", "akşama doğru") bu etiketi ata.
 - "Şafi": Notta "şafi", "şafi mezhebindeyim", "şafii", "safi", "safı" gibi ifadeler varsa bu etiketi ata VE uyarı olarak "Şafi mezhebine göre kesim gerekiyor" yaz. Bu önemli bir uyarıdır.
-- "Sünnet" bağış cinsi: Notta "sünnet", "sunnet" ifadesi geçerse, categories listesine "sünnet" ekle. Bu bir donationType (bağış cinsi) olarak değerlendirilmeli.
+- "Sünnet" bağış cinsi: Notta "sünnet", "sunnet" ifadesi geçerse, categories listesine "sünnet" ekle. Sünnet/Sunnet ifadesi geçerse bu bir bağış cinsidir (donationType). Bağış cinsi olarak 'Sünnet' yazılmalı.
 
 Her bağışçı için JSON formatında yanıt ver:
 {

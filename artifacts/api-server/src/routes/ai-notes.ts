@@ -28,7 +28,7 @@ Kategori kuralları:
 - "erken_kesim": Notta "seferi olacağım ilk hayvanda kesilsin", "ilk hayvan", "birinci hayvan", "ılk hayvan", "erken kesim", "erkenden kesim", "yola çıkacağım", "mümkünse erkenden kesilsin", "sabah erken saatte kesilsin", "öğleden önce kesilsin", "geç kesim", "erken saat", "seferi" gibi ifadeler varsa bu etiketi ata. Zaman hassasiyeti olan tüm istekleri kapsar.
 - "özel_kesim": Notta belirli bir saat belirtiliyorsa (ör: "saat 10'da", "14:00'te"), özel zaman talebi varsa (ör: "öğleden sonra kesilsin", "akşama doğru") bu etiketi ata.
 - "Şafi": Notta "şafi", "şafi mezhebindeyim", "şafii", "safi", "safı" gibi ifadeler varsa bu etiketi ata VE uyarı olarak "Şafi mezhebine göre kesim gerekiyor" yaz. Bu önemli bir uyarıdır.
-- "Sünnet" bağış cinsi: Notta "sünnet", "sunnet" ifadesi geçerse, categories listesine "sünnet" ekle. Bu bir donationType (bağış cinsi) olarak değerlendirilmeli.
+- "Sünnet" bağış cinsi: Notta "sünnet", "sunnet" ifadesi geçerse, categories listesine "sünnet" ekle. Sünnet/Sunnet ifadesi geçerse bu bir bağış cinsidir (donationType). Bağış cinsi olarak 'Sünnet' yazılmalı.
 
 Her bağışçı için JSON formatında yanıt ver:
 {
@@ -57,13 +57,65 @@ const DEFAULT_CATEGORIES = [
   "sünnet",
 ];
 
+async function syncAiSettingsToDb(): Promise<void> {
+  const [promptRow, categoriesRow] = await Promise.all([
+    db.select().from(appSettingsTable).where(eq(appSettingsTable.key, "ai_prompt")).then(r => r[0]),
+    db.select().from(appSettingsTable).where(eq(appSettingsTable.key, "ai_categories")).then(r => r[0]),
+  ]);
+
+  if (!promptRow) {
+    await db.insert(appSettingsTable)
+      .values({ key: "ai_prompt", value: DEFAULT_PROMPT })
+      .onConflictDoNothing();
+  } else if (!promptRow.value.includes("Kategori kuralları")) {
+    const categoryRulesSection = DEFAULT_PROMPT.substring(
+      DEFAULT_PROMPT.indexOf("Kategori kuralları:")
+    );
+    const insertPoint = promptRow.value.indexOf("Her bağışçı için JSON formatında");
+    const updatedPrompt = insertPoint !== -1
+      ? promptRow.value.substring(0, insertPoint) + categoryRulesSection
+      : DEFAULT_PROMPT;
+    await db.update(appSettingsTable)
+      .set({ value: updatedPrompt })
+      .where(eq(appSettingsTable.key, "ai_prompt"));
+  }
+
+  if (!categoriesRow) {
+    await db.insert(appSettingsTable)
+      .values({ key: "ai_categories", value: JSON.stringify(DEFAULT_CATEGORIES) })
+      .onConflictDoNothing();
+  } else {
+    const existing = JSON.parse(categoriesRow.value) as string[];
+    const missing = DEFAULT_CATEGORIES.filter(c => !existing.includes(c));
+    if (missing.length > 0) {
+      const merged = [...existing, ...missing];
+      await db.update(appSettingsTable)
+        .set({ value: JSON.stringify(merged) })
+        .where(eq(appSettingsTable.key, "ai_categories"));
+    }
+  }
+}
+
 async function getAiSettings(): Promise<{ prompt: string; categories: string[] }> {
   const [promptRow, categoriesRow] = await Promise.all([
     db.select().from(appSettingsTable).where(eq(appSettingsTable.key, "ai_prompt")).then(r => r[0]),
     db.select().from(appSettingsTable).where(eq(appSettingsTable.key, "ai_categories")).then(r => r[0]),
   ]);
 
-  const prompt = promptRow?.value || DEFAULT_PROMPT;
+  let prompt = promptRow?.value || DEFAULT_PROMPT;
+
+  if (prompt && !prompt.includes("Kategori kuralları")) {
+    const categoryRulesSection = DEFAULT_PROMPT.substring(
+      DEFAULT_PROMPT.indexOf("Kategori kuralları:")
+    );
+    const insertPoint = prompt.indexOf("Her bağışçı için JSON formatında");
+    if (insertPoint !== -1) {
+      prompt = prompt.substring(0, insertPoint) + categoryRulesSection;
+    } else {
+      prompt = DEFAULT_PROMPT;
+    }
+  }
+
   const categories = categoriesRow ? JSON.parse(categoriesRow.value) as string[] : DEFAULT_CATEGORIES;
 
   return { prompt, categories };
@@ -708,4 +760,5 @@ setInterval(async () => {
   }
 }, STALE_JOB_CLEANUP_INTERVAL_MS);
 
+export { syncAiSettingsToDb };
 export default router;
