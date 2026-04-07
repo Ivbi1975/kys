@@ -54,6 +54,8 @@ interface AiClassificationProps {
   setBatchSize: (v: number) => void;
   startAiClassification: (resume?: boolean) => void;
   stopAiClassification: () => void;
+  skipClassified: boolean;
+  setSkipClassified: (v: boolean) => void;
   showAiReport: boolean;
   setShowAiReport: (v: boolean) => void;
   aiReportCollapsed: boolean;
@@ -69,6 +71,7 @@ export function AiClassification({
   donations, notesWithContent, aiRunning, aiStopped, aiResults, aiProgress,
   showAiPanel, setShowAiPanel, rangeMode, setRangeMode, rangeStart, setRangeStart,
   rangeEnd, setRangeEnd, batchSize, setBatchSize, startAiClassification, stopAiClassification,
+  skipClassified, setSkipClassified,
   showAiReport, setShowAiReport, aiReportCollapsed, setAiReportCollapsed,
   aiReportStats, scrollToDonation, aiCategoryFilter, setAiCategoryFilter,
   handleAddLabelsToDescriptions,
@@ -124,6 +127,19 @@ export function AiClassification({
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="skipClassified"
+                checked={skipClassified}
+                onChange={e => setSkipClassified(e.target.checked)}
+                className="rounded border-gray-300"
+                disabled={aiRunning}
+              />
+              <label htmlFor="skipClassified" className="text-xs text-muted-foreground cursor-pointer select-none">
+                Daha önce sınıflandırılmış olanları atla
+              </label>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               {!aiRunning ? (

@@ -298,7 +298,7 @@ router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
 }));
 
 const CHUNK_SIZE = 25;
-const PARALLEL_CHUNKS = 3;
+const PARALLEL_CHUNKS = 5;
 
 async function isJobCancelled(jobId: string): Promise<boolean> {
   const [job] = await db.select({ status: aiJobsTable.status }).from(aiJobsTable).where(eq(aiJobsTable.id, jobId));

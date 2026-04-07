@@ -95,6 +95,7 @@ export default function NotDuzenlemePage() {
   const [showAiReport, setShowAiReport] = useState(false);
   const [aiReportCollapsed, setAiReportCollapsed] = useState(false);
   const [aiCategoryFilter, setAiCategoryFilter] = useState<string | null>(null);
+  const [skipClassified, setSkipClassified] = useState(false);
   const activeJobIdsRef = useRef<string[]>([]);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -447,6 +448,11 @@ export default function NotDuzenlemePage() {
                 await saveAiClassifications(allCollectedResults.slice(si, si + SAVE_CHUNK));
               }
               setAiSaveStatus("saved");
+              const catMap = new Map(allCollectedResults.map(r => [r.donationId, r.categories]));
+              setDonations(prev => prev.map(d => {
+                const cats = catMap.get(d.id);
+                return cats ? { ...d, aiCategories: cats } : d;
+              }));
             } catch { setAiSaveStatus("error"); }
           }
 
@@ -645,7 +651,14 @@ export default function NotDuzenlemePage() {
     if (resume) {
       withNotes = withNotes.filter(d => !aiResults.has(d.id));
     }
-    if (withNotes.length === 0) { toast({ title: resume ? "Devam edilecek not yok" : "İşlenecek not yok", description: resume ? "Tüm bağışçılar zaten işlenmiş" : "Notu olan bağışçı bulunamadı" }); setAiRunning(false); return; }
+    if (skipClassified) {
+      const beforeCount = withNotes.length;
+      withNotes = withNotes.filter(d => !d.aiCategories || d.aiCategories.length === 0);
+      if (beforeCount > withNotes.length) {
+        console.log(`[AI] Skipped ${beforeCount - withNotes.length} already classified donations`);
+      }
+    }
+    if (withNotes.length === 0) { toast({ title: resume ? "Devam edilecek not yok" : "İşlenecek not yok", description: resume ? "Tüm bağışçılar zaten işlenmiş" : skipClassified ? "Tüm notlu bağışçılar zaten sınıflandırılmış" : "Notu olan bağışçı bulunamadı" }); setAiRunning(false); return; }
     console.log(`[AI Start] totalDonations=${toProcess.length} withNotes=${withNotes.length} resume=${resume}`);
     const previouslyDone = resume ? aiResults.size : 0;
     const totalToProcess = previouslyDone + withNotes.length;
@@ -798,6 +811,7 @@ export default function NotDuzenlemePage() {
           rangeMode={rangeMode} setRangeMode={setRangeMode} rangeStart={rangeStart} setRangeStart={setRangeStart}
           rangeEnd={rangeEnd} setRangeEnd={setRangeEnd} batchSize={batchSize} setBatchSize={setBatchSize}
           startAiClassification={startAiClassification} stopAiClassification={stopAiClassification}
+          skipClassified={skipClassified} setSkipClassified={setSkipClassified}
           showAiReport={showAiReport} setShowAiReport={setShowAiReport}
           aiReportCollapsed={aiReportCollapsed} setAiReportCollapsed={setAiReportCollapsed}
           aiReportStats={aiReportStats} scrollToDonation={scrollToDonation}
