@@ -74,7 +74,7 @@ export async function apiUpdateKesimAlani(
     onChunkProgress?.({ chunkIndex: i, totalChunks, savedCount, totalGroups: donations.length });
   }
 
-  if (data.animalGroups && data.animalGroups.length > 0) {
+  if (data.animalGroups !== undefined) {
     return apiUpdateBulkAnimalGroups(data.id, data.animalGroups, onChunkProgress ? (progress) => {
       onChunkProgress({ ...progress, savedCount: savedCount + progress.savedCount });
     } : undefined);
