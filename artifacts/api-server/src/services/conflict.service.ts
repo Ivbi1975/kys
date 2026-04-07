@@ -55,11 +55,12 @@ function hasNoteWarning(notes: string): boolean {
 }
 
 export async function detectConflicts(projectId?: string) {
-  const projectClause = projectId ? sql`AND ka.project_id = ${projectId}` : sql``;
+  const projectClauseRaw = projectId ? sql`AND project_id = ${projectId}` : sql``;
+  const projectClauseKA = projectId ? sql`AND ka.project_id = ${projectId}` : sql``;
 
   const conflictKeysResult = await db.execute(sql`
     WITH active_ka AS (
-      SELECT id FROM kesim_alanlari WHERE deleted_at IS NULL ${projectClause}
+      SELECT id FROM kesim_alanlari WHERE deleted_at IS NULL ${projectClauseRaw}
     ),
     active_donations AS (
       SELECT
@@ -103,7 +104,7 @@ export async function detectConflicts(projectId?: string) {
            d.vekalet, d.notes, d.phone, d.excluded, d.kesim_alani_id,
            ka.name AS ka_name
     FROM donations d
-    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id AND ka.deleted_at IS NULL ${projectClause}
+    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id AND ka.deleted_at IS NULL ${projectClauseKA}
     WHERE d.deleted_at IS NULL
       AND (
         (${nameKeys.length > 0 ? sql`LOWER(TRIM(d.name)) IN (${sql.join(nameKeys.map(k => sql`${k}`), sql`, `)})` : sql`FALSE`})
