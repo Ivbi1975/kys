@@ -434,9 +434,19 @@ async function processOneChunk(
 }
 
 function filterValidResults(results: unknown[]): unknown[] {
-  return results.filter(r =>
-    r && typeof r === "object" && "donationId" in r && typeof (r as { donationId: unknown }).donationId === "string"
-  );
+  return results
+    .filter(r =>
+      r && typeof r === "object" && "donationId" in r && typeof (r as { donationId: unknown }).donationId === "string"
+    )
+    .map(r => {
+      const obj = r as Record<string, unknown>;
+      if (!Array.isArray(obj.categories)) {
+        obj.categories = typeof obj.categories === "string" && obj.categories.trim()
+          ? [obj.categories]
+          : [];
+      }
+      return obj;
+    });
 }
 
 function deduplicateResults(results: unknown[]): unknown[] {
@@ -672,7 +682,14 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
   const parsed = z.object({
     classifications: z.array(z.object({
       donationId: z.string(),
-      categories: z.array(z.string()),
+      categories: z.preprocess(
+        (val) => {
+          if (Array.isArray(val)) return val;
+          if (typeof val === "string" && val.trim()) return [val];
+          return [];
+        },
+        z.array(z.string()),
+      ),
       warnings: z.string().optional().default(""),
     })).max(50000),
   }).safeParse(req.body);

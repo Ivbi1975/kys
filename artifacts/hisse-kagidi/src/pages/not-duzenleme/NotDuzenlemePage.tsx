@@ -378,12 +378,13 @@ export default function NotDuzenlemePage() {
             setAiResults(prev => {
               const next = new Map(prev);
               for (const r of status.results!) {
+                const cats = Array.isArray(r.categories) ? r.categories : (r.categories ? [String(r.categories)] : []);
                 const donor = donationMap.get(r.donationId);
                 const donationType = donor?.donationType || "";
                 let warnings = r.warnings || "";
-                if (warnings && donationType && r.categories) {
+                if (warnings && donationType && cats.length > 0) {
                   const dtLower = donationType.toLocaleLowerCase("tr");
-                  const catsLower = r.categories.map(c => c.toLocaleLowerCase("tr"));
+                  const catsLower = cats.map(c => c.toLocaleLowerCase("tr"));
                   if (catsLower.includes(dtLower)) {
                     warnings = warnings
                       .split(/[.;]\s*/)
@@ -393,7 +394,7 @@ export default function NotDuzenlemePage() {
                     if (warnings === "." || warnings === ",") warnings = "";
                   }
                 }
-                next.set(r.donationId, { ...r, warnings, donationType });
+                next.set(r.donationId, { ...r, categories: cats, warnings, donationType });
               }
               console.log(`[AI Poll] job=${jid} statusResults=${status.results!.length} mapSize=${next.size}`);
               return next;
@@ -403,7 +404,11 @@ export default function NotDuzenlemePage() {
           if (status.status === "completed" || status.status === "failed" || status.status === "cancelled") {
             finishedJobs.add(jid);
             if (status.results && status.results.length > 0) {
-              allCollectedResults.push(...status.results.map(r => ({ donationId: r.donationId, categories: r.categories || [], warnings: r.warnings || "" })));
+              allCollectedResults.push(...status.results.map(r => ({
+                donationId: r.donationId,
+                categories: Array.isArray(r.categories) ? r.categories : (r.categories ? [String(r.categories)] : []),
+                warnings: r.warnings || "",
+              })));
             }
             if (status.status === "cancelled") {
               setAiStopped(true);
