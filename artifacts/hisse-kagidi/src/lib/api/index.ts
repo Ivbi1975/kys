@@ -44,8 +44,11 @@ export {
   fetchGroupPhotosAdmin,
   getGroupPhotoUrlAdmin,
   splitKesimAlani,
+  fetchKesimAlaniMeta,
+  fetchAllDonations,
+  fetchAllGroupsCompact,
 } from "./kesim-alanlari";
-export type { DeletedDonation, SplitTarget, SplitResult, ChunkProgress } from "./kesim-alanlari";
+export type { DeletedDonation, SplitTarget, SplitResult, ChunkProgress, KesimAlaniMeta } from "./kesim-alanlari";
 
 export {
   fetchTrackingData,

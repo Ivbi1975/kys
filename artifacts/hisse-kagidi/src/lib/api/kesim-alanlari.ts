@@ -1,4 +1,4 @@
-import type { KesimAlani } from "../types";
+import type { KesimAlani, Donation } from "../types";
 import { apiFetch } from "./core";
 import { buildSignedPhotoUrl } from "./signed-url";
 
@@ -61,6 +61,105 @@ export async function fetchKesimAlani(id: string): Promise<KesimAlani | null> {
     return null;
   }
 }
+
+export interface KesimAlaniMeta {
+  id: string;
+  name: string;
+  createdAt: string;
+  deletedAt: string | null;
+  projectId: string | null;
+  trackingToken: string | null;
+  kesimListeId: string | null;
+  parentKesimAlaniId: string | null;
+  splitStatus: string | null;
+  teams: { id: string; name: string; color: string }[];
+  donationCount: number;
+  groupCount: number;
+}
+
+export async function fetchKesimAlaniMeta(id: string): Promise<KesimAlaniMeta | null> {
+  try {
+    return await apiFetch<KesimAlaniMeta>(`/kesim-alanlari/${id}/meta`);
+  } catch {
+    return null;
+  }
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export async function fetchDonationsPage(
+  kaId: string,
+  limit = 500,
+  cursor: string | null = null,
+): Promise<PaginatedResult<Donation>> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set("cursor", cursor);
+  return apiFetch<PaginatedResult<Donation>>(`/kesim-alanlari/${kaId}/donations?${params}`);
+}
+
+interface CompactGroupItem {
+  id: string;
+  animalNo: number;
+  colorTag?: string;
+  locked?: boolean;
+  notes?: string;
+  kesildi?: boolean;
+  kesildiAt?: string | null;
+  teamId?: string | null;
+  updatedAt?: string | null;
+  donationIds: string[];
+  donationCount: number;
+}
+
+export async function fetchGroupsPageCompact(
+  kaId: string,
+  limit = 100,
+  cursor: string | null = null,
+): Promise<PaginatedResult<CompactGroupItem>> {
+  const params = new URLSearchParams({ limit: String(limit), compact: "1" });
+  if (cursor) params.set("cursor", cursor);
+  return apiFetch<PaginatedResult<CompactGroupItem>>(`/kesim-alanlari/${kaId}/groups?${params}`);
+}
+
+export async function fetchAllDonations(
+  kaId: string,
+  onPage?: (accumulated: Donation[], pageItems: Donation[]) => void,
+): Promise<Donation[]> {
+  const all: Donation[] = [];
+  let cursor: string | null = null;
+  let hasMore = true;
+  while (hasMore) {
+    const page = await fetchDonationsPage(kaId, 500, cursor);
+    all.push(...page.items);
+    onPage?.(all, page.items);
+    cursor = page.nextCursor;
+    hasMore = page.hasMore;
+  }
+  return all;
+}
+
+export async function fetchAllGroupsCompact(
+  kaId: string,
+  onPage?: (accumulated: CompactGroupItem[], pageItems: CompactGroupItem[]) => void,
+): Promise<CompactGroupItem[]> {
+  const all: CompactGroupItem[] = [];
+  let cursor: string | null = null;
+  let hasMore = true;
+  while (hasMore) {
+    const page = await fetchGroupsPageCompact(kaId, 200, cursor);
+    all.push(...page.items);
+    onPage?.(all, page.items);
+    cursor = page.nextCursor;
+    hasMore = page.hasMore;
+  }
+  return all;
+}
+
+export type { CompactGroupItem };
 
 export async function createKesimAlani(data: KesimAlani & { projectId?: string | null }): Promise<KesimAlani> {
   return apiFetch<KesimAlani>("/kesim-alanlari", {

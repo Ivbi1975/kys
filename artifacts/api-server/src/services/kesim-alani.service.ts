@@ -404,6 +404,32 @@ export function invalidateKACache() {
   cacheInvalidatePrefix(KA_ITEM_CACHE_KEY);
 }
 
+export async function getKesimAlaniMeta(id: string) {
+  const [ka] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
+  if (!ka) return null;
+
+  const [donationCountResult, groupCountResult, teamRows] = await Promise.all([
+    db.execute(sql`SELECT COUNT(*)::int AS cnt FROM donations WHERE kesim_alani_id = ${id} AND deleted_at IS NULL`),
+    db.execute(sql`SELECT COUNT(*)::int AS cnt FROM animal_groups WHERE kesim_alani_id = ${id}`),
+    db.select().from(teamsTable).where(eq(teamsTable.kesimAlaniId, id)),
+  ]);
+
+  return {
+    id: ka.id,
+    name: ka.name,
+    createdAt: ka.createdAt,
+    deletedAt: ka.deletedAt || null,
+    projectId: ka.projectId || null,
+    trackingToken: ka.trackingToken || null,
+    kesimListeId: ka.kesimListeId || null,
+    parentKesimAlaniId: ka.parentKesimAlaniId || null,
+    splitStatus: ka.splitStatus || null,
+    teams: teamRows.map(t => ({ id: t.id, name: t.name, color: t.color })),
+    donationCount: (donationCountResult.rows[0] as { cnt: number }).cnt,
+    groupCount: (groupCountResult.rows[0] as { cnt: number }).cnt,
+  };
+}
+
 export function getCachedKAList(includeDeleted: boolean) {
   const cacheKey = includeDeleted ? KA_LIST_CACHE_KEY + ":all" : KA_LIST_CACHE_KEY;
   return { cached: cacheGet<unknown[]>(cacheKey), cacheKey };

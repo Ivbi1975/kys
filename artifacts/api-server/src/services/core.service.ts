@@ -9,6 +9,7 @@ import {
   getCachedKAList,
   setCachedKAList,
   invalidateKACache,
+  getKesimAlaniMeta,
   saveDonations,
   saveAnimalGroups,
   diffUpdateDonations,
@@ -68,6 +69,12 @@ export async function listDeletedKesimAlanlari() {
 
 export async function getSingleKesimAlani(id: string): Promise<ServiceResult<{ data: unknown }>> {
   const result = await getFullKesimAlani(id);
+  if (!result) return serviceError("not_found", 404);
+  return serviceOk({ data: result });
+}
+
+export async function getKesimAlaniMetaService(id: string): Promise<ServiceResult<{ data: unknown }>> {
+  const result = await getKesimAlaniMeta(id);
   if (!result) return serviceError("not_found", 404);
   return serviceOk({ data: result });
 }

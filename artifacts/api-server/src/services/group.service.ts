@@ -52,6 +52,7 @@ interface ListGroupsParams {
   limit: number;
   cursor: string | null;
   offset: number;
+  compact?: boolean;
 }
 
 export async function listGroups(params: ListGroupsParams) {
@@ -101,7 +102,9 @@ export async function listGroups(params: ListGroupsParams) {
       ? db.select({
           groupId: animalGroupDonationsTable.groupId,
           donationId: animalGroupDonationsTable.donationId,
-        }).from(animalGroupDonationsTable).where(inArray(animalGroupDonationsTable.groupId, groupIds))
+        }).from(animalGroupDonationsTable)
+          .where(inArray(animalGroupDonationsTable.groupId, groupIds))
+          .orderBy(asc(animalGroupDonationsTable.sortOrder))
       : Promise.resolve([] as { groupId: string; donationId: string }[]),
     groupIds.length > 0
       ? db.select({
@@ -113,9 +116,14 @@ export async function listGroups(params: ListGroupsParams) {
       : Promise.resolve([] as { animalGroupId: string; photoCount: number }[]),
   ]);
 
+  const donationIdsByGroup: Record<string, string[]> = {};
   const donationCountByGroup: Record<string, number> = {};
   for (const link of groupDonationLinks) {
     donationCountByGroup[link.groupId] = (donationCountByGroup[link.groupId] || 0) + 1;
+    if (params.compact) {
+      if (!donationIdsByGroup[link.groupId]) donationIdsByGroup[link.groupId] = [];
+      donationIdsByGroup[link.groupId].push(link.donationId);
+    }
   }
 
   const photoCountByGroup: Record<string, number> = {};
@@ -123,19 +131,26 @@ export async function listGroups(params: ListGroupsParams) {
     photoCountByGroup[pc.animalGroupId] = pc.photoCount;
   }
 
-  const items = pageRows.map(g => ({
-    id: g.id,
-    animalNo: g.animalNo,
-    colorTag: g.colorTag,
-    locked: g.locked,
-    notes: g.notes,
-    kesildi: g.kesildi,
-    kesildiAt: g.kesildiAt || null,
-    teamId: g.teamId || null,
-    sortOrder: g.sortOrder,
-    donationCount: donationCountByGroup[g.id] || 0,
-    photoCount: photoCountByGroup[g.id] || 0,
-  }));
+  const items = pageRows.map(g => {
+    const base = {
+      id: g.id,
+      animalNo: g.animalNo,
+      colorTag: g.colorTag,
+      locked: g.locked,
+      notes: g.notes,
+      kesildi: g.kesildi,
+      kesildiAt: g.kesildiAt || null,
+      teamId: g.teamId || null,
+      sortOrder: g.sortOrder,
+      updatedAt: g.updatedAt ? g.updatedAt.toISOString() : null,
+      donationCount: donationCountByGroup[g.id] || 0,
+      photoCount: photoCountByGroup[g.id] || 0,
+    };
+    if (params.compact) {
+      return { ...base, donationIds: donationIdsByGroup[g.id] || [] };
+    }
+    return base;
+  });
 
   const lastItem = pageRows[pageRows.length - 1];
   let nextCursor: string | null = null;

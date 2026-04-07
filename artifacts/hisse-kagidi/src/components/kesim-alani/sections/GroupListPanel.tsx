@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Virtuoso } from "react-virtuoso";
 import { AnimalGroupCard } from "@/components/AnimalGroupCard";
-import { checkGroupConflicts } from "@/lib/grouping";
+import type { ConflictInfo } from "@/lib/grouping";
 import { ALL_GROUP_COLUMNS, type ColumnKey } from "@/lib/useWorkspacePreferences";
 import {
   AlertTriangle, ArrowDown, ArrowLeftRight, ArrowUp, ChevronsDownUp, ChevronsUpDown,
@@ -182,7 +182,7 @@ export function GroupListPanel() {
             {kesim.animalGroups.some(g => !g.donations.some(d => d.name.trim())) && (
               <Button variant="outline" size="sm" onClick={cleanEmptyGroups} title="Boş Grupları Temizle"><Trash2 className="w-4 h-4 mr-1" />Boşları Temizle</Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => { const found = checkGroupConflicts(kesim.animalGroups); setConflicts(found); setShowConflicts(true); }}><Search className="w-4 h-4 mr-1" />Çakışma Kontrol</Button>
+            <Button variant="outline" size="sm" onClick={() => { ctx.runCheckConflicts(kesim.animalGroups).then(found => { setConflicts(found); setShowConflicts(true); }).catch(() => {}); }}><Search className="w-4 h-4 mr-1" />Çakışma Kontrol</Button>
             <GroupFindDeleteDialog />
             <GroupBulkLockPopover />
           </div>

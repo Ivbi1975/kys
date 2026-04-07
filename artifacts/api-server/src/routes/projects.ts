@@ -52,6 +52,7 @@ export async function refreshProjectStats() {
   try {
     await db.execute(sql`REFRESH MATERIALIZED VIEW CONCURRENTLY project_stats_view`);
     cacheInvalidate(PROJECTS_CACHE_KEY);
+    cacheInvalidatePrefix("dashboard:");
   } catch (err) {
     logger.error({ err }, "Failed to refresh project_stats_view");
   } finally {
@@ -333,8 +334,14 @@ router.post("/projects/:id/unarchive", asyncHandler(async (req, res) => {
   res.json({ ...restored, archivedAt: null, stats: emptyStats });
 }));
 
+const DASHBOARD_CACHE_TTL = 30_000;
+
 router.get("/projects/:id/dashboard", asyncHandler(async (req, res) => {
   const { id } = req.params;
+  const dashCacheKey = `dashboard:${id}`;
+  const cached = cacheGet<unknown>(dashCacheKey);
+  if (cached) { res.json(cached); return; }
+
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
   if (!project) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
 
@@ -375,7 +382,7 @@ router.get("/projects/:id/dashboard", asyncHandler(async (req, res) => {
     };
   });
 
-  res.json({
+  const response = {
     projectId: id,
     projectName: project.name,
     totalAnimals,
@@ -384,7 +391,9 @@ router.get("/projects/:id/dashboard", asyncHandler(async (req, res) => {
     kesildiPercent: totalAnimals > 0 ? Math.round((kesildiCount / totalAnimals) * 100) : 0,
     lastKesildiAt,
     kesimAlanlari,
-  });
+  };
+  cacheSet(dashCacheKey, response, DASHBOARD_CACHE_TTL);
+  res.json(response);
 }));
 
 export default router;

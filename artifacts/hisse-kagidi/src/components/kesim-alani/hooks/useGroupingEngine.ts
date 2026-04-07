@@ -15,6 +15,7 @@ interface UseGroupingEngineDeps extends KesimDeps {
     lockedIndices: number[]
   ) => Promise<AnimalGroup[]>;
   cancelGrouping: () => void;
+  runCheckConflicts: (groups: AnimalGroup[]) => Promise<ConflictInfo[]>;
   isGroupLocked: (groupIdx: number) => boolean;
   selectedIds: Set<string>;
   setSelectedIds: React.Dispatch<React.SetStateAction<Set<string>>>;
@@ -29,6 +30,7 @@ export function useGroupingEngine({
   runGrouping,
   runIncrementalGrouping,
   cancelGrouping,
+  runCheckConflicts,
   isGroupLocked,
   selectedIds,
   setSelectedIds,
@@ -186,9 +188,10 @@ export function useGroupingEngine({
           "groups"
         );
       }
-      const found = checkGroupConflicts(finalGroups);
-      setConflicts(found);
-      if (found.length > 0) setShowConflicts(true);
+      runCheckConflicts(finalGroups).then(found => {
+        setConflicts(found);
+        if (found.length > 0) setShowConflicts(true);
+      }).catch(() => {});
     } catch (err) {
       if (err instanceof Error && err.name === "CancelledError") return;
       throw err;
@@ -256,9 +259,10 @@ export function useGroupingEngine({
           "groups"
         );
       }
-      const found = checkGroupConflicts(allGroups);
-      setConflicts(found);
-      if (found.length > 0) setShowConflicts(true);
+      runCheckConflicts(allGroups).then(found => {
+        setConflicts(found);
+        if (found.length > 0) setShowConflicts(true);
+      }).catch(() => {});
       setSelectedIds(new Set());
     } catch (err) {
       if (err instanceof Error && err.name === "CancelledError") return;
@@ -488,9 +492,10 @@ export function useGroupingEngine({
     setAutoResolveOpen(false);
     setResolveResults([]);
 
-    const newConflicts = checkGroupConflicts(groups);
-    setConflicts(newConflicts);
-    if (newConflicts.length > 0) setShowConflicts(true);
+    runCheckConflicts(groups).then(newConflicts => {
+      setConflicts(newConflicts);
+      if (newConflicts.length > 0) setShowConflicts(true);
+    }).catch(() => {});
   }
 
   return {

@@ -3,7 +3,7 @@ import { produce } from "immer";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag } from "@/lib/types";
 import { turkishNormalize } from "@/lib/utils";
 import { apiSoftDeleteDonation, apiUpdateSingleGroup, apiUpdateSingleDonation } from "@/lib/api";
-import { checkGroupConflicts } from "@/lib/grouping";
+import type { ConflictInfo } from "@/lib/grouping";
 import { MAX_SHARES_PER_ANIMAL } from "@/lib/constants";
 import type { ColumnKey } from "@/lib/useWorkspacePreferences";
 import { generateId } from "./types";
@@ -16,9 +16,10 @@ interface UseAnimalGroupsDeps extends KesimDeps {
     setColumnOrder: (order: ColumnKey[]) => void;
   };
   setConflicts: React.Dispatch<React.SetStateAction<import("@/lib/grouping").ConflictInfo[]>>;
+  runCheckConflicts: (groups: AnimalGroup[]) => Promise<ConflictInfo[]>;
 }
 
-export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspace, setConflicts }: UseAnimalGroupsDeps) {
+export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspace, setConflicts, runCheckConflicts }: UseAnimalGroupsDeps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
   const [selectedGroupDonations, setSelectedGroupDonations] = useState<Set<string>>(new Set());
@@ -217,8 +218,9 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
       true,
       "groups"
     );
-    const found = checkGroupConflicts(updated.animalGroups);
-    setConflicts(found);
+    runCheckConflicts(updated.animalGroups).then(found => {
+      setConflicts(found);
+    }).catch(() => {});
   }
 
   function openSplitGroupDialog(groupIdx: number) {

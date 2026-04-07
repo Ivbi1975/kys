@@ -68,6 +68,7 @@ router.get("/kesim-alanlari/:id/groups", asyncHandler(async (req, res) => {
   const cursor = typeof req.query.cursor === "string" ? req.query.cursor : null;
   const rawOffset = Number(req.query.offset);
   const offset = !cursor && Number.isFinite(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
+  const compact = req.query.compact === "1";
 
   let result;
   try {
@@ -77,6 +78,7 @@ router.get("/kesim-alanlari/:id/groups", asyncHandler(async (req, res) => {
       limit: rawLimit,
       cursor,
       offset,
+      compact,
     });
   } catch {
     res.status(400).json({ error: ERROR_MESSAGES.INVALID_CURSOR });

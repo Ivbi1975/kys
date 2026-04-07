@@ -7,6 +7,7 @@ import {
   listKesimAlanlari,
   listDeletedKesimAlanlari,
   getSingleKesimAlani,
+  getKesimAlaniMetaService,
   createKesimAlani,
   moveKesimAlani,
   updateKesimAlani,
@@ -82,6 +83,15 @@ router.get("/kesim-alanlari", asyncHandler(async (req, res) => {
 
 router.get("/kesim-alanlari/deleted", asyncHandler(async (_req, res) => {
   const result = await listDeletedKesimAlanlari();
+  res.json(result.data);
+}));
+
+router.get("/kesim-alanlari/:id/meta", asyncHandler(async (req, res) => {
+  const result = await getKesimAlaniMetaService(req.params.id);
+  if (!result.ok) {
+    res.status(result.status).json({ error: ERROR_MESSAGES.NOT_FOUND });
+    return;
+  }
   res.json(result.data);
 }));
 

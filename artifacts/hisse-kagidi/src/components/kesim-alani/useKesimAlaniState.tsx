@@ -5,7 +5,8 @@ import { useParams, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
-import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, fetchTags, fetchPhotoCountsAdmin, fetchGroupPhotosAdmin, fetchNotificationLogs, fetchNotificationTemplate, updateNotificationTemplate, generateTrackingToken, fetchKesimAlaniTrackingNotes, updateTrackingNoteStatus } from "@/lib/api";
+import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, fetchTags, fetchPhotoCountsAdmin, fetchGroupPhotosAdmin, fetchNotificationLogs, fetchNotificationTemplate, updateNotificationTemplate, generateTrackingToken, fetchKesimAlaniTrackingNotes, updateTrackingNoteStatus, fetchKesimAlaniMeta, fetchAllDonations, fetchAllGroupsCompact } from "@/lib/api";
+import type { CompactGroupItem } from "@/lib/api/kesim-alanlari";
 import type { TrackingNote, GroupPhoto, NotificationLog } from "@/lib/api";
 import { getTotalShares, getRequiredAnimals, computeEffectiveShares, trCollator } from "@/lib/grouping";
 import { useGroupingWorker } from "@/lib/useGroupingWorker";
@@ -47,7 +48,7 @@ export function useKesimAlaniState() {
   const [kesim, setKesim] = useState<KesimAlani | null>(null);
   const { toggle: toggleTheme, mode: themeMode } = useTheme();
   const workspace = useWorkspacePreferences();
-  const { runGrouping, runIncrementalGrouping, cancelGrouping } = useGroupingWorker();
+  const { runGrouping, runIncrementalGrouping, cancelGrouping, runComputeShares, runCheckConflicts } = useGroupingWorker();
 
   const [colorTagFilter, setColorTagFilter] = useState<ColorTag | "all">("all");
   const [groupCinsFilter, setGroupCinsFilter] = useState<Set<string>>(new Set());
@@ -83,6 +84,8 @@ export function useKesimAlaniState() {
   const [notificationTemplateOpen, setNotificationTemplateOpen] = useState(false);
   const [notificationTemplate, setNotificationTemplate] = useState("Hayvan {animalNo} kesildi. Hayırlı olsun!");
   const [notificationTemplateSaving, setNotificationTemplateSaving] = useState(false);
+  const [dataFullyLoaded, setDataFullyLoaded] = useState(false);
+  const [dataLoadProgress, setDataLoadProgress] = useState<{ donations: number; groups: number; totalDonations: number; totalGroups: number } | null>(null);
 
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -191,7 +194,21 @@ export function useKesimAlaniState() {
     return count;
   }, [ungroupedDonors]);
 
-  const effectiveShareMap = useMemo(() => computeEffectiveShares(donations), [donations]);
+  const [effectiveShareMap, setEffectiveShareMap] = useState<Map<string, number>>(() => new Map());
+
+  useEffect(() => {
+    if (donations.length === 0) {
+      setEffectiveShareMap(new Map());
+      return;
+    }
+    let cancelled = false;
+    runComputeShares(donations).then(result => {
+      if (!cancelled) setEffectiveShareMap(result);
+    }).catch(() => {
+      if (!cancelled) setEffectiveShareMap(computeEffectiveShares(donations));
+    });
+    return () => { cancelled = true; };
+  }, [donations, runComputeShares]);
 
   const shareDistribution = useMemo(() => {
     const dist: Record<number, number> = {};
@@ -241,6 +258,7 @@ export function useKesimAlaniState() {
     toast,
     workspace,
     setConflicts: (val) => setConflictsRef.current(val),
+    runCheckConflicts,
   });
 
   const { removedFromGroupIds, isGroupLocked, saveSingleGroupField, ...animalGroupsRest } = animalGroupsHook;
@@ -285,6 +303,7 @@ export function useKesimAlaniState() {
     runGrouping,
     runIncrementalGrouping,
     cancelGrouping,
+    runCheckConflicts,
     isGroupLocked,
     selectedIds,
     setSelectedIds,
@@ -340,35 +359,144 @@ export function useKesimAlaniState() {
     toggleFullscreen,
   });
 
+  const loadRequestIdRef = useRef(0);
+
   useEffect(() => {
     async function loadData() {
-      if (params.id) {
-        const data = await fetchKesimAlani(params.id);
-        if (data) {
-          setKesim(data);
-          history.initialize(data);
-          const stored = loadBasketFromStorage(data.projectId);
-          basket.setBasketItems(stored);
-          fetchPhotoCountsAdmin(data.id).then(setPhotoCounts).catch(() => {});
-          if (data.projectId) {
-            try {
-              const [allKA, projects] = await Promise.all([fetchKesimAlanlari(), fetchProjects()]);
-              const siblings = allKA
-                .filter((ka) => ka.projectId === data.projectId && ka.id !== data.id && !ka.deletedAt)
-                .map((ka) => ({ id: ka.id, name: ka.name }));
-              setSiblingKesimAlanlari(siblings);
-              const proj = projects.find((p) => p.id === data.projectId);
-              if (proj) setProjectName(proj.name);
-            } catch {}
+      if (!params.id) return;
+      const requestId = ++loadRequestIdRef.current;
+      setDataFullyLoaded(false);
+      setDataLoadProgress(null);
+
+      try {
+        const meta = await fetchKesimAlaniMeta(params.id);
+        if (requestId !== loadRequestIdRef.current) return;
+
+        if (!meta) {
+          const fallback = await fetchKesimAlani(params.id);
+          if (requestId !== loadRequestIdRef.current) return;
+          if (fallback) {
+            setKesim(fallback);
+            history.initialize(fallback);
+            setDataFullyLoaded(true);
+            const stored = loadBasketFromStorage(fallback.projectId);
+            basket.setBasketItems(stored);
+            fetchPhotoCountsAdmin(fallback.id).then(setPhotoCounts).catch(() => {});
+          } else {
+            setLocation("/");
           }
-        } else {
-          setLocation("/");
+          try { setGlobalTags(await fetchTags()); } catch {}
+          return;
+        }
+
+        const shell: KesimAlani = {
+          id: meta.id,
+          name: meta.name,
+          createdAt: meta.createdAt as unknown as string,
+          deletedAt: meta.deletedAt,
+          projectId: meta.projectId,
+          trackingToken: meta.trackingToken,
+          kesimListeId: meta.kesimListeId,
+          parentKesimAlaniId: meta.parentKesimAlaniId,
+          splitStatus: meta.splitStatus,
+          teams: meta.teams,
+          donations: [],
+          animalGroups: [],
+        };
+        setKesim(shell);
+        setDataLoadProgress({ donations: 0, groups: 0, totalDonations: meta.donationCount, totalGroups: meta.groupCount });
+
+        const donationsById = new Map<string, Donation>();
+        let allCompactGroups: CompactGroupItem[] = [];
+        let donationsComplete = false;
+        let groupsComplete = false;
+
+        function hydrateGroups(compactGroups: CompactGroupItem[]): AnimalGroup[] {
+          return compactGroups.map(g => ({
+            id: g.id,
+            animalNo: g.animalNo,
+            colorTag: g.colorTag as KesimAlani["animalGroups"][0]["colorTag"],
+            locked: g.locked,
+            notes: g.notes,
+            kesildi: g.kesildi,
+            kesildiAt: g.kesildiAt,
+            teamId: g.teamId,
+            updatedAt: g.updatedAt ?? undefined,
+            donations: (g.donationIds || []).map(did => donationsById.get(did)).filter(Boolean) as Donation[],
+          }));
+        }
+
+        const totalDonations = meta.donationCount;
+        const totalGroups = meta.groupCount;
+
+        function updateKesimState() {
+          if (requestId !== loadRequestIdRef.current) return;
+          const allDonations = Array.from(donationsById.values());
+          const animalGroups = hydrateGroups(allCompactGroups);
+          const current: KesimAlani = { ...shell, donations: allDonations, animalGroups };
+          setKesim(current);
+          setDataLoadProgress({
+            donations: allDonations.length,
+            groups: allCompactGroups.length,
+            totalDonations,
+            totalGroups,
+          });
+          if (donationsComplete && groupsComplete) {
+            history.initialize(current);
+            setDataFullyLoaded(true);
+            setDataLoadProgress(null);
+          }
+        }
+
+        await Promise.all([
+          fetchAllDonations(params.id, (accumulated) => {
+            if (requestId !== loadRequestIdRef.current) return;
+            donationsById.clear();
+            for (const d of accumulated) donationsById.set(d.id, d);
+            updateKesimState();
+          }).then(() => { donationsComplete = true; }),
+          fetchAllGroupsCompact(params.id, (accumulated) => {
+            if (requestId !== loadRequestIdRef.current) return;
+            allCompactGroups = accumulated;
+            updateKesimState();
+          }).then(() => { groupsComplete = true; }),
+        ]);
+        if (requestId !== loadRequestIdRef.current) return;
+
+        updateKesimState();
+
+        const stored = loadBasketFromStorage(meta.projectId);
+        basket.setBasketItems(stored);
+        fetchPhotoCountsAdmin(meta.id).then(setPhotoCounts).catch(() => {});
+
+        if (meta.projectId) {
+          try {
+            const [allKA, projects] = await Promise.all([fetchKesimAlanlari(), fetchProjects()]);
+            if (requestId !== loadRequestIdRef.current) return;
+            const siblings = allKA
+              .filter((ka) => ka.projectId === meta.projectId && ka.id !== meta.id && !ka.deletedAt)
+              .map((ka) => ({ id: ka.id, name: ka.name }));
+            setSiblingKesimAlanlari(siblings);
+            const proj = projects.find((p) => p.id === meta.projectId);
+            if (proj) setProjectName(proj.name);
+          } catch {}
+        }
+
+        try { setGlobalTags(await fetchTags()); } catch {}
+      } catch (err) {
+        if (requestId !== loadRequestIdRef.current) return;
+        console.error("[loadData] Failed to load kesim alanı data", err);
+        setDataFullyLoaded(true);
+        setDataLoadProgress(null);
+        const fallback = await fetchKesimAlani(params.id).catch(() => null);
+        if (requestId !== loadRequestIdRef.current) return;
+        if (fallback) {
+          setKesim(fallback);
+          history.initialize(fallback);
+          const stored = loadBasketFromStorage(fallback.projectId);
+          basket.setBasketItems(stored);
         }
       }
-      try {
-        const tags = await fetchTags();
-        setGlobalTags(tags);
-      } catch {}
     }
     loadData();
   }, [params.id, setLocation]);
@@ -691,6 +819,8 @@ export function useKesimAlaniState() {
     history,
     historyPanelOpen,
     isDraggingSplit,
+    dataFullyLoaded,
+    dataLoadProgress,
     isFullscreen,
     isMobile,
     jumpDialogOpen,
@@ -725,6 +855,7 @@ export function useKesimAlaniState() {
     resetBulkDialog,
     runGrouping,
     runIncrementalGrouping,
+    runCheckConflicts,
     save,
     saveProgress: saveManagerRest.saveProgress,
     saveStatus: saveManagerRest.saveStatus,

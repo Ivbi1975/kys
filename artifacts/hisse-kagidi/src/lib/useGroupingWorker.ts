@@ -163,7 +163,59 @@ export function useGroupingWorker() {
     []
   );
 
-  return { runGrouping, runIncrementalGrouping, cancelGrouping, isRunning };
+  const runComputeShares = useCallback(
+    (donations: Donation[]): Promise<Map<string, number>> => {
+      const worker = getWorker();
+      if (!worker) {
+        return import("./grouping").then(m => m.computeEffectiveShares(donations));
+      }
+      const id = crypto.randomUUID();
+      return new Promise<Map<string, number>>((resolve, reject) => {
+        function handler(e: MessageEvent<WorkerResponse>) {
+          const msg = e.data;
+          if (msg.id !== id) return;
+          worker!.removeEventListener("message", handler);
+          if (msg.type === "sharesResult") {
+            const map = new Map<string, number>();
+            for (const [k, v] of Object.entries(msg.shares)) map.set(k, v);
+            resolve(map);
+          } else if (msg.type === "error") {
+            reject(new Error(msg.message));
+          }
+        }
+        worker.addEventListener("message", handler);
+        worker.postMessage({ type: "computeShares", id, donations });
+      });
+    },
+    []
+  );
+
+  const runCheckConflicts = useCallback(
+    (groups: AnimalGroup[]): Promise<import("./grouping").ConflictInfo[]> => {
+      const worker = getWorker();
+      if (!worker) {
+        return import("./grouping").then(m => m.checkGroupConflicts(groups));
+      }
+      const id = crypto.randomUUID();
+      return new Promise((resolve, reject) => {
+        function handler(e: MessageEvent<WorkerResponse>) {
+          const msg = e.data;
+          if (msg.id !== id) return;
+          worker!.removeEventListener("message", handler);
+          if (msg.type === "conflictsResult") {
+            resolve(msg.conflicts);
+          } else if (msg.type === "error") {
+            reject(new Error(msg.message));
+          }
+        }
+        worker.addEventListener("message", handler);
+        worker.postMessage({ type: "checkConflicts", id, groups });
+      });
+    },
+    []
+  );
+
+  return { runGrouping, runIncrementalGrouping, cancelGrouping, isRunning, runComputeShares, runCheckConflicts };
 }
 
 async function fallbackGrouping(
