@@ -535,126 +535,89 @@ function groupNeedsUpdate(existing: ExistingGroup, incoming: AnimalGroupPayload,
 export async function upsertDonationsBatch(tx: Tx, kesimAlaniId: string, donations: DonationPayload[], sortOrderOffset: number) {
   if (donations.length === 0) return;
 
-  const donationIds = donations.map(d => d.id);
-  const existingRows = await tx.select({
-    id: donationsTable.id,
-    name: donationsTable.name,
-    description: donationsTable.description,
-    donationType: donationsTable.donationType,
-    shareCount: donationsTable.shareCount,
-    vekalet: donationsTable.vekalet,
-    notes: donationsTable.notes,
-    phone: donationsTable.phone,
-    excluded: donationsTable.excluded,
-    sortOrder: donationsTable.sortOrder,
-  }).from(donationsTable).where(
-    and(inArray(donationsTable.id, donationIds), eq(donationsTable.kesimAlaniId, kesimAlaniId))
-  );
-  const existingMap = new Map(existingRows.map(r => [r.id, r]));
-
-  const toInsert: DonationPayload[] = [];
-  const toUpdate: { id: string; updates: Record<string, string | number | boolean> }[] = [];
-
-  for (let i = 0; i < donations.length; i++) {
-    const d = donations[i];
-    const existing = existingMap.get(d.id);
-    const effectiveSortOrder = sortOrderOffset + i;
-    if (!existing) {
-      toInsert.push({ ...d, shareCount: d.shareCount || 1 });
-    } else {
-      const updates = donationNeedsUpdate(existing, d, effectiveSortOrder);
-      if (updates) {
-        toUpdate.push({ id: d.id, updates });
-      }
-    }
-  }
-
-  if (toInsert.length > 0) {
-    const donationIndexMap = new Map(donations.map((d, i) => [d.id, i]));
-    const insertRows = toInsert.map(d => ({
-      id: d.id,
-      kesimAlaniId,
-      name: d.name || "",
-      description: d.description || "",
-      donationType: d.donationType || "",
-      shareCount: d.shareCount || 1,
-      vekalet: d.vekalet || "",
-      notes: d.notes || "",
-      phone: d.phone || "",
-      excluded: d.excluded || false,
-      sortOrder: sortOrderOffset + (donationIndexMap.get(d.id) ?? 0),
-    }));
-    for (let i = 0; i < insertRows.length; i += BATCH_SIZE) {
-      await tx.insert(donationsTable).values(insertRows.slice(i, i + BATCH_SIZE));
-    }
-
-    const tagRows: { donationId: string; tagId: string }[] = [];
-    for (const d of toInsert) {
-      if (d.tags && d.tags.length > 0) {
-        for (const tagId of d.tags) {
-          tagRows.push({ donationId: d.id, tagId });
-        }
-      }
-    }
-    if (tagRows.length > 0) {
-      for (let i = 0; i < tagRows.length; i += BATCH_SIZE) {
-        await tx.insert(donationTagsTable).values(tagRows.slice(i, i + BATCH_SIZE)).onConflictDoNothing();
-      }
-    }
-  }
-
-  for (const { id, updates } of toUpdate) {
-    await tx.update(donationsTable).set(updates).where(
-      and(eq(donationsTable.id, id), eq(donationsTable.kesimAlaniId, kesimAlaniId))
-    );
-  }
-
+  const seen = new Set<string>();
+  const deduped: DonationPayload[] = [];
   for (const d of donations) {
-    if (d.tags !== undefined && existingMap.has(d.id)) {
-      await tx.delete(donationTagsTable).where(eq(donationTagsTable.donationId, d.id));
-      if (d.tags.length > 0) {
-        await tx.insert(donationTagsTable)
-          .values(d.tags.map(tagId => ({ donationId: d.id, tagId })))
-          .onConflictDoNothing();
+    if (!seen.has(d.id)) {
+      seen.add(d.id);
+      deduped.push(d);
+    }
+  }
+
+  const upsertRows = deduped.map((d, i) => ({
+    id: d.id,
+    kesimAlaniId,
+    name: d.name || "",
+    description: d.description || "",
+    donationType: d.donationType || "",
+    shareCount: d.shareCount || 1,
+    vekalet: d.vekalet || "",
+    notes: d.notes || "",
+    phone: d.phone || "",
+    excluded: d.excluded || false,
+    sortOrder: sortOrderOffset + i,
+  }));
+
+  for (let i = 0; i < upsertRows.length; i += BATCH_SIZE) {
+    const batch = upsertRows.slice(i, i + BATCH_SIZE);
+    await tx.insert(donationsTable).values(batch).onConflictDoUpdate({
+      target: donationsTable.id,
+      set: {
+        name: sql`excluded.name`,
+        description: sql`excluded.description`,
+        donationType: sql`excluded.donation_type`,
+        shareCount: sql`excluded.share_count`,
+        vekalet: sql`excluded.vekalet`,
+        notes: sql`excluded.notes`,
+        phone: sql`excluded.phone`,
+        excluded: sql`excluded.excluded`,
+        sortOrder: sql`excluded.sort_order`,
+      },
+      setWhere: eq(donationsTable.kesimAlaniId, kesimAlaniId),
+    });
+  }
+
+  const allTagRows: { donationId: string; tagId: string }[] = [];
+  const donationIdsWithTags: string[] = [];
+  for (const d of deduped) {
+    if (d.tags !== undefined) {
+      donationIdsWithTags.push(d.id);
+      for (const tagId of d.tags) {
+        allTagRows.push({ donationId: d.id, tagId });
+      }
+    }
+  }
+
+  if (donationIdsWithTags.length > 0) {
+    for (let i = 0; i < donationIdsWithTags.length; i += BATCH_SIZE) {
+      const batch = donationIdsWithTags.slice(i, i + BATCH_SIZE);
+      await tx.delete(donationTagsTable).where(inArray(donationTagsTable.donationId, batch));
+    }
+    if (allTagRows.length > 0) {
+      for (let i = 0; i < allTagRows.length; i += BATCH_SIZE) {
+        await tx.insert(donationTagsTable).values(allTagRows.slice(i, i + BATCH_SIZE)).onConflictDoNothing();
       }
     }
   }
 }
 
 export async function diffUpdateDonations(tx: Tx, kesimAlaniId: string, incoming: DonationPayload[]) {
-  const existingRows = await tx.select({
-    id: donationsTable.id,
-    name: donationsTable.name,
-    description: donationsTable.description,
-    donationType: donationsTable.donationType,
-    shareCount: donationsTable.shareCount,
-    vekalet: donationsTable.vekalet,
-    notes: donationsTable.notes,
-    phone: donationsTable.phone,
-    excluded: donationsTable.excluded,
-    sortOrder: donationsTable.sortOrder,
-  }).from(donationsTable).where(and(eq(donationsTable.kesimAlaniId, kesimAlaniId), isNull(donationsTable.deletedAt)));
-
-  const existingMap = new Map(existingRows.map(r => [r.id, r]));
-  const incomingIds = new Set(incoming.map(d => d.id));
-
-  const toInsert: DonationPayload[] = [];
-  const toUpdate: { id: string; updates: Record<string, string | number | boolean> }[] = [];
-  const toDeleteIds: string[] = [];
-
-  for (let i = 0; i < incoming.length; i++) {
-    const d = incoming[i];
-    const existing = existingMap.get(d.id);
-    if (!existing) {
-      toInsert.push(d);
-    } else {
-      const updates = donationNeedsUpdate(existing, d, i);
-      if (updates) {
-        toUpdate.push({ id: d.id, updates });
-      }
+  const seen = new Set<string>();
+  const deduped: DonationPayload[] = [];
+  for (const d of incoming) {
+    if (!seen.has(d.id)) {
+      seen.add(d.id);
+      deduped.push(d);
     }
   }
 
+  const existingRows = await tx.select({
+    id: donationsTable.id,
+  }).from(donationsTable).where(and(eq(donationsTable.kesimAlaniId, kesimAlaniId), isNull(donationsTable.deletedAt)));
+
+  const incomingIds = new Set(deduped.map(d => d.id));
+
+  const toDeleteIds: string[] = [];
   for (const existing of existingRows) {
     if (!incomingIds.has(existing.id)) {
       toDeleteIds.push(existing.id);
@@ -669,51 +632,58 @@ export async function diffUpdateDonations(tx: Tx, kesimAlaniId: string, incoming
     }
   }
 
-  if (toInsert.length > 0) {
-    const insertIdx = incoming.reduce((acc, d, i) => { acc.set(d.id, i); return acc; }, new Map<string, number>());
-    const insertRows = toInsert.map(d => ({
-      id: d.id,
-      kesimAlaniId,
-      name: d.name || "",
-      description: d.description || "",
-      donationType: d.donationType || "",
-      shareCount: d.shareCount || 1,
-      vekalet: d.vekalet || "",
-      notes: d.notes || "",
-      phone: d.phone || "",
-      excluded: d.excluded || false,
-      sortOrder: insertIdx.get(d.id) ?? 0,
-    }));
-    for (let i = 0; i < insertRows.length; i += BATCH_SIZE) {
-      await tx.insert(donationsTable).values(insertRows.slice(i, i + BATCH_SIZE));
-    }
+  const upsertRows = deduped.map((d, i) => ({
+    id: d.id,
+    kesimAlaniId,
+    name: d.name || "",
+    description: d.description || "",
+    donationType: d.donationType || "",
+    shareCount: d.shareCount || 1,
+    vekalet: d.vekalet || "",
+    notes: d.notes || "",
+    phone: d.phone || "",
+    excluded: d.excluded || false,
+    sortOrder: i,
+  }));
 
-    const tagRows: { donationId: string; tagId: string }[] = [];
-    for (const d of toInsert) {
-      if (d.tags && d.tags.length > 0) {
-        for (const tagId of d.tags) {
-          tagRows.push({ donationId: d.id, tagId });
-        }
-      }
-    }
-    if (tagRows.length > 0) {
-      for (let i = 0; i < tagRows.length; i += BATCH_SIZE) {
-        await tx.insert(donationTagsTable).values(tagRows.slice(i, i + BATCH_SIZE)).onConflictDoNothing();
+  for (let i = 0; i < upsertRows.length; i += BATCH_SIZE) {
+    const batch = upsertRows.slice(i, i + BATCH_SIZE);
+    await tx.insert(donationsTable).values(batch).onConflictDoUpdate({
+      target: donationsTable.id,
+      set: {
+        name: sql`excluded.name`,
+        description: sql`excluded.description`,
+        donationType: sql`excluded.donation_type`,
+        shareCount: sql`excluded.share_count`,
+        vekalet: sql`excluded.vekalet`,
+        notes: sql`excluded.notes`,
+        phone: sql`excluded.phone`,
+        excluded: sql`excluded.excluded`,
+        sortOrder: sql`excluded.sort_order`,
+      },
+      setWhere: eq(donationsTable.kesimAlaniId, kesimAlaniId),
+    });
+  }
+
+  const allTagRows: { donationId: string; tagId: string }[] = [];
+  const donationIdsWithTags: string[] = [];
+  for (const d of deduped) {
+    if (d.tags !== undefined) {
+      donationIdsWithTags.push(d.id);
+      for (const tagId of d.tags) {
+        allTagRows.push({ donationId: d.id, tagId });
       }
     }
   }
 
-  for (const { id, updates } of toUpdate) {
-    await tx.update(donationsTable).set(updates).where(eq(donationsTable.id, id));
-  }
-
-  for (const d of incoming) {
-    if (d.tags !== undefined && existingMap.has(d.id)) {
-      await tx.delete(donationTagsTable).where(eq(donationTagsTable.donationId, d.id));
-      if (d.tags.length > 0) {
-        await tx.insert(donationTagsTable)
-          .values(d.tags.map(tagId => ({ donationId: d.id, tagId })))
-          .onConflictDoNothing();
+  if (donationIdsWithTags.length > 0) {
+    for (let i = 0; i < donationIdsWithTags.length; i += BATCH_SIZE) {
+      const batch = donationIdsWithTags.slice(i, i + BATCH_SIZE);
+      await tx.delete(donationTagsTable).where(inArray(donationTagsTable.donationId, batch));
+    }
+    if (allTagRows.length > 0) {
+      for (let i = 0; i < allTagRows.length; i += BATCH_SIZE) {
+        await tx.insert(donationTagsTable).values(allTagRows.slice(i, i + BATCH_SIZE)).onConflictDoNothing();
       }
     }
   }
