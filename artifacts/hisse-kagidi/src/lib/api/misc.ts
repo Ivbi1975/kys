@@ -47,6 +47,40 @@ export async function downloadCsvExport(
   return new Blob(chunks as BlobPart[], { type: "text/csv; charset=utf-8" });
 }
 
+export async function downloadExcelExport(
+  kaId: string,
+  onProgress?: (phase: string) => void,
+): Promise<Blob> {
+  const apiKey = getApiKey();
+  const fetchHeaders: Record<string, string> = {};
+  if (apiKey) {
+    fetchHeaders["X-API-Key"] = apiKey;
+  }
+  onProgress?.("Sunucudan Excel oluşturuluyor...");
+  const res = await fetch(`${API_BASE}/export/excel?kaId=${encodeURIComponent(kaId)}`, {
+    headers: fetchHeaders,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Excel export hatası" }));
+    throw new Error(err.error || "Excel export hatası");
+  }
+
+  onProgress?.("İndiriliyor...");
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("Stream desteklenmiyor");
+
+  const chunks: Uint8Array[] = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+
+  return new Blob(chunks as BlobPart[], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+}
+
 export interface ConflictEntry {
   donationId: string;
   donationName: string;

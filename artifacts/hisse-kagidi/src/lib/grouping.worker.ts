@@ -289,13 +289,59 @@ function mod7GroupDonations(donations: Donation[]): GroupedSegment[][] {
   return [...fullAnimals, ...matchedAnimals, ...leftoverAnimals];
 }
 
+interface ConflictInfo {
+  description: string;
+  animalNos: number[];
+  totalShares: number;
+  isExpected: boolean;
+}
+
+function workerCheckGroupConflicts(groups: AnimalGroup[]): ConflictInfo[] {
+  const descToAnimals = new Map<string, Set<number>>();
+  const descToCount = new Map<string, number>();
+  const descToOriginal = new Map<string, string>();
+  for (const group of groups) {
+    for (const d of group.donations) {
+      const key = d.description.trim().toLowerCase();
+      if (!key) continue;
+      if (!descToAnimals.has(key)) {
+        descToAnimals.set(key, new Set());
+        descToOriginal.set(key, d.description);
+      }
+      descToAnimals.get(key)!.add(group.animalNo);
+      descToCount.set(key, (descToCount.get(key) || 0) + 1);
+    }
+  }
+  const conflicts: ConflictInfo[] = [];
+  for (const [desc, animals] of descToAnimals) {
+    if (animals.size > 1) {
+      const totalShares = descToCount.get(desc) || 0;
+      conflicts.push({
+        description: descToOriginal.get(desc) || desc,
+        animalNos: Array.from(animals).sort((a, b) => a - b),
+        totalShares,
+        isExpected: totalShares > 7,
+      });
+    }
+  }
+  conflicts.sort((a, b) => {
+    if (a.isExpected !== b.isExpected) return a.isExpected ? 1 : -1;
+    return a.description.localeCompare(b.description, "tr");
+  });
+  return conflicts;
+}
+
 export type WorkerRequest =
   | { type: "group"; id: string; donations: Donation[] }
-  | { type: "incrementalGroup"; id: string; donations: Donation[]; existingGroups: AnimalGroup[]; changedDonationIds: string[]; lockedGroupIndices: number[] };
+  | { type: "incrementalGroup"; id: string; donations: Donation[]; existingGroups: AnimalGroup[]; changedDonationIds: string[]; lockedGroupIndices: number[] }
+  | { type: "checkConflicts"; id: string; groups: AnimalGroup[] }
+  | { type: "computeShares"; id: string; donations: Donation[] };
 
 export type WorkerResponse =
   | { type: "progress"; id: string; current: number; total: number }
   | { type: "result"; id: string; groups: AnimalGroup[]; cancelled?: boolean }
+  | { type: "conflictsResult"; id: string; conflicts: ConflictInfo[] }
+  | { type: "sharesResult"; id: string; shares: Record<string, number> }
   | { type: "error"; id: string; message: string };
 
 let cancelledId: string | null = null;
@@ -380,6 +426,28 @@ self.onmessage = (e: MessageEvent<WorkerRequest | { type: "cancel"; id: string }
 
   if (msg.type === "cancel") {
     cancelledId = msg.id;
+    return;
+  }
+
+  if (msg.type === "checkConflicts") {
+    try {
+      const conflicts = workerCheckGroupConflicts(msg.groups);
+      self.postMessage({ type: "conflictsResult", id: msg.id, conflicts } satisfies WorkerResponse);
+    } catch (err) {
+      self.postMessage({ type: "error", id: msg.id, message: err instanceof Error ? err.message : "Bilinmeyen hata" } satisfies WorkerResponse);
+    }
+    return;
+  }
+
+  if (msg.type === "computeShares") {
+    try {
+      const shareMap = computeEffectiveShares(msg.donations);
+      const shares: Record<string, number> = {};
+      for (const [k, v] of shareMap) shares[k] = v;
+      self.postMessage({ type: "sharesResult", id: msg.id, shares } satisfies WorkerResponse);
+    } catch (err) {
+      self.postMessage({ type: "error", id: msg.id, message: err instanceof Error ? err.message : "Bilinmeyen hata" } satisfies WorkerResponse);
+    }
     return;
   }
 

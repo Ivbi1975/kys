@@ -338,56 +338,40 @@ router.get("/projects/:id/dashboard", asyncHandler(async (req, res) => {
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
   if (!project) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
 
-  const kesimRows = await db.select({
-    id: kesimAlanlariTable.id,
-    name: kesimAlanlariTable.name,
-  }).from(kesimAlanlariTable).where(
-    and(
-      eq(kesimAlanlariTable.projectId, id),
-      isNull(kesimAlanlariTable.deletedAt)
-    )
-  );
+  const areaStats = await db.execute(sql`
+    SELECT
+      ka.id,
+      ka.name,
+      COUNT(ag.id)::int AS total_animals,
+      COUNT(ag.id) FILTER (WHERE ag.kesildi = true)::int AS kesildi_count,
+      MAX(ag.kesildi_at) AS last_kesildi_at
+    FROM kesim_alanlari ka
+    LEFT JOIN animal_groups ag ON ag.kesim_alani_id = ka.id AND ag.deleted_at IS NULL
+    WHERE ka.project_id = ${id} AND ka.deleted_at IS NULL
+    GROUP BY ka.id, ka.name
+    ORDER BY ka.name
+  `);
 
-  const kesimIds = kesimRows.map(k => k.id);
-  if (kesimIds.length === 0) {
-    res.json({
-      projectId: id,
-      projectName: project.name,
-      totalAnimals: 0,
-      kesildiCount: 0,
-      remainingCount: 0,
-      kesildiPercent: 0,
-      lastKesildiAt: null,
-      kesimAlanlari: [],
-    });
-    return;
-  }
+  type AreaStatRow = { id: string; name: string; total_animals: number; kesildi_count: number; last_kesildi_at: string | null };
+  const rows = areaStats.rows as AreaStatRow[];
 
-  const groups = await db.select({
-    id: animalGroupsTable.id,
-    kesimAlaniId: animalGroupsTable.kesimAlaniId,
-    kesildi: animalGroupsTable.kesildi,
-    kesildiAt: animalGroupsTable.kesildiAt,
-  }).from(animalGroupsTable).where(
-    inArray(animalGroupsTable.kesimAlaniId, kesimIds)
-  );
+  let totalAnimals = 0;
+  let kesildiCount = 0;
+  let lastKesildiAt: string | null = null;
 
-  const totalAnimals = groups.length;
-  const kesildiCount = groups.filter(g => g.kesildi).length;
-  const allTimes = groups.filter(g => g.kesildiAt).map(g => g.kesildiAt!).sort();
-  const lastKesildiAt = allTimes.length > 0 ? allTimes[allTimes.length - 1] : null;
-
-  const perArea = kesimRows.map(k => {
-    const areaGroups = groups.filter(g => g.kesimAlaniId === k.id);
-    const areaKesildi = areaGroups.filter(g => g.kesildi).length;
-    const areaTimes = areaGroups.filter(g => g.kesildiAt).map(g => g.kesildiAt!).sort();
+  const kesimAlanlari = rows.map(r => {
+    totalAnimals += r.total_animals;
+    kesildiCount += r.kesildi_count;
+    if (r.last_kesildi_at && (!lastKesildiAt || r.last_kesildi_at > lastKesildiAt)) {
+      lastKesildiAt = r.last_kesildi_at;
+    }
     return {
-      id: k.id,
-      name: k.name,
-      totalAnimals: areaGroups.length,
-      kesildiCount: areaKesildi,
-      kesildiPercent: areaGroups.length > 0 ? Math.round((areaKesildi / areaGroups.length) * 100) : 0,
-      lastKesildiAt: areaTimes.length > 0 ? areaTimes[areaTimes.length - 1] : null,
+      id: r.id,
+      name: r.name,
+      totalAnimals: r.total_animals,
+      kesildiCount: r.kesildi_count,
+      kesildiPercent: r.total_animals > 0 ? Math.round((r.kesildi_count / r.total_animals) * 100) : 0,
+      lastKesildiAt: r.last_kesildi_at,
     };
   });
 
@@ -399,7 +383,7 @@ router.get("/projects/:id/dashboard", asyncHandler(async (req, res) => {
     remainingCount: totalAnimals - kesildiCount,
     kesildiPercent: totalAnimals > 0 ? Math.round((kesildiCount / totalAnimals) * 100) : 0,
     lastKesildiAt,
-    kesimAlanlari: perArea,
+    kesimAlanlari,
   });
 }));
 

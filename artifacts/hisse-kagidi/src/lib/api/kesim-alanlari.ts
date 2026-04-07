@@ -10,9 +10,52 @@ export async function fetchDeletedKesimAlanlari(): Promise<KesimAlani[]> {
   return apiFetch<KesimAlani[]>("/kesim-alanlari/deleted");
 }
 
+interface CompactAnimalGroup {
+  id: string;
+  animalNo: number;
+  donationIds: string[];
+  colorTag?: string;
+  locked?: boolean;
+  notes?: string;
+  kesildi?: boolean;
+  kesildiAt?: string | null;
+  teamId?: string | null;
+  updatedAt?: string;
+}
+
+interface CompactKesimAlani extends Omit<KesimAlani, "animalGroups"> {
+  animalGroups: CompactAnimalGroup[];
+  _compact?: boolean;
+}
+
+function reconstructFromCompact(data: CompactKesimAlani): KesimAlani {
+  const donationsById = new Map<string, KesimAlani["donations"][0]>();
+  for (const d of data.donations) {
+    donationsById.set(d.id, d);
+  }
+  const animalGroups = data.animalGroups.map(g => ({
+    id: g.id,
+    animalNo: g.animalNo,
+    colorTag: g.colorTag,
+    locked: g.locked,
+    notes: g.notes,
+    kesildi: g.kesildi,
+    kesildiAt: g.kesildiAt,
+    teamId: g.teamId,
+    updatedAt: g.updatedAt,
+    donations: g.donationIds.map(did => donationsById.get(did)).filter(Boolean) as KesimAlani["donations"],
+  }));
+  const { _compact, ...rest } = data;
+  return { ...rest, animalGroups } as KesimAlani;
+}
+
 export async function fetchKesimAlani(id: string): Promise<KesimAlani | null> {
   try {
-    return await apiFetch<KesimAlani>(`/kesim-alanlari/${id}`);
+    const raw = await apiFetch<CompactKesimAlani | KesimAlani>(`/kesim-alanlari/${id}?compact=1`);
+    if (raw && "_compact" in raw && raw._compact) {
+      return reconstructFromCompact(raw as CompactKesimAlani);
+    }
+    return raw as KesimAlani;
   } catch (err) {
     console.warn(`fetchKesimAlani(${id}) failed:`, err instanceof Error ? err.message : err);
     return null;

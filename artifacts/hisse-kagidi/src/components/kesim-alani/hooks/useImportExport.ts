@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { produce } from "immer";
 import type { KesimAlani, Donation } from "@/lib/types";
-import { downloadCsvExport, apiCreateDonation } from "@/lib/api";
+import { downloadCsvExport, downloadExcelExport, apiCreateDonation } from "@/lib/api";
 
 export type ColumnMapping = "name" | "description" | "donationType" | "shareCount" | "vekalet" | "notes" | "skip";
 
@@ -480,32 +480,29 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
     XLSX.writeFile(wb, `${kesim.name}_bagiscilar.xlsx`);
   }
 
+  const [excelExporting, setExcelExporting] = useState(false);
+
   async function exportGroupsExcel() {
     if (!kesim || kesim.animalGroups.length === 0) return;
-    const XLSX = await getXLSX();
-    const data: Record<string, string | number>[] = [];
-    for (const group of kesim.animalGroups) {
-      for (let i = 0; i < group.donations.length; i++) {
-        const d = group.donations[i];
-        data.push({
-          "Kesim Listesi ID": kesim.kesimListeId || "",
-          "Hayvan No": group.animalNo,
-          "Sıra": i + 1,
-          "Vekalet": d.vekalet,
-          "Vekaleti Veren": d.description,
-          "Adına Kesilen": d.name,
-          "Cinsi": d.donationType,
-          "Notlar": d.notes,
-        });
-      }
+    setExcelExporting(true);
+    try {
+      const blob = await downloadExcelExport(kesim.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${kesim.name.replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ ]/g, "").replace(/\s+/g, "_")}_kesim_kagidi.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Excel indirildi" });
+    } catch (err) {
+      toast({
+        title: "Excel export hatası",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    } finally {
+      setExcelExporting(false);
     }
-    const ws = XLSX.utils.json_to_sheet(data);
-    ws["!cols"] = [
-      { wch: 16 }, { wch: 10 }, { wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 10 }, { wch: 18 },
-    ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Kesim Kağıdı");
-    XLSX.writeFile(wb, `${kesim.name}_kesim_kagidi.xlsx`);
   }
 
   async function handleExportKaCsv() {
@@ -555,6 +552,7 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
     setBulkReviewExpanded,
     csvExporting,
     setCsvExporting,
+    excelExporting,
     donorListReportOpen,
     setDonorListReportOpen,
     bulkReviewTransferTarget,

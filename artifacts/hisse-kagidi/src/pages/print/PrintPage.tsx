@@ -2,9 +2,9 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, ChevronDown, ChevronUp, Eye, EyeOff, FileSpreadsheet, FileText, LayoutTemplate, Printer, QrCode, RotateCcw, Settings2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Eye, EyeOff, FileSpreadsheet, FileText, LayoutTemplate, Loader2, Printer, QrCode, RotateCcw, Settings2 } from "lucide-react";
 import type { KesimAlani, AnimalGroup } from "@/lib/types";
-import { fetchKesimAlani, fetchLogo } from "@/lib/api";
+import { fetchKesimAlani, fetchLogo, downloadExcelExport } from "@/lib/api";
 import {
   loadPrintPreferences,
   savePrintPreferences,
@@ -14,7 +14,6 @@ import {
 } from "@/lib/storage";
 import type { PrintPreferences, PrintTemplate } from "@/lib/storage";
 import { COLUMNS, CONTENT_HIDE_ALLOWED_COLUMNS, DEFAULT_FONT_SIZES } from "./printHelpers";
-import { exportKesimKagidiExcel } from "./excelExport";
 import { StandardTemplate, PortraitTemplate, CompactTemplate, NameListTemplate, SummaryTemplate } from "./templates";
 
 export default function PrintPage() {
@@ -26,6 +25,7 @@ export default function PrintPage() {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [contentRulesOpen, setContentRulesOpen] = useState<string | null>(null);
   const [prefs, setPrefs] = useState<PrintPreferences>(() => loadPrintPreferences());
+  const [excelExporting, setExcelExporting] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -132,8 +132,19 @@ export default function PrintPage() {
           <Settings2 className="w-4 h-4 mr-1" />Yazdırma Seçenekleri
           {optionsOpen ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
         </Button>
-        <Button variant="outline" size="sm" onClick={() => exportKesimKagidiExcel({ kesim, processedGroups, visibleColumns, shouldHideContent })} disabled={processedGroups.length === 0}>
-          <FileSpreadsheet className="w-4 h-4 mr-1" />Excel
+        <Button variant="outline" size="sm" disabled={processedGroups.length === 0 || excelExporting} onClick={async () => {
+          setExcelExporting(true);
+          try {
+            const blob = await downloadExcelExport(kesim.id);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${kesim.name.replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ ]/g, "").replace(/\s+/g, "_")}_kesim_kagidi.xlsx`;
+            a.click();
+            URL.revokeObjectURL(url);
+          } catch { /* ignore */ } finally { setExcelExporting(false); }
+        }}>
+          {excelExporting ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Excel...</> : <><FileSpreadsheet className="w-4 h-4 mr-1" />Excel</>}
         </Button>
         <Button variant="outline" size="sm" onClick={() => window.print()} disabled={processedGroups.length === 0} title="Tarayıcı yazdırma diyaloğunda PDF olarak kaydedin">
           <FileText className="w-4 h-4 mr-1" />PDF İndir

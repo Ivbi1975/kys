@@ -91,6 +91,22 @@ router.get("/kesim-alanlari/:id", asyncHandler(async (req, res) => {
     res.status(result.status).json({ error: ERROR_MESSAGES.NOT_FOUND });
     return;
   }
+  if (req.query.compact === "1") {
+    const original = result.data as Record<string, unknown>;
+    const animalGroups = original.animalGroups as Array<Record<string, unknown>>;
+    if (Array.isArray(animalGroups)) {
+      const compactGroups = animalGroups.map(g => {
+        const donations = g.donations as Array<{ id: string }>;
+        const { donations: _, ...rest } = g;
+        return { ...rest, donationIds: Array.isArray(donations) ? donations.map(d => d.id) : [] };
+      });
+      const compactData = { ...original, animalGroups: compactGroups, _compact: true };
+      res.json(compactData);
+      return;
+    }
+    res.json(original);
+    return;
+  }
   res.json(result.data);
 }));
 

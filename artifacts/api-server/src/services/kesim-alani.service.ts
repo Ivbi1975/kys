@@ -20,6 +20,8 @@ import { BATCH_SIZE } from "../lib/constants";
 
 export const KA_LIST_CACHE_KEY = "kesim-alanlari:list";
 export const KA_LIST_TTL = 15_000;
+export const KA_ITEM_CACHE_KEY = "kesim-alanlari:item";
+export const KA_ITEM_TTL = 10_000;
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -260,6 +262,10 @@ export async function getFullKesimAlaniList(kaRows: KesimAlaniRow[]) {
 }
 
 export async function getFullKesimAlani(id: string) {
+  const itemCacheKey = `${KA_ITEM_CACHE_KEY}:${id}`;
+  const cached = cacheGet<unknown>(itemCacheKey);
+  if (cached) return cached;
+
   const result = await db.execute(sql`
     SELECT
       ka.id AS ka_id, ka.name, ka.created_at, ka.deleted_at,
@@ -386,11 +392,16 @@ export async function getFullKesimAlani(id: string) {
     updatedAt: new Date(),
   }));
 
-  return assembleKesimAlani(ka, donations, groups, tagsByDonation, groupLinks, teams);
+  const assembled = assembleKesimAlani(ka, donations, groups, tagsByDonation, groupLinks, teams);
+  if (assembled) {
+    cacheSet(itemCacheKey, assembled, KA_ITEM_TTL);
+  }
+  return assembled;
 }
 
 export function invalidateKACache() {
   cacheInvalidatePrefix(KA_LIST_CACHE_KEY);
+  cacheInvalidatePrefix(KA_ITEM_CACHE_KEY);
 }
 
 export function getCachedKAList(includeDeleted: boolean) {

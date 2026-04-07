@@ -57,8 +57,8 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - Animal group locking (prevents accidental changes)
 - Animal group notes
 - Dark theme support with three modes: Açık (light), Koyu (dark), Sistem (system auto-detect) — settable via header toggle or Settings > Tema
-- Excel export for donor lists (with both Bağışçılar + Hayvan Grupları sheets) and kesim kağıdı format (with cell merges + column widths)
-- Excel export on print page matching visible column layout with HAYVAN cell merges
+- Excel export for donor lists (client-side, lightweight) and kesim kağıdı format (server-side streaming via ExcelJS for 4700+ animal support, with cell merges + column widths + styling)
+- Excel export on print page matching visible column layout with HAYVAN cell merges (server-side download)
 - PDF export on print page (opens browser print dialog for Save as PDF)
 - Statistics dashboard — kesim detail: active donors, excluded count, total shares, required animals, empty slots, occupancy % (doluluk)
 - Statistics dashboard — home page: each card shows bağışçı/hisse/hayvan/grup/doluluk; summary row for all areas when 2+ exist
@@ -162,7 +162,8 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
 - Entry: `src/index.ts` — reads `PORT`, starts Express
 - App setup: `src/app.ts` — mounts compression, logging, helmet (security headers with CSP), rate limiting (200 req/min per IP), CORS, JSON/urlencoded parsing, routes at `/api`; trust proxy enabled for correct IP resolution
 - Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` (`GET /api/healthz`); `src/routes/projects.ts` (project CRUD with aggregated stats, soft delete/restore); `src/routes/kesim-alanlari/` (domain-split route directory: `core.ts`, `donations.ts`, `groups.ts`, `photos.ts`, `teams.ts`, `tracking.ts`, `notifications.ts`, `transfers.ts`, `conflicts.ts`, `search.ts`; barrel `index.ts`; 57 routes total); `src/routes/tags.ts` (custom tag CRUD, zod-validated); `src/routes/settings.ts` (logo management, zod-validated); `src/routes/backup.ts` (export/import with transactions, zod-validated); `src/routes/ai-notes.ts` (AI classification with OpenAI integration)
-- Services: `src/services/kesim-alani.service.ts` (shared CRUD, grouping, stats); `src/services/conflict.service.ts`, `src/services/tracking.service.ts`, `src/services/search.service.ts`, `src/services/transfer.service.ts` (domain-specific business logic)
+- Services: `src/services/kesim-alani.service.ts` (shared CRUD, grouping, stats, per-item cache with 10s TTL); `src/services/conflict.service.ts`, `src/services/tracking.service.ts`, `src/services/search.service.ts`, `src/services/transfer.service.ts` (domain-specific business logic)
+- Performance: In-memory cache for KA list (15s TTL) and individual KA items (10s TTL) with prefix-based invalidation; Dashboard endpoint uses SQL GROUP BY aggregation; Compact response format (`?compact=1`) reduces payload ~50% by sending donation IDs instead of full objects in animal groups; Brotli/gzip response compression; ExcelJS streaming workbook writer for large exports
 - Depends on: `@workspace/db`, `@workspace/api-zod`
 - `pnpm --filter @workspace/api-server run dev` — run the dev server
 - `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)

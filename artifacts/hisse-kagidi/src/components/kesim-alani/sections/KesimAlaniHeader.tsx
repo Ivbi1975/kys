@@ -6,6 +6,7 @@ import {
   ChevronRight, FileSpreadsheet, History, Home, Keyboard, Link2, Loader2,
   Maximize, MessageSquarePlus, Minimize, Printer, QrCode,
   Redo2, Save, Search, Send, Undo2, UserCog, Download,
+
 } from "lucide-react";
 import { useKesimAlaniContext } from "../KesimAlaniContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -16,7 +17,7 @@ export function KesimAlaniHeader() {
     kesim, setKesim, setLocation, projectName, save, saveToApi, saveStatus, saveProgress, lastSavedTime,
     toast, handleUndo, handleRedo, history, historyPanelOpen,
     setHistoryPanelOpen, setShortcutHelpOpen, toggleFullscreen, isFullscreen,
-    exportDonorsExcel, exportGroupsExcel, handleExportKaCsv, csvExporting,
+    exportDonorsExcel, exportGroupsExcel, handleExportKaCsv, csvExporting, excelExporting,
     setQrUrl, setQrModalOpen, setTrackingNotesOpen, setTrackingNotesLoading, setTrackingNotes,
     setNotificationLogsOpen, setNotificationLogsLoading, setNotificationLogs, setTeamDialogOpen,
     totalShares, requiredAnimals,
@@ -229,9 +230,9 @@ export function KesimAlaniHeader() {
           </Button>
           {kesim.animalGroups.length > 0 && (
             <>
-              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={exportGroupsExcel} title="Kesim Kağıdı Excel" aria-label="Kesim Kağıdı Excel">
-                <FileSpreadsheet className="w-3.5 h-3.5 mr-1" />
-                <span className="hidden sm:inline">Excel</span>
+              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={exportGroupsExcel} disabled={excelExporting} title="Kesim Kağıdı Excel" aria-label="Kesim Kağıdı Excel">
+                {excelExporting ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5 mr-1" />}
+                <span className="hidden sm:inline">{excelExporting ? "..." : "Excel"}</span>
               </Button>
               <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setLocation(`/not-duzenleme/${kesim.id}`)}>
                 <Search className="w-3.5 h-3.5 mr-1" />

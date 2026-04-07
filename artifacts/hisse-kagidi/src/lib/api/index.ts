@@ -109,6 +109,7 @@ export {
 export {
   fetchExportCount,
   downloadCsvExport,
+  downloadExcelExport,
   fetchCatismaTespiti,
   transferDonation,
   createTeam,
