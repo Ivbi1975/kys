@@ -45,6 +45,9 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
       window.location.reload();
       throw new Error("Oturum süresi doldu. Yeniden giriş yapılıyor...");
     }
+    if (res.status === 413) {
+      throw new ApiFetchError("Gönderilen veri çok büyük. Lütfen daha az kayıt ile tekrar deneyin veya sayfayı yenileyip tekrar kaydedin.");
+    }
     const err: ApiError = await res.json().catch(() => ({ error: "Sunucu hatası" }));
     throw new ApiFetchError(err.error || `HTTP ${res.status}`, err.details);
   }

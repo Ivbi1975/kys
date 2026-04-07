@@ -26,11 +26,65 @@ export async function createKesimAlani(data: KesimAlani & { projectId?: string |
   });
 }
 
-export async function apiUpdateKesimAlani(data: KesimAlani): Promise<KesimAlani> {
-  return apiFetch<KesimAlani>(`/kesim-alanlari/${data.id}`, {
-    method: "PUT",
-    body: JSON.stringify(data),
-  });
+const DONATION_CHUNK_THRESHOLD = 3000;
+const DONATION_CHUNK_SIZE = 2000;
+
+export async function apiUpdateKesimAlani(
+  data: KesimAlani,
+  onChunkProgress?: (progress: ChunkProgress) => void,
+): Promise<KesimAlani> {
+  const donationCount = data.donations?.length ?? 0;
+
+  if (donationCount <= DONATION_CHUNK_THRESHOLD) {
+    return apiFetch<KesimAlani>(`/kesim-alanlari/${data.id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  const donations = data.donations;
+  const totalChunks = Math.ceil(donations.length / DONATION_CHUNK_SIZE);
+  const allDonationIds = donations.map(d => d.id);
+  let lastResult: unknown = null;
+  let savedCount = 0;
+
+  for (let i = 0; i < totalChunks; i++) {
+    const chunk = donations.slice(i * DONATION_CHUNK_SIZE, (i + 1) * DONATION_CHUNK_SIZE);
+    const payload: Record<string, unknown> = {
+      donations: chunk,
+      chunkIndex: i,
+      totalChunks,
+      sortOrderOffset: i * DONATION_CHUNK_SIZE,
+    };
+    if (i === 0) {
+      payload.allDonationIds = allDonationIds;
+      if (data.name) payload.name = data.name;
+      if (data.kesimListeId !== undefined) payload.kesimListeId = data.kesimListeId;
+    }
+
+    const result = await apiFetch<{ chunkIndex: number; totalChunks: number; savedCount: number; data?: KesimAlani }>(
+      `/kesim-alanlari/${data.id}/update-chunked`,
+      {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      },
+    );
+    savedCount += result.savedCount;
+    lastResult = result;
+    onChunkProgress?.({ chunkIndex: i, totalChunks, savedCount, totalGroups: donations.length });
+  }
+
+  if (data.animalGroups && data.animalGroups.length > 0) {
+    return apiUpdateBulkAnimalGroups(data.id, data.animalGroups, onChunkProgress ? (progress) => {
+      onChunkProgress({ ...progress, savedCount: savedCount + progress.savedCount });
+    } : undefined);
+  }
+
+  const finalResult = lastResult as { data?: KesimAlani };
+  if (finalResult?.data) {
+    return finalResult.data;
+  }
+  return apiFetch<KesimAlani>(`/kesim-alanlari/${data.id}`);
 }
 
 const CHUNK_SIZE = 500;

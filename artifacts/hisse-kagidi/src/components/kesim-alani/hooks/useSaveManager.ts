@@ -67,7 +67,9 @@ export function useSaveManager({ toast, scrollToAnimalGroupRef }: UseSaveManager
           ? apiUpdateBulkAnimalGroups(data.id, data.animalGroups, (progress) => {
               setSaveProgress(progress);
             })
-          : apiUpdateKesimAlani(data);
+          : apiUpdateKesimAlani(data, (progress) => {
+              setSaveProgress(progress);
+            });
       apiCall
         .then(() => {
           setSaveStatus("saved");

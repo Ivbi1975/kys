@@ -10,6 +10,7 @@ import {
   createKesimAlani,
   moveKesimAlani,
   updateKesimAlani,
+  updateKesimAlaniDonationsChunked,
   deleteKesimAlani,
   restoreKesimAlani,
 } from "../../services/core.service";
@@ -53,6 +54,18 @@ const updateKesimAlaniSchema = z.object({
   kesimListeId: z.string().optional().nullable(),
   donations: z.array(donationPayloadSchema).optional(),
   animalGroups: z.array(animalGroupPayloadSchema).optional(),
+});
+
+const updateKesimAlaniChunkedSchema = z.object({
+  donations: z.array(donationPayloadSchema),
+  chunkIndex: z.number().int().min(0),
+  totalChunks: z.number().int().min(1),
+  sortOrderOffset: z.number().int().min(0).default(0),
+  allDonationIds: z.array(z.string()).optional(),
+  name: z.string().min(1).optional(),
+  kesimListeId: z.string().optional().nullable(),
+}).refine(data => data.chunkIndex < data.totalChunks, {
+  message: "chunkIndex must be less than totalChunks",
 });
 
 const moveKesimAlaniSchema = z.object({
@@ -124,6 +137,34 @@ router.put("/kesim-alanlari/:id", asyncHandler(async (req, res) => {
   }
   res.json(result.data);
   refreshProjectStats();
+}));
+
+router.put("/kesim-alanlari/:id/update-chunked", asyncHandler(async (req, res) => {
+  const parsed = updateKesimAlaniChunkedSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
+    return;
+  }
+  const { donations, chunkIndex, totalChunks, sortOrderOffset, allDonationIds, name, kesimListeId } = parsed.data;
+  const metaUpdates = (name !== undefined || kesimListeId !== undefined) ? { name, kesimListeId } : undefined;
+  const result = await updateKesimAlaniDonationsChunked(
+    req.params.id,
+    donations,
+    chunkIndex,
+    totalChunks,
+    sortOrderOffset,
+    allDonationIds,
+    metaUpdates,
+  );
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
+    return;
+  }
+  const { ok: _ok, ...responseData } = result;
+  res.json(responseData);
+  if (chunkIndex === totalChunks - 1) {
+    refreshProjectStats();
+  }
 }));
 
 router.delete("/kesim-alanlari/:id", asyncHandler(async (req, res) => {

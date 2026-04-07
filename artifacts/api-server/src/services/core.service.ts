@@ -1,6 +1,6 @@
 import { db } from "@workspace/db";
-import { kesimAlanlariTable, projectsTable } from "@workspace/db/schema";
-import { eq, isNull, isNotNull, inArray } from "drizzle-orm";
+import { kesimAlanlariTable, projectsTable, donationsTable, donationTagsTable } from "@workspace/db/schema";
+import { eq, isNull, isNotNull, inArray, and } from "drizzle-orm";
 import crypto from "crypto";
 import { serviceError, serviceOk, type ServiceResult } from "./result";
 import {
@@ -13,6 +13,7 @@ import {
   saveAnimalGroups,
   diffUpdateDonations,
   diffUpdateGroups,
+  upsertDonationsBatch,
   requireActiveKesimAlani,
   type DonationPayload,
   type AnimalGroupPayload,
@@ -151,6 +152,58 @@ export async function updateKesimAlani(id: string, params: {
 
   invalidateKACache();
   return serviceOk({ data: await getFullKesimAlani(id) });
+}
+
+export async function updateKesimAlaniDonationsChunked(
+  id: string,
+  donations: DonationPayload[],
+  chunkIndex: number,
+  totalChunks: number,
+  sortOrderOffset: number,
+  allDonationIds?: string[],
+  metaUpdates?: { name?: string; kesimListeId?: string | null },
+): Promise<ServiceResult<{ chunkIndex: number; totalChunks: number; savedCount: number; data?: unknown }>> {
+  const kaCheck = await requireActiveKesimAlani(id);
+  if (kaCheck.error) return serviceError(kaCheck.error, kaCheck.status);
+
+  const isFirstChunk = chunkIndex === 0;
+
+  await db.transaction(async (tx) => {
+    if (isFirstChunk && metaUpdates) {
+      const kaUpdates: Record<string, string | null> = {};
+      if (metaUpdates.name !== undefined) kaUpdates.name = metaUpdates.name;
+      if (metaUpdates.kesimListeId !== undefined) kaUpdates.kesimListeId = metaUpdates.kesimListeId ?? null;
+      if (Object.keys(kaUpdates).length > 0) {
+        await tx.update(kesimAlanlariTable).set(kaUpdates).where(eq(kesimAlanlariTable.id, id));
+      }
+    }
+
+    if (isFirstChunk && allDonationIds) {
+      const existingRows = await tx.select({ id: donationsTable.id })
+        .from(donationsTable)
+        .where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)));
+      const keepIds = new Set(allDonationIds);
+      const toDeleteIds = existingRows.filter(r => !keepIds.has(r.id)).map(r => r.id);
+      if (toDeleteIds.length > 0) {
+        for (let i = 0; i < toDeleteIds.length; i += 500) {
+          const batch = toDeleteIds.slice(i, i + 500);
+          await tx.delete(donationTagsTable).where(inArray(donationTagsTable.donationId, batch));
+          await tx.delete(donationsTable).where(inArray(donationsTable.id, batch));
+        }
+      }
+    }
+
+    await upsertDonationsBatch(tx, id, donations, sortOrderOffset);
+  });
+
+  const isLastChunk = chunkIndex === totalChunks - 1;
+  if (isLastChunk) {
+    invalidateKACache();
+    const fullData = await getFullKesimAlani(id);
+    return serviceOk({ chunkIndex, totalChunks, savedCount: donations.length, data: fullData });
+  }
+
+  return serviceOk({ chunkIndex, totalChunks, savedCount: donations.length });
 }
 
 export async function deleteKesimAlani(id: string, permanent: boolean): Promise<ServiceResult<{ success: true }>> {
