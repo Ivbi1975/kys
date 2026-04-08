@@ -7,6 +7,7 @@ import {
   FolderOpen,
   Search,
   Archive,
+  Package,
 } from "lucide-react";
 import QrCodeModal from "@/components/QrCodeModal";
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
@@ -65,6 +66,15 @@ export default function ProjeDetayPage() {
             </p>
           </div>
           <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              title="Bağış Havuzu"
+              onClick={() => state.setLocation(`/bagis-havuzu/${state.project!.id}`)}
+            >
+              <Package className="w-4 h-4 mr-1" />
+              Bağış Havuzu
+            </Button>
             <Button
               variant="outline"
               size="sm"

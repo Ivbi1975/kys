@@ -3,7 +3,7 @@ import { produce } from "immer";
 import type { KesimAlani, Donation } from "@/lib/types";
 import { downloadCsvExport, downloadExcelExport, apiCreateDonation } from "@/lib/api";
 
-export type ColumnMapping = "name" | "description" | "donationType" | "shareCount" | "vekalet" | "notes" | "skip";
+export type ColumnMapping = "name" | "description" | "donationType" | "shareCount" | "vekalet" | "notes" | "phone" | "birim" | "temsilci" | "skip";
 
 export const COLUMN_OPTIONS: { value: ColumnMapping; label: string }[] = [
   { value: "name", label: "Adına Kesilen" },
@@ -12,6 +12,9 @@ export const COLUMN_OPTIONS: { value: ColumnMapping; label: string }[] = [
   { value: "shareCount", label: "Hisse Sayısı" },
   { value: "vekalet", label: "Vekalet No" },
   { value: "notes", label: "Notlar" },
+  { value: "phone", label: "Telefon" },
+  { value: "birim", label: "Birim" },
+  { value: "temsilci", label: "Temsilci" },
   { value: "skip", label: "Atla (kullanma)" },
 ];
 
@@ -22,6 +25,9 @@ const COLUMN_KEYWORDS: Record<Exclude<ColumnMapping, "skip">, string[]> = {
   shareCount: ["hisse sayısı", "hisse sayisi", "hisse", "share", "adet", "miktar", "sayı", "sayi", "count", "pay"],
   vekalet: ["vekalet no", "vekalet", "vekâlet", "numara", "sıra no", "sira no", "fiş no", "fiş", "fis", "makbuz no", "makbuz"],
   notes: ["notlar", "not", "note", "notes", "açıklama notu", "ek bilgi", "bilgi", "memo", "yorum"],
+  phone: ["telefon", "tel", "phone", "gsm", "cep", "iletişim", "iletisim"],
+  birim: ["birim", "şube", "sube", "bölge", "bolge", "il", "şehir", "sehir", "branch", "unit"],
+  temsilci: ["temsilci", "sorumlu", "yetkili", "representative", "agent", "danışman", "danisman"],
 };
 
 function normalizeText(text: string): string {
@@ -274,6 +280,12 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
           donation.vekalet = cellValue;
         } else if (mapping === "notes") {
           notesParts.push(cellValue);
+        } else if (mapping === "phone") {
+          donation.phone = cellValue;
+        } else if (mapping === "birim") {
+          donation.birim = cellValue;
+        } else if (mapping === "temsilci") {
+          donation.temsilci = cellValue;
         }
       }
       donation.notes = notesParts.join(" | ");
@@ -299,6 +311,9 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
       shareCount: 1,
       vekalet: "",
       notes: "",
+      phone: "",
+      birim: "",
+      temsilci: "",
     };
     const notesParts: string[] = [];
     for (let c = 0; c < columnMappings.length; c++) {
@@ -317,6 +332,12 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
         donation.vekalet = cellValue;
       } else if (mapping === "notes") {
         notesParts.push(cellValue);
+      } else if (mapping === "phone") {
+        donation.phone = cellValue;
+      } else if (mapping === "birim") {
+        donation.birim = cellValue;
+      } else if (mapping === "temsilci") {
+        donation.temsilci = cellValue;
       }
     }
     donation.notes = notesParts.join(" | ");

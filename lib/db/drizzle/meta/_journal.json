@@ -127,6 +127,13 @@
       "when": 1774946000000,
       "tag": "0017_ai_jobs_kesim_alani_id",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1774946100000,
+      "tag": "0018_donation_birim_temsilci",
+      "breakpoints": true
     }
   ]
 }

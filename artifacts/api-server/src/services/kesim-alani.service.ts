@@ -57,6 +57,8 @@ export interface DonationOutput {
   vekalet: string;
   notes: string;
   phone: string;
+  birim: string;
+  temsilci: string;
   excluded: boolean;
   tags: string[];
   aiCategories: string[];
@@ -89,6 +91,8 @@ export function assembleKesimAlani(
       vekalet: d.vekalet,
       notes: d.notes,
       phone: d.phone || "",
+      birim: d.birim || "",
+      temsilci: d.temsilci || "",
       excluded: d.excluded,
       tags: tagsByDonation[d.id] || [],
       aiCategories: d.aiCategories ? JSON.parse(d.aiCategories) : [],
@@ -149,6 +153,7 @@ export async function getFullKesimAlaniList(kaRows: KesimAlaniRow[]) {
           SELECT
             don.id, don.name, don.description, don.donation_type,
             don.share_count, don.vekalet, don.notes, don.phone,
+            don.birim, don.temsilci,
             don.excluded, don.sort_order, don.ai_categories, don.ai_warnings,
             COALESCE((
               SELECT json_agg(dt.tag_id)
@@ -191,7 +196,7 @@ export async function getFullKesimAlaniList(kaRows: KesimAlaniRow[]) {
 
   type RawRow = {
     ka_id: string;
-    donations: { id: string; name: string; description: string; donation_type: string; share_count: number; vekalet: string; notes: string; phone: string; excluded: boolean; sort_order: number; ai_categories: string | null; ai_warnings: string | null; tags: string[] }[];
+    donations: { id: string; name: string; description: string; donation_type: string; share_count: number; vekalet: string; notes: string; phone: string; birim?: string; temsilci?: string; excluded: boolean; sort_order: number; ai_categories: string | null; ai_warnings: string | null; tags: string[] }[];
     groups: { id: string; animal_no: number; color_tag: string; locked: boolean; notes: string; kesildi: boolean; kesildi_at: string | null; team_id: string | null; sort_order: number; donation_links: { donationId: string; sortOrder: number }[] }[];
     teams: { id: string; name: string; color: string }[];
   };
@@ -216,6 +221,8 @@ export async function getFullKesimAlaniList(kaRows: KesimAlaniRow[]) {
         vekalet: d.vekalet,
         notes: d.notes,
         phone: d.phone || "",
+        birim: d.birim || "",
+        temsilci: d.temsilci || "",
         excluded: d.excluded,
         sortOrder: d.sort_order,
         deletedAt: null,
@@ -277,6 +284,7 @@ export async function getFullKesimAlani(id: string) {
           SELECT
             don.id, don.name, don.description, don.donation_type,
             don.share_count, don.vekalet, don.notes, don.phone,
+            don.birim, don.temsilci,
             don.excluded, don.sort_order, don.ai_categories, don.ai_warnings,
             COALESCE((
               SELECT json_agg(dt.tag_id)
@@ -313,7 +321,7 @@ export async function getFullKesimAlani(id: string) {
 
   if (result.rows.length === 0) return null;
 
-  type SingleRawDonation = { id: string; name: string; description: string; donation_type: string; share_count: number; vekalet: string; notes: string; phone: string; excluded: boolean; sort_order: number; ai_categories: string | null; ai_warnings: string | null; tags: string[] };
+  type SingleRawDonation = { id: string; name: string; description: string; donation_type: string; share_count: number; vekalet: string; notes: string; phone: string; birim?: string; temsilci?: string; excluded: boolean; sort_order: number; ai_categories: string | null; ai_warnings: string | null; tags: string[] };
   type SingleRawGroup = { id: string; animal_no: number; color_tag: string; locked: boolean; notes: string; kesildi: boolean; kesildi_at: string | null; team_id: string | null; sort_order: number; donation_links: { donationId: string; sortOrder: number }[] };
   type SingleRawTeam = { id: string; name: string; color: string };
   type SingleRawRow = {
@@ -353,6 +361,8 @@ export async function getFullKesimAlani(id: string) {
       vekalet: d.vekalet,
       notes: d.notes,
       phone: d.phone || "",
+      birim: d.birim || "",
+      temsilci: d.temsilci || "",
       excluded: d.excluded,
       sortOrder: d.sort_order,
       deletedAt: null,

@@ -72,6 +72,8 @@ function mapDonationRow(d: typeof donationsTable.$inferSelect, tags: string[]) {
     vekalet: d.vekalet,
     notes: d.notes,
     phone: d.phone || "",
+    birim: d.birim || "",
+    temsilci: d.temsilci || "",
     excluded: d.excluded,
     sortOrder: d.sortOrder,
     tags,
@@ -169,6 +171,8 @@ interface DonationInput {
   vekalet?: string;
   notes?: string;
   phone?: string;
+  birim?: string;
+  temsilci?: string;
   excluded?: boolean;
   tags?: string[];
 }
@@ -191,6 +195,8 @@ export async function createDonation(kesimAlaniId: string, donation: DonationInp
       vekalet: donation.vekalet || "",
       notes: donation.notes || "",
       phone: donation.phone || "",
+      birim: donation.birim || "",
+      temsilci: donation.temsilci || "",
       excluded: donation.excluded || false,
       sortOrder,
     });
@@ -223,6 +229,8 @@ export async function updateDonation(kesimAlaniId: string, donationId: string, u
   if (updates.vekalet !== undefined) dbUpdates.vekalet = updates.vekalet;
   if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
   if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+  if (updates.birim !== undefined) dbUpdates.birim = updates.birim;
+  if (updates.temsilci !== undefined) dbUpdates.temsilci = updates.temsilci;
   if (updates.excluded !== undefined) dbUpdates.excluded = updates.excluded;
 
   await db.transaction(async (tx) => {

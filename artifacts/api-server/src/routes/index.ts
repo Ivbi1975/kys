@@ -8,6 +8,7 @@ import backupRouter from "./backup";
 import aiNotesRouter from "./ai-notes";
 import exportRouter from "./export";
 import integrityRouter from "./integrity";
+import bagisHavuzuRouter from "./bagis-havuzu";
 import authRouter from "./auth";
 
 const router: IRouter = Router();
@@ -15,6 +16,7 @@ const router: IRouter = Router();
 router.use(authRouter);
 router.use(healthRouter);
 router.use(projectsRouter);
+router.use(bagisHavuzuRouter);
 router.use(kesimAlanlariRouter);
 router.use(tagsRouter);
 router.use(settingsRouter);

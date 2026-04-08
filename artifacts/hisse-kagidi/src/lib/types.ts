@@ -15,10 +15,32 @@ export interface Donation {
   vekalet: string;
   notes: string;
   phone?: string;
+  birim?: string;
+  temsilci?: string;
   excluded?: boolean;
   tags?: string[];
   aiCategories?: string[];
   aiWarnings?: string;
+}
+
+export interface PoolDonation extends Donation {
+  kesimAlaniId: string;
+  kesimAlaniName: string;
+}
+
+export interface PoolStats {
+  total: number;
+  active: number;
+  excluded: number;
+  total_shares: number;
+  birim_count: number;
+  temsilci_count: number;
+  type_count: number;
+  birimDistribution: { birim: string; count: number; shares: number }[];
+  temsilciDistribution: { temsilci: string; count: number; shares: number }[];
+  typeDistribution: { type: string; count: number; shares: number }[];
+  kesimAlaniDistribution: { id: string; name: string; count: number; shares: number }[];
+  multiLocationVekalets: string[];
 }
 
 export interface Team {

@@ -97,7 +97,7 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - Offline mode for tracking page: Service Worker via vite-plugin-pwa caches assets; IndexedDB stores tracking data and queues offline changes (kesildi toggles, notes); auto-sync when back online; offline banner with pending change counter; NetworkFirst caching strategy for API requests
 
 Data model (Donation):
-- `id`, `name` (adına kesilen), `description` (vekaleti veren), `donationType` (cinsi), `shareCount`, `vekalet` (vekalet no), `notes` (notlar), `excluded?`, `tags?`
+- `id`, `name` (adına kesilen), `description` (vekaleti veren), `donationType` (cinsi), `shareCount`, `vekalet` (vekalet no), `notes` (notlar), `phone`, `birim`, `temsilci`, `excluded?`, `tags?`
 
 Data model (AnimalGroup):
 - `id`, `animalNo`, `donations[]`, `colorTag?` (green/orange/red), `locked?`, `notes?`, `kesildi?` (boolean, tracks slaughter status)
@@ -139,6 +139,8 @@ Key files:
 - `src/pages/kesim-rapor.tsx` - Kesim report page (`/rapor/:id`), print-optimized PDF with stats, timeline, team breakdown, notes; accessible from kesim-alani "Rapor" button
 - `src/lib/offlineStore.ts` - IndexedDB wrapper for offline tracking data cache and change queue
 - `src/lib/useOfflineSync.ts` - React hook for offline-aware data loading, change queuing, and sync
+- `src/pages/bagis-havuzu.tsx` - Bağış Havuzu (donation pool) page (`/bagis-havuzu/:id`), central view of all donations across all kesim areas in a project; features filtering by kesim area/type/status/birim/temsilci, search, Excel bulk import with column mapping, transfer to kesim areas, bulk operations (exclude/include/delete), AI classification, statistics panel with distribution breakdowns
+- `src/lib/api/bagis-havuzu.ts` - API client for Bağış Havuzu endpoints (fetchPoolDonations, fetchPoolStats, bulkImportDonations, transferDonationsToKA, bulkActionDonations)
 
 ## TypeScript & Composite Projects
 
@@ -161,7 +163,7 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
 
 - Entry: `src/index.ts` — reads `PORT`, starts Express
 - App setup: `src/app.ts` — mounts compression, logging, helmet (security headers with CSP), rate limiting (200 req/min per IP), CORS, JSON/urlencoded parsing, routes at `/api`; trust proxy enabled for correct IP resolution
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` (`GET /api/healthz`); `src/routes/projects.ts` (project CRUD with aggregated stats, soft delete/restore); `src/routes/kesim-alanlari/` (domain-split route directory: `core.ts`, `donations.ts`, `groups.ts`, `photos.ts`, `teams.ts`, `tracking.ts`, `notifications.ts`, `transfers.ts`, `conflicts.ts`, `search.ts`; barrel `index.ts`; 57 routes total); `src/routes/tags.ts` (custom tag CRUD, zod-validated); `src/routes/settings.ts` (logo management, zod-validated); `src/routes/backup.ts` (export/import with transactions, zod-validated); `src/routes/ai-notes.ts` (AI classification with OpenAI integration)
+- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` (`GET /api/healthz`); `src/routes/projects.ts` (project CRUD with aggregated stats, soft delete/restore); `src/routes/kesim-alanlari/` (domain-split route directory: `core.ts`, `donations.ts`, `groups.ts`, `photos.ts`, `teams.ts`, `tracking.ts`, `notifications.ts`, `transfers.ts`, `conflicts.ts`, `search.ts`; barrel `index.ts`; 57 routes total); `src/routes/tags.ts` (custom tag CRUD, zod-validated); `src/routes/settings.ts` (logo management, zod-validated); `src/routes/backup.ts` (export/import with transactions, zod-validated); `src/routes/ai-notes.ts` (AI classification with OpenAI integration); `src/routes/bagis-havuzu.ts` (project-level donation pool: list/stats/bulk-import/transfer/bulk-action/vekalet-check with project-scoped authorization)
 - Services: `src/services/kesim-alani.service.ts` (shared CRUD, grouping, stats, per-item cache with 10s TTL); `src/services/conflict.service.ts`, `src/services/tracking.service.ts`, `src/services/search.service.ts`, `src/services/transfer.service.ts` (domain-specific business logic)
 - Performance: In-memory cache for KA list (15s TTL) and individual KA items (10s TTL) with prefix-based invalidation; Dashboard endpoint uses SQL GROUP BY aggregation; Compact response format (`?compact=1`) reduces payload ~50% by sending donation IDs instead of full objects in animal groups; Brotli/gzip response compression; ExcelJS streaming workbook writer for large exports
 - Depends on: `@workspace/db`, `@workspace/api-zod`

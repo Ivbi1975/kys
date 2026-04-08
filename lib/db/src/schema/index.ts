@@ -55,6 +55,8 @@ export const donationsTable = pgTable("donations", {
   vekalet: text("vekalet").notNull().default(""),
   notes: text("notes").notNull().default(""),
   phone: text("phone").notNull().default(""),
+  birim: text("birim").notNull().default(""),
+  temsilci: text("temsilci").notNull().default(""),
   excluded: boolean("excluded").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),

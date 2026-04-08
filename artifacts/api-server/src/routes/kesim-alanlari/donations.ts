@@ -22,6 +22,8 @@ const donationPayloadSchema = z.object({
   vekalet: z.string().optional().default(""),
   notes: z.string().optional().default(""),
   phone: z.string().optional().default(""),
+  birim: z.string().optional().default(""),
+  temsilci: z.string().optional().default(""),
   excluded: z.boolean().optional().default(false),
   tags: z.array(z.string()).optional().default([]),
 });
