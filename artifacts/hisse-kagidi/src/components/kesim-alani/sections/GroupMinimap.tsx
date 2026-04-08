@@ -2,10 +2,10 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MapIcon } from "lucide-react";
-import { useKesimAlaniContext } from "../KesimAlaniContext";
+import { useGroupContext } from "../KesimAlaniContext";
 
 export function GroupMinimap() {
-  const { kesim, minimapOpen, scrollToAnimalGroup, setMinimapOpen } = useKesimAlaniContext();
+  const { kesim, minimapOpen, scrollToAnimalGroup, setMinimapOpen } = useGroupContext();
 
   if (!minimapOpen || !kesim || kesim.animalGroups.length === 0) return null;
 

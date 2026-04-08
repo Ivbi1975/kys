@@ -1,17 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, forwardRef } from "react";
-import { turkishNormalize } from "@/lib/utils";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { useParams, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useIsMobile } from "@/hooks/use-mobile";
-import type { Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag } from "@/lib/types";
-import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, fetchTags, fetchPhotoCountsAdmin, fetchGroupPhotosAdmin, fetchNotificationLogs, fetchNotificationTemplate, updateNotificationTemplate, generateTrackingToken, fetchKesimAlaniTrackingNotes, updateTrackingNoteStatus, fetchKesimAlaniMeta, fetchAllDonations, fetchAllGroupsCompact } from "@/lib/api";
+import type { Donation, AnimalGroup, KesimAlani, ColorTag } from "@/lib/types";
+import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, fetchTags, fetchPhotoCountsAdmin, fetchGroupPhotosAdmin, fetchKesimAlaniMeta, fetchAllDonations, fetchAllGroupsCompact } from "@/lib/api";
 import type { CompactGroupItem } from "@/lib/api/kesim-alanlari";
-import type { TrackingNote, GroupPhoto, NotificationLog } from "@/lib/api";
 import { getTotalShares, getRequiredAnimals, computeEffectiveShares, trCollator } from "@/lib/grouping";
 import { useGroupingWorker } from "@/lib/useGroupingWorker";
 import { useWorkspacePreferences, ALL_GROUP_COLUMNS, type ColumnKey } from "@/lib/useWorkspacePreferences";
-import { useTheme } from "@/lib/useTheme";
 import { MAX_SHARES_PER_ANIMAL } from "@/lib/constants";
 
 import { useUndoRedo } from "./hooks/useUndoRedo";
@@ -28,6 +24,8 @@ import { useTeams } from "./hooks/useTeams";
 import { useTrash } from "./hooks/useTrash";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useSmartPlacement } from "./hooks/useSmartPlacement";
+import { useUIState } from "./hooks/useUIState";
+import { useNotifications } from "./hooks/useNotifications";
 import { loadBasketFromStorage, generateId } from "./hooks/types";
 import type { SortField } from "./hooks/types";
 
@@ -45,59 +43,19 @@ export function useKesimAlaniState() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const isMobile = useIsMobile();
   const [kesim, setKesim] = useState<KesimAlani | null>(null);
-  const { toggle: toggleTheme, mode: themeMode } = useTheme();
   const workspace = useWorkspacePreferences();
   const { runGrouping, runIncrementalGrouping, cancelGrouping, runComputeShares, runCheckConflicts } = useGroupingWorker();
 
-  const [colorTagFilter, setColorTagFilter] = useState<ColorTag | "all">("all");
-  const [groupCinsFilter, setGroupCinsFilter] = useState<Set<string>>(new Set());
-  const [jumpDialogOpen, setJumpDialogOpen] = useState(false);
-  const [jumpToAnimal, setJumpToAnimal] = useState("");
-  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
-  const [minimapOpen, setMinimapOpen] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [donorListVisible, setDonorListVisible] = useState(true);
-  const [fullscreenMode, setFullscreenMode] = useState(false);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const [mobileTab, setMobileTab] = useState<"donors" | "groups">("donors");
-  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
-  const [globalTags, setGlobalTags] = useState<CustomTag[]>([]);
-  const [tagPopoverDonorId, setTagPopoverDonorId] = useState<string | null>(null);
-  const [smartPlacePopover, setSmartPlacePopover] = useState<string | null>(null);
-  const [splitShareDialog, setSplitShareDialog] = useState<{ donationId: string; totalShares: number } | null>(null);
-  const [qrModalOpen, setQrModalOpen] = useState(false);
-  const [qrUrl, setQrUrl] = useState("");
+  const ui = useUIState();
+  const notifications = useNotifications();
+
   const [siblingKesimAlanlari, setSiblingKesimAlanlari] = useState<{ id: string; name: string }[]>([]);
   const [projectName, setProjectName] = useState<string | null>(null);
-
-  const [trackingNotesOpen, setTrackingNotesOpen] = useState(false);
-  const [trackingNotes, setTrackingNotes] = useState<TrackingNote[]>([]);
-  const [trackingNotesLoading, setTrackingNotesLoading] = useState(false);
-  const [photoCounts, setPhotoCounts] = useState<Record<string, number>>({});
-  const [photoViewGroup, setPhotoViewGroup] = useState<{ id: string; animalNo: number } | null>(null);
-  const [photoViewPhotos, setPhotoViewPhotos] = useState<GroupPhoto[]>([]);
-  const [photoViewLoading, setPhotoViewLoading] = useState(false);
-  const [notificationLogsOpen, setNotificationLogsOpen] = useState(false);
-  const [notificationLogs, setNotificationLogs] = useState<NotificationLog[]>([]);
-  const [notificationLogsLoading, setNotificationLogsLoading] = useState(false);
-  const [notificationTemplateOpen, setNotificationTemplateOpen] = useState(false);
-  const [notificationTemplate, setNotificationTemplate] = useState("Hayvan {animalNo} kesildi. Hayırlı olsun!");
-  const [notificationTemplateSaving, setNotificationTemplateSaving] = useState(false);
   const [dataFullyLoaded, setDataFullyLoaded] = useState(false);
   const [dataLoadProgress, setDataLoadProgress] = useState<{ donations: number; groups: number; totalDonations: number; totalGroups: number } | null>(null);
 
-  const splitContainerRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const groupsScrollTopRef = useRef<number>(0);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const jumpInputRef = useRef<HTMLInputElement>(null);
-  const groupsHeaderRef = useRef<HTMLDivElement>(null);
-  const groupsVirtuosoRef = useRef<VirtuosoHandle>(null);
-  const scrollToAnimalGroupRef = useRef<((animalNo: number) => void) | undefined>(undefined);
-
-  const saveManager = useSaveManager({ toast, scrollToAnimalGroupRef });
+  const saveManager = useSaveManager({ toast, scrollToAnimalGroupRef: ui.scrollToAnimalGroupRef });
   const { saveToApi, debouncedSaveToApi, discardPendingSave, buildErrorDescription, ...saveManagerRest } = saveManager;
 
   const undoRedo = useUndoRedo({ setKesim, saveToApi, discardPendingSave });
@@ -328,19 +286,11 @@ export function useKesimAlaniState() {
   const teams = useTeams({ kesim, setKesim, toast, setFilterTeam });
   const trash = useTrash({ kesim, setKesim, toast, history });
 
-  const dragAndDrop = useDragAndDrop({ kesim, save, toast, isGroupLocked, scrollContainerRef });
+  const dragAndDrop = useDragAndDrop({ kesim, save, toast, isGroupLocked, scrollContainerRef: ui.scrollContainerRef });
   const {
     dragItem, setDragItem, dragOverItem, setDragOverItem, dragOverGroup, setDragOverGroup,
     moveGroupDonation, handleDragStart, handleDragOver, handleDragLeave, handleDrop, handleDragEnd, handleDragOverCard,
   } = dragAndDrop;
-
-  const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
-    }
-  }, []);
 
   useKeyboardShortcuts({
     kesim,
@@ -349,16 +299,16 @@ export function useKesimAlaniState() {
     handleRedo,
     editingCell,
     cancelEdit,
-    shortcutHelpOpen,
-    setShortcutHelpOpen,
-    minimapOpen,
-    setMinimapOpen,
-    fullscreenMode,
-    setFullscreenMode,
-    jumpDialogOpen,
-    setJumpDialogOpen,
-    searchInputRef,
-    toggleFullscreen,
+    shortcutHelpOpen: ui.shortcutHelpOpen,
+    setShortcutHelpOpen: ui.setShortcutHelpOpen,
+    minimapOpen: ui.minimapOpen,
+    setMinimapOpen: ui.setMinimapOpen,
+    fullscreenMode: ui.fullscreenMode,
+    setFullscreenMode: ui.setFullscreenMode,
+    jumpDialogOpen: ui.jumpDialogOpen,
+    setJumpDialogOpen: ui.setJumpDialogOpen,
+    searchInputRef: ui.searchInputRef,
+    toggleFullscreen: ui.toggleFullscreen,
   });
 
   const loadRequestIdRef = useRef(0);
@@ -383,11 +333,11 @@ export function useKesimAlaniState() {
             setDataFullyLoaded(true);
             const stored = loadBasketFromStorage(fallback.projectId);
             basket.setBasketItems(stored);
-            fetchPhotoCountsAdmin(fallback.id).then(setPhotoCounts).catch(() => {});
+            fetchPhotoCountsAdmin(fallback.id).then(notifications.setPhotoCounts).catch(() => {});
           } else {
             setLocation("/");
           }
-          try { setGlobalTags(await fetchTags()); } catch {}
+          try { ui.setGlobalTags(await fetchTags()); } catch {}
           return;
         }
 
@@ -469,7 +419,7 @@ export function useKesimAlaniState() {
 
         const stored = loadBasketFromStorage(meta.projectId);
         basket.setBasketItems(stored);
-        fetchPhotoCountsAdmin(meta.id).then(setPhotoCounts).catch(() => {});
+        fetchPhotoCountsAdmin(meta.id).then(notifications.setPhotoCounts).catch(() => {});
 
         if (meta.projectId) {
           try {
@@ -484,7 +434,7 @@ export function useKesimAlaniState() {
           } catch {}
         }
 
-        try { setGlobalTags(await fetchTags()); } catch {}
+        try { ui.setGlobalTags(await fetchTags()); } catch {}
       } catch (err) {
         if (requestId !== loadRequestIdRef.current) return;
         console.error("[loadData] Failed to load kesim alanı data", err);
@@ -530,18 +480,18 @@ export function useKesimAlaniState() {
 
   useEffect(() => {
     const handleScroll = () => {
-      const container = scrollContainerRef.current;
+      const container = ui.scrollContainerRef.current;
       const scrollY = container ? container.scrollTop : window.scrollY;
-      setShowScrollTop(scrollY > 150);
+      ui.setShowScrollTop(scrollY > 150);
     };
-    const container = scrollContainerRef.current;
+    const container = ui.scrollContainerRef.current;
     if (container) {
       container.addEventListener("scroll", handleScroll, { passive: true });
       return () => container.removeEventListener("scroll", handleScroll);
     }
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [fullscreenMode]);
+  }, [ui.fullscreenMode]);
 
   useEffect(() => {
     groupingEngine.setSwapSelection(null);
@@ -557,13 +507,13 @@ export function useKesimAlaniState() {
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isDraggingSplit || !splitContainerRef.current) return;
-      const rect = splitContainerRef.current.getBoundingClientRect();
+      if (!ui.isDraggingSplit || !ui.splitContainerRef.current) return;
+      const rect = ui.splitContainerRef.current.getBoundingClientRect();
       const ratio = ((e.clientX - rect.left) / rect.width) * 100;
       workspace.setSplitRatio(ratio);
     };
-    const handleMouseUp = () => setIsDraggingSplit(false);
-    if (isDraggingSplit) {
+    const handleMouseUp = () => ui.setIsDraggingSplit(false);
+    if (ui.isDraggingSplit) {
       window.addEventListener("mousemove", handleMouseMove);
       window.addEventListener("mouseup", handleMouseUp);
     }
@@ -571,13 +521,7 @@ export function useKesimAlaniState() {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isDraggingSplit]);
-
-  useEffect(() => {
-    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, []);
+  }, [ui.isDraggingSplit]);
 
   const currentGroupMatches = useMemo(() => animalGroupsHook.groupSearchMatches(), [animalGroupsHook.groupSearchMatches]);
 
@@ -598,7 +542,7 @@ export function useKesimAlaniState() {
     return kesim.animalGroups
       .map((group, groupIdx) => ({ group, groupIdx }))
       .filter(({ group }) => {
-        if (colorTagFilter !== "all" && (group.colorTag || "") !== colorTagFilter) return false;
+        if (ui.colorTagFilter !== "all" && (group.colorTag || "") !== ui.colorTagFilter) return false;
         if (filterTeam !== "all") {
           if (filterTeam === "none" && group.teamId) return false;
           if (filterTeam !== "none" && group.teamId !== filterTeam) return false;
@@ -607,16 +551,16 @@ export function useKesimAlaniState() {
           const filled = group.donations.filter((d) => d.name.trim() !== "").length;
           if (filled >= MAX_SHARES_PER_ANIMAL) return false;
         }
-        if (groupCinsFilter.size > 0) {
+        if (ui.groupCinsFilter.size > 0) {
           const hasMatchingType = group.donations.some(d => {
             const t = d.donationType?.trim();
-            return t && groupCinsFilter.has(t);
+            return t && ui.groupCinsFilter.has(t);
           });
           if (!hasMatchingType) return false;
         }
         return true;
       });
-  }, [kesim?.animalGroups, colorTagFilter, filterTeam, showOnlyIncomplete, groupCinsFilter]);
+  }, [kesim?.animalGroups, ui.colorTagFilter, filterTeam, showOnlyIncomplete, ui.groupCinsFilter]);
 
   const effectiveColumnCount = workspace?.prefs?.columnCount ?? 1;
 
@@ -632,9 +576,9 @@ export function useKesimAlaniState() {
   const scrollToAnimalGroup = useCallback(
     (animalNo: number) => {
       const idx = filteredGroupItems.findIndex((item) => item.group.animalNo === animalNo);
-      if (idx >= 0 && groupsVirtuosoRef.current && filteredGroupItems.length > 20) {
+      if (idx >= 0 && ui.groupsVirtuosoRef.current) {
         const rowIdx = Math.floor(idx / effectiveColumnCount);
-        groupsVirtuosoRef.current.scrollToIndex({ index: rowIdx, align: "center", behavior: "smooth" });
+        ui.groupsVirtuosoRef.current.scrollToIndex({ index: rowIdx, align: "center", behavior: "smooth" });
       } else {
         const el = document.getElementById(`animal-group-${animalNo}`);
         if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -643,7 +587,7 @@ export function useKesimAlaniState() {
     [filteredGroupItems, effectiveColumnCount]
   );
 
-  scrollToAnimalGroupRef.current = scrollToAnimalGroup;
+  ui.scrollToAnimalGroupRef.current = scrollToAnimalGroup;
 
   useEffect(() => {
     if (currentGroupMatches.length > 0 && animalGroupsHook.groupSearchMatchIdx >= 0) {
@@ -662,12 +606,12 @@ export function useKesimAlaniState() {
   const handleViewPhotos = useCallback(
     (groupId: string, animalNo: number) => {
       if (!kesim) return;
-      setPhotoViewGroup({ id: groupId, animalNo });
-      setPhotoViewLoading(true);
+      notifications.setPhotoViewGroup({ id: groupId, animalNo });
+      notifications.setPhotoViewLoading(true);
       fetchGroupPhotosAdmin(kesim.id, groupId)
-        .then(setPhotoViewPhotos)
-        .catch(() => setPhotoViewPhotos([]))
-        .finally(() => setPhotoViewLoading(false));
+        .then(notifications.setPhotoViewPhotos)
+        .catch(() => notifications.setPhotoViewPhotos([]))
+        .finally(() => notifications.setPhotoViewLoading(false));
     },
     [kesim?.id]
   );
@@ -714,7 +658,7 @@ export function useKesimAlaniState() {
     }
   }, []);
 
-  const smartPlacement = useSmartPlacement({ kesim, save, isGroupLocked, setSmartPlacePopover });
+  const smartPlacement = useSmartPlacement({ kesim, save, isGroupLocked, setSmartPlacePopover: ui.setSmartPlacePopover });
   const { getAvailableGroupsForDonor, getSwapSuggestions, executeSwapSuggestion, smartPlaceDonor } = smartPlacement;
 
   const totalShares = kesim ? getTotalShares(kesim.donations) : 0;
@@ -731,6 +675,7 @@ export function useKesimAlaniState() {
     ...teams,
     ...trash,
     ...saveManagerRest,
+    ...notifications,
     saveToApi,
     debouncedSaveToApi,
     discardPendingSave,
@@ -756,7 +701,7 @@ export function useKesimAlaniState() {
     bulkStep,
     cancelGrouping,
     clearAdvancedFilters,
-    colorTagFilter,
+    colorTagFilter: ui.colorTagFilter,
     columnHeaderLabel,
     columnHeaderWidth,
     columnMappings,
@@ -767,7 +712,7 @@ export function useKesimAlaniState() {
     descCountMap,
     displayPreviewRows,
     donorListReportOpen,
-    donorListVisible,
+    donorListVisible: ui.donorListVisible,
     dragItem,
     dragOverGroup,
     dragOverItem,
@@ -788,17 +733,17 @@ export function useKesimAlaniState() {
     filterUngrouped,
     filteredDonations,
     filteredGroupItems,
-    fullscreenMode,
-    groupCinsFilter,
+    fullscreenMode: ui.fullscreenMode,
+    groupCinsFilter: ui.groupCinsFilter,
     getAvailableGroupsForDonor,
     getSwapSuggestions,
-    globalTags,
+    globalTags: ui.globalTags,
     groupCompositions,
     groupRows,
     groupedDonorIds,
-    groupsHeaderRef,
-    groupsScrollTopRef,
-    groupsVirtuosoRef,
+    groupsHeaderRef: ui.groupsHeaderRef,
+    groupsScrollTopRef: ui.groupsScrollTopRef,
+    groupsVirtuosoRef: ui.groupsVirtuosoRef,
     handleColumnDragEnd: animalGroupsHook.handleColumnDragEnd,
     handleColumnDragOver: animalGroupsHook.handleColumnDragOver,
     handleColumnDragStart: animalGroupsHook.handleColumnDragStart,
@@ -821,38 +766,28 @@ export function useKesimAlaniState() {
     highlightIncomplete,
     history,
     historyPanelOpen,
-    isDraggingSplit,
+    isDraggingSplit: ui.isDraggingSplit,
     dataFullyLoaded,
     dataLoadProgress,
-    isFullscreen,
-    isMobile,
-    jumpDialogOpen,
-    jumpInputRef,
-    jumpToAnimal,
+    isFullscreen: ui.isFullscreen,
+    isMobile: ui.isMobile,
+    jumpDialogOpen: ui.jumpDialogOpen,
+    jumpInputRef: ui.jumpInputRef,
+    jumpToAnimal: ui.jumpToAnimal,
     kesim,
     lastSavedTime: saveManagerRest.lastSavedTime,
-    minimapOpen,
-    mobileTab,
+    minimapOpen: ui.minimapOpen,
+    mobileTab: ui.mobileTab,
     moveGroupDonation,
-    notificationLogs,
-    notificationLogsLoading,
-    notificationLogsOpen,
-    notificationTemplate,
-    notificationTemplateOpen,
-    notificationTemplateSaving,
     pasteText,
     pendingSaveRef: saveManagerRest.pendingSaveRef,
     pendingSaveTypeRef: saveManagerRest.pendingSaveTypeRef,
     personSearchQuery,
-    photoCounts,
-    photoViewGroup,
-    photoViewLoading,
-    photoViewPhotos,
     previewData,
     processRawData,
     projectName,
-    qrModalOpen,
-    qrUrl,
+    qrModalOpen: ui.qrModalOpen,
+    qrUrl: ui.qrUrl,
     remainingSlots,
     requiredAnimals,
     resetBulkDialog,
@@ -863,10 +798,10 @@ export function useKesimAlaniState() {
     saveProgress: saveManagerRest.saveProgress,
     saveStatus: saveManagerRest.saveStatus,
     saveTimeoutRef: saveManagerRest.saveTimeoutRef,
-    scrollContainerRef,
+    scrollContainerRef: ui.scrollContainerRef,
     scrollToAnimalGroup,
     searchIndex,
-    searchInputRef,
+    searchInputRef: ui.searchInputRef,
     setAddDialogOpen: donationsHook.setAddDialogOpen,
     setBulkDialogOpen,
     setBulkEditField: donationsHook.setBulkEditField,
@@ -877,13 +812,13 @@ export function useKesimAlaniState() {
     setBulkReviewRows,
     setBulkReviewTransferTarget,
     setBulkStep,
-    setColorTagFilter,
-    setGroupCinsFilter,
+    setColorTagFilter: ui.setColorTagFilter,
+    setGroupCinsFilter: ui.setGroupCinsFilter,
     setColumnMappings,
     setCsvExporting,
     setDebouncedSearchQuery,
     setDonorListReportOpen,
-    setDonorListVisible,
+    setDonorListVisible: ui.setDonorListVisible,
     setDragItem,
     setDragOverGroup,
     setDragOverItem,
@@ -896,77 +831,61 @@ export function useKesimAlaniState() {
     setFilterTags,
     setFilterTeam,
     setFilterUngrouped,
-    setFullscreenMode,
-    setGlobalTags,
+    setFullscreenMode: ui.setFullscreenMode,
+    setGlobalTags: ui.setGlobalTags,
     setHasHeaderRow,
     setHighlightIncomplete,
     setHistoryPanelOpen,
-    setIsDraggingSplit,
-    setIsFullscreen,
-    setJumpDialogOpen,
-    setJumpToAnimal,
+    setIsDraggingSplit: ui.setIsDraggingSplit,
+    setIsFullscreen: ui.setIsFullscreen,
+    setJumpDialogOpen: ui.setJumpDialogOpen,
+    setJumpToAnimal: ui.setJumpToAnimal,
     setKesim,
     setLastSavedTime: saveManagerRest.setLastSavedTime,
     setLocation,
-    setMinimapOpen,
-    setMobileTab,
-    setNotificationLogs,
-    setNotificationLogsLoading,
-    setNotificationLogsOpen,
-    setNotificationTemplate,
-    setNotificationTemplateOpen,
-    setNotificationTemplateSaving,
+    setMinimapOpen: ui.setMinimapOpen,
+    setMobileTab: ui.setMobileTab,
     setPasteText,
     setPersonSearchQuery,
-    setPhotoCounts,
-    setPhotoViewGroup,
-    setPhotoViewLoading,
-    setPhotoViewPhotos,
     setPreviewData,
     setProjectName,
-    setQrModalOpen,
-    setQrUrl,
+    setQrModalOpen: ui.setQrModalOpen,
+    setQrUrl: ui.setQrUrl,
     setSaveStatus: saveManagerRest.setSaveStatus,
-    setShortcutHelpOpen,
+    setShortcutHelpOpen: ui.setShortcutHelpOpen,
     setShowAdvancedFilter,
     setShowOnlyIncomplete,
     setShowRemovedFilter,
-    setShowScrollTop,
+    setShowScrollTop: ui.setShowScrollTop,
     setSiblingKesimAlanlari,
-    setSmartPlacePopover,
+    setSmartPlacePopover: ui.setSmartPlacePopover,
     setSortDir,
     setSortField,
-    setSplitShareDialog,
-    setTagPopoverDonorId,
-    setTrackingNotes,
-    setTrackingNotesLoading,
-    setTrackingNotesOpen,
+    setSplitShareDialog: ui.setSplitShareDialog,
+    setTagPopoverDonorId: ui.setTagPopoverDonorId,
     shareDistribution,
-    shortcutHelpOpen,
+    shortcutHelpOpen: ui.shortcutHelpOpen,
     showAdvancedFilter,
     showOnlyIncomplete,
     showRemovedFilter,
-    showScrollTop,
+    showScrollTop: ui.showScrollTop,
     siblingKesimAlanlari,
     smartPlaceDonor,
-    smartPlacePopover,
+    smartPlacePopover: ui.smartPlacePopover,
     sortDir,
     sortField,
     sortKeyMap,
     sortedDonorList,
-    splitContainerRef,
-    splitShareDialog,
+    splitContainerRef: ui.splitContainerRef,
+    splitShareDialog: ui.splitShareDialog,
     startFilterTransition,
-    tagPopoverDonorId,
-    themeMode,
+    tagPopoverDonorId: ui.tagPopoverDonorId,
+    themeMode: ui.themeMode,
     toast,
-    toggleFullscreen,
-    toggleTheme,
+    toggleFullscreen: ui.toggleFullscreen,
+    toggleTheme: ui.toggleTheme,
     totalShares,
     transferReviewRowsToKesimAlani,
-    trackingNotes,
-    trackingNotesLoading,
-    trackingNotesOpen,
     ungroupedDonors,
     ungroupedShareCount,
     uniqueDonationTypes,

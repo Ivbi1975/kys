@@ -2,6 +2,14 @@ import type { KesimAlani, Donation } from "@/lib/types";
 
 export type SortField = "name" | "description" | "donationType" | "shareCount";
 
+export const FIND_DELETE_COLUMN_LABELS: Record<string, string> = {
+  name: "Adına Kesilen",
+  description: "Vekaleti Veren",
+  donationType: "Cinsi",
+  vekalet: "Vekalet No",
+  notes: "Notlar",
+};
+
 export interface BasketItem {
   type: "donation" | "animalGroup";
   donationId: string;

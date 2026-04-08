@@ -144,26 +144,18 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
   const [bulkReviewHandledIdxs, setBulkReviewHandledIdxs] = useState<Set<number>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const XLSX = await getXLSX();
-        const data = evt.target?.result;
-        const workbook = XLSX.read(data, { type: "binary" });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-        if (rows.length > 0) {
-          processRawData(rows);
-        }
-      } catch {
-        toast({ title: "Excel dosyası okunamadı", description: "Lütfen geçerli bir dosya seçin.", variant: "destructive" });
+    try {
+      const { parseExcelInWorker } = await import("@/lib/excel.worker.client");
+      const rows = await parseExcelInWorker(file);
+      if (rows.length > 0) {
+        processRawData(rows);
       }
-    };
-    reader.readAsBinaryString(file);
+    } catch {
+      toast({ title: "Excel dosyası okunamadı", description: "Lütfen geçerli bir dosya seçin.", variant: "destructive" });
+    }
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 

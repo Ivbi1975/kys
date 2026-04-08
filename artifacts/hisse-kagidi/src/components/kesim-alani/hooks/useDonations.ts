@@ -6,7 +6,7 @@ import { apiSoftDeleteDonation, apiUpdateSingleDonation } from "@/lib/api";
 import { trCollator } from "@/lib/grouping";
 import { MAX_SHARES_PER_ANIMAL } from "@/lib/constants";
 import type { ColumnKey } from "@/lib/useWorkspacePreferences";
-import { generateId } from "./types";
+import { generateId, FIND_DELETE_COLUMN_LABELS } from "./types";
 import type { SaveFn, SortField, KesimDeps } from "./types";
 
 interface UseDonationsDeps extends KesimDeps {
@@ -51,13 +51,7 @@ export function useDonations({
   const [findDeleteValue, setFindDeleteValue] = useState("");
   const [findDeleteConfirm, setFindDeleteConfirm] = useState(false);
 
-  const findDeleteColumnLabel: Record<string, string> = {
-    name: "Adına Kesilen",
-    description: "Vekaleti Veren",
-    donationType: "Cinsi",
-    vekalet: "Vekalet No",
-    notes: "Notlar",
-  };
+  const findDeleteColumnLabel = FIND_DELETE_COLUMN_LABELS;
 
   const saveSingleDonationField = useCallback(
     (donationId: string, updates: Record<string, string | number | boolean | string[]>) => {

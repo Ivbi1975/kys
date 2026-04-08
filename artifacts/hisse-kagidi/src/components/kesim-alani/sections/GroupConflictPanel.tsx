@@ -2,13 +2,14 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AlertTriangle, Sparkles, UserCog } from "lucide-react";
-import { useKesimAlaniContext } from "../KesimAlaniContext";
+import { useGroupContext, useDonationContext } from "../KesimAlaniContext";
 
 export function GroupConflictPanel() {
   const {
-    conflicts, openAutoResolve, scrollToAnimalGroup, setPersonEditDesc,
+    conflicts, openAutoResolve, scrollToAnimalGroup,
     setShowConflicts, showConflicts,
-  } = useKesimAlaniContext();
+  } = useGroupContext();
+  const { setPersonEditDesc } = useDonationContext();
 
   if (!showConflicts) return null;
 

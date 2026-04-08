@@ -4,14 +4,15 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, Settings2, ShoppingBag, Trash2, Wand2 } from "lucide-react";
-import { useKesimAlaniContext } from "../KesimAlaniContext";
+import { useSelectionContext, useDonationContext } from "../KesimAlaniContext";
 
 export function DonorBulkActions() {
+  const { selectedIds, setSelectedIds } = useSelectionContext();
   const {
     addSelectedToBasket, applyBulkEdit, bulkEditField, bulkEditOpen, bulkEditValue,
-    deleteSelected, groupingInProgress, handleAutoGroupSelected, selectedIds,
-    setBulkEditField, setBulkEditOpen, setBulkEditValue, setSelectedIds,
-  } = useKesimAlaniContext();
+    deleteSelected, groupingInProgress, handleAutoGroupSelected,
+    setBulkEditField, setBulkEditOpen, setBulkEditValue,
+  } = useDonationContext();
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 

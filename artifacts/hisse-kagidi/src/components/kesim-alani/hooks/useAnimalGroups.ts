@@ -6,7 +6,7 @@ import { apiSoftDeleteDonation, apiUpdateSingleGroup, apiUpdateSingleDonation } 
 import type { ConflictInfo } from "@/lib/grouping";
 import { MAX_SHARES_PER_ANIMAL } from "@/lib/constants";
 import type { ColumnKey } from "@/lib/useWorkspacePreferences";
-import { generateId } from "./types";
+import { generateId, FIND_DELETE_COLUMN_LABELS } from "./types";
 import type { SaveFn, KesimDeps } from "./types";
 
 interface UseAnimalGroupsDeps extends KesimDeps {
@@ -696,13 +696,7 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
     const matches = getGroupFindDeleteMatches();
     if (matches.length === 0) return;
     const matchIds = new Set(matches.map((d) => d.id));
-    const findDeleteColumnLabel: Record<string, string> = {
-      name: "Adına Kesilen",
-      description: "Vekaleti Veren",
-      donationType: "Cinsi",
-      vekalet: "Vekalet No",
-      notes: "Notlar",
-    };
+    const findDeleteColumnLabel = FIND_DELETE_COLUMN_LABELS;
     try {
       await Promise.all(matches.map((d) => apiSoftDeleteDonation(kesim.id, d.id)));
       const updated = produce(kesim, (draft) => {

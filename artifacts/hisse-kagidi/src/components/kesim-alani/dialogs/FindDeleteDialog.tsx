@@ -4,14 +4,15 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchX, Trash2 } from "lucide-react";
-import { useKesimAlaniContext } from "../KesimAlaniContext";
+import { useDonationContext } from "../KesimAlaniContext";
+import { FIND_DELETE_COLUMN_LABELS } from "../hooks/types";
 
 export function FindDeleteDialog() {
   const {
-    executeFindDelete, findDeleteColumn, findDeleteColumnLabel, findDeleteConfirm,
+    executeFindDelete, findDeleteColumn, findDeleteConfirm,
     findDeleteOpen, findDeleteValue, getFindDeleteMatches, setFindDeleteColumn,
     setFindDeleteConfirm, setFindDeleteOpen, setFindDeleteValue,
-  } = useKesimAlaniContext();
+  } = useDonationContext();
 
   return (
     <Dialog open={findDeleteOpen} onOpenChange={(open) => { setFindDeleteOpen(open); if (!open) { setFindDeleteValue(""); setFindDeleteConfirm(false); } }}>
@@ -38,7 +39,7 @@ export function FindDeleteDialog() {
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Aranacak Değer</label>
-            <Input placeholder={`${findDeleteColumnLabel[findDeleteColumn]} içinde ara...`} value={findDeleteValue} onChange={(e) => { setFindDeleteValue(e.target.value); setFindDeleteConfirm(false); }} />
+            <Input placeholder={`${FIND_DELETE_COLUMN_LABELS[findDeleteColumn]} içinde ara...`} value={findDeleteValue} onChange={(e) => { setFindDeleteValue(e.target.value); setFindDeleteConfirm(false); }} />
           </div>
           {findDeleteValue.trim() && (() => {
             const matches = getFindDeleteMatches();

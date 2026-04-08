@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SlidersHorizontal, X } from "lucide-react";
-import { useKesimAlaniContext } from "../KesimAlaniContext";
+import { useFilterContext } from "../KesimAlaniContext";
 
 export function DonorAdvancedFilter() {
   const {
@@ -11,7 +11,7 @@ export function DonorAdvancedFilter() {
     filterAiWarnings, filterCinsi, filterHisseMax, filterHisseMin, filterStatus,
     filterTags, globalTags, setFilterAiCategories, setFilterAiWarnings, setFilterCinsi,
     setFilterHisseMax, setFilterHisseMin, setFilterStatus, setFilterTags, uniqueDonationTypes,
-  } = useKesimAlaniContext();
+  } = useFilterContext();
 
   return (
     <Card className="mb-3 p-3 space-y-3">

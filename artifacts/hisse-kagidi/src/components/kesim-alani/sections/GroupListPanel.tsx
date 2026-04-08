@@ -307,7 +307,7 @@ export function GroupListPanel() {
           <Wand2 className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
           <p className="text-muted-foreground">Bağışçı listesini doldurup "Otomatik Grupla" butonuna tıklayın</p>
         </Card>
-      ) : filteredGroupItems.length > 20 ? (() => {
+      ) : (() => {
         const virtuosoProps = fullscreenMode && scrollContainerRef.current
           ? { customScrollParent: scrollContainerRef.current }
           : { useWindowScroll: true as const };
@@ -320,9 +320,7 @@ export function GroupListPanel() {
             itemContent={(_index, row) => (<div className={`${gridClassName} pb-4`}>{row.map(renderGroupCard)}</div>)}
           />
         );
-      })() : (
-        <div className={gridClassName}>{filteredGroupItems.map(renderGroupCard)}</div>
-      )}
+      })()}
     </Profiler>
   );
 }

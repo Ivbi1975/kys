@@ -3,13 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Lock, Unlock } from "lucide-react";
-import { useKesimAlaniContext } from "../KesimAlaniContext";
+import { useGroupContext } from "../KesimAlaniContext";
 
 export function GroupBulkLockPopover() {
   const {
     applyRangeLock, kesim, lockAllGroups, rangeLockInput,
     setRangeLockInput, unlockAllGroups,
-  } = useKesimAlaniContext();
+  } = useGroupContext();
 
   if (!kesim) return null;
 

@@ -4,10 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
-import { useKesimAlaniContext } from "../KesimAlaniContext";
+import { useDonationContext } from "../KesimAlaniContext";
 
 export function AddDonorDialog() {
-  const { addDialogOpen, addDonation, setAddDialogOpen } = useKesimAlaniContext();
+  const { addDialogOpen, addDonation, setAddDialogOpen } = useDonationContext();
 
   const [newDonation, setNewDonation] = useState({
     name: "", description: "", donationType: "", shareCount: 1, vekalet: "", notes: "", phone: "",

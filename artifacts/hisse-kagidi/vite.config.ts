@@ -129,6 +129,9 @@ export default defineConfig({
       },
     },
   },
+  optimizeDeps: {
+    include: ["lucide-react", "react", "react-dom", "react-virtuoso"],
+  },
   server: {
     port,
     host: "0.0.0.0",

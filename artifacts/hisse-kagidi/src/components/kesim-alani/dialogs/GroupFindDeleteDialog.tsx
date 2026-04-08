@@ -4,15 +4,16 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchX, Trash2 } from "lucide-react";
-import { useKesimAlaniContext } from "../KesimAlaniContext";
+import { useGroupContext } from "../KesimAlaniContext";
+import { FIND_DELETE_COLUMN_LABELS } from "../hooks/types";
 
 export function GroupFindDeleteDialog() {
   const {
-    executeGroupFindDelete, findDeleteColumnLabel, getGroupFindDeleteMatches,
+    executeGroupFindDelete, getGroupFindDeleteMatches,
     groupFindDeleteColumn, groupFindDeleteConfirm, groupFindDeleteOpen,
     groupFindDeleteValue, setGroupFindDeleteColumn, setGroupFindDeleteConfirm,
     setGroupFindDeleteOpen, setGroupFindDeleteValue,
-  } = useKesimAlaniContext();
+  } = useGroupContext();
 
   return (
     <Dialog open={groupFindDeleteOpen} onOpenChange={(open) => { setGroupFindDeleteOpen(open); if (!open) { setGroupFindDeleteValue(""); setGroupFindDeleteConfirm(false); } }}>
@@ -37,7 +38,7 @@ export function GroupFindDeleteDialog() {
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Aranacak Değer</label>
-            <Input placeholder={`${findDeleteColumnLabel[groupFindDeleteColumn]} içinde ara...`} value={groupFindDeleteValue} onChange={(e) => { setGroupFindDeleteValue(e.target.value); setGroupFindDeleteConfirm(false); }} />
+            <Input placeholder={`${FIND_DELETE_COLUMN_LABELS[groupFindDeleteColumn]} içinde ara...`} value={groupFindDeleteValue} onChange={(e) => { setGroupFindDeleteValue(e.target.value); setGroupFindDeleteConfirm(false); }} />
           </div>
           {groupFindDeleteValue.trim() && (() => {
             const matches = getGroupFindDeleteMatches();
