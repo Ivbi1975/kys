@@ -1,4 +1,4 @@
-import React, { Profiler, useState, useCallback } from "react";
+import React, { Profiler, useState, useCallback, useMemo, useEffect } from "react";
 import type { Donation } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,21 @@ export function DonorListPanel() {
     sortDir, sortField, startEditing, tagPopoverDonorId, toggleDonationTag,
     toggleSelect, toggleSelectAll, updateDonationField, virtuosoTableComponents,
   } = ctx;
+
+  const visibleDonations = useMemo(
+    () => filteredDonations.filter(d => !basketItemIds.has(d.id)),
+    [filteredDonations, basketItemIds]
+  );
+
+  useEffect(() => {
+    if (selectedIds.size === 0 || basketItemIds.size === 0) return;
+    const hiddenSelected = [...selectedIds].filter(id => basketItemIds.has(id));
+    if (hiddenSelected.length > 0) {
+      const next = new Set(selectedIds);
+      hiddenSelected.forEach(id => next.delete(id));
+      setSelectedIds(next);
+    }
+  }, [basketItemIds, selectedIds, setSelectedIds]);
 
   const onRenderCallback: React.ProfilerOnRenderCallback = useCallback(
     (id, phase, actualDuration, baseDuration) => {
@@ -100,14 +115,16 @@ export function DonorListPanel() {
       <DonorBulkActions />
 
       <Card className="overflow-hidden">
-        {filteredDonations.length === 0 ? (
+        {visibleDonations.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground text-sm">
-            {searchQuery.trim() ? `"${searchQuery}" için sonuç bulunamadı` : filterUngrouped ? "Tüm bağışçılar gruplara atanmış" : 'Henüz bağışçı eklenmedi. "Toplu Ekle" ile Excel yükleyin veya yapıştırın.'}
+            {filteredDonations.length > 0 && visibleDonations.length === 0
+              ? "Tüm eşleşen bağışçılar sepette. Sepetten çıkarıldıklarında burada görünecekler."
+              : searchQuery.trim() ? `"${searchQuery}" için sonuç bulunamadı` : filterUngrouped ? "Tüm bağışçılar gruplara atanmış" : 'Henüz bağışçı eklenmedi. "Toplu Ekle" ile Excel yükleyin veya yapıştırın.'}
           </div>
         ) : (
           <TableVirtuoso
-            style={{ height: `min(calc(100vh - 150px), ${filteredDonations.length * 45 + 50}px)`, minHeight: 200 }}
-            data={filteredDonations}
+            style={{ height: `min(calc(100vh - 150px), ${visibleDonations.length * 45 + 50}px)`, minHeight: 200 }}
+            data={visibleDonations}
             overscan={30}
             computeItemKey={(_idx: number, d: Donation) => d.id}
             components={virtuosoTableComponents as any}
