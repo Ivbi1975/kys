@@ -5,8 +5,7 @@ import { fetchKesimAlaniTrackingNotes, fetchNotificationLogs } from "@/lib/api";
 import {
   ChevronRight, FileSpreadsheet, History, Home, Keyboard, Link2, Loader2,
   Maximize, MessageSquarePlus, Minimize, Printer, QrCode,
-  Redo2, Save, Search, Send, Undo2, UserCog, Download,
-
+  Redo2, Save, Search, Send, ShoppingBag, Undo2, UserCog, Download,
 } from "lucide-react";
 import { useKesimAlaniContext } from "../KesimAlaniContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -21,6 +20,7 @@ export function KesimAlaniHeader() {
     setQrUrl, setQrModalOpen, setTrackingNotesOpen, setTrackingNotesLoading, setTrackingNotes,
     setNotificationLogsOpen, setNotificationLogsLoading, setNotificationLogs, setTeamDialogOpen,
     totalShares, requiredAnimals,
+    basketItems, basketOpen, setBasketOpen,
   } = useKesimAlaniContext();
 
   const { resolveToken, buildTrackingUrl } = useTrackingActions({
@@ -159,6 +159,20 @@ export function KesimAlaniHeader() {
             <Send className="w-4 h-4" />
             <span className="hidden sm:inline ml-1">Bildirimler</span>
           </Button>
+          {basketItems.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="relative shrink-0 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300"
+              aria-label="Sepet"
+              onClick={() => setBasketOpen(prev => !prev)}
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-emerald-500 text-white text-[10px] font-bold leading-none px-1">
+                {basketItems.length}
+              </span>
+            </Button>
+          )}
           <ThemeToggle className="h-8 w-8 p-0 shrink-0" />
           <Button
             size="sm"

@@ -80,3 +80,24 @@ export function saveBasketToStorage(items: BasketItem[], projectId: string | nul
     }
   } catch {}
 }
+
+export type BasketSortKey = "name" | "type" | "source";
+export type BasketSortDir = "asc" | "desc";
+
+export interface ReturnToSourceResult {
+  success: boolean;
+  restoredToOriginalSlot: number;
+  restoredToAlternativeSlot: number;
+  sentToDonorList: number;
+  groupDeletedCount: number;
+  slotFullCount: number;
+}
+
+export interface OfflineQueueItem {
+  id: string;
+  action: "crossKATransfer" | "sendToPool";
+  payload: Record<string, unknown>;
+  timestamp: number;
+}
+
+export const OFFLINE_QUEUE_KEY = "kurban-basket-offline-queue";

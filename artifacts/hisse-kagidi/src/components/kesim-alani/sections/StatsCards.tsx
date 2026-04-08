@@ -1,4 +1,5 @@
 import React from "react";
+import { AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useKesimAlaniContext } from "../KesimAlaniContext";
 
@@ -8,6 +9,7 @@ export function StatsCards() {
     shareDistribution, groupCompositions, photoCounts,
     ungroupedDonors, ungroupedShareCount, filterUngrouped,
     setFilterUngrouped, donorListVisible, setDonorListVisible,
+    vekaletCheck, siblingKesimAlanlari,
   } = useKesimAlaniContext();
 
   if (!kesim) return null;
@@ -96,6 +98,41 @@ export function StatsCards() {
           </Card>
         )}
       </div>
+
+      {vekaletCheck.hasConflicts && (
+        <div className="mb-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 p-3">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-1">
+                Çift Vekalet Uyarısı
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
+                Bu listede bulunan {vekaletCheck.conflictsByVekalet.size} vekalet numarası başka kesim alanlarında da mevcut:
+              </p>
+              <div className="space-y-1">
+                {Array.from(vekaletCheck.conflictsByVekalet.entries()).map(([vek, conflicts]) => {
+                  const kaNames = conflicts.map(c => {
+                    const ka = siblingKesimAlanlari.find(s => s.id === c.kesimAlaniId);
+                    return ka?.name || "Bilinmeyen KA";
+                  });
+                  return (
+                    <div key={vek} className="flex items-center gap-2 text-xs">
+                      <span className="font-mono font-medium text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-900 px-1.5 py-0.5 rounded">
+                        {vek}
+                      </span>
+                      <span className="text-amber-600 dark:text-amber-400">→</span>
+                      <span className="text-amber-700 dark:text-amber-300 truncate">
+                        {kaNames.join(", ")}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {(kesim.donations.filter(d => !d.excluded).length > 0 || kesim.animalGroups.length > 0) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">

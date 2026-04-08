@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { KesimAlani, Donation } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronUp, ListPlus, Loader2, MoveRight, Package, Send, ShoppingBag, UserPlus, Wand2, X, ShoppingCart, ArrowRightLeft } from "lucide-react";
+import { ArrowUpDown, ChevronUp, CornerDownLeft, ListPlus, Loader2, MoveRight, Package, Search, Send, ShoppingBag, UserPlus, Wand2, X, ShoppingCart, ArrowRightLeft } from "lucide-react";
 import { COLOR_MAP } from "@/lib/constants";
 import { computeEffectiveShares } from "@/lib/grouping";
-import type { BasketItem } from "../hooks/types";
+import type { BasketItem, ReturnToSourceResult, BasketSortKey, BasketSortDir } from "../hooks/types";
 
 type BasketTab = "contents" | "place" | "transfer";
 
@@ -35,8 +36,10 @@ interface BasketPanelProps {
   cleanupEmptyGroups: () => void;
   dismissEmptyGroupsCleanup: () => void;
   returnSelectedToDonorList: (selectedIds: Set<string>) => boolean;
-  returnSelectedToSource: (selectedIds: Set<string>) => boolean;
+  returnSelectedToSource: (selectedIds: Set<string>) => ReturnToSourceResult;
   transferSelectedToGroup: (selectedIds: Set<string>, targetGroupIdx: number) => boolean;
+  sendSelectedToPool?: (selectedIds: Set<string>) => boolean;
+  addEmptyGroup?: () => void;
 }
 
 export function BasketPanel({
@@ -49,31 +52,53 @@ export function BasketPanel({
   transferToDonorListRemoving, transferForeignToCurrentDonorList,
   emptyGroupsAfterTransfer, cleanupEmptyGroups, dismissEmptyGroupsCleanup,
   returnSelectedToDonorList, returnSelectedToSource, transferSelectedToGroup,
+  sendSelectedToPool, addEmptyGroup,
 }: BasketPanelProps) {
   const [crossKAConfirmOpen, setCrossKAConfirmOpen] = useState(false);
   const [selectedBasketIds, setSelectedBasketIds] = useState<Set<string>>(new Set());
   const [retrieveTargetGroup, setRetrieveTargetGroup] = useState<number>(-1);
   const [activeTab, setActiveTab] = useState<BasketTab>("contents");
+  const [basketSearch, setBasketSearch] = useState("");
+  const [basketSortKey, setBasketSortKey] = useState<BasketSortKey>("name");
+  const [basketSortDir, setBasketSortDir] = useState<BasketSortDir>("asc");
+  const [lastReturnResult, setLastReturnResult] = useState<ReturnToSourceResult | null>(null);
 
   if (basketItems.length === 0 && emptyGroupsAfterTransfer.length === 0) return null;
 
-  const localDonationItems = localBasketItems.filter(b => b.type !== "animalGroup");
-  const localAnimalGroupItems = localBasketItems.filter(b => b.type === "animalGroup");
+  const localDonationItems = useMemo(() => localBasketItems.filter(b => b.type !== "animalGroup"), [localBasketItems]);
+  const localAnimalGroupItems = useMemo(() => localBasketItems.filter(b => b.type === "animalGroup"), [localBasketItems]);
 
-  const sharesMap = computeEffectiveShares(kesim.donations);
-  let basketTotalShares = 0;
-  for (const b of localDonationItems) {
-    const grouped = kesim.animalGroups.flatMap(g => g.donations).find(d => d.id === b.donationId);
-    if (grouped) {
-      basketTotalShares += 1;
-    } else {
-      basketTotalShares += sharesMap.get(b.donationId) || 1;
+  const { basketTotalShares, basketAnimals } = useMemo(() => {
+    const sharesMap = computeEffectiveShares(kesim.donations);
+    let total = 0;
+    for (const b of localDonationItems) {
+      const grouped = kesim.animalGroups.flatMap(g => g.donations).find(d => d.id === b.donationId);
+      total += grouped ? 1 : (sharesMap.get(b.donationId) || 1);
     }
-  }
-  for (const b of localAnimalGroupItems) {
-    basketTotalShares += (b.filledCount || 0);
-  }
-  const basketAnimals = Math.ceil(basketTotalShares / 7);
+    for (const b of localAnimalGroupItems) {
+      total += (b.filledCount || 0);
+    }
+    return { basketTotalShares: total, basketAnimals: Math.ceil(total / 7) };
+  }, [localDonationItems, localAnimalGroupItems, kesim.donations, kesim.animalGroups]);
+
+  const filteredLocalDonationItems = useMemo(() => {
+    let items = localDonationItems;
+    if (basketSearch.trim()) {
+      const q = basketSearch.toLowerCase();
+      items = items.filter(b =>
+        b.name.toLowerCase().includes(q) ||
+        b.description.toLowerCase().includes(q) ||
+        (b.vekalet && b.vekalet.toLowerCase().includes(q))
+      );
+    }
+    return [...items].sort((a, b) => {
+      let cmp = 0;
+      if (basketSortKey === "name") cmp = (a.description || a.name).localeCompare(b.description || b.name, "tr");
+      else if (basketSortKey === "type") cmp = (a.donationType || "").localeCompare(b.donationType || "", "tr");
+      else if (basketSortKey === "source") cmp = (a.sourceGroupAnimalNo || 0) - (b.sourceGroupAnimalNo || 0);
+      return basketSortDir === "desc" ? -cmp : cmp;
+    });
+  }, [localDonationItems, basketSearch, basketSortKey, basketSortDir]);
 
   const toggleBasketSelect = (donationId: string) => {
     setSelectedBasketIds(prev => {
@@ -102,9 +127,24 @@ export function BasketPanel({
 
   const handleReturnToSource = () => {
     if (selectedBasketIds.size === 0) return;
-    const success = returnSelectedToSource(selectedBasketIds);
-    if (success) {
+    const result = returnSelectedToSource(selectedBasketIds);
+    if (result.success) {
       setSelectedBasketIds(new Set());
+      if (result.slotFullCount > 0 || result.groupDeletedCount > 0) {
+        setLastReturnResult(result);
+      }
+    }
+  };
+
+  const handleReturnAll = () => {
+    if (localBasketItems.length === 0) return;
+    const allIds = new Set(localBasketItems.map(b => b.donationId));
+    const result = returnSelectedToSource(allIds);
+    if (result.success) {
+      setSelectedBasketIds(new Set());
+      if (result.slotFullCount > 0 || result.groupDeletedCount > 0) {
+        setLastReturnResult(result);
+      }
     }
   };
 
@@ -195,27 +235,70 @@ export function BasketPanel({
               {activeTab === "contents" && (
                 <div className="space-y-3">
                   {localBasketItems.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="rounded w-3.5 h-3.5"
-                          checked={selectedBasketIds.size === localBasketItems.length && localBasketItems.length > 0}
-                          onChange={toggleSelectAll}
-                        />
-                        Tümünü Seç
-                      </label>
-                      {selectedBasketIds.size > 0 && (
-                        <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                          {selectedBasketIds.size} seçili
-                        </span>
-                      )}
-                      <div className="ml-auto">
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={clearBasket}>
-                          <X className="w-3 h-3 mr-1" /> Sepeti Temizle
-                        </Button>
+                    <>
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="rounded w-3.5 h-3.5"
+                            checked={selectedBasketIds.size === localBasketItems.length && localBasketItems.length > 0}
+                            onChange={toggleSelectAll}
+                          />
+                          Tümünü Seç
+                        </label>
+                        {selectedBasketIds.size > 0 && (
+                          <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                            {selectedBasketIds.size} seçili
+                          </span>
+                        )}
+                        <div className="ml-auto flex items-center gap-1">
+                          <Button variant="ghost" size="sm" className="h-7 text-xs text-amber-600" onClick={handleReturnAll} title="Tümünü Eski Yerine Geri Al">
+                            <CornerDownLeft className="w-3 h-3 mr-1" /> Tümünü Geri Al
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={clearBasket}>
+                            <X className="w-3 h-3 mr-1" /> Sepeti Temizle
+                          </Button>
+                        </div>
                       </div>
-                    </div>
+                      {localDonationItems.length > 5 && (
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                            <Input
+                              className="h-7 text-xs pl-7 pr-2"
+                              placeholder="Sepette ara..."
+                              value={basketSearch}
+                              onChange={(e) => setBasketSearch(e.target.value)}
+                            />
+                            {basketSearch && (
+                              <button className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => setBasketSearch("")}>
+                                <X className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                              </button>
+                            )}
+                          </div>
+                          <Select value={basketSortKey} onValueChange={(v) => setBasketSortKey(v as BasketSortKey)}>
+                            <SelectTrigger className="h-7 w-24 text-xs">
+                              <ArrowUpDown className="w-3 h-3 mr-1" />
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent side="top">
+                              <SelectItem value="name">Ad</SelectItem>
+                              <SelectItem value="type">Tür</SelectItem>
+                              <SelectItem value="source">Kaynak</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={() => setBasketSortDir(d => d === "asc" ? "desc" : "asc")}
+                            title={basketSortDir === "asc" ? "Artan" : "Azalan"}
+                          >
+                            <ArrowUpDown className={`w-3.5 h-3.5 ${basketSortDir === "desc" ? "rotate-180" : ""}`} />
+                          </Button>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {localAnimalGroupItems.length > 0 && (
@@ -250,10 +333,10 @@ export function BasketPanel({
                     </div>
                   )}
 
-                  {localDonationItems.length > 0 && (() => {
-                    const grouped: { key: string; label: string; items: typeof localDonationItems }[] = [];
+                  {filteredLocalDonationItems.length > 0 && (() => {
+                    const grouped: { key: string; label: string; items: typeof filteredLocalDonationItems }[] = [];
                     const seen = new Map<string, number>();
-                    for (const b of localDonationItems) {
+                    for (const b of filteredLocalDonationItems) {
                       const label = (b.description || b.name).trim();
                       const existing = seen.get(label);
                       if (existing !== undefined) {
@@ -306,6 +389,33 @@ export function BasketPanel({
                       </div>
                     );
                   })()}
+
+                  {basketSearch && filteredLocalDonationItems.length === 0 && localDonationItems.length > 0 && (
+                    <div className="text-center py-3 text-xs text-muted-foreground">
+                      "{basketSearch}" ile eşleşen sonuç bulunamadı
+                    </div>
+                  )}
+
+                  {lastReturnResult && (lastReturnResult.slotFullCount > 0 || lastReturnResult.groupDeletedCount > 0) && (
+                    <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/30 p-2.5">
+                      <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300 mb-1.5">Bazı öğeler eski yerine yerleştirilemedi</p>
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-2">
+                        {lastReturnResult.slotFullCount > 0 && `${lastReturnResult.slotFullCount} slot dolu. `}
+                        {lastReturnResult.groupDeletedCount > 0 && `${lastReturnResult.groupDeletedCount} grup silinmiş. `}
+                        Bu bağışçılar bağışçı listesine eklendi.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        {addEmptyGroup && (
+                          <Button variant="outline" size="sm" className="h-7 text-xs border-amber-300 text-amber-700 dark:text-amber-300" onClick={() => { addEmptyGroup(); setLastReturnResult(null); }}>
+                            <Package className="w-3 h-3 mr-1" /> Yeni Hayvan Grubu Oluştur
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setLastReturnResult(null)}>
+                          Kapat
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
                   {foreignBasketItems.length > 0 && (
                     <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30 p-2.5">
@@ -471,9 +581,49 @@ export function BasketPanel({
                     </div>
                   )}
 
-                  {siblingKesimAlanlari.length === 0 && (
+                  {siblingKesimAlanlari.length === 0 && !sendSelectedToPool && (
                     <div className="text-center py-4 text-sm text-muted-foreground">
                       Aktarım yapılabilecek başka kesim alanı bulunmuyor
+                    </div>
+                  )}
+
+                  {sendSelectedToPool && (() => {
+                    const eligibleCount = localBasketItems.filter(
+                      b => selectedBasketIds.has(b.donationId) && b.type !== "animalGroup"
+                    ).length;
+                    return selectedBasketIds.size > 0 ? (
+                      <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30 p-3">
+                        <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 mb-2">Bağış Havuzuna Gönder</p>
+                        <p className="text-[11px] text-blue-600 dark:text-blue-400 mb-2">
+                          {eligibleCount > 0
+                            ? `Seçili ${eligibleCount} bağışçıyı bu kesim alanından çıkarıp bağış havuzuna gönderir.`
+                            : "Seçili öğeler arasında havuza gönderilebilecek bağışçı yok (hayvan grupları havuza gönderilemez)."}
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs w-full border-blue-300 text-blue-700 dark:text-blue-300"
+                          disabled={eligibleCount === 0}
+                          onClick={() => {
+                            const ok = sendSelectedToPool(selectedBasketIds);
+                            if (ok) setSelectedBasketIds(new Set());
+                          }}
+                        >
+                          <MoveRight className="w-3.5 h-3.5 mr-1" />
+                          Havuza Gönder ({eligibleCount})
+                        </Button>
+                      </div>
+                    ) : null;
+                  })()}
+
+                  {sendSelectedToPool && selectedBasketIds.size === 0 && localBasketItems.length > 0 && (
+                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                      <span className="text-xs text-blue-700 dark:text-blue-300">
+                        Havuza göndermek için "Sepet İçeriği" sekmesinden seçim yapın
+                      </span>
+                      <Button variant="outline" size="sm" className="h-7 text-xs shrink-0" onClick={() => setActiveTab("contents")}>
+                        Sepete Git
+                      </Button>
                     </div>
                   )}
                 </div>

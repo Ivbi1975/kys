@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { produce } from "immer";
 import type { Donation, AnimalGroup, KesimAlani } from "@/lib/types";
 import { computeEffectiveShares } from "@/lib/grouping";
@@ -6,7 +6,7 @@ import { moveDonationsToKesimAlani, moveAnimalGroupToKesimAlani, fetchKesimAlani
 import type { DonationTransferEntry } from "@/lib/api";
 import { MAX_SHARES_PER_ANIMAL } from "@/lib/constants";
 import { generateId, loadBasketFromStorage, saveBasketToStorage } from "./types";
-import type { BasketItem, SaveFn, KesimDeps } from "./types";
+import type { BasketItem, SaveFn, KesimDeps, ReturnToSourceResult } from "./types";
 
 interface UseBasketDeps extends KesimDeps {
   isGroupLocked: (groupIdx: number) => boolean;
@@ -14,7 +14,9 @@ interface UseBasketDeps extends KesimDeps {
 }
 
 export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked, siblingKesimAlanlari }: UseBasketDeps) {
-  const [basketItems, setBasketItems] = useState<BasketItem[]>([]);
+  const [basketItems, setBasketItems] = useState<BasketItem[]>(() => {
+    return loadBasketFromStorage(kesim?.projectId);
+  });
   const [basketTransferTarget, setBasketTransferTarget] = useState<number>(-1);
   const [basketCrossKATarget, setBasketCrossKATarget] = useState<string>("");
   const [basketOpen, setBasketOpen] = useState(true);
@@ -22,6 +24,32 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
   const [emptyGroupsAfterTransfer, setEmptyGroupsAfterTransfer] = useState<Array<{ id: string; animalNo: number }>>([]);
   const [transferToDonorListConfirm, setTransferToDonorListConfirm] = useState(false);
   const [transferToDonorListRemoving, setTransferToDonorListRemoving] = useState(false);
+
+  const broadcastRef = useRef<BroadcastChannel | null>(null);
+  const isReceivingBroadcast = useRef(false);
+
+  useEffect(() => {
+    if (!kesim?.projectId) return;
+    const channel = new BroadcastChannel(`basket-${kesim.projectId}`);
+    broadcastRef.current = channel;
+    channel.onmessage = (e) => {
+      if (e.data?.type === "basket-update") {
+        isReceivingBroadcast.current = true;
+        setBasketItems(e.data.items);
+        requestAnimationFrame(() => { isReceivingBroadcast.current = false; });
+      }
+    };
+    return () => { channel.close(); broadcastRef.current = null; };
+  }, [kesim?.projectId]);
+
+  useEffect(() => {
+    saveBasketToStorage(basketItems, kesim?.projectId);
+    if (!isReceivingBroadcast.current && broadcastRef.current) {
+      try {
+        broadcastRef.current.postMessage({ type: "basket-update", items: basketItems });
+      } catch {}
+    }
+  }, [basketItems, kesim?.projectId]);
 
   const basketItemIds = useMemo(() => new Set(basketItems.filter(b => b.type !== "animalGroup").map((b) => b.donationId)), [basketItems]);
   const basketAnimalGroupIds = useMemo(() => new Set(basketItems.filter(b => b.type === "animalGroup").map(b => b.animalGroupId!)), [basketItems]);
@@ -906,22 +934,29 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
     return true;
   }
 
-  function returnSelectedToSource(selectedDonationIds: Set<string>): boolean {
-    if (!kesim || selectedDonationIds.size === 0) return false;
+  function returnSelectedToSource(selectedDonationIds: Set<string>): ReturnToSourceResult {
+    if (!kesim || selectedDonationIds.size === 0) return { success: false, restoredToOriginalSlot: 0, restoredToAlternativeSlot: 0, sentToDonorList: 0, groupDeletedCount: 0, slotFullCount: 0 };
 
     const itemsToReturn = basketItems.filter(
       b => b.kesimAlaniId === kesim.id && selectedDonationIds.has(b.donationId)
     );
-    if (itemsToReturn.length === 0) return false;
+    if (itemsToReturn.length === 0) return { success: false, restoredToOriginalSlot: 0, restoredToAlternativeSlot: 0, sentToDonorList: 0, groupDeletedCount: 0, slotFullCount: 0 };
 
     const withSource = itemsToReturn.filter(b => b.sourceGroupId);
     const withoutSource = itemsToReturn.filter(b => !b.sourceGroupId);
+
+    let restoredToOriginalSlot = 0;
+    let restoredToAlternativeSlot = 0;
+    let sentToDonorList = 0;
+    let groupDeletedCount = 0;
+    let slotFullCount = 0;
 
     const updated = produce(kesim, (draft) => {
       const existingDonorIds = new Set(draft.donations.map(d => d.id));
       for (const item of withSource) {
         const groupIdx = draft.animalGroups.findIndex(g => g.id === item.sourceGroupId);
         if (groupIdx < 0) {
+          groupDeletedCount++;
           if (item.type === "animalGroup" && item.donationSnapshots) {
             for (const snap of item.donationSnapshots) {
               if (!existingDonorIds.has(snap.id)) {
@@ -931,6 +966,7 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
                   vekalet: snap.vekalet, notes: snap.notes,
                 });
                 existingDonorIds.add(snap.id);
+                sentToDonorList++;
               }
             }
           } else if (!existingDonorIds.has(item.donationId)) {
@@ -940,6 +976,7 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
               vekalet: item.vekalet || "", notes: item.donorNotes || "",
             });
             existingDonorIds.add(item.donationId);
+            sentToDonorList++;
           }
           continue;
         }
@@ -955,6 +992,7 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
                   donationType: snap.donationType, shareCount: snap.shareCount,
                   vekalet: snap.vekalet, notes: snap.notes,
                 };
+                restoredToOriginalSlot++;
                 continue;
               }
             }
@@ -965,12 +1003,15 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
                 donationType: snap.donationType, shareCount: snap.shareCount,
                 vekalet: snap.vekalet, notes: snap.notes,
               };
+              restoredToAlternativeSlot++;
             } else {
               draft.donations.push({
                 id: snap.id, name: snap.name, description: snap.description,
                 donationType: snap.donationType, shareCount: snap.shareCount,
                 vekalet: snap.vekalet, notes: snap.notes,
               });
+              sentToDonorList++;
+              slotFullCount++;
             }
           }
         } else {
@@ -983,6 +1024,7 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
                 donationType: item.donationType || "", shareCount: item.donorShareCount || 1,
                 vekalet: item.vekalet || "", notes: item.donorNotes || "",
               };
+              restoredToOriginalSlot++;
               continue;
             }
           }
@@ -993,12 +1035,15 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
               donationType: item.donationType || "", shareCount: item.donorShareCount || 1,
               vekalet: item.vekalet || "", notes: item.donorNotes || "",
             };
+            restoredToAlternativeSlot++;
           } else {
             draft.donations.push({
               id: item.donationId, name: item.name, description: item.description,
               donationType: item.donationType || "", shareCount: item.donorShareCount || 1,
               vekalet: item.vekalet || "", notes: item.donorNotes || "",
             });
+            sentToDonorList++;
+            slotFullCount++;
           }
         }
       }
@@ -1013,6 +1058,7 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
                 vekalet: snap.vekalet, notes: snap.notes,
               });
               existingDonorIds.add(snap.id);
+              sentToDonorList++;
             }
           }
         } else if (!existingDonorIds.has(item.donationId)) {
@@ -1022,23 +1068,37 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
             vekalet: item.vekalet || "", notes: item.donorNotes || "",
           });
           existingDonorIds.add(item.donationId);
+          sentToDonorList++;
         }
       }
     });
 
-    const groupReturns = withSource.filter(b => {
-      const g = kesim.animalGroups.find(ag => ag.id === b.sourceGroupId);
-      return !!g;
-    });
-    const listReturns = itemsToReturn.length - groupReturns.length;
-    const desc = groupReturns.length > 0
-      ? `${groupReturns.length} öğe eski grubuna geri yerleştirildi${listReturns > 0 ? `, ${listReturns} öğe bağışçı listesine eklendi` : ""}`
-      : `${listReturns} öğe bağışçı listesine eklendi`;
+    const parts: string[] = [];
+    if (restoredToOriginalSlot > 0) parts.push(`${restoredToOriginalSlot} eski yerine yerleştirildi`);
+    if (restoredToAlternativeSlot > 0) parts.push(`${restoredToAlternativeSlot} aynı gruptaki başka slota yerleştirildi`);
+    if (sentToDonorList > 0) {
+      const reasons: string[] = [];
+      if (groupDeletedCount > 0) reasons.push(`${groupDeletedCount} grubun silinmiş olması`);
+      if (slotFullCount > 0) reasons.push(`${slotFullCount} slotun dolu olması`);
+      parts.push(`${sentToDonorList} bağışçı listesine eklendi${reasons.length > 0 ? ` (${reasons.join(", ")})` : ""}`);
+    }
+    const desc = parts.join("; ");
 
-    save(updated, desc, false, groupReturns.length > 0 ? "full" : "donations");
+    const hasGroupChanges = restoredToOriginalSlot > 0 || restoredToAlternativeSlot > 0;
+    save(updated, desc, false, hasGroupChanges ? "full" : "donations");
     setBasketItems(prev => prev.filter(b => !selectedDonationIds.has(b.donationId)));
-    toast({ title: desc });
-    return true;
+
+    if (slotFullCount > 0 || groupDeletedCount > 0) {
+      toast({
+        title: "Kısmi Geri Yükleme",
+        description: desc + ". Yeni hayvan grubu oluşturup yerleştirebilirsiniz.",
+        variant: "destructive",
+      });
+    } else {
+      toast({ title: desc });
+    }
+
+    return { success: true, restoredToOriginalSlot, restoredToAlternativeSlot, sentToDonorList, groupDeletedCount, slotFullCount };
   }
 
   function transferSelectedToGroup(selectedDonationIds: Set<string>, targetGroupIdx: number): boolean {
@@ -1151,6 +1211,27 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
     return true;
   }
 
+  function sendSelectedToPool(selectedDonationIds: Set<string>): boolean {
+    if (!kesim || selectedDonationIds.size === 0) return false;
+    const itemsToSend = basketItems.filter(
+      b => b.kesimAlaniId === kesim.id && selectedDonationIds.has(b.donationId) && b.type !== "animalGroup"
+    );
+    if (itemsToSend.length === 0) return false;
+
+    const idsToExclude = new Set(itemsToSend.map(b => b.donationId));
+    const updated = produce(kesim, (draft) => {
+      for (const d of draft.donations) {
+        if (idsToExclude.has(d.id)) {
+          d.excluded = true;
+        }
+      }
+    });
+    save(updated, `${itemsToSend.length} bağışçı havuza gönderildi (hariç tutuldu)`, false, "donations");
+    setBasketItems(prev => prev.filter(b => !idsToExclude.has(b.donationId)));
+    toast({ title: `${itemsToSend.length} bağışçı bağış havuzuna gönderildi` });
+    return true;
+  }
+
   const handleToggleBasketItem = useCallback(
     (groupIdx: number, dIdx: number, donationId: string, isInBasket: boolean) => {
       if (isInBasket) {
@@ -1200,5 +1281,6 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
     returnSelectedToDonorList,
     returnSelectedToSource,
     transferSelectedToGroup,
+    sendSelectedToPool,
   };
 }
