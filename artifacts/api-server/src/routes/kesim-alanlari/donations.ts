@@ -12,6 +12,7 @@ import {
   restoreDonation,
   listDeletedDonations,
 } from "../../services/donation.service";
+import { auditLog } from "../../services/audit-log.service";
 
 const donationPayloadSchema = z.object({
   id: z.string().min(1),
@@ -76,6 +77,7 @@ router.post("/kesim-alanlari/:id/donations", asyncHandler(async (req, res) => {
   }
   res.status(201).json(result.data);
   refreshProjectStats();
+  auditLog({ action: "create", entityType: "donation", entityId: parsed.data.id, entityName: parsed.data.name, newValue: parsed.data, req });
 }));
 
 router.put("/kesim-alanlari/:id/donations/:donationId", asyncHandler(async (req, res) => {
@@ -92,6 +94,7 @@ router.put("/kesim-alanlari/:id/donations/:donationId", asyncHandler(async (req,
   }
   res.json(result.data);
   refreshProjectStats();
+  auditLog({ action: "update", entityType: "donation", entityId: req.params.donationId, entityName: parsed.data.name, newValue: parsed.data, req });
 }));
 
 router.delete("/kesim-alanlari/:id/donations/:donationId", asyncHandler(async (req, res) => {
@@ -104,6 +107,7 @@ router.delete("/kesim-alanlari/:id/donations/:donationId", asyncHandler(async (r
   }
   res.json({ success: true });
   refreshProjectStats();
+  auditLog({ action: "delete", entityType: "donation", entityId: req.params.donationId, newValue: { permanent }, req });
 }));
 
 router.post("/kesim-alanlari/:id/donations/:donationId/restore", asyncHandler(async (req, res) => {
@@ -118,6 +122,7 @@ router.post("/kesim-alanlari/:id/donations/:donationId/restore", asyncHandler(as
   }
   res.json(result.data);
   refreshProjectStats();
+  auditLog({ action: "restore", entityType: "donation", entityId: req.params.donationId, req });
 }));
 
 router.get("/kesim-alanlari/:id/donations/deleted", asyncHandler(async (req, res) => {

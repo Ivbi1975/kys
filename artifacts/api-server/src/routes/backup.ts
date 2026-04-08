@@ -14,6 +14,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { asyncHandler } from "../middleware/error-handler";
 import { logger } from "../lib/logger";
+import { auditLog } from "../services/audit-log.service";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -175,6 +176,7 @@ router.post("/backup/export", asyncHandler(async (_req, res) => {
   };
 
   res.json(data);
+  auditLog({ action: "export", entityType: "backup", entityName: "Yedek dışa aktarma", newValue: { kesimAlanlariCount: kesimAlanlari.length }, req: _req });
 }));
 
 const importPayloadSchema = z.object({
@@ -361,6 +363,7 @@ router.post("/backup/import", asyncHandler(async (req, res) => {
   logger.info({ mode, importLog }, "Backup import completed");
   res.json({ success: true, count: data.kesimAlanlari.length, mode, importLog });
   refreshProjectStats();
+  auditLog({ action: "import", entityType: "backup", entityName: "Yedek içe aktarma", newValue: { mode, importLog }, req });
 }));
 
 export default router;

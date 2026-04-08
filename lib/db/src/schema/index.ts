@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, index, unique, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, index, unique, foreignKey, jsonb } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -260,3 +260,23 @@ export const aiJobsTable = pgTable("ai_jobs", {
 });
 
 export type AiJobRow = typeof aiJobsTable.$inferSelect;
+
+export const auditLogsTable = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  action: text("action").notNull(),
+  entityType: text("entity_type").notNull(),
+  entityId: text("entity_id"),
+  entityName: text("entity_name"),
+  oldValue: jsonb("old_value"),
+  newValue: jsonb("new_value"),
+  sourceType: text("source_type").notNull().default("system"),
+  sourceIdentifier: text("source_identifier"),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("idx_audit_entity").on(table.entityType, table.entityId),
+  index("idx_audit_action").on(table.action),
+  index("idx_audit_created_at").on(table.createdAt),
+]);
+
+export type AuditLogRow = typeof auditLogsTable.$inferSelect;

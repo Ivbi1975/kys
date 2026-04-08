@@ -16,6 +16,7 @@ import {
   restoreKesimAlani,
 } from "../../services/core.service";
 import { splitKesimAlani } from "../../services/split.service";
+import { auditLog } from "../../services/audit-log.service";
 
 const donationPayloadSchema = z.object({
   id: z.string().min(1),
@@ -129,6 +130,7 @@ router.post("/kesim-alanlari", asyncHandler(async (req, res) => {
   const result = await createKesimAlani(parsed.data);
   res.status(201).json(result.data);
   refreshProjectStats();
+  auditLog({ action: "create", entityType: "kesim_alani", entityId: parsed.data.id, entityName: parsed.data.name, newValue: { name: parsed.data.name, projectId: parsed.data.projectId }, req });
 }));
 
 router.put("/kesim-alanlari/:id/move", asyncHandler(async (req, res) => {
@@ -148,6 +150,7 @@ router.put("/kesim-alanlari/:id/move", asyncHandler(async (req, res) => {
   }
   res.json(result.data);
   refreshProjectStats();
+  auditLog({ action: "move", entityType: "kesim_alani", entityId: req.params.id, newValue: { projectId: parsed.data.projectId }, req });
 }));
 
 router.put("/kesim-alanlari/:id", asyncHandler(async (req, res) => {
@@ -163,6 +166,7 @@ router.put("/kesim-alanlari/:id", asyncHandler(async (req, res) => {
   }
   res.json(result.data);
   refreshProjectStats();
+  auditLog({ action: "update", entityType: "kesim_alani", entityId: req.params.id, newValue: { name: parsed.data.name, kesimListeId: parsed.data.kesimListeId }, req });
 }));
 
 router.put("/kesim-alanlari/:id/update-chunked", asyncHandler(async (req, res) => {
@@ -202,6 +206,7 @@ router.delete("/kesim-alanlari/:id", asyncHandler(async (req, res) => {
   }
   res.json({ success: true });
   refreshProjectStats();
+  auditLog({ action: "delete", entityType: "kesim_alani", entityId: req.params.id, newValue: { permanent }, req });
 }));
 
 router.post("/kesim-alanlari/:id/restore", asyncHandler(async (req, res) => {
@@ -216,6 +221,7 @@ router.post("/kesim-alanlari/:id/restore", asyncHandler(async (req, res) => {
   }
   res.json(result.data);
   refreshProjectStats();
+  auditLog({ action: "restore", entityType: "kesim_alani", entityId: req.params.id, req });
 }));
 
 const splitSchema = z.object({
@@ -246,6 +252,7 @@ router.post("/kesim-alanlari/:id/split", asyncHandler(async (req, res) => {
   }
   res.json({ parent: result.parent, children: result.children });
   refreshProjectStats();
+  auditLog({ action: "split", entityType: "kesim_alani", entityId: req.params.id, newValue: { targets: parsed.data.targets, childrenCount: result.children.length }, req });
 }));
 
 export default router;

@@ -10,6 +10,7 @@ import exportRouter from "./export";
 import integrityRouter from "./integrity";
 import bagisHavuzuRouter from "./bagis-havuzu";
 import authRouter from "./auth";
+import auditLogsRouter from "./audit-logs";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(backupRouter);
 router.use(aiNotesRouter);
 router.use(exportRouter);
 router.use(integrityRouter);
+router.use(auditLogsRouter);
 
 export default router;

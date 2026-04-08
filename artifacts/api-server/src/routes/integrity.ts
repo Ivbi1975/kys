@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { asyncHandler } from "../middleware/error-handler";
+import { auditLog } from "../services/audit-log.service";
 
 const router: IRouter = Router();
 
@@ -217,7 +218,7 @@ router.get("/integrity/check", asyncHandler(async (_req, res) => {
   res.json(report);
 }));
 
-router.post("/integrity/repair", asyncHandler(async (_req, res) => {
+router.post("/integrity/repair", asyncHandler(async (req, res) => {
   const results = await runChecks();
   const repairs: { type: string; action: string; count: number }[] = [];
 
@@ -335,12 +336,14 @@ router.post("/integrity/repair", asyncHandler(async (_req, res) => {
 
   const afterResults = await runChecks();
 
-  res.json({
+  const repairResult = {
     repairedAt: new Date().toISOString(),
     repairs,
     remainingIssues: afterResults.reduce((sum, r) => sum + r.issue.count, 0),
     remainingDetails: afterResults.map(r => r.issue),
-  });
+  };
+  res.json(repairResult);
+  auditLog({ action: "repair", entityType: "backup", entityName: "Bütünlük onarımı", newValue: { repairs, remainingIssues: repairResult.remainingIssues }, req });
 }));
 
 export default router;

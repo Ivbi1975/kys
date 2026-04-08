@@ -9,6 +9,7 @@ import { useHomeState } from "@/hooks/useHomeState";
 import { KesimCard } from "@/components/home/KesimCard";
 import { ProjectCard } from "@/components/home/ProjectCard";
 import { SettingsDialog } from "@/components/home/SettingsDialog";
+import { AuditLogViewer } from "@/components/home/AuditLogViewer";
 import { HomeDialogs } from "@/components/home/HomeDialogs";
 import { ArchiveSection } from "@/components/home/ArchiveSection";
 import { TrashSection } from "@/components/home/TrashSection";
@@ -45,6 +46,7 @@ export default function Home() {
             Ara
           </Button>
           <ThemeToggle className="h-8 w-8 p-0" />
+          <AuditLogViewer />
           <SettingsDialog
             settingsOpen={state.settingsOpen}
             setSettingsOpen={state.setSettingsOpen}

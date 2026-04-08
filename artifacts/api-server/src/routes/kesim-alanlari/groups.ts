@@ -15,6 +15,7 @@ import {
   deleteGroup,
 } from "../../services/group.service";
 import type { AnimalGroupPayload } from "../../services/kesim-alani.service";
+import { auditLog } from "../../services/audit-log.service";
 
 const donationPayloadSchema = z.object({
   id: z.string().min(1),
@@ -128,6 +129,7 @@ router.post("/kesim-alanlari/:id/groups/bulk-lock", asyncHandler(async (req, res
     return;
   }
   res.json({ updated: result.updated, locked: result.locked });
+  auditLog({ action: parsed.data.locked ? "lock" : "unlock", entityType: "animal_group", entityName: `${result.updated} grup`, newValue: { locked: parsed.data.locked, groupIds: parsed.data.groupIds, updated: result.updated }, req });
 }));
 
 router.post("/kesim-alanlari/:id/animal-groups", asyncHandler(async (req, res) => {
@@ -143,6 +145,7 @@ router.post("/kesim-alanlari/:id/animal-groups", asyncHandler(async (req, res) =
   }
   res.status(201).json(result.data);
   refreshProjectStats();
+  auditLog({ action: "create", entityType: "animal_group", entityId: parsed.data.id, entityName: `Hayvan #${parsed.data.animalNo}`, newValue: parsed.data, req });
 }));
 
 router.put("/kesim-alanlari/:id/animal-groups/bulk", asyncHandler(async (req, res) => {
@@ -199,6 +202,11 @@ router.put("/kesim-alanlari/:id/animal-groups/:groupId", asyncHandler(async (req
   }
   res.json(result.data);
   refreshProjectStats();
+  if (parsed.data.kesildi !== undefined) {
+    auditLog({ action: "toggle_kesildi", entityType: "animal_group", entityId: req.params.groupId, newValue: { kesildi: parsed.data.kesildi }, req });
+  } else {
+    auditLog({ action: "update", entityType: "animal_group", entityId: req.params.groupId, newValue: parsed.data, req });
+  }
 }));
 
 router.delete("/kesim-alanlari/:id/animal-groups/:groupId", asyncHandler(async (req, res) => {
@@ -210,6 +218,7 @@ router.delete("/kesim-alanlari/:id/animal-groups/:groupId", asyncHandler(async (
   }
   res.json({ success: true });
   refreshProjectStats();
+  auditLog({ action: "delete", entityType: "animal_group", entityId: req.params.groupId, req });
 }));
 
 export default router;

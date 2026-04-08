@@ -20,6 +20,7 @@ import { asyncHandler } from "../middleware/error-handler";
 import { ERROR_MESSAGES, MATERIALIZED_VIEW_DEBOUNCE_MS } from "../lib/constants";
 import { logger } from "../lib/logger";
 import { invalidateKACache } from "../services/kesim-alani.service";
+import { auditLog } from "../services/audit-log.service";
 
 const idParamSchema = z.object({
   id: z.string().min(1),
@@ -159,6 +160,7 @@ router.post("/projects", asyncHandler(async (req, res) => {
   await refreshProjectStatsImmediate();
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
   res.status(201).json({ ...project, stats: emptyStats });
+  auditLog({ action: "create", entityType: "project", entityId: id, entityName: name, req });
 }));
 
 router.put("/projects/:id", asyncHandler(async (req, res) => {
@@ -182,6 +184,7 @@ router.put("/projects/:id", asyncHandler(async (req, res) => {
   cacheInvalidate(PROJECTS_CACHE_KEY);
   const [updated] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
   res.json({ ...updated, stats: emptyStats });
+  auditLog({ action: "update", entityType: "project", entityId: id, entityName: name, oldValue: { name: existing.name }, newValue: { name }, req });
 }));
 
 router.delete("/projects/:id", asyncHandler(async (req, res) => {
@@ -245,6 +248,7 @@ router.delete("/projects/:id", asyncHandler(async (req, res) => {
     await refreshProjectStatsImmediate();
     res.json({ success: true });
   }
+  auditLog({ action: "delete", entityType: "project", entityId: id, entityName: existing.name, newValue: { permanent }, req });
 }));
 
 router.post("/projects/:id/restore", asyncHandler(async (req, res) => {
@@ -262,6 +266,7 @@ router.post("/projects/:id/restore", asyncHandler(async (req, res) => {
   await refreshProjectStatsImmediate();
   const [restored] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
   res.json({ ...restored, stats: emptyStats });
+  auditLog({ action: "restore", entityType: "project", entityId: id, entityName: existing.name, req });
 }));
 
 router.get("/projects/deleted", asyncHandler(async (_req, res) => {
@@ -322,6 +327,7 @@ router.post("/projects/:id/archive", asyncHandler(async (req, res) => {
   cacheInvalidatePrefix("kesim-alanlari");
 
   res.json({ success: true, archivedAt: now });
+  auditLog({ action: "archive", entityType: "project", entityId: id, entityName: project.name, req });
 }));
 
 router.post("/projects/:id/unarchive", asyncHandler(async (req, res) => {
@@ -356,6 +362,7 @@ router.post("/projects/:id/unarchive", asyncHandler(async (req, res) => {
 
   const [restored] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
   res.json({ ...restored, archivedAt: null, stats: emptyStats });
+  auditLog({ action: "unarchive", entityType: "project", entityId: id, entityName: project.name, req });
 }));
 
 const DASHBOARD_CACHE_TTL = 30_000;

@@ -16,6 +16,7 @@ import {
   createTrackingNote,
   approveEditRequest,
 } from "../../services/tracking.service";
+import { auditLog } from "../../services/audit-log.service";
 
 const kesildiSchema = z.object({
   kesildi: z.boolean(),
@@ -97,6 +98,7 @@ router.put("/tracking/:token/group/:groupId/kesildi", asyncHandler(async (req, r
   }
   res.json({ success: true, groupId: result.groupId, kesildi: result.kesildi, kesildiAt: result.kesildiAt });
   refreshProjectStats();
+  auditLog({ action: "toggle_kesildi", entityType: "animal_group", entityId: req.params.groupId, newValue: { kesildi: result.kesildi, kesildiAt: result.kesildiAt }, req, sourceType: "tracking_token", sourceIdentifier: req.params.token.slice(0, 8) });
 }));
 
 router.get("/kesim-alanlari/:id/dashboard", asyncHandler(async (req, res) => {
