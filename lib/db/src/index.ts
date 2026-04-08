@@ -76,9 +76,10 @@ export function startPoolMonitoring(intervalMs = 20_000) {
     dbLog.error("Warm-up failed:", err.message),
   );
   poolLogInterval = setInterval(() => {
-    ensureMinConnections().catch(() => {});
     const active = pool.totalCount - pool.idleCount;
     const waiting = pool.waitingCount;
+
+    ensureMinConnections().catch(() => {});
 
     if (waiting > 0) {
       consecutiveWaiting++;
