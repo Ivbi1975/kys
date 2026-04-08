@@ -2,7 +2,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, ClipboardPaste, FileSpreadsheet, Loader2, MoveRight, Settings2, ShoppingBag, Upload } from "lucide-react";
+import { AlertTriangle, Ban, ClipboardPaste, FileSpreadsheet, Loader2, MoveRight, Settings2, ShoppingBag, Upload } from "lucide-react";
 import type { ColumnMapping } from "../hooks/useImportExport";
 import { useKesimAlaniContext } from "../KesimAlaniContext";
 
@@ -183,29 +183,38 @@ export function BulkImportDialog() {
               <label htmlFor="hasHeader" className="text-sm font-medium">İlk satır başlık satırıdır (veri olarak eklenmez)</label>
             </div>
             <div className="border rounded-lg overflow-hidden min-h-0 flex-1">
-              <div className="overflow-auto max-h-full">
-                <table className="w-full text-sm">
+              <div className="overflow-auto max-h-full thick-scrollbar">
+                <table className="w-full text-sm" style={{ minWidth: columnMappings.length * 150 + "px" }}>
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-primary/10 border-b">
                       {columnMappings.map((mapping, colIdx) => (
-                        <th key={colIdx} className="p-2 min-w-[140px]">
+                        <th key={colIdx} className={`p-2 min-w-[140px] ${mapping === "skip" ? "bg-orange-100 dark:bg-orange-950/40" : ""}`}>
                           <Select value={mapping} onValueChange={(v) => { const newMappings = [...columnMappings]; newMappings[colIdx] = v as ColumnMapping; setColumnMappings(newMappings); }}>
-                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>{COLUMN_OPTIONS.map((opt) => (<SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>))}</SelectContent>
+                            <SelectTrigger className={`h-8 text-xs ${mapping === "skip" ? "border-orange-400 dark:border-orange-600 bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-400 font-semibold" : ""}`}><SelectValue /></SelectTrigger>
+                            <SelectContent>{COLUMN_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.value === "skip" ? (
+                                  <span className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 font-semibold">
+                                    <Ban className="w-3.5 h-3.5" />
+                                    {opt.label}
+                                  </span>
+                                ) : opt.label}
+                              </SelectItem>
+                            ))}</SelectContent>
                           </Select>
                         </th>
                       ))}
                     </tr>
                     {headerRow && (
                       <tr className="bg-muted/30 border-b">
-                        {headerRow.map((cell, idx) => (<td key={idx} className="p-2 text-xs text-muted-foreground font-medium">{cell || "—"}</td>))}
+                        {headerRow.map((cell, idx) => (<td key={idx} className={`p-2 text-xs text-muted-foreground font-medium ${columnMappings[idx] === "skip" ? "bg-orange-50/50 dark:bg-orange-950/20" : ""}`}>{cell || "—"}</td>))}
                       </tr>
                     )}
                   </thead>
                   <tbody>
                     {displayPreviewRows.slice(0, 5).map((row, rIdx) => (
                       <tr key={rIdx} className="border-b">
-                        {columnMappings.map((mapping, cIdx) => (<td key={cIdx} className={`p-2 text-xs ${mapping === "skip" ? "text-muted-foreground/40 line-through" : ""}`}>{row[cIdx] || "—"}</td>))}
+                        {columnMappings.map((mapping, cIdx) => (<td key={cIdx} className={`p-2 text-xs ${mapping === "skip" ? "text-orange-400/60 dark:text-orange-600/60 line-through bg-orange-50/30 dark:bg-orange-950/10" : ""}`}>{row[cIdx] || "—"}</td>))}
                       </tr>
                     ))}
                   </tbody>
