@@ -153,9 +153,10 @@ const DONATION_TYPE_ALIASES: Record<string, string> = {
   "VACİP": "VACIP", "VACİB": "VACIP", "VACIB": "VACIP",
   "AKİKA": "AKIKA",
   "MEVTA KURBANI": "MEVTA",
+  "ŞÜKÜR KURBANI": "ŞÜKÜR", "SUKUR": "ŞÜKÜR", "ŞUKUR": "ŞÜKÜR",
 };
 
-const DONATION_TYPE_PRIORITY_ORDER: string[] = ["VACIP", "ADAK", "AKIKA", "MEVTA"];
+const DONATION_TYPE_PRIORITY_ORDER: string[] = ["VACIP", "ADAK", "AKIKA", "ŞÜKÜR", "MEVTA"];
 
 function canonicalizeDonationType(t: string): string {
   const normalized = normalizeDonationType(t);
@@ -296,11 +297,51 @@ function getSegmentGroupDominantType(segments: GroupedSegment[]): string {
   return dominant;
 }
 
+function getSegmentGroupTypes(segments: GroupedSegment[]): Set<string> {
+  const types = new Set<string>();
+  for (const seg of segments) {
+    for (const d of seg.donations) {
+      types.add(canonicalizeDonationType(d.donationType));
+    }
+    const extraSlots = seg.shares - seg.donations.length;
+    if (extraSlots > 0) {
+      types.add(canonicalizeDonationType(seg.templateDonation.donationType));
+    }
+  }
+  return types;
+}
+
+function getSegmentGroupMinPriority(segments: GroupedSegment[]): number {
+  const types = getSegmentGroupTypes(segments);
+  let minPriority = DONATION_TYPE_PRIORITY_ORDER.length;
+  for (const t of types) {
+    const p = getDonationTypePriority(t);
+    if (p < minPriority) minPriority = p;
+  }
+  return minPriority;
+}
+
+function getAnimalSortRank(segments: GroupedSegment[]): number {
+  const types = getSegmentGroupTypes(segments);
+  const isMixed = types.size > 1;
+  if (isMixed && types.has("VACIP")) return 0;
+  if (!isMixed) return 1;
+  return 2;
+}
+
 function sortAnimalsByDominantType(animals: GroupedSegment[][]): GroupedSegment[][] {
   return [...animals].sort((a, b) => {
-    const typeA = getSegmentGroupDominantType(a);
-    const typeB = getSegmentGroupDominantType(b);
-    return getDonationTypePriority(typeA) - getDonationTypePriority(typeB);
+    const rankA = getAnimalSortRank(a);
+    const rankB = getAnimalSortRank(b);
+    if (rankA !== rankB) return rankA - rankB;
+
+    if (rankA === 1) {
+      const typeA = getSegmentGroupDominantType(a);
+      const typeB = getSegmentGroupDominantType(b);
+      return getDonationTypePriority(typeA) - getDonationTypePriority(typeB);
+    }
+
+    return getSegmentGroupMinPriority(a) - getSegmentGroupMinPriority(b);
   });
 }
 
@@ -314,16 +355,7 @@ function packLeftoversByType(remainders: DonorUnit[]): GroupedSegment[][] {
     typeGroups.get(dtype)!.push(u);
   }
 
-  const typeShareCounts = new Map<string, number>();
-  for (const [dtype, typeUnits] of typeGroups) {
-    let total = 0;
-    for (const u of typeUnits) total += u.totalShares;
-    typeShareCounts.set(dtype, total);
-  }
-
   const sortedTypes = Array.from(typeGroups.entries()).sort((a, b) => {
-    const countDiff = (typeShareCounts.get(b[0]) || 0) - (typeShareCounts.get(a[0]) || 0);
-    if (countDiff !== 0) return countDiff;
     return getDonationTypePriority(a[0]) - getDonationTypePriority(b[0]);
   });
 
