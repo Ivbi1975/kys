@@ -76,7 +76,11 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
       toast({ title: "Bu hayvan komple olarak zaten sepette", variant: "destructive" });
       return;
     }
-    setBasketItems((prev) => [...prev, makeBasketItem(d)]);
+    const item = makeBasketItem(d);
+    item.sourceGroupId = group.id;
+    item.sourceGroupAnimalNo = group.animalNo;
+    item.sourceSlotIndex = donationIdx;
+    setBasketItems((prev) => [...prev, item]);
     const updated = produce(kesim, (draft) => {
       draft.animalGroups[groupIdx].donations[donationIdx] = makeEmptyDonation();
     });
@@ -102,16 +106,22 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
       kesim.donations.find((dd) => dd.id === donationId) ||
       kesim.animalGroups.flatMap((g) => g.donations).find((dd) => dd.id === donationId);
     if (!d || !d.name.trim()) return;
-    setBasketItems((prev) => [...prev, makeBasketItem(d)]);
+    const item = makeBasketItem(d);
     if (ownerGroup) {
       const groupIdx = kesim.animalGroups.indexOf(ownerGroup);
       const donationIdx = ownerGroup.donations.findIndex(dd => dd.id === donationId);
+      item.sourceGroupId = ownerGroup.id;
+      item.sourceGroupAnimalNo = ownerGroup.animalNo;
+      item.sourceSlotIndex = donationIdx;
+      setBasketItems((prev) => [...prev, item]);
       if (groupIdx >= 0 && donationIdx >= 0) {
         const updated = produce(kesim, (draft) => {
           draft.animalGroups[groupIdx].donations[donationIdx] = makeEmptyDonation();
         });
         save(updated, `${d.description || d.name} sepete eklendi (gruptan çıkarıldı)`, false, "groups");
       }
+    } else {
+      setBasketItems((prev) => [...prev, item]);
     }
   }
 
@@ -133,9 +143,15 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
     setBasketItems((prev) => {
       const existingIds = new Set(prev.map((b) => b.donationId));
       const newItems = [...prev];
-      for (const d of filled) {
+      for (let di = 0; di < group.donations.length; di++) {
+        const d = group.donations[di];
+        if (!d.name.trim()) continue;
         if (!existingIds.has(d.id)) {
-          newItems.push(makeBasketItem(d));
+          const item = makeBasketItem(d);
+          item.sourceGroupId = group.id;
+          item.sourceGroupAnimalNo = group.animalNo;
+          item.sourceSlotIndex = di;
+          newItems.push(item);
           existingIds.add(d.id);
           addedIds.push(d.id);
         }
@@ -198,7 +214,9 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
       colorTag: group.colorTag || "",
       donationIds: filled.map((d) => d.id),
       groupUpdatedAt: group.updatedAt ? new Date(group.updatedAt).toISOString() : undefined,
-      donationSnapshots: filled.map((d) => ({
+      sourceGroupId: group.id,
+      sourceGroupAnimalNo: group.animalNo,
+      donationSnapshots: group.donations.map((d, di) => ({
         id: d.id,
         name: d.name,
         description: d.description,
@@ -206,7 +224,8 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
         shareCount: d.shareCount,
         vekalet: d.vekalet,
         notes: d.notes || "",
-      })),
+        slotIndex: d.name.trim() ? di : undefined,
+      })).filter(s => s.name.trim()),
     };
     setBasketItems((prev) => [...prev, item]);
     const updated = produce(kesim, (draft) => {
@@ -887,6 +906,141 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
     return true;
   }
 
+  function returnSelectedToSource(selectedDonationIds: Set<string>): boolean {
+    if (!kesim || selectedDonationIds.size === 0) return false;
+
+    const itemsToReturn = basketItems.filter(
+      b => b.kesimAlaniId === kesim.id && selectedDonationIds.has(b.donationId)
+    );
+    if (itemsToReturn.length === 0) return false;
+
+    const withSource = itemsToReturn.filter(b => b.sourceGroupId);
+    const withoutSource = itemsToReturn.filter(b => !b.sourceGroupId);
+
+    const updated = produce(kesim, (draft) => {
+      const existingDonorIds = new Set(draft.donations.map(d => d.id));
+      for (const item of withSource) {
+        const groupIdx = draft.animalGroups.findIndex(g => g.id === item.sourceGroupId);
+        if (groupIdx < 0) {
+          if (item.type === "animalGroup" && item.donationSnapshots) {
+            for (const snap of item.donationSnapshots) {
+              if (!existingDonorIds.has(snap.id)) {
+                draft.donations.push({
+                  id: snap.id, name: snap.name, description: snap.description,
+                  donationType: snap.donationType, shareCount: snap.shareCount,
+                  vekalet: snap.vekalet, notes: snap.notes,
+                });
+                existingDonorIds.add(snap.id);
+              }
+            }
+          } else if (!existingDonorIds.has(item.donationId)) {
+            draft.donations.push({
+              id: item.donationId, name: item.name, description: item.description,
+              donationType: item.donationType || "", shareCount: item.donorShareCount || 1,
+              vekalet: item.vekalet || "", notes: item.donorNotes || "",
+            });
+            existingDonorIds.add(item.donationId);
+          }
+          continue;
+        }
+
+        if (item.type === "animalGroup" && item.donationSnapshots) {
+          for (const snap of item.donationSnapshots) {
+            const slotIdx = snap.slotIndex;
+            if (slotIdx !== undefined && slotIdx >= 0 && slotIdx < draft.animalGroups[groupIdx].donations.length) {
+              const slot = draft.animalGroups[groupIdx].donations[slotIdx];
+              if (!slot.name.trim()) {
+                draft.animalGroups[groupIdx].donations[slotIdx] = {
+                  id: snap.id, name: snap.name, description: snap.description,
+                  donationType: snap.donationType, shareCount: snap.shareCount,
+                  vekalet: snap.vekalet, notes: snap.notes,
+                };
+                continue;
+              }
+            }
+            const emptyIdx = draft.animalGroups[groupIdx].donations.findIndex(d => !d.name.trim());
+            if (emptyIdx >= 0) {
+              draft.animalGroups[groupIdx].donations[emptyIdx] = {
+                id: snap.id, name: snap.name, description: snap.description,
+                donationType: snap.donationType, shareCount: snap.shareCount,
+                vekalet: snap.vekalet, notes: snap.notes,
+              };
+            } else {
+              draft.donations.push({
+                id: snap.id, name: snap.name, description: snap.description,
+                donationType: snap.donationType, shareCount: snap.shareCount,
+                vekalet: snap.vekalet, notes: snap.notes,
+              });
+            }
+          }
+        } else {
+          const slotIdx = item.sourceSlotIndex;
+          if (slotIdx !== undefined && slotIdx >= 0 && slotIdx < draft.animalGroups[groupIdx].donations.length) {
+            const slot = draft.animalGroups[groupIdx].donations[slotIdx];
+            if (!slot.name.trim()) {
+              draft.animalGroups[groupIdx].donations[slotIdx] = {
+                id: item.donationId, name: item.name, description: item.description,
+                donationType: item.donationType || "", shareCount: item.donorShareCount || 1,
+                vekalet: item.vekalet || "", notes: item.donorNotes || "",
+              };
+              continue;
+            }
+          }
+          const emptyIdx = draft.animalGroups[groupIdx].donations.findIndex(d => !d.name.trim());
+          if (emptyIdx >= 0) {
+            draft.animalGroups[groupIdx].donations[emptyIdx] = {
+              id: item.donationId, name: item.name, description: item.description,
+              donationType: item.donationType || "", shareCount: item.donorShareCount || 1,
+              vekalet: item.vekalet || "", notes: item.donorNotes || "",
+            };
+          } else {
+            draft.donations.push({
+              id: item.donationId, name: item.name, description: item.description,
+              donationType: item.donationType || "", shareCount: item.donorShareCount || 1,
+              vekalet: item.vekalet || "", notes: item.donorNotes || "",
+            });
+          }
+        }
+      }
+
+      for (const item of withoutSource) {
+        if (item.type === "animalGroup" && item.donationSnapshots) {
+          for (const snap of item.donationSnapshots) {
+            if (!existingDonorIds.has(snap.id)) {
+              draft.donations.push({
+                id: snap.id, name: snap.name, description: snap.description,
+                donationType: snap.donationType, shareCount: snap.shareCount,
+                vekalet: snap.vekalet, notes: snap.notes,
+              });
+              existingDonorIds.add(snap.id);
+            }
+          }
+        } else if (!existingDonorIds.has(item.donationId)) {
+          draft.donations.push({
+            id: item.donationId, name: item.name, description: item.description,
+            donationType: item.donationType || "", shareCount: item.donorShareCount || 1,
+            vekalet: item.vekalet || "", notes: item.donorNotes || "",
+          });
+          existingDonorIds.add(item.donationId);
+        }
+      }
+    });
+
+    const groupReturns = withSource.filter(b => {
+      const g = kesim.animalGroups.find(ag => ag.id === b.sourceGroupId);
+      return !!g;
+    });
+    const listReturns = itemsToReturn.length - groupReturns.length;
+    const desc = groupReturns.length > 0
+      ? `${groupReturns.length} öğe eski grubuna geri yerleştirildi${listReturns > 0 ? `, ${listReturns} öğe bağışçı listesine eklendi` : ""}`
+      : `${listReturns} öğe bağışçı listesine eklendi`;
+
+    save(updated, desc, false, groupReturns.length > 0 ? "full" : "donations");
+    setBasketItems(prev => prev.filter(b => !selectedDonationIds.has(b.donationId)));
+    toast({ title: desc });
+    return true;
+  }
+
   function transferSelectedToGroup(selectedDonationIds: Set<string>, targetGroupIdx: number): boolean {
     if (!kesim || selectedDonationIds.size === 0 || targetGroupIdx < 0 || targetGroupIdx >= kesim.animalGroups.length) return false;
     if (isGroupLocked(targetGroupIdx)) {
@@ -1044,6 +1198,7 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
     transferForeignToCurrentDonorList,
     handleToggleBasketItem,
     returnSelectedToDonorList,
+    returnSelectedToSource,
     transferSelectedToGroup,
   };
 }

@@ -130,7 +130,7 @@ export function DonorListPanel() {
             components={virtuosoTableComponents as any}
             fixedHeaderContent={() => (
               <tr className="border-b bg-muted/50">
-                <th className="p-2 w-8"><input type="checkbox" checked={kesim.donations.length > 0 && selectedIds.size === kesim.donations.length} onChange={toggleSelectAll} className="rounded" /></th>
+                <th className="p-2 w-8"><input type="checkbox" checked={visibleDonations.length > 0 && visibleDonations.every(d => selectedIds.has(d.id))} onChange={() => { const visibleIds = new Set(visibleDonations.map(d => d.id)); const allSelected = visibleDonations.every(d => selectedIds.has(d.id)); if (allSelected) { setSelectedIds(prev => { const next = new Set(prev); visibleIds.forEach(id => next.delete(id)); return next; }); } else { setSelectedIds(prev => new Set([...prev, ...visibleIds])); } }} className="rounded" /></th>
                 <th className="p-2 text-left w-8">#</th>
                 <th className="p-2 text-left w-20">Vekalet</th>
                 <th className="p-2 text-left cursor-pointer hover:bg-muted" onClick={() => handleSort("description")}>

@@ -35,6 +35,7 @@ interface BasketPanelProps {
   cleanupEmptyGroups: () => void;
   dismissEmptyGroupsCleanup: () => void;
   returnSelectedToDonorList: (selectedIds: Set<string>) => boolean;
+  returnSelectedToSource: (selectedIds: Set<string>) => boolean;
   transferSelectedToGroup: (selectedIds: Set<string>, targetGroupIdx: number) => boolean;
 }
 
@@ -47,7 +48,7 @@ export function BasketPanel({
   transferToDonorListConfirm, setTransferToDonorListConfirm,
   transferToDonorListRemoving, transferForeignToCurrentDonorList,
   emptyGroupsAfterTransfer, cleanupEmptyGroups, dismissEmptyGroupsCleanup,
-  returnSelectedToDonorList, transferSelectedToGroup,
+  returnSelectedToDonorList, returnSelectedToSource, transferSelectedToGroup,
 }: BasketPanelProps) {
   const [crossKAConfirmOpen, setCrossKAConfirmOpen] = useState(false);
   const [selectedBasketIds, setSelectedBasketIds] = useState<Set<string>>(new Set());
@@ -98,6 +99,19 @@ export function BasketPanel({
       setSelectedBasketIds(new Set());
     }
   };
+
+  const handleReturnToSource = () => {
+    if (selectedBasketIds.size === 0) return;
+    const success = returnSelectedToSource(selectedBasketIds);
+    if (success) {
+      setSelectedBasketIds(new Set());
+    }
+  };
+
+  const selectedHaveSource = [...selectedBasketIds].some(id => {
+    const item = localBasketItems.find(b => b.donationId === id);
+    return item?.sourceGroupId;
+  });
 
   const handleTransferToGroup = () => {
     if (selectedBasketIds.size === 0 || retrieveTargetGroup < 0) return;
@@ -281,6 +295,7 @@ export function BasketPanel({
                                 />
                                 <span className="font-medium">{g.label}</span>
                                 {g.items.length > 1 && <span className="text-emerald-500 font-semibold">×{g.items.length}</span>}
+                                {g.items[0]?.sourceGroupAnimalNo && <span className="text-[10px] text-amber-600 dark:text-amber-400">H{g.items[0].sourceGroupAnimalNo}</span>}
                                 <button onClick={(e) => { e.stopPropagation(); g.items.forEach(item => { removeFromBasket(item.donationId); setSelectedBasketIds(prev => { const next = new Set(prev); next.delete(item.donationId); return next; }); }); }} className="ml-0.5 text-muted-foreground hover:text-red-500 transition-colors">
                                   <X className="w-3 h-3" />
                                 </button>
@@ -353,6 +368,17 @@ export function BasketPanel({
                           Gruba Yerleştir
                         </Button>
                       </div>
+                      {selectedHaveSource && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="h-8 text-xs w-full bg-amber-600 hover:bg-amber-700 text-white"
+                          onClick={handleReturnToSource}
+                        >
+                          <MoveRight className="w-3.5 h-3.5 mr-1 rotate-180" />
+                          Eski Yerine Geri Al
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"

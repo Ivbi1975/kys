@@ -48,7 +48,7 @@ export function KesimAlaniDialogs(props: KesimAlaniStateReturn) {
     donorListReportOpen, setDonorListReportOpen, fullscreenMode, showScrollTop,
     qrModalOpen, setQrModalOpen, qrUrl,
     transferToDonorListConfirm, setTransferToDonorListConfirm, transferToDonorListRemoving,
-    returnSelectedToDonorList, transferSelectedToGroup,
+    returnSelectedToDonorList, returnSelectedToSource, transferSelectedToGroup,
     updateGroupDonation, addEmptyGroup,
     handleAssignTeam,
   } = props;
@@ -190,6 +190,7 @@ export function KesimAlaniDialogs(props: KesimAlaniStateReturn) {
         cleanupEmptyGroups={cleanupEmptyGroups}
         dismissEmptyGroupsCleanup={dismissEmptyGroupsCleanup}
         returnSelectedToDonorList={returnSelectedToDonorList}
+        returnSelectedToSource={returnSelectedToSource}
         transferSelectedToGroup={transferSelectedToGroup}
       />
 

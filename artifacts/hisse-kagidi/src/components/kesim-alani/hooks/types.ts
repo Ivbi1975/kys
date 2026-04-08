@@ -19,6 +19,9 @@ export interface BasketItem {
   donorShareCount?: number;
   vekalet?: string;
   donorNotes?: string;
+  sourceGroupId?: string;
+  sourceGroupAnimalNo?: number;
+  sourceSlotIndex?: number;
   donationSnapshots?: Array<{
     id: string;
     name: string;
@@ -27,6 +30,7 @@ export interface BasketItem {
     shareCount: number;
     vekalet: string;
     notes: string;
+    slotIndex?: number;
   }>;
 }
 
