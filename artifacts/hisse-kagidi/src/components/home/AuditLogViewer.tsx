@@ -128,15 +128,15 @@ function LogRow({ entry }: { entry: AuditLogEntry }) {
           ID: {entry.entityId}
         </div>
       )}
-      {(entry.newValue || entry.oldValue) && (
+      {(entry.newValue != null || entry.oldValue != null) && (
         <div className="mt-1 space-y-0.5">
-          {entry.oldValue && (
+          {entry.oldValue != null && (
             <div className="flex items-start gap-1">
               <span className="text-[10px] text-muted-foreground flex-shrink-0">Eski:</span>
               <JsonPreview data={entry.oldValue} />
             </div>
           )}
-          {entry.newValue && (
+          {entry.newValue != null && (
             <div className="flex items-start gap-1">
               <span className="text-[10px] text-muted-foreground flex-shrink-0">Yeni:</span>
               <JsonPreview data={entry.newValue} />
