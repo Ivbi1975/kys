@@ -29,6 +29,7 @@ export const kesimAlanlariTable = pgTable("kesim_alanlari", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   projectId: text("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
   trackingToken: text("tracking_token"),
+  trackingTokenExpiresAt: timestamp("tracking_token_expires_at", { withTimezone: true }),
   kesimListeId: text("kesim_liste_id"),
   parentKesimAlaniId: text("parent_kesim_alani_id"),
   splitStatus: text("split_status"),
@@ -253,6 +254,7 @@ export const aiJobsTable = pgTable("ai_jobs", {
   result: text("result"),
   error: text("error"),
   kesimAlaniId: text("kesim_alani_id"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

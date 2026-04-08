@@ -28,6 +28,12 @@ export type AiJobStatus = (typeof AiJobStatus)[keyof typeof AiJobStatus];
 
 export const STALE_JOB_CUTOFF_MS = 24 * 60 * 60 * 1000;
 export const STALE_JOB_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+export const AI_JOB_TTL_MS = 15 * 60 * 1000;
+export const AI_JOB_EXPIRY_CHECK_INTERVAL_MS = 60 * 1000;
+export const SOFT_DELETE_PURGE_DAYS = 90;
+export const SOFT_DELETE_PURGE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+export const TRACKING_TOKEN_TTL_DAYS = 30;
+export const MATERIALIZED_VIEW_DEBOUNCE_MS = 10_000;
 
 export const ERROR_MESSAGES = {
   INVALID_DATA: "Geçersiz veri",
@@ -73,6 +79,9 @@ export const ERROR_MESSAGES = {
   GROUP_LOCKED: "Kilitli hayvan grubu transfer edilemez",
   GROUP_KESILDI: "Kesilmiş hayvan grubu transfer edilemez",
   GROUP_NOT_IN_SOURCE: "Hayvan grubu kaynak kesim alanında bulunamadı",
+  TRACKING_TOKEN_EXPIRED: "Takip linki süresi dolmuş. Lütfen yöneticinizle iletişime geçin.",
+  TRACKING_TOKEN_REVOKED: "Takip linki iptal edilmiş.",
+  AI_JOB_EXPIRED: "AI işi zaman aşımına uğradı",
 } as const;
 
 export const NOTE_WARNING_KEYWORDS = [

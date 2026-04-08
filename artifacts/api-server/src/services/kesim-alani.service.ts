@@ -276,7 +276,7 @@ export async function getFullKesimAlani(id: string) {
   const result = await db.execute(sql`
     SELECT
       ka.id AS ka_id, ka.name, ka.created_at, ka.deleted_at,
-      ka.project_id, ka.tracking_token, ka.kesim_liste_id,
+      ka.project_id, ka.tracking_token, ka.tracking_token_expires_at, ka.kesim_liste_id,
       ka.parent_kesim_alani_id, ka.split_status,
       COALESCE((
         SELECT json_agg(d ORDER BY d.sort_order)
@@ -326,7 +326,7 @@ export async function getFullKesimAlani(id: string) {
   type SingleRawTeam = { id: string; name: string; color: string };
   type SingleRawRow = {
     ka_id: string; name: string; created_at: string; deleted_at: string | null;
-    project_id: string | null; tracking_token: string | null; kesim_liste_id: string | null;
+    project_id: string | null; tracking_token: string | null; tracking_token_expires_at: string | null; kesim_liste_id: string | null;
     parent_kesim_alani_id: string | null; split_status: string | null;
     donations: SingleRawDonation[];
     groups: SingleRawGroup[];
@@ -342,6 +342,7 @@ export async function getFullKesimAlani(id: string) {
     updatedAt: new Date(),
     projectId: rawRow.project_id,
     trackingToken: rawRow.tracking_token,
+    trackingTokenExpiresAt: rawRow.tracking_token_expires_at ? new Date(rawRow.tracking_token_expires_at) : null,
     kesimListeId: rawRow.kesim_liste_id,
     parentKesimAlaniId: rawRow.parent_kesim_alani_id,
     splitStatus: rawRow.split_status,

@@ -7,7 +7,7 @@ import { openai } from "@workspace/integrations-openai-ai-server";
 import crypto from "crypto";
 import { asyncHandler } from "../middleware/error-handler";
 import { logger } from "../lib/logger";
-import { TX_BATCH_SIZE, AiJobStatus, STALE_JOB_CUTOFF_MS, STALE_JOB_CLEANUP_INTERVAL_MS, ERROR_MESSAGES } from "../lib/constants";
+import { TX_BATCH_SIZE, AiJobStatus, STALE_JOB_CUTOFF_MS, STALE_JOB_CLEANUP_INTERVAL_MS, AI_JOB_TTL_MS, AI_JOB_EXPIRY_CHECK_INTERVAL_MS, ERROR_MESSAGES } from "../lib/constants";
 
 const router: IRouter = Router();
 
@@ -281,12 +281,14 @@ router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
 
   const { donations, kesimAlaniId } = parsed.data;
   const jobId = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + AI_JOB_TTL_MS);
 
   await db.insert(aiJobsTable).values({
     id: jobId,
     status: AiJobStatus.PENDING,
     totalDonations: donations.length,
     processedDonations: 0,
+    expiresAt,
     ...(kesimAlaniId ? { kesimAlaniId } : {}),
   });
 
@@ -300,9 +302,17 @@ router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
 const CHUNK_SIZE = 25;
 const PARALLEL_CHUNKS = 5;
 
-async function isJobCancelled(jobId: string): Promise<boolean> {
-  const [job] = await db.select({ status: aiJobsTable.status }).from(aiJobsTable).where(eq(aiJobsTable.id, jobId));
-  return !job || job.status === AiJobStatus.CANCELLED;
+async function isJobCancelledOrExpired(jobId: string): Promise<boolean> {
+  const [job] = await db.select({ status: aiJobsTable.status, expiresAt: aiJobsTable.expiresAt }).from(aiJobsTable).where(eq(aiJobsTable.id, jobId));
+  if (!job || job.status === AiJobStatus.CANCELLED) return true;
+  if (job.expiresAt && new Date() > job.expiresAt) {
+    await db.update(aiJobsTable)
+      .set({ status: AiJobStatus.FAILED, error: ERROR_MESSAGES.AI_JOB_EXPIRED, updatedAt: new Date() })
+      .where(eq(aiJobsTable.id, jobId));
+    logger.warn({ jobId }, "AI job expired during processing");
+    return true;
+  }
+  return false;
 }
 
 async function callAiForDonations(
@@ -486,8 +496,8 @@ async function processClassifyJob(
     let failedBatchCount = 0;
 
     for (let i = 0; i < chunks.length; i += PARALLEL_CHUNKS) {
-      if (await isJobCancelled(jobId)) {
-        logger.info({ jobId }, "AI job cancelled by user");
+      if (await isJobCancelledOrExpired(jobId)) {
+        logger.info({ jobId }, "AI job cancelled or expired");
         return;
       }
 
@@ -713,7 +723,7 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
           .where(eq(donationsTable.id, c.donationId))
       ));
     }
-  });
+  }, { isolationLevel: "repeatable read" });
 
   res.json({ success: true, count: classifications.length });
 }));
@@ -748,7 +758,7 @@ router.put("/ai-notes/bulk-update", asyncHandler(async (req, res) => {
           .where(eq(donationsTable.id, u.donationId));
       }));
     }
-  });
+  }, { isolationLevel: "repeatable read" });
 
   res.json({ success: true, count: updates.length });
 }));
@@ -776,6 +786,24 @@ setInterval(async () => {
     logger.error({ err }, "[ai-jobs] Cleanup error");
   }
 }, STALE_JOB_CLEANUP_INTERVAL_MS);
+
+setInterval(async () => {
+  try {
+    const now = new Date();
+    const activeCondition = or(
+      eq(aiJobsTable.status, AiJobStatus.PENDING),
+      eq(aiJobsTable.status, AiJobStatus.PROCESSING),
+    );
+    const result = await db.update(aiJobsTable)
+      .set({ status: AiJobStatus.FAILED, error: ERROR_MESSAGES.AI_JOB_EXPIRED, updatedAt: now })
+      .where(and(activeCondition!, lt(aiJobsTable.expiresAt, now)));
+    if (result.rowCount && result.rowCount > 0) {
+      logger.info({ count: result.rowCount }, "[ai-jobs] Expired jobs marked as failed");
+    }
+  } catch (err) {
+    logger.error({ err }, "[ai-jobs] Expiry check error");
+  }
+}, AI_JOB_EXPIRY_CHECK_INTERVAL_MS);
 
 export { syncAiSettingsToDb };
 export default router;

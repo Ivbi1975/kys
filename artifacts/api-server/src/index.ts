@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { startPoolMonitoring, shutdownPool } from "@workspace/db";
 import { syncAiSettingsToDb } from "./routes/ai-notes";
+import { startPurgeScheduler } from "./services/purge.service";
 import type { Server } from "http";
 
 const rawPort = process.env["PORT"];
@@ -28,6 +29,7 @@ const server: Server = app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
   startPoolMonitoring();
+  startPurgeScheduler();
   syncAiSettingsToDb()
     .then(() => logger.info("AI settings synced to DB"))
     .catch((err) => logger.error({ err }, "Failed to sync AI settings to DB"));

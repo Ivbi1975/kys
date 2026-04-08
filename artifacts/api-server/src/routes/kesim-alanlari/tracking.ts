@@ -6,6 +6,7 @@ import { NoteType, NoteStatus, ERROR_MESSAGES } from "../../lib/constants";
 import { requireActiveKesimAlani } from "../../services/kesim-alani.service";
 import {
   generateTrackingToken,
+  revokeTrackingToken,
   getTrackingNotesByKA,
   getTrackingPage,
   getTrackingDelta,
@@ -28,13 +29,26 @@ router.post("/kesim-alanlari/:id/generate-tracking-token", asyncHandler(async (r
     res.status(result.status).json({ error: result.error });
     return;
   }
-  res.json({ trackingToken: result.trackingToken });
+  res.json({ trackingToken: result.trackingToken, expiresAt: result.expiresAt });
+}));
+
+router.post("/kesim-alanlari/:id/revoke-tracking-token", asyncHandler(async (req, res) => {
+  const result = await revokeTrackingToken(req.params.id);
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
+    return;
+  }
+  res.json({ success: true });
 }));
 
 router.get("/tracking/:token", asyncHandler(async (req, res) => {
   const result = await getTrackingPage(req.params.token);
   if (!result.ok) {
-    res.status(result.status).json({ error: ERROR_MESSAGES.TRACKING_LINK_NOT_FOUND });
+    const errorMap: Record<string, string> = {
+      not_found: ERROR_MESSAGES.TRACKING_LINK_NOT_FOUND,
+      token_expired: ERROR_MESSAGES.TRACKING_TOKEN_EXPIRED,
+    };
+    res.status(result.status).json({ error: errorMap[result.error] || result.error, expired: result.error === "token_expired" });
     return;
   }
   res.json(result.data);
@@ -54,7 +68,11 @@ router.get("/tracking/:token/delta", asyncHandler(async (req, res) => {
 
   const result = await getTrackingDelta(req.params.token, sinceDate);
   if (!result.ok) {
-    res.status(result.status).json({ error: ERROR_MESSAGES.TRACKING_LINK_NOT_FOUND });
+    const errorMap: Record<string, string> = {
+      not_found: ERROR_MESSAGES.TRACKING_LINK_NOT_FOUND,
+      token_expired: ERROR_MESSAGES.TRACKING_TOKEN_EXPIRED,
+    };
+    res.status(result.status).json({ error: errorMap[result.error] || result.error, expired: result.error === "token_expired" });
     return;
   }
   res.json(result.data);
@@ -72,8 +90,9 @@ router.put("/tracking/:token/group/:groupId/kesildi", asyncHandler(async (req, r
     const errorMap: Record<string, string> = {
       not_found: ERROR_MESSAGES.TRACKING_LINK_NOT_FOUND,
       group_not_found: ERROR_MESSAGES.ANIMAL_GROUP_NOT_FOUND,
+      token_expired: ERROR_MESSAGES.TRACKING_TOKEN_EXPIRED,
     };
-    res.status(result.status).json({ error: errorMap[result.error] || result.error });
+    res.status(result.status).json({ error: errorMap[result.error] || result.error, expired: result.error === "token_expired" });
     return;
   }
   res.json({ success: true, groupId: result.groupId, kesildi: result.kesildi, kesildiAt: result.kesildiAt });
@@ -93,7 +112,11 @@ router.get("/kesim-alanlari/:id/dashboard", asyncHandler(async (req, res) => {
 router.get("/tracking/:token/notes", asyncHandler(async (req, res) => {
   const result = await getTrackingNotes(req.params.token);
   if (!result.ok) {
-    res.status(result.status).json({ error: ERROR_MESSAGES.TRACKING_LINK_NOT_FOUND });
+    const errorMap: Record<string, string> = {
+      not_found: ERROR_MESSAGES.TRACKING_LINK_NOT_FOUND,
+      token_expired: ERROR_MESSAGES.TRACKING_TOKEN_EXPIRED,
+    };
+    res.status(result.status).json({ error: errorMap[result.error] || result.error, expired: result.error === "token_expired" });
     return;
   }
   res.json(result.notes);
@@ -120,8 +143,9 @@ router.post("/tracking/:token/notes", asyncHandler(async (req, res) => {
     const errorMap: Record<string, string> = {
       not_found: ERROR_MESSAGES.TRACKING_LINK_NOT_FOUND,
       invalid_group: ERROR_MESSAGES.INVALID_ANIMAL_GROUP,
+      token_expired: ERROR_MESSAGES.TRACKING_TOKEN_EXPIRED,
     };
-    res.status(result.status).json({ error: errorMap[result.error] || result.error });
+    res.status(result.status).json({ error: errorMap[result.error] || result.error, expired: result.error === "token_expired" });
     return;
   }
   res.status(201).json(result.note);

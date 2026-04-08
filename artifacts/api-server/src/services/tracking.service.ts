@@ -14,7 +14,7 @@ import { desc, gt, count, asc } from "drizzle-orm";
 import { eq, inArray, isNull, isNotNull, and, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { cacheInvalidatePrefix } from "../lib/cache";
-import { NoteType } from "../lib/constants";
+import { NoteType, TRACKING_TOKEN_TTL_DAYS } from "../lib/constants";
 import { serviceError, serviceOk } from "./result";
 import { logger } from "../lib/logger";
 import { KA_LIST_CACHE_KEY, requireActiveKesimAlani, createNotificationLogs } from "./kesim-alani.service";
@@ -24,8 +24,24 @@ export async function generateTrackingToken(kesimAlaniId: string) {
   if (check.error) return serviceError(check.error, check.status);
 
   const token = crypto.randomBytes(16).toString("hex");
-  await db.update(kesimAlanlariTable).set({ trackingToken: token }).where(eq(kesimAlanlariTable.id, kesimAlaniId));
-  return serviceOk({ trackingToken: token });
+  const expiresAt = new Date(Date.now() + TRACKING_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
+  await db.update(kesimAlanlariTable).set({ trackingToken: token, trackingTokenExpiresAt: expiresAt }).where(eq(kesimAlanlariTable.id, kesimAlaniId));
+  return serviceOk({ trackingToken: token, expiresAt });
+}
+
+export async function revokeTrackingToken(kesimAlaniId: string) {
+  const check = await requireActiveKesimAlani(kesimAlaniId);
+  if (check.error) return serviceError(check.error, check.status);
+
+  await db.update(kesimAlanlariTable).set({ trackingToken: null, trackingTokenExpiresAt: null }).where(eq(kesimAlanlariTable.id, kesimAlaniId));
+  return serviceOk({ success: true as const });
+}
+
+function checkTokenExpiration(ka: { trackingTokenExpiresAt: Date | null }) {
+  if (ka.trackingTokenExpiresAt && new Date() > ka.trackingTokenExpiresAt) {
+    return serviceError("token_expired", 410);
+  }
+  return null;
 }
 
 export async function getTrackingNotesByKA(kesimAlaniId: string) {
@@ -39,6 +55,9 @@ export async function getTrackingPage(token: string) {
   const [ka] = await db.select().from(kesimAlanlariTable)
     .where(eq(kesimAlanlariTable.trackingToken, token));
   if (!ka || ka.deletedAt) return serviceError("not_found", 404);
+
+  const expError = checkTokenExpiration(ka);
+  if (expError) return expError;
 
   const groups = await db.select().from(animalGroupsTable)
     .where(eq(animalGroupsTable.kesimAlaniId, ka.id))
@@ -110,6 +129,9 @@ export async function getTrackingDelta(token: string, sinceDate: Date) {
   const [ka] = await db.select().from(kesimAlanlariTable)
     .where(eq(kesimAlanlariTable.trackingToken, token));
   if (!ka || ka.deletedAt) return serviceError("not_found", 404);
+
+  const expError = checkTokenExpiration(ka);
+  if (expError) return expError;
 
   const serverTime = new Date().toISOString();
 
@@ -220,6 +242,9 @@ export async function updateKesildiStatus(token: string, groupId: string, kesild
     .where(eq(kesimAlanlariTable.trackingToken, token));
   if (!ka || ka.deletedAt) return serviceError("not_found", 404);
 
+  const expError = checkTokenExpiration(ka);
+  if (expError) return expError;
+
   const [group] = await db.select().from(animalGroupsTable)
     .where(and(eq(animalGroupsTable.id, groupId), eq(animalGroupsTable.kesimAlaniId, ka.id)));
   if (!group) return serviceError("group_not_found", 404);
@@ -258,6 +283,9 @@ export async function getTrackingNotes(token: string) {
     .where(eq(kesimAlanlariTable.trackingToken, token));
   if (!ka || ka.deletedAt) return serviceError("not_found", 404);
 
+  const expError = checkTokenExpiration(ka);
+  if (expError) return expError;
+
   const notes = await db.select().from(trackingNotesTable)
     .where(eq(trackingNotesTable.kesimAlaniId, ka.id))
     .orderBy(desc(trackingNotesTable.createdAt));
@@ -278,6 +306,9 @@ export async function createTrackingNote(token: string, params: CreateNoteParams
   const [ka] = await db.select().from(kesimAlanlariTable)
     .where(eq(kesimAlanlariTable.trackingToken, token));
   if (!ka || ka.deletedAt) return serviceError("not_found", 404);
+
+  const expError = checkTokenExpiration(ka);
+  if (expError) return expError;
 
   const { animalGroupId, type, content, fieldName, oldValue, newValue } = params;
 

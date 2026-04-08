@@ -180,7 +180,37 @@ app.use(cors({
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
+const aiClassifyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 5,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: {
+    error: "AI sınıflandırma için çok fazla istek. Lütfen bir dakika bekleyin.",
+  },
+});
+
+const bulkImportLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 3,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: {
+    error: "Toplu import için çok fazla istek. Lütfen bir dakika bekleyin.",
+  },
+});
+
+app.use("/api/v1/tracking", trackingLimiter);
+app.use("/api/v1/ai-notes/classify-async", aiClassifyLimiter);
+app.use("/api/v1/ai-notes/classify", aiClassifyLimiter);
+app.use("/api/v1/backup/import", bulkImportLimiter);
+
 app.use("/api/tracking", trackingLimiter);
+app.use("/api/ai-notes/classify-async", aiClassifyLimiter);
+app.use("/api/ai-notes/classify", aiClassifyLimiter);
+app.use("/api/backup/import", bulkImportLimiter);
+
+app.use("/api/v1", apiKeyAuth, adminKeyAuth, router);
 
 app.use("/api", apiKeyAuth, adminKeyAuth, router);
 

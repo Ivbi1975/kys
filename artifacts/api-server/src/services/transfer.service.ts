@@ -11,6 +11,7 @@ import { desc, max } from "drizzle-orm";
 import { eq, inArray, isNull, and } from "drizzle-orm";
 import { NoteType, NoteStatus } from "../lib/constants";
 import { serviceError, serviceOk } from "./result";
+import { withSerializationRetry } from "../lib/tx-retry";
 
 interface MoveDonationsParams {
   donationIds: string[];
@@ -83,23 +84,26 @@ export async function moveDonations(params: MoveDonationsParams) {
     }
   }
 
-  await db.transaction(async (tx) => {
-    const groupLinksToRemove = groupLinks.filter(l => validIds.includes(l.donationId));
-    if (groupLinksToRemove.length > 0) {
-      await tx.delete(animalGroupDonationsTable)
-        .where(inArray(animalGroupDonationsTable.donationId, validIds));
-    }
+  await withSerializationRetry(() =>
+    db.transaction(async (tx) => {
+      const groupLinksToRemove = groupLinks.filter(l => validIds.includes(l.donationId));
+      if (groupLinksToRemove.length > 0) {
+        await tx.delete(animalGroupDonationsTable)
+          .where(inArray(animalGroupDonationsTable.donationId, validIds));
+      }
 
-    const existingTarget = await tx.select().from(donationsTable)
-      .where(and(eq(donationsTable.kesimAlaniId, targetKesimAlaniId), isNull(donationsTable.deletedAt)));
-    const maxSort = existingTarget.length;
+      const existingTarget = await tx.select().from(donationsTable)
+        .where(and(eq(donationsTable.kesimAlaniId, targetKesimAlaniId), isNull(donationsTable.deletedAt)));
+      const maxSort = existingTarget.length;
 
-    for (let i = 0; i < validIds.length; i++) {
-      await tx.update(donationsTable)
-        .set({ kesimAlaniId: targetKesimAlaniId, sortOrder: maxSort + i })
-        .where(eq(donationsTable.id, validIds[i]));
-    }
-  });
+      for (let i = 0; i < validIds.length; i++) {
+        await tx.update(donationsTable)
+          .set({ kesimAlaniId: targetKesimAlaniId, sortOrder: maxSort + i })
+          .where(eq(donationsTable.id, validIds[i]));
+      }
+    }, { isolationLevel: "repeatable read" }),
+    "transferDonations"
+  );
 
   return serviceOk({ count: validIds.length, skipped: donationIds.length - validIds.length, movedIds: validIds });
 }
@@ -220,7 +224,7 @@ export async function moveAnimalGroup(params: MoveAnimalGroupParams) {
 
   let newAnimalNo = 0;
 
-  await db.transaction(async (tx) => {
+  await withSerializationRetry(() => db.transaction(async (tx) => {
     if (lastUpdatedAt) {
       const freshGroup = await tx.select({ updatedAt: animalGroupsTable.updatedAt })
         .from(animalGroupsTable)
@@ -336,7 +340,7 @@ export async function moveAnimalGroup(params: MoveAnimalGroupParams) {
           .where(eq(animalGroupsTable.id, sourceSorted[i].id));
       }
     }
-  }).catch((err) => {
+  }, { isolationLevel: "repeatable read" }), "moveAnimalGroup").catch((err) => {
     if (err.message === "concurrent_modification") {
       throw err;
     }

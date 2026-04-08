@@ -1,0 +1,2 @@
+ALTER TABLE "ai_jobs" ADD COLUMN IF NOT EXISTS "expires_at" TIMESTAMP WITH TIME ZONE;
+ALTER TABLE "kesim_alanlari" ADD COLUMN IF NOT EXISTS "tracking_token_expires_at" TIMESTAMP WITH TIME ZONE;

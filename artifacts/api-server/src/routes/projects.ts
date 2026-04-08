@@ -17,7 +17,7 @@ import { eq, isNull, isNotNull, and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { cacheGet, cacheSet, cacheInvalidate, cacheInvalidatePrefix } from "../lib/cache";
 import { asyncHandler } from "../middleware/error-handler";
-import { ERROR_MESSAGES } from "../lib/constants";
+import { ERROR_MESSAGES, MATERIALIZED_VIEW_DEBOUNCE_MS } from "../lib/constants";
 import { logger } from "../lib/logger";
 import { invalidateKACache } from "../services/kesim-alani.service";
 
@@ -42,8 +42,10 @@ const emptyStats = { donorCount: 0, shareCount: 0, groupCount: 0, kesildiCount: 
 
 let refreshInProgress = false;
 let refreshQueued = false;
+let lastRefreshTime = 0;
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-export async function refreshProjectStats() {
+async function doRefresh() {
   if (refreshInProgress) {
     refreshQueued = true;
     return;
@@ -53,15 +55,37 @@ export async function refreshProjectStats() {
     await db.execute(sql`REFRESH MATERIALIZED VIEW CONCURRENTLY project_stats_view`);
     cacheInvalidate(PROJECTS_CACHE_KEY);
     cacheInvalidatePrefix("dashboard:");
+    lastRefreshTime = Date.now();
   } catch (err) {
     logger.error({ err }, "Failed to refresh project_stats_view");
   } finally {
     refreshInProgress = false;
     if (refreshQueued) {
       refreshQueued = false;
-      refreshProjectStats();
+      doRefresh();
     }
   }
+}
+
+export function refreshProjectStats() {
+  const elapsed = Date.now() - lastRefreshTime;
+  if (elapsed >= MATERIALIZED_VIEW_DEBOUNCE_MS) {
+    doRefresh();
+    return;
+  }
+  if (debounceTimer) return;
+  debounceTimer = setTimeout(() => {
+    debounceTimer = null;
+    doRefresh();
+  }, MATERIALIZED_VIEW_DEBOUNCE_MS - elapsed);
+}
+
+export async function refreshProjectStatsImmediate() {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+  await doRefresh();
 }
 
 type ProjectRow = {
@@ -132,7 +156,7 @@ router.post("/projects", asyncHandler(async (req, res) => {
   const id = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
   const now = new Date();
   await db.insert(projectsTable).values({ id, name, createdAt: now });
-  await refreshProjectStats();
+  await refreshProjectStatsImmediate();
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
   res.status(201).json({ ...project, stats: emptyStats });
 }));
@@ -214,11 +238,11 @@ router.delete("/projects/:id", asyncHandler(async (req, res) => {
     invalidateKACache();
     cacheInvalidate(PROJECTS_CACHE_KEY);
     cacheInvalidatePrefix("kesim-alanlari");
-    await refreshProjectStats();
+    await refreshProjectStatsImmediate();
     res.json({ success: true });
   } else {
     await db.update(projectsTable).set({ deletedAt: new Date() }).where(eq(projectsTable.id, id));
-    await refreshProjectStats();
+    await refreshProjectStatsImmediate();
     res.json({ success: true });
   }
 }));
@@ -235,7 +259,7 @@ router.post("/projects/:id/restore", asyncHandler(async (req, res) => {
   if (!existing) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
 
   await db.update(projectsTable).set({ deletedAt: null }).where(eq(projectsTable.id, id));
-  await refreshProjectStats();
+  await refreshProjectStatsImmediate();
   const [restored] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
   res.json({ ...restored, stats: emptyStats });
 }));
@@ -294,7 +318,7 @@ router.post("/projects/:id/archive", asyncHandler(async (req, res) => {
     }
   });
 
-  await refreshProjectStats();
+  await refreshProjectStatsImmediate();
   cacheInvalidatePrefix("kesim-alanlari");
 
   res.json({ success: true, archivedAt: now });
@@ -327,7 +351,7 @@ router.post("/projects/:id/unarchive", asyncHandler(async (req, res) => {
       ));
   });
 
-  await refreshProjectStats();
+  await refreshProjectStatsImmediate();
   cacheInvalidatePrefix("kesim-alanlari");
 
   const [restored] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));

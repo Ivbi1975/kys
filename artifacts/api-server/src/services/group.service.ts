@@ -16,6 +16,7 @@ import {
   createNotificationLogs,
   type AnimalGroupPayload,
 } from "./kesim-alani.service";
+import { withSerializationRetry } from "../lib/tx-retry";
 
 const GROUP_SORT_FIELDS = {
   sortOrder: animalGroupsTable.sortOrder,
@@ -311,15 +312,18 @@ export async function bulkUpdateGroups(kesimAlaniId: string, animalGroups: Anima
   }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId));
   const kesildiMap = new Map(existingGroups.map(g => [g.id, { kesildi: g.kesildi, kesildiAt: g.kesildiAt, teamId: g.teamId }]));
 
-  await db.transaction(async (tx) => {
-    await tx.delete(animalGroupDonationsTable).where(
-      inArray(animalGroupDonationsTable.groupId,
-        tx.select({ id: animalGroupsTable.id }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId))
-      )
-    );
-    await tx.delete(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId));
-    await saveAnimalGroups(tx, kesimAlaniId, animalGroups, kesildiMap);
-  });
+  await withSerializationRetry(() =>
+    db.transaction(async (tx) => {
+      await tx.delete(animalGroupDonationsTable).where(
+        inArray(animalGroupDonationsTable.groupId,
+          tx.select({ id: animalGroupsTable.id }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId))
+        )
+      );
+      await tx.delete(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId));
+      await saveAnimalGroups(tx, kesimAlaniId, animalGroups, kesildiMap);
+    }, { isolationLevel: "serializable" }),
+    "bulkUpdateGroups"
+  );
 
   return serviceOk({ data: await getFullKesimAlani(kesimAlaniId) });
 }
@@ -381,15 +385,18 @@ export async function bulkUpdateGroupsChunked(
         startedAt: Date.now(),
       });
 
-      await db.transaction(async (tx) => {
-        await tx.delete(animalGroupDonationsTable).where(
-          inArray(animalGroupDonationsTable.groupId,
-            tx.select({ id: animalGroupsTable.id }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId))
-          )
-        );
-        await tx.delete(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId));
-        await saveAnimalGroups(tx, kesimAlaniId, animalGroups, kesildiMap);
-      });
+      await withSerializationRetry(() =>
+        db.transaction(async (tx) => {
+          await tx.delete(animalGroupDonationsTable).where(
+            inArray(animalGroupDonationsTable.groupId,
+              tx.select({ id: animalGroupsTable.id }).from(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId))
+            )
+          );
+          await tx.delete(animalGroupsTable).where(eq(animalGroupsTable.kesimAlaniId, kesimAlaniId));
+          await saveAnimalGroups(tx, kesimAlaniId, animalGroups, kesildiMap);
+        }, { isolationLevel: "serializable" }),
+        "bulkUpdateGroupsChunked:first"
+      );
     } else {
       const session = activeSessions.get(sessionKey);
       if (!session) {
@@ -405,9 +412,12 @@ export async function bulkUpdateGroupsChunked(
         return serviceError("Parça sayısı uyuşmazlığı. Lütfen baştan deneyin.", 409);
       }
 
-      await db.transaction(async (tx) => {
-        await saveAnimalGroups(tx, kesimAlaniId, animalGroups, session.kesildiMap);
-      });
+      await withSerializationRetry(() =>
+        db.transaction(async (tx) => {
+          await saveAnimalGroups(tx, kesimAlaniId, animalGroups, session.kesildiMap);
+        }, { isolationLevel: "serializable" }),
+        "bulkUpdateGroupsChunked:subsequent"
+      );
 
       session.nextExpectedChunk = chunkIndex + 1;
     }

@@ -134,6 +134,13 @@
       "when": 1774946100000,
       "tag": "0018_donation_birim_temsilci",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1774946200000,
+      "tag": "0019_resilience_security",
+      "breakpoints": true
     }
   ]
 }
