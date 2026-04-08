@@ -1,7 +1,8 @@
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LocalInput } from "@/components/LocalInput";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, Team } from "@/lib/types";
 import { COLOR_MAP } from "@/lib/constants";
 import type { ColumnKey } from "@/lib/useWorkspacePreferences";
@@ -21,6 +22,7 @@ import {
   Square,
   Camera,
   Package,
+  MoreHorizontal,
 } from "lucide-react";
 
 interface AnimalGroupCardProps {
@@ -341,6 +343,137 @@ const GroupDonationRow = memo(function GroupDonationRow({
   return true;
 });
 
+const GroupOverflowMenu = memo(function GroupOverflowMenu({
+  group, groupIdx, compact, filledCount, totalGroupCount, teams,
+  basketAnimalGroupIds, onMoveUp, onMoveDown, onSplit,
+  onAddWholeAnimalToBasket, onAssignTeam, onSetColorTag, onDelete,
+}: {
+  group: AnimalGroup;
+  groupIdx: number;
+  compact: boolean;
+  filledCount: number;
+  totalGroupCount: number;
+  teams: Team[];
+  basketAnimalGroupIds: Set<string>;
+  onMoveUp: (groupIdx: number) => void;
+  onMoveDown: (groupIdx: number) => void;
+  onSplit: (groupIdx: number) => void;
+  onAddWholeAnimalToBasket: (groupIdx: number) => void;
+  onAssignTeam: (groupId: string, teamId: string | null) => void;
+  onSetColorTag: (groupIdx: number, tag: ColorTag) => void;
+  onDelete: (groupIdx: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="p-1 rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+          title="Daha fazla"
+        >
+          <MoreHorizontal className="w-4 h-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-52 p-1" align="end" side="bottom">
+        <div className="space-y-0.5">
+          <button
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            onClick={() => { onMoveUp(groupIdx); setOpen(false); }}
+            disabled={groupIdx <= 0}
+          >
+            <ArrowUp className="w-3.5 h-3.5" />
+            Yukarı Taşı
+          </button>
+          <button
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            onClick={() => { onMoveDown(groupIdx); setOpen(false); }}
+            disabled={groupIdx >= totalGroupCount - 1}
+          >
+            <ArrowDown className="w-3.5 h-3.5" />
+            Aşağı Taşı
+          </button>
+
+          <div className="h-px bg-border my-1" />
+
+          <button
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            onClick={() => { onSplit(groupIdx); setOpen(false); }}
+            disabled={group.locked || filledCount <= 1}
+          >
+            <Scissors className="w-3.5 h-3.5" />
+            Grubu Böl
+          </button>
+          <button
+            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+              basketAnimalGroupIds.has(group.id) ? "bg-orange-50 dark:bg-orange-950 text-orange-600" : "hover:bg-muted"
+            }`}
+            onClick={() => { onAddWholeAnimalToBasket(groupIdx); setOpen(false); }}
+            disabled={group.locked || group.kesildi || filledCount === 0 || basketAnimalGroupIds.has(group.id)}
+          >
+            <Package className="w-3.5 h-3.5 text-orange-500" />
+            {basketAnimalGroupIds.has(group.id) ? "Komple Hayvan Sepette" : "Komple Hayvanı Sepete Ekle"}
+          </button>
+
+          {teams.length > 0 && (
+            <>
+              <div className="h-px bg-border my-1" />
+              <div className="px-2 py-1">
+                <p className="text-[10px] text-muted-foreground font-medium mb-1">Ekip Ata</p>
+                <select
+                  value={group.teamId || ""}
+                  onChange={(e) => { onAssignTeam(group.id, e.target.value || null); }}
+                  className="w-full h-6 text-xs rounded border bg-background px-1"
+                >
+                  <option value="">Ekip yok</option>
+                  {teams.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
+          <div className="h-px bg-border my-1" />
+
+          <div className="px-2 py-1">
+            <p className="text-[10px] text-muted-foreground font-medium mb-1.5">Renk Etiketi</p>
+            <div className="flex items-center gap-1.5">
+              {(["green", "orange", "red", ""] as ColorTag[]).map((c) => (
+                <button
+                  key={c || "none"}
+                  onClick={() => { onSetColorTag(groupIdx, c); }}
+                  className={`w-5 h-5 rounded-full border-2 transition-all ${
+                    (group.colorTag || "") === c ? "scale-110 ring-2 ring-offset-1 ring-primary" : "opacity-60 hover:opacity-100 hover:scale-105"
+                  } ${c === "" ? "border-dashed border-muted-foreground/40" : "border-transparent"}`}
+                  style={c ? { backgroundColor: COLOR_MAP[c] } : {}}
+                  title={c === "green" ? "Yeşil" : c === "orange" ? "Turuncu" : c === "red" ? "Kırmızı" : "Renksiz"}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="h-px bg-border my-1" />
+
+          <button
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            onClick={() => {
+              if (group.locked) return;
+              if (!confirm(`Hayvan ${group.animalNo} grubunu silmek istediğinize emin misiniz? İçindeki bağışçılar grupsuz kalacaktır.`)) return;
+              onDelete(groupIdx);
+              setOpen(false);
+            }}
+            disabled={group.locked}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Grubu Sil
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+});
+
 export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupCardProps) {
   const {
     group,
@@ -485,147 +618,71 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
               {team.name}
             </span>
           )}
-          <div className="flex items-center gap-0.5 ml-1" onClick={(e) => e.stopPropagation()}>
-            {(["green", "orange", "red", ""] as ColorTag[]).map((c) => (
-              <button
-                key={c || "none"}
-                onClick={() => onSetColorTag(groupIdx, c)}
-                className={`${compact ? "w-3 h-3" : "w-3.5 h-3.5"} rounded-full border transition-transform ${
-                  (group.colorTag || "") === c ? "scale-125 ring-1 ring-offset-1" : "opacity-50 hover:opacity-100"
-                } ${c === "" ? "border-dashed" : ""}`}
-                style={c ? { backgroundColor: COLOR_MAP[c] } : {}}
-                title={c === "green" ? "Yeşil" : c === "orange" ? "Turuncu" : c === "red" ? "Kırmızı" : "Renksiz"}
-                aria-label={c === "green" ? "Yeşil etiket" : c === "orange" ? "Turuncu etiket" : c === "red" ? "Kırmızı etiket" : "Renk etiketini kaldır"}
-                aria-pressed={(group.colorTag || "") === c}
+          {group.colorTag && (
+            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: COLOR_MAP[group.colorTag] }} />
+          )}
+        </div>
+        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-0.5 mr-1" title={`${filledCount}/7 hisse dolu`}>
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div
+                key={i}
+                className={`${compact ? "w-2 h-2" : "w-2.5 h-2.5"} rounded-sm transition-colors ${
+                  i < filledCount
+                    ? filledCount === 7 ? "bg-emerald-500" : "bg-primary"
+                    : "bg-muted-foreground/20"
+                }`}
               />
             ))}
+            <span className={`${compact ? "text-[10px]" : "text-xs"} text-muted-foreground ml-1`}>
+              {filledCount}/7
+            </span>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`${compact ? "text-[10px]" : "text-xs"} text-muted-foreground`}>
-            {filledCount}/7 dolu
-          </span>
           <button
-            onClick={(e) => { e.stopPropagation(); onMoveUp(groupIdx); }}
-            className={`p-0.5 rounded transition-colors ${groupIdx <= 0 ? "opacity-30 cursor-not-allowed" : "text-muted-foreground/60 hover:text-muted-foreground"}`}
-            title="Yukarı Taşı"
-            aria-label="Yukarı Taşı"
-            disabled={groupIdx <= 0}
-          >
-            <ArrowUp className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onMoveDown(groupIdx); }}
-            className={`p-0.5 rounded transition-colors ${groupIdx >= totalGroupCount - 1 ? "opacity-30 cursor-not-allowed" : "text-muted-foreground/60 hover:text-muted-foreground"}`}
-            title="Aşağı Taşı"
-            aria-label="Aşağı Taşı"
-            disabled={groupIdx >= totalGroupCount - 1}
-          >
-            <ArrowDown className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onSplit(groupIdx); }}
-            className={`p-0.5 rounded transition-colors ${group.locked || filledCount <= 1 ? "opacity-30 cursor-not-allowed" : "text-muted-foreground/60 hover:text-muted-foreground"}`}
-            title={group.locked ? "Kilitli grup bölünemez" : filledCount <= 1 ? "Bölmek için en az 2 bağışçı gerekli" : "Grubu Böl"}
-            aria-label={group.locked ? "Kilitli grup bölünemez" : filledCount <= 1 ? "Bölmek için en az 2 bağışçı gerekli" : "Grubu Böl"}
-            disabled={group.locked || filledCount <= 1}
-          >
-            <Scissors className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddGroupToBasket(groupIdx);
-            }}
-            className={`p-0.5 rounded transition-colors ${group.locked || group.kesildi || filledCount === 0 ? "opacity-30 cursor-not-allowed" : "text-emerald-500/60 hover:text-emerald-600"}`}
+            onClick={() => onAddGroupToBasket(groupIdx)}
+            className={`p-1 rounded transition-colors ${group.locked || group.kesildi || filledCount === 0 ? "opacity-30 cursor-not-allowed" : "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950"}`}
             title={group.locked ? "Kilitli grup sepete eklenemez" : group.kesildi ? "Kesilmiş grup sepete eklenemez" : filledCount === 0 ? "Grupta bağışçı yok" : `Bağışçıları Sepete Ekle (${filledCount})`}
-            aria-label={group.locked ? "Kilitli grup sepete eklenemez" : group.kesildi ? "Kesilmiş grup sepete eklenemez" : filledCount === 0 ? "Grupta bağışçı yok" : `Bağışçıları Sepete Ekle (${filledCount})`}
+            aria-label={`Hayvan ${group.animalNo} bağışçılarını sepete ekle`}
             disabled={group.locked || group.kesildi || filledCount === 0}
           >
-            <ShoppingBag className="w-3.5 h-3.5" />
+            <ShoppingBag className="w-4 h-4" />
           </button>
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddWholeAnimalToBasket(groupIdx);
-            }}
-            className={`p-0.5 rounded transition-colors ${
-              group.locked || group.kesildi || filledCount === 0
-                ? "opacity-30 cursor-not-allowed"
-                : basketAnimalGroupIds.has(group.id)
-                ? "text-orange-500 bg-orange-100 dark:bg-orange-900/30"
-                : "text-orange-400/60 hover:text-orange-500"
-            }`}
-            title={
-              group.locked ? "Kilitli grup taşınamaz"
-                : group.kesildi ? "Kesilmiş grup taşınamaz"
-                : filledCount === 0 ? "Grupta bağışçı yok"
-                : basketAnimalGroupIds.has(group.id) ? "Komple hayvan zaten sepette"
-                : `Komple Hayvanı Sepete Ekle (hayvan + ${filledCount} bağışçı)`
-            }
-            aria-label={
-              group.locked ? "Kilitli grup taşınamaz"
-                : group.kesildi ? "Kesilmiş grup taşınamaz"
-                : `Komple Hayvanı Sepete Ekle (${filledCount} bağışçı)`
-            }
-            disabled={group.locked || group.kesildi || filledCount === 0 || basketAnimalGroupIds.has(group.id)}
+            onClick={() => onToggleLock(groupIdx)}
+            className={`p-1 rounded transition-colors ${group.locked ? "text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950" : "text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted"}`}
+            title={group.locked ? "Kilidi Aç" : "Kilitle"}
+            aria-label={group.locked ? `Hayvan ${group.animalNo} kilidini aç` : `Hayvan ${group.animalNo} kilitle`}
           >
-            <Package className="w-3.5 h-3.5" />
+            {group.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
           </button>
           {(photoCounts[group.id] ?? 0) > 0 && (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewPhotos(group.id, group.animalNo);
-              }}
-              className="p-0.5 rounded transition-colors text-blue-500 hover:text-blue-600 relative"
+              onClick={() => onViewPhotos(group.id, group.animalNo)}
+              className="p-1 rounded transition-colors text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 relative"
               title={`${photoCounts[group.id]} fotoğraf`}
-              aria-label={`${photoCounts[group.id]} fotoğraf görüntüle`}
             >
-              <Camera className="w-3.5 h-3.5" />
-              <span className="absolute -top-1.5 -right-1.5 bg-blue-500 text-white text-[8px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none font-bold" aria-hidden="true">
+              <Camera className="w-4 h-4" />
+              <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-[8px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none font-bold">
                 {photoCounts[group.id]}
               </span>
             </button>
           )}
-          {teams.length > 0 && (
-            <select
-              value={group.teamId || ""}
-              onChange={(e) => { e.stopPropagation(); onAssignTeam(group.id, e.target.value || null); }}
-              onClick={(e) => e.stopPropagation()}
-              className="h-5 text-[10px] rounded border bg-background px-1 max-w-[80px]"
-              title="Ekip Ata"
-              aria-label={`Hayvan ${group.animalNo} için ekip ata`}
-            >
-              <option value="">Ekip yok</option>
-              {teams.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          )}
-          <button
-            onClick={(e) => { e.stopPropagation(); onToggleLock(groupIdx); }}
-            className={`p-0.5 rounded transition-colors ${group.locked ? "text-amber-500" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
-            title={group.locked ? "Kilidi Aç" : "Kilitle"}
-            aria-label={group.locked ? "Kilidi Aç" : "Kilitle"}
-            aria-pressed={!!group.locked}
-          >
-            {group.locked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (group.locked) return;
-              if (!confirm(`Hayvan ${group.animalNo} grubunu silmek istediğinize emin misiniz? İçindeki bağışçılar grupsuz kalacaktır.`)) return;
-              onDelete(groupIdx);
-            }}
-            className={`p-0.5 rounded transition-colors ${group.locked ? "opacity-30 cursor-not-allowed" : "text-red-400/60 hover:text-red-500"}`}
-            title={group.locked ? "Kilitli grup silinemez" : "Grubu Sil"}
-            aria-label={group.locked ? "Kilitli grup silinemez" : "Grubu Sil"}
-            disabled={group.locked}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          <GroupOverflowMenu
+            group={group}
+            groupIdx={groupIdx}
+            compact={compact}
+            filledCount={filledCount}
+            totalGroupCount={totalGroupCount}
+            teams={teams}
+            basketAnimalGroupIds={basketAnimalGroupIds}
+            onMoveUp={onMoveUp}
+            onMoveDown={onMoveDown}
+            onSplit={onSplit}
+            onAddWholeAnimalToBasket={onAddWholeAnimalToBasket}
+            onAssignTeam={onAssignTeam}
+            onSetColorTag={onSetColorTag}
+            onDelete={onDelete}
+          />
         </div>
       </div>
       {!isCollapsed && (

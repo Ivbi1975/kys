@@ -2,10 +2,12 @@ import { useState } from "react";
 import type { KesimAlani, Donation } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronUp, ListPlus, Loader2, MoveRight, Package, Send, ShoppingBag, UserPlus, Wand2, X } from "lucide-react";
+import { ChevronUp, ListPlus, Loader2, MoveRight, Package, Send, ShoppingBag, UserPlus, Wand2, X, ShoppingCart, ArrowRightLeft } from "lucide-react";
 import { COLOR_MAP } from "@/lib/constants";
 import { computeEffectiveShares } from "@/lib/grouping";
 import type { BasketItem } from "../hooks/types";
+
+type BasketTab = "contents" | "place" | "transfer";
 
 interface BasketPanelProps {
   kesim: KesimAlani;
@@ -50,6 +52,7 @@ export function BasketPanel({
   const [crossKAConfirmOpen, setCrossKAConfirmOpen] = useState(false);
   const [selectedBasketIds, setSelectedBasketIds] = useState<Set<string>>(new Set());
   const [retrieveTargetGroup, setRetrieveTargetGroup] = useState<number>(-1);
+  const [activeTab, setActiveTab] = useState<BasketTab>("contents");
 
   if (basketItems.length === 0 && emptyGroupsAfterTransfer.length === 0) return null;
 
@@ -105,275 +108,350 @@ export function BasketPanel({
     }
   };
 
+  const tabs: { id: BasketTab; label: string; icon: React.ReactNode; badge?: string }[] = [
+    { id: "contents", label: "Sepet İçeriği", icon: <ShoppingCart className="w-3.5 h-3.5" />, badge: selectedBasketIds.size > 0 ? `${selectedBasketIds.size} seçili` : undefined },
+    { id: "place", label: "Yerleştir", icon: <Package className="w-3.5 h-3.5" /> },
+    { id: "transfer", label: "Aktar", icon: <ArrowRightLeft className="w-3.5 h-3.5" /> },
+  ];
+
   return (
     <>
-      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 shadow-lg">
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t-2 border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-950 shadow-2xl">
         <button
-          className="w-full flex items-center gap-3 px-4 py-2 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors"
+          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors border-b border-border/50"
           onClick={() => setBasketOpen(prev => !prev)}
         >
-          <ShoppingBag className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
-            Sepet: {basketItems.filter(b => b.type !== "animalGroup").length} bağışçı
-            {basketItems.filter(b => b.type === "animalGroup").length > 0 && `, ${basketItems.filter(b => b.type === "animalGroup").length} hayvan`}
-          </span>
-          {foreignBasketItems.length > 0 && (
-            <span className="text-xs text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded-full font-semibold">
-              {foreignBasketItems.length} diğer KA
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900">
+            <ShoppingBag className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <div className="flex flex-col items-start">
+            <span className="text-sm font-semibold text-foreground">
+              Sepet
             </span>
-          )}
-          {localBasketItems.length > 0 && (
-            <>
-              <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 rounded-full font-semibold">
-                {basketTotalShares} hisse
+            <span className="text-[11px] text-muted-foreground">
+              {basketItems.filter(b => b.type !== "animalGroup").length} bağışçı
+              {basketItems.filter(b => b.type === "animalGroup").length > 0 && ` · ${basketItems.filter(b => b.type === "animalGroup").length} hayvan`}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 ml-auto mr-2">
+            {foreignBasketItems.length > 0 && (
+              <span className="text-[11px] text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded-full font-semibold">
+                {foreignBasketItems.length} diğer KA
               </span>
-              <span className="text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 rounded-full font-semibold">
-                ~{basketAnimals} hayvan
-              </span>
-            </>
-          )}
-          <ChevronUp className={`w-4 h-4 text-emerald-600 ml-auto transition-transform ${basketOpen ? "" : "rotate-180"}`} />
-        </button>
-        {basketOpen && (
-          <div className="px-4 pb-3 space-y-2">
+            )}
             {localBasketItems.length > 0 && (
-              <div className="flex items-center gap-2 mb-1">
-                <label className="flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="rounded w-3 h-3"
-                    checked={selectedBasketIds.size === localBasketItems.length && localBasketItems.length > 0}
-                    onChange={toggleSelectAll}
-                  />
-                  Tümünü Seç
-                </label>
-                {selectedBasketIds.size > 0 && (
-                  <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                    {selectedBasketIds.size} seçili
-                  </span>
-                )}
-              </div>
-            )}
-            {localAnimalGroupItems.length > 0 && (
-              <div className="flex items-center gap-1 text-xs text-orange-700 dark:text-orange-300 flex-wrap">
-                <span className="text-[10px] font-semibold mr-1">
-                  <Package className="w-3 h-3 inline mr-0.5" />
-                  Komple Hayvan:
+              <>
+                <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-2.5 py-0.5 rounded-full">
+                  {basketTotalShares} hisse
                 </span>
-                {localAnimalGroupItems.map(b => (
-                  <span
-                    key={b.animalGroupId}
-                    className={`px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900 rounded text-[10px] inline-flex items-center gap-0.5 cursor-pointer transition-colors ${selectedBasketIds.has(b.donationId) ? "ring-2 ring-orange-500 bg-orange-200 dark:bg-orange-800" : ""}`}
-                    style={b.colorTag && b.colorTag in COLOR_MAP ? { borderLeft: `3px solid ${COLOR_MAP[b.colorTag as keyof typeof COLOR_MAP]}` } : {}}
-                    onClick={() => toggleBasketSelect(b.donationId)}
-                  >
-                    <input
-                      type="checkbox"
-                      className="rounded w-2.5 h-2.5"
-                      checked={selectedBasketIds.has(b.donationId)}
-                      onChange={() => toggleBasketSelect(b.donationId)}
-                      onClick={e => e.stopPropagation()}
-                    />
-                    Hayvan {b.animalNo} ({b.filledCount} bağışçı)
-                    <button onClick={(e) => { e.stopPropagation(); removeFromBasket(b.donationId); setSelectedBasketIds(prev => { const next = new Set(prev); next.delete(b.donationId); return next; }); }} className="hover:text-red-500">
-                      <X className="w-2.5 h-2.5" />
-                    </button>
-                  </span>
-                ))}
-              </div>
+                <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-2.5 py-0.5 rounded-full">
+                  ~{basketAnimals} hayvan
+                </span>
+              </>
             )}
-            {localDonationItems.length > 0 && (() => {
-              const grouped: { key: string; label: string; items: typeof localDonationItems }[] = [];
-              const seen = new Map<string, number>();
-              for (const b of localDonationItems) {
-                const label = (b.description || b.name).trim();
-                const existing = seen.get(label);
-                if (existing !== undefined) {
-                  grouped[existing].items.push(b);
-                } else {
-                  seen.set(label, grouped.length);
-                  grouped.push({ key: label, label, items: [b] });
-                }
-              }
-              return (
-                <div className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300 flex-wrap">
-                  <span className="text-[10px] font-semibold mr-1">Bu KA:</span>
-                  {grouped.slice(0, 6).map(g => {
-                    const allSelected = g.items.every(item => selectedBasketIds.has(item.donationId));
-                    const toggleGroup = () => {
-                      setSelectedBasketIds(prev => {
-                        const next = new Set(prev);
-                        if (allSelected) {
-                          g.items.forEach(item => next.delete(item.donationId));
-                        } else {
-                          g.items.forEach(item => next.add(item.donationId));
-                        }
-                        return next;
-                      });
-                    };
-                    return (
-                      <span
-                        key={g.key}
-                        className={`px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900 rounded text-[10px] inline-flex items-center gap-0.5 cursor-pointer transition-colors ${allSelected ? "ring-2 ring-emerald-500 bg-emerald-200 dark:bg-emerald-800" : ""}`}
-                        onClick={toggleGroup}
-                      >
+          </div>
+          <ChevronUp className={`w-5 h-5 text-muted-foreground transition-transform ${basketOpen ? "" : "rotate-180"}`} />
+        </button>
+
+        {basketOpen && (
+          <div className="max-h-[50vh] overflow-y-auto">
+            <div className="flex border-b border-border">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors border-b-2 ${
+                    activeTab === tab.id
+                      ? "border-emerald-500 text-emerald-700 dark:text-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/30"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  }`}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  {tab.icon}
+                  {tab.label}
+                  {tab.badge && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-bold leading-none">
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="p-3">
+              {activeTab === "contents" && (
+                <div className="space-y-3">
+                  {localBasketItems.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
                         <input
                           type="checkbox"
-                          className="rounded w-2.5 h-2.5"
-                          checked={allSelected}
-                          onChange={toggleGroup}
-                          onClick={e => e.stopPropagation()}
+                          className="rounded w-3.5 h-3.5"
+                          checked={selectedBasketIds.size === localBasketItems.length && localBasketItems.length > 0}
+                          onChange={toggleSelectAll}
                         />
-                        {g.label}
-                        {g.items.length > 1 && <span className="text-emerald-500">×{g.items.length}</span>}
-                        <button onClick={(e) => { e.stopPropagation(); g.items.forEach(item => { removeFromBasket(item.donationId); setSelectedBasketIds(prev => { const next = new Set(prev); next.delete(item.donationId); return next; }); }); }} className="hover:text-red-500">
-                          <X className="w-2.5 h-2.5" />
-                        </button>
-                      </span>
+                        Tümünü Seç
+                      </label>
+                      {selectedBasketIds.size > 0 && (
+                        <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                          {selectedBasketIds.size} seçili
+                        </span>
+                      )}
+                      <div className="ml-auto">
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={clearBasket}>
+                          <X className="w-3 h-3 mr-1" /> Sepeti Temizle
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {localAnimalGroupItems.length > 0 && (
+                    <div className="rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/30 p-2.5">
+                      <p className="text-[11px] font-semibold text-orange-700 dark:text-orange-300 mb-2 flex items-center gap-1">
+                        <Package className="w-3.5 h-3.5" />
+                        Komple Hayvanlar
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {localAnimalGroupItems.map(b => (
+                          <span
+                            key={b.animalGroupId}
+                            className={`px-2 py-1 bg-white dark:bg-zinc-900 rounded-md text-xs inline-flex items-center gap-1.5 cursor-pointer transition-all border ${selectedBasketIds.has(b.donationId) ? "ring-2 ring-orange-400 border-orange-300" : "border-orange-200 dark:border-orange-800 hover:border-orange-300"}`}
+                            style={b.colorTag && b.colorTag in COLOR_MAP ? { borderLeft: `3px solid ${COLOR_MAP[b.colorTag as keyof typeof COLOR_MAP]}` } : {}}
+                            onClick={() => toggleBasketSelect(b.donationId)}
+                          >
+                            <input
+                              type="checkbox"
+                              className="rounded w-3 h-3"
+                              checked={selectedBasketIds.has(b.donationId)}
+                              onChange={() => toggleBasketSelect(b.donationId)}
+                              onClick={e => e.stopPropagation()}
+                            />
+                            <span className="font-medium">Hayvan {b.animalNo}</span>
+                            <span className="text-muted-foreground">({b.filledCount} kişi)</span>
+                            <button onClick={(e) => { e.stopPropagation(); removeFromBasket(b.donationId); setSelectedBasketIds(prev => { const next = new Set(prev); next.delete(b.donationId); return next; }); }} className="ml-0.5 text-muted-foreground hover:text-red-500 transition-colors">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {localDonationItems.length > 0 && (() => {
+                    const grouped: { key: string; label: string; items: typeof localDonationItems }[] = [];
+                    const seen = new Map<string, number>();
+                    for (const b of localDonationItems) {
+                      const label = (b.description || b.name).trim();
+                      const existing = seen.get(label);
+                      if (existing !== undefined) {
+                        grouped[existing].items.push(b);
+                      } else {
+                        seen.set(label, grouped.length);
+                        grouped.push({ key: label, label, items: [b] });
+                      }
+                    }
+                    return (
+                      <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 p-2.5">
+                        <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 mb-2">Bu Kesim Alanı</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {grouped.map(g => {
+                            const allSelected = g.items.every(item => selectedBasketIds.has(item.donationId));
+                            const toggleGroup = () => {
+                              setSelectedBasketIds(prev => {
+                                const next = new Set(prev);
+                                if (allSelected) {
+                                  g.items.forEach(item => next.delete(item.donationId));
+                                } else {
+                                  g.items.forEach(item => next.add(item.donationId));
+                                }
+                                return next;
+                              });
+                            };
+                            return (
+                              <span
+                                key={g.key}
+                                className={`px-2 py-1 bg-white dark:bg-zinc-900 rounded-md text-xs inline-flex items-center gap-1.5 cursor-pointer transition-all border ${allSelected ? "ring-2 ring-emerald-400 border-emerald-300" : "border-emerald-200 dark:border-emerald-800 hover:border-emerald-300"}`}
+                                onClick={toggleGroup}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="rounded w-3 h-3"
+                                  checked={allSelected}
+                                  onChange={toggleGroup}
+                                  onClick={e => e.stopPropagation()}
+                                />
+                                <span className="font-medium">{g.label}</span>
+                                {g.items.length > 1 && <span className="text-emerald-500 font-semibold">×{g.items.length}</span>}
+                                <button onClick={(e) => { e.stopPropagation(); g.items.forEach(item => { removeFromBasket(item.donationId); setSelectedBasketIds(prev => { const next = new Set(prev); next.delete(item.donationId); return next; }); }); }} className="ml-0.5 text-muted-foreground hover:text-red-500 transition-colors">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
                     );
-                  })}
-                  {grouped.length > 6 && (
-                    <span className="text-[10px] text-emerald-500">+{grouped.length - 6} daha</span>
+                  })()}
+
+                  {foreignBasketItems.length > 0 && (
+                    <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30 p-2.5">
+                      <p className="text-[11px] font-semibold text-blue-700 dark:text-blue-300 mb-2">Diğer Kesim Alanlarından</p>
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {foreignBasketItems.map(b => (
+                          <span key={b.donationId} className="px-2 py-1 bg-white dark:bg-zinc-900 rounded-md text-xs inline-flex items-center gap-1.5 border border-blue-200 dark:border-blue-800">
+                            <span className="font-medium">{b.description || b.name}</span>
+                            <button onClick={(e) => { e.stopPropagation(); removeFromBasket(b.donationId); }} className="text-muted-foreground hover:text-red-500 transition-colors">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs border-blue-300 text-blue-700 dark:text-blue-300"
+                        onClick={() => setTransferToDonorListConfirm(true)}
+                        disabled={transferToDonorListRemoving}
+                      >
+                        {transferToDonorListRemoving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <UserPlus className="w-3 h-3 mr-1" />}
+                        Bu Listeye Ekle ({foreignBasketItems.length})
+                      </Button>
+                    </div>
                   )}
                 </div>
-              );
-            })()}
-            {foreignBasketItems.length > 0 && (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 text-xs text-blue-700 dark:text-blue-300 flex-wrap flex-1">
-                  <span className="text-[10px] font-semibold mr-1">Diğer KA:</span>
-                  {foreignBasketItems.slice(0, 4).map(b => (
-                    <span key={b.donationId} className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900 rounded text-[10px] inline-flex items-center gap-0.5">
-                      {b.description || b.name}
-                      <button onClick={(e) => { e.stopPropagation(); removeFromBasket(b.donationId); }} className="hover:text-red-500">
-                        <X className="w-2.5 h-2.5" />
-                      </button>
-                    </span>
-                  ))}
-                  {foreignBasketItems.length > 4 && <span className="text-[10px] text-blue-500">+{foreignBasketItems.length - 4}</span>}
+              )}
+
+              {activeTab === "place" && (
+                <div className="space-y-3">
+                  {selectedBasketIds.size > 0 && (
+                    <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 p-3">
+                      <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200 mb-2.5">
+                        Seçilen {selectedBasketIds.size} Öğeyi Yerleştir
+                      </p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Select value={retrieveTargetGroup < 0 ? "" : String(retrieveTargetGroup)} onValueChange={(v) => setRetrieveTargetGroup(parseInt(v))}>
+                          <SelectTrigger className="h-8 flex-1 text-xs">
+                            <SelectValue placeholder="Hedef hayvan grubu seçin..." />
+                          </SelectTrigger>
+                          <SelectContent side="top">
+                            {kesim.animalGroups.map((g, i) => {
+                              const empty = g.donations.filter(d => !d.name.trim()).length;
+                              return (
+                                <SelectItem key={g.id} value={String(i)} disabled={g.locked || empty === 0}>
+                                  Hayvan {g.animalNo} ({empty} boş yer)
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={handleTransferToGroup}
+                          disabled={retrieveTargetGroup < 0}
+                        >
+                          <MoveRight className="w-3.5 h-3.5 mr-1" />
+                          Gruba Yerleştir
+                        </Button>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs w-full"
+                        onClick={handleReturnToDonorList}
+                      >
+                        <ListPlus className="w-3.5 h-3.5 mr-1" />
+                        Bağışçı Listesine Geri Gönder
+                      </Button>
+                    </div>
+                  )}
+
+                  {localDonationItems.length > 0 && (
+                    <div className="rounded-lg border bg-muted/30 p-3">
+                      <p className="text-xs font-semibold mb-2.5">Tüm Sepeti Yerleştir</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Select value={String(basketTransferTarget)} onValueChange={(v) => setBasketTransferTarget(parseInt(v))}>
+                          <SelectTrigger className="h-8 flex-1 text-xs">
+                            <SelectValue placeholder="Hedef hayvan grubu seçin..." />
+                          </SelectTrigger>
+                          <SelectContent side="top">
+                            {kesim.animalGroups.map((g, i) => {
+                              const empty = g.donations.filter(d => !d.name.trim()).length;
+                              return (
+                                <SelectItem key={g.id} value={String(i)} disabled={g.locked || empty === 0}>
+                                  Hayvan {g.animalNo} ({empty} boş yer)
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                        <Button size="sm" className="h-8 text-xs" onClick={() => transferBasketToGroup(basketTransferTarget)} disabled={basketTransferTarget < 0}>
+                          <Package className="w-3.5 h-3.5 mr-1" />
+                          Yerleştir
+                        </Button>
+                      </div>
+                      <Button variant="secondary" size="sm" className="h-8 text-xs w-full" onClick={autoDistributeBasket}>
+                        <Wand2 className="w-3.5 h-3.5 mr-1" />
+                        Otomatik Dağıt ({basketTotalShares} hisse → ~{basketAnimals} hayvan)
+                      </Button>
+                    </div>
+                  )}
+
+                  {selectedBasketIds.size === 0 && localDonationItems.length === 0 && (
+                    <div className="text-center py-4 text-sm text-muted-foreground">
+                      Yerleştirmek için önce "Sepet İçeriği" sekmesinden öğe seçin
+                    </div>
+                  )}
+                  {selectedBasketIds.size === 0 && localDonationItems.length > 0 && (
+                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                      <span className="text-xs text-amber-700 dark:text-amber-300">
+                        Belirli öğeleri yerleştirmek için "Sepet İçeriği" sekmesinden seçim yapın
+                      </span>
+                      <Button variant="outline" size="sm" className="h-7 text-xs shrink-0" onClick={() => setActiveTab("contents")}>
+                        Sepete Git
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs border-blue-300 text-blue-700 dark:text-blue-300"
-                  onClick={() => setTransferToDonorListConfirm(true)}
-                  disabled={transferToDonorListRemoving}
-                >
-                  {transferToDonorListRemoving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <UserPlus className="w-3 h-3 mr-1" />}
-                  Bağışçı Listesine Ekle ({foreignBasketItems.length})
-                </Button>
-              </div>
-            )}
-
-            {selectedBasketIds.size > 0 && (
-              <div className="flex items-center gap-1 flex-wrap p-1.5 bg-emerald-100 dark:bg-emerald-900 rounded-lg border border-emerald-300 dark:border-emerald-700">
-                <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-200 mr-1">
-                  Sepetten Al ({selectedBasketIds.size} seçili):
-                </span>
-                <Select value={retrieveTargetGroup < 0 ? "" : String(retrieveTargetGroup)} onValueChange={(v) => setRetrieveTargetGroup(parseInt(v))}>
-                  <SelectTrigger className="h-6 w-32 text-[10px]">
-                    <SelectValue placeholder="Hedef grup..." />
-                  </SelectTrigger>
-                  <SelectContent side="top">
-                    {kesim.animalGroups.map((g, i) => {
-                      const empty = g.donations.filter(d => !d.name.trim()).length;
-                      return (
-                        <SelectItem key={g.id} value={String(i)} disabled={g.locked || empty === 0}>
-                          Hayvan {g.animalNo} ({empty} boş)
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="h-6 text-[10px] px-2"
-                  onClick={handleTransferToGroup}
-                  disabled={retrieveTargetGroup < 0}
-                >
-                  <MoveRight className="w-3 h-3 mr-0.5" />
-                  Gruba Aktar
-                </Button>
-                <div className="w-px h-4 bg-emerald-300 dark:bg-emerald-700 mx-0.5" />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 text-[10px] px-2 border-emerald-400 text-emerald-700 dark:text-emerald-300"
-                  onClick={handleReturnToDonorList}
-                >
-                  <ListPlus className="w-3 h-3 mr-0.5" />
-                  Bağışçı Listesine Ekle
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 text-[10px] px-1 text-emerald-600"
-                  onClick={() => setSelectedBasketIds(new Set())}
-                >
-                  Seçimi Kaldır
-                </Button>
-              </div>
-            )}
-
-            <div className="flex items-center gap-1 flex-wrap">
-              {localDonationItems.length > 0 && (
-                <>
-                  <Select value={String(basketTransferTarget)} onValueChange={(v) => setBasketTransferTarget(parseInt(v))}>
-                    <SelectTrigger className="h-7 w-36 text-xs">
-                      <SelectValue placeholder="Hedef grup..." />
-                    </SelectTrigger>
-                    <SelectContent side="top">
-                      {kesim.animalGroups.map((g, i) => {
-                        const empty = g.donations.filter(d => !d.name.trim()).length;
-                        return (
-                          <SelectItem key={g.id} value={String(i)} disabled={g.locked || empty === 0}>
-                            Hayvan {g.animalNo} ({empty} boş)
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <Button variant="default" size="sm" className="h-7 text-xs" onClick={() => transferBasketToGroup(basketTransferTarget)} disabled={basketTransferTarget < 0}>
-                    <Package className="w-3 h-3 mr-1" />
-                    Yerleştir
-                  </Button>
-                  <Button variant="secondary" size="sm" className="h-7 text-xs" onClick={autoDistributeBasket}>
-                    <Wand2 className="w-3 h-3 mr-1" />
-                    Otomatik Dağıt
-                  </Button>
-                </>
               )}
-              {siblingKesimAlanlari.length > 0 && localBasketItems.length > 0 && (
-                <>
-                  <div className="w-px h-5 bg-emerald-300 dark:bg-emerald-700 mx-1" />
-                  <Select value={basketCrossKATarget} onValueChange={setBasketCrossKATarget}>
-                    <SelectTrigger className="h-7 w-40 text-xs">
-                      <SelectValue placeholder="Başka KA'ya taşı..." />
-                    </SelectTrigger>
-                    <SelectContent side="top">
-                      {siblingKesimAlanlari.map(ka => (
-                        <SelectItem key={ka.id} value={ka.id}>
-                          {ka.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => setCrossKAConfirmOpen(true)}
-                    disabled={!basketCrossKATarget || crossKATransferring}
-                  >
-                    {crossKATransferring ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
-                    Aktar
-                  </Button>
-                </>
+
+              {activeTab === "transfer" && (
+                <div className="space-y-3">
+                  {siblingKesimAlanlari.length > 0 && localBasketItems.length > 0 && (
+                    <div className="rounded-lg border bg-muted/30 p-3">
+                      <p className="text-xs font-semibold mb-2.5">Başka Kesim Alanına Aktar</p>
+                      <div className="flex items-center gap-2">
+                        <Select value={basketCrossKATarget} onValueChange={setBasketCrossKATarget}>
+                          <SelectTrigger className="h-8 flex-1 text-xs">
+                            <SelectValue placeholder="Hedef kesim alanı seçin..." />
+                          </SelectTrigger>
+                          <SelectContent side="top">
+                            {siblingKesimAlanlari.map(ka => (
+                              <SelectItem key={ka.id} value={ka.id}>
+                                {ka.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={() => setCrossKAConfirmOpen(true)}
+                          disabled={!basketCrossKATarget || crossKATransferring}
+                        >
+                          {crossKATransferring ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Send className="w-3.5 h-3.5 mr-1" />}
+                          Aktar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {siblingKesimAlanlari.length === 0 && (
+                    <div className="text-center py-4 text-sm text-muted-foreground">
+                      Aktarım yapılabilecek başka kesim alanı bulunmuyor
+                    </div>
+                  )}
+                </div>
               )}
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={clearBasket}>
-                Temizle
-              </Button>
             </div>
           </div>
         )}

@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import type { Donation } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  AlertTriangle, Eye, EyeOff, Scissors, ShoppingBag, Tag, Trash2, UserCog, Wand2,
+  AlertTriangle, Eye, EyeOff, MoreHorizontal, Scissors, ShoppingBag, Tag, Trash2, UserCog, Wand2,
 } from "lucide-react";
 
 interface DonorRowProps {
@@ -57,6 +57,101 @@ function EditableCell({
   return (
     <span className="cursor-text block px-1 py-0.5 rounded hover:bg-muted/50 transition-colors"
       onClick={() => onStartEditing(d.id, field)}>{displayValue || "—"}</span>
+  );
+}
+
+function DonorRowOverflowMenu({
+  d, isGrouped, canSplit, splitShares, globalTags, tagPopoverOpen,
+  onSetPersonEditDesc, onUpdateField, onToggleTag, onSetTagPopover,
+  onSmartPlace, onSplitShare, onDelete,
+}: {
+  d: Donation;
+  isGrouped: boolean;
+  canSplit: boolean;
+  splitShares: number;
+  globalTags: Array<{ id: string; name: string; color: string }>;
+  tagPopoverOpen: boolean;
+  onSetPersonEditDesc: (desc: string) => void;
+  onUpdateField: (id: string, field: keyof Donation, value: string | number | boolean) => void;
+  onToggleTag: (donationId: string, tagId: string) => void;
+  onSetTagPopover: (id: string | null) => void;
+  onSmartPlace: (id: string) => void;
+  onSplitShare: (params: { donationId: string; totalShares: number }) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Daha fazla" aria-label="Daha fazla seçenek">
+          <MoreHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-48 p-1" align="end" side="bottom">
+        <div className="space-y-0.5">
+          {!d.excluded && !isGrouped && (
+            <button
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-muted transition-colors"
+              onClick={() => { onSmartPlace(d.id); setOpen(false); }}
+            >
+              <Wand2 className="w-3.5 h-3.5 text-primary" />
+              Akıllı Yerleştir
+            </button>
+          )}
+          {canSplit && (
+            <button
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-muted transition-colors"
+              onClick={() => { onSplitShare({ donationId: d.id, totalShares: splitShares }); setOpen(false); }}
+            >
+              <Scissors className="w-3.5 h-3.5 text-amber-600" />
+              Hisse Böl
+            </button>
+          )}
+          <button
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-muted transition-colors"
+            onClick={() => { onUpdateField(d.id, "excluded", !d.excluded); setOpen(false); }}
+          >
+            {d.excluded
+              ? <><Eye className="w-3.5 h-3.5 text-green-600" /> Dahil Et</>
+              : <><EyeOff className="w-3.5 h-3.5 text-muted-foreground" /> Hariç Tut</>
+            }
+          </button>
+
+          {globalTags.length > 0 && (
+            <>
+              <div className="h-px bg-border my-1" />
+              <div className="px-2 py-1">
+                <p className="text-[10px] text-muted-foreground font-medium mb-1">Etiketler</p>
+                <div className="space-y-0.5">
+                  {globalTags.map(tag => {
+                    const isActive = (d.tags || []).includes(tag.id);
+                    return (
+                      <button key={tag.id} className={`w-full flex items-center gap-2 px-1.5 py-1 rounded text-xs hover:bg-muted transition-colors ${isActive ? "bg-muted" : ""}`}
+                        onClick={() => onToggleTag(d.id, tag.id)}>
+                        <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+                        <span className="flex-1 text-left">{tag.name}</span>
+                        {isActive && <span className="text-primary text-xs">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="h-px bg-border my-1" />
+
+          <button
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-destructive hover:bg-destructive/10 transition-colors"
+            onClick={() => { onDelete(d.id); setOpen(false); }}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Sil
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -128,16 +223,16 @@ function DonorRowInner({
     </td>
     <td className="p-2 text-center">
       {descCount > 1 ? (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">{effectiveShare}</span>
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 text-sm font-bold border border-amber-200 dark:border-amber-800">{effectiveShare}</span>
       ) : (
         <Select value={String(d.shareCount)} onValueChange={(v) => onUpdateField(d.id, "shareCount", parseInt(v))}>
-          <SelectTrigger className="h-7 w-16 text-sm mx-auto"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-8 w-16 text-sm font-bold mx-auto"><SelectValue /></SelectTrigger>
           <SelectContent>{[1, 2, 3, 4, 5, 6, 7].map((n) => (<SelectItem key={n} value={String(n)}>{n}</SelectItem>))}</SelectContent>
         </Select>
       )}
     </td>
     <td className="p-2">
-      <div className="flex items-center gap-1 flex-wrap">
+      <div className="flex items-center gap-0.5">
         {(d.tags || []).length > 0 && globalTags.length > 0 && (
           <div className="flex gap-0.5 flex-wrap mr-1">
             {(d.tags || []).map(tagId => {
@@ -147,49 +242,28 @@ function DonorRowInner({
             })}
           </div>
         )}
-        {globalTags.length > 0 && (
-          <Popover open={tagPopoverOpen} onOpenChange={(open) => onSetTagPopover(open ? d.id : null)}>
-            <PopoverTrigger asChild><Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Etiket ata" aria-label="Etiket ata"><Tag className="w-3 h-3 text-muted-foreground" /></Button></PopoverTrigger>
-            <PopoverContent className="w-48 p-2" align="end">
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground mb-2">Etiket Ata</p>
-                {globalTags.map(tag => {
-                  const isActive = (d.tags || []).includes(tag.id);
-                  return (
-                    <button key={tag.id} className={`w-full flex items-center gap-2 px-2 py-1 rounded text-xs hover:bg-muted transition-colors ${isActive ? "bg-muted" : ""}`}
-                      onClick={() => onToggleTag(d.id, tag.id)}>
-                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
-                      <span className="flex-1 text-left">{tag.name}</span>
-                      {isActive && <span className="text-primary">✓</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            </PopoverContent>
-          </Popover>
-        )}
         {!d.excluded && (
-          <Button variant="ghost" size="sm" className={`h-7 w-7 p-0 ${isInBasket ? "bg-emerald-100 dark:bg-emerald-900" : ""}`}
+          <Button variant="ghost" size="sm" className={`h-7 w-7 p-0 ${isInBasket ? "bg-emerald-100 dark:bg-emerald-900 ring-1 ring-emerald-300" : ""}`}
             title={isInBasket ? "Sepetten Çıkar" : "Sepete Ekle"} aria-label={isInBasket ? "Sepetten Çıkar" : "Sepete Ekle"}
             onClick={() => isInBasket ? onRemoveFromBasket(d.id) : onAddToBasket(d.id)}>
-            <ShoppingBag className={`w-3 h-3 ${isInBasket ? "text-emerald-600" : "text-muted-foreground"}`} />
+            <ShoppingBag className={`w-3.5 h-3.5 ${isInBasket ? "text-emerald-600" : "text-muted-foreground"}`} />
           </Button>
         )}
-        {!d.excluded && !isGrouped && (
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Akıllı Yerleştir" aria-label="Akıllı Yerleştir"
-            onClick={() => onSmartPlace(d.id)}><Wand2 className="w-3 h-3 text-primary" /></Button>
-        )}
-        {canSplit && (
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Hisse Böl" aria-label="Hisse Böl"
-            onClick={() => onSplitShare({ donationId: d.id, totalShares: splitShares })}><Scissors className="w-3 h-3 text-amber-600" /></Button>
-        )}
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
-          title={d.excluded ? "Dahil et" : "Hariç tut"} aria-label={d.excluded ? "Dahil et" : "Hariç tut"}
-          onClick={() => onUpdateField(d.id, "excluded", !d.excluded)}>
-          {d.excluded ? <Eye className="w-3 h-3 text-green-600" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" aria-label="Bağışçıyı sil"
-          onClick={() => onDelete(d.id)}><Trash2 className="w-3 h-3 text-destructive" /></Button>
+        <DonorRowOverflowMenu
+          d={d}
+          isGrouped={isGrouped}
+          canSplit={canSplit}
+          splitShares={splitShares}
+          globalTags={globalTags}
+          tagPopoverOpen={tagPopoverOpen}
+          onSetPersonEditDesc={onSetPersonEditDesc}
+          onUpdateField={onUpdateField}
+          onToggleTag={onToggleTag}
+          onSetTagPopover={onSetTagPopover}
+          onSmartPlace={onSmartPlace}
+          onSplitShare={onSplitShare}
+          onDelete={onDelete}
+        />
       </div>
     </td>
   </>);
