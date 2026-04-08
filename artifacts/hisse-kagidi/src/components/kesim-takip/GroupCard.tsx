@@ -33,24 +33,33 @@ export const GroupCard = memo(function GroupCard({
         }`}
         style={group.colorTag && COLOR_MAP[group.colorTag] ? { borderLeft: `4px solid ${COLOR_MAP[group.colorTag]}` } : {}}
         onClick={() => onSelect(index)}
+        role="button"
+        tabIndex={0}
+        aria-label={`Hayvan ${group.animalNo}, ${group.filledCount}/7 dolu${group.kesildi ? ", kesildi" : ", bekliyor"}`}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(index); } }}
       >
         <div className="flex items-center gap-3">
-          <div className="shrink-0" onClick={(e) => { e.stopPropagation(); onToggle(group); }}>
+          <button
+            className="shrink-0 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full hover:bg-muted/50 transition-colors"
+            onClick={(e) => { e.stopPropagation(); onToggle(group); }}
+            aria-label={group.kesildi ? `Hayvan ${group.animalNo} kesim işaretini kaldır` : `Hayvan ${group.animalNo} kesildi olarak işaretle`}
+            disabled={isToggling}
+          >
             {isToggling ? (
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              <Loader2 className="w-7 h-7 animate-spin text-muted-foreground" />
             ) : group.kesildi ? (
-              <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+              <CheckCircle2 className="w-7 h-7 text-emerald-500" />
             ) : (
-              <Circle className="w-6 h-6 text-muted-foreground" />
+              <Circle className="w-7 h-7 text-muted-foreground" />
             )}
-          </div>
+          </button>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-sm">Hayvan {group.animalNo}</span>
               <span className="text-xs text-muted-foreground">({group.filledCount}/7 dolu)</span>
               {noteCount > 0 && (
                 <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
-                  <MessageSquarePlus className="w-2.5 h-2.5" />
+                  <MessageSquarePlus className="w-2.5 h-2.5" aria-hidden="true" />
                   {noteCount}
                 </span>
               )}
@@ -67,7 +76,7 @@ export const GroupCard = memo(function GroupCard({
                   Kesildi
                   {group.kesildiAt && (
                     <>
-                      <Clock className="w-2.5 h-2.5" />
+                      <Clock className="w-2.5 h-2.5" aria-hidden="true" />
                       {formatKesildiTime(group.kesildiAt)}
                     </>
                   )}

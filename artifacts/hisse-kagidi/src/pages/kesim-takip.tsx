@@ -9,10 +9,12 @@ import { useMinLoadingTime } from "@/hooks/useMinLoadingTime";
 import type { TrackingGroup, TrackingNote } from "@/lib/api";
 import { useOfflineSync } from "@/lib/useOfflineSync";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   AlertTriangle, Beef,
+  CheckCircle2,
   ChevronDown, ChevronUp,
-  StickyNote,
+  StickyNote, MessageSquarePlus, Sun,
 } from "lucide-react";
 import { NoteInput } from "@/components/kesim-takip/NoteInput";
 import { NotesList } from "@/components/kesim-takip/NotesList";
@@ -52,6 +54,21 @@ export default function KesimTakipPage() {
   );
   const lastNotifCheckRef = useRef<string>(new Date().toISOString());
   const seenNotifIdsRef = useRef<Set<string>>(new Set());
+
+  const [highContrast, setHighContrast] = useState(() => {
+    return localStorage.getItem("hisse-kagidi-high-contrast") === "true";
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (highContrast) {
+      root.classList.add("high-contrast");
+    } else {
+      root.classList.remove("high-contrast");
+    }
+    localStorage.setItem("hisse-kagidi-high-contrast", String(highContrast));
+    return () => { root.classList.remove("high-contrast"); };
+  }, [highContrast]);
 
   useEffect(() => {
     if (typeof Notification !== "undefined" && Notification.permission === "default") {
@@ -123,6 +140,8 @@ export default function KesimTakipPage() {
     return groups;
   }, [filledGroups, filterMode, searchQuery]);
 
+  const pendingGroups = useMemo(() => filteredGroups.filter(g => !g.kesildi), [filteredGroups]);
+
   const handleSelectGroup = useCallback((idx: number) => {
     setOverlayIndex(idx);
   }, []);
@@ -158,15 +177,27 @@ export default function KesimTakipPage() {
     }
   }
 
+  const handleMarkNextPendingDone = useCallback(() => {
+    if (pendingGroups.length === 0) return;
+    handleToggle(pendingGroups[0]);
+  }, [pendingGroups]);
+
+  const handleOpenNextPendingNotes = useCallback(() => {
+    if (pendingGroups.length === 0) return;
+    const firstPending = pendingGroups[0];
+    const idx = filteredGroups.findIndex(g => g.id === firstPending.id);
+    if (idx >= 0) setOverlayIndex(idx);
+  }, [pendingGroups, filteredGroups]);
+
   if (loading) {
     return <KesimTakipSkeleton />;
   }
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-red-50 to-white dark:from-red-950 dark:to-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-b from-red-50 to-white dark:from-red-950 dark:to-background flex items-center justify-center p-4" role="alert">
         <Card className="p-6 text-center max-w-sm">
-          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-3" aria-hidden="true" />
           <h2 className="text-lg font-semibold mb-2">Takip Linki Bulunamadı</h2>
           <p className="text-sm text-muted-foreground">{error || "Geçersiz veya süresi dolmuş link"}</p>
         </Card>
@@ -175,15 +206,32 @@ export default function KesimTakipPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white dark:from-emerald-950 dark:to-background">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white dark:from-emerald-950 dark:to-background pb-20">
       <div className="max-w-lg mx-auto p-4">
         <div className="text-center mb-6 pt-4">
-          <Beef className="w-10 h-10 text-emerald-600 mx-auto mb-2" />
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Beef className="w-10 h-10 text-emerald-600" aria-hidden="true" />
+          </div>
           <h1 className="text-xl font-bold text-foreground">{data.kesimAlaniName}</h1>
           {data.projectName && (
             <p className="text-sm text-muted-foreground">{data.projectName}</p>
           )}
-          <p className="text-xs text-muted-foreground mt-1">Kesim Takip Sayfası</p>
+          <div className="flex items-center justify-center gap-2 mt-1">
+            <p className="text-xs text-muted-foreground">Kesim Takip Sayfası</p>
+            <button
+              onClick={() => setHighContrast(!highContrast)}
+              className={`inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-full border transition-colors min-h-[48px] min-w-[48px] ${
+                highContrast
+                  ? "bg-yellow-400 text-black border-yellow-500 font-bold"
+                  : "bg-background border-border text-muted-foreground hover:bg-muted"
+              }`}
+              aria-label={highContrast ? "Yüksek kontrast modunu kapat" : "Yüksek kontrast modunu aç"}
+              aria-pressed={highContrast}
+            >
+              <Sun className="w-4 h-4" aria-hidden="true" />
+              HC
+            </button>
+          </div>
         </div>
 
         <ProgressCard
@@ -201,11 +249,13 @@ export default function KesimTakipPage() {
 
         <Card className="p-3 mb-4">
           <button
-            className="flex items-center justify-between w-full text-sm"
+            className="flex items-center justify-between w-full text-sm min-h-[48px]"
             onClick={() => setShowGlobalNotes(!showGlobalNotes)}
+            aria-expanded={showGlobalNotes}
+            aria-label={`Genel Notlar${notes.length > 0 ? ` (${notes.length} not)` : ""}`}
           >
             <span className="flex items-center gap-1.5 font-medium">
-              <StickyNote className="w-4 h-4 text-primary" />
+              <StickyNote className="w-4 h-4 text-primary" aria-hidden="true" />
               Genel Notlar
               {notes.length > 0 && (
                 <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-semibold">{notes.length}</span>
@@ -214,7 +264,7 @@ export default function KesimTakipPage() {
                 <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold">{editRequestCount} talep</span>
               )}
             </span>
-            {showGlobalNotes ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {showGlobalNotes ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
           </button>
           {showGlobalNotes && (
             <div className="mt-3 space-y-2">
@@ -239,7 +289,7 @@ export default function KesimTakipPage() {
           <Virtuoso
             useWindowScroll
             data={filteredGroups}
-            defaultItemHeight={68}
+            defaultItemHeight={72}
             overscan={200}
             itemContent={(idx, group) => (
               <GroupCard
@@ -267,6 +317,46 @@ export default function KesimTakipPage() {
           Bir hayvan grubuna tıklayarak kesim kağıdı detayını görüntüleyin • Sayfa her 30 saniyede otomatik güncellenir
         </p>
       </div>
+
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t shadow-lg" aria-label="Hızlı eylemler">
+        <div className="max-w-lg mx-auto flex items-center gap-2 p-2">
+          {pendingGroups.length > 0 && (
+            <span className="text-[10px] text-muted-foreground shrink-0 hidden sm:block" aria-live="polite">
+              #{pendingGroups[0].animalNo}
+            </span>
+          )}
+          <Button
+            className="flex-1 h-12 min-h-[48px] text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+            onClick={handleMarkNextPendingDone}
+            disabled={pendingGroups.length === 0 || (pendingGroups.length > 0 && toggling.has(pendingGroups[0].id))}
+            aria-label={pendingGroups.length > 0 ? `Hayvan ${pendingGroups[0].animalNo} kesildi olarak işaretle` : "Tüm hayvanlar kesildi"}
+          >
+            <CheckCircle2 className="w-5 h-5 mr-1.5 shrink-0" aria-hidden="true" />
+            {pendingGroups.length > 0
+              ? `Kesildi İşaretle (${pendingGroups.length})`
+              : "Tümü Kesildi"
+            }
+          </Button>
+          <Button
+            variant="outline"
+            className="h-12 min-h-[48px] px-3 text-sm"
+            onClick={handleOpenNextPendingNotes}
+            disabled={pendingGroups.length === 0}
+            aria-label={pendingGroups.length > 0 ? `Hayvan ${pendingGroups[0].animalNo} için not ekle` : "Bekleyen hayvan yok"}
+          >
+            <MessageSquarePlus className="w-5 h-5 mr-1" aria-hidden="true" />
+            Not Ekle
+          </Button>
+          <Button
+            variant="ghost"
+            className="h-12 min-h-[48px] px-3 text-sm"
+            onClick={() => setShowSummaryReport(true)}
+            aria-label="Durum raporunu görüntüle"
+          >
+            Rapor
+          </Button>
+        </div>
+      </nav>
 
       {overlayIndex !== null && (
         <KesimKagidiOverlay

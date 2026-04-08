@@ -124,13 +124,13 @@ export default function PrintPage() {
     <div>
       <style dangerouslySetInnerHTML={{ __html: pageStyle }} />
       <div className="print:hidden p-4 flex items-center gap-3 bg-background border-b sticky top-0 z-10">
-        <Button variant="ghost" size="sm" onClick={() => setLocation(`/kesim/${kesim.id}`)}>
-          <ArrowLeft className="w-4 h-4 mr-1" />Geri
+        <Button variant="ghost" size="sm" onClick={() => setLocation(`/kesim/${kesim.id}`)} aria-label="Kesim alanına geri dön">
+          <ArrowLeft className="w-4 h-4 mr-1" aria-hidden="true" />Geri
         </Button>
         <div className="flex-1"><h1 className="text-lg font-semibold">{kesim.name} - Yazdırma Önizleme</h1></div>
-        <Button variant="outline" size="sm" onClick={() => setOptionsOpen(!optionsOpen)}>
-          <Settings2 className="w-4 h-4 mr-1" />Yazdırma Seçenekleri
-          {optionsOpen ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
+        <Button variant="outline" size="sm" onClick={() => setOptionsOpen(!optionsOpen)} aria-expanded={optionsOpen} aria-label="Yazdırma seçenekleri">
+          <Settings2 className="w-4 h-4 mr-1" aria-hidden="true" />Yazdırma Seçenekleri
+          {optionsOpen ? <ChevronUp className="w-4 h-4 ml-1" aria-hidden="true" /> : <ChevronDown className="w-4 h-4 ml-1" aria-hidden="true" />}
         </Button>
         <Button variant="outline" size="sm" disabled={processedGroups.length === 0 || excelExporting} onClick={async () => {
           setExcelExporting(true);
@@ -144,12 +144,12 @@ export default function PrintPage() {
             URL.revokeObjectURL(url);
           } catch { /* ignore */ } finally { setExcelExporting(false); }
         }}>
-          {excelExporting ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Excel...</> : <><FileSpreadsheet className="w-4 h-4 mr-1" />Excel</>}
+          {excelExporting ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" aria-hidden="true" />Excel...</> : <><FileSpreadsheet className="w-4 h-4 mr-1" aria-hidden="true" />Excel</>}
         </Button>
-        <Button variant="outline" size="sm" onClick={() => window.print()} disabled={processedGroups.length === 0} title="Tarayıcı yazdırma diyaloğunda PDF olarak kaydedin">
-          <FileText className="w-4 h-4 mr-1" />PDF İndir
+        <Button variant="outline" size="sm" onClick={() => window.print()} disabled={processedGroups.length === 0} title="Tarayıcı yazdırma diyaloğunda PDF olarak kaydedin" aria-label="PDF olarak indir">
+          <FileText className="w-4 h-4 mr-1" aria-hidden="true" />PDF İndir
         </Button>
-        <Button onClick={() => window.print()}><Printer className="w-4 h-4 mr-2" />Yazdır</Button>
+        <Button onClick={() => window.print()} aria-label="Sayfayı yazdır"><Printer className="w-4 h-4 mr-2" aria-hidden="true" />Yazdır</Button>
       </div>
 
       {optionsOpen && (

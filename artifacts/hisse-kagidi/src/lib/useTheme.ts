@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 const THEME_KEY = "hisse-kagidi-theme";
+const HIGH_CONTRAST_KEY = "hisse-kagidi-high-contrast";
 
 export type ThemeMode = "light" | "dark" | "system";
 
@@ -20,6 +21,10 @@ export function useTheme() {
     return "system";
   });
 
+  const [highContrast, setHighContrast] = useState<boolean>(() => {
+    return localStorage.getItem(HIGH_CONTRAST_KEY) === "true";
+  });
+
   const isDark = resolveIsDark(mode);
 
   useEffect(() => {
@@ -31,6 +36,16 @@ export function useTheme() {
     }
     localStorage.setItem(THEME_KEY, mode);
   }, [isDark, mode]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (highContrast) {
+      root.classList.add("high-contrast");
+    } else {
+      root.classList.remove("high-contrast");
+    }
+    localStorage.setItem(HIGH_CONTRAST_KEY, String(highContrast));
+  }, [highContrast]);
 
   useEffect(() => {
     if (mode !== "system") return;
@@ -53,5 +68,9 @@ export function useTheme() {
 
   const setThemeMode = useCallback((m: ThemeMode) => setMode(m), []);
 
-  return { isDark, mode, toggle, setThemeMode };
+  const toggleHighContrast = useCallback(() => {
+    setHighContrast((prev) => !prev);
+  }, []);
+
+  return { isDark, mode, toggle, setThemeMode, highContrast, toggleHighContrast };
 }

@@ -91,22 +91,22 @@ export function DonorListPanel() {
         <div className="flex gap-2 items-center flex-wrap">
           <div className="flex items-center gap-1">
             <div className="relative">
-              <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input ref={searchInputRef} className="h-8 text-sm pl-8 pr-7 w-32 sm:w-48" placeholder="Ara... (Ctrl+F)" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleDonorSearch(); } }} />
+              <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input ref={searchInputRef} className="h-8 text-sm pl-8 pr-7 w-32 sm:w-48" placeholder="Ara... (Ctrl+F)" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleDonorSearch(); } }} aria-label="Bağışçı ara" />
               {(searchQuery || debouncedSearchQuery) && (
-                <button className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 hover:bg-muted rounded" onClick={handleDonorSearchClear}><X className="w-3 h-3" /></button>
+                <button className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 hover:bg-muted rounded" onClick={handleDonorSearchClear} aria-label="Aramayı temizle"><X className="w-3 h-3" aria-hidden="true" /></button>
               )}
             </div>
             <Button variant="outline" size="sm" className="h-8 px-2" onClick={handleDonorSearch} title="Ara">Ara</Button>
           </div>
-          <Button variant={showAdvancedFilter ? "default" : "outline"} size="sm" onClick={() => setShowAdvancedFilter(!showAdvancedFilter)} title="Gelişmiş Filtre">
-            <Filter className="w-4 h-4" />
+          <Button variant={showAdvancedFilter ? "default" : "outline"} size="sm" onClick={() => setShowAdvancedFilter(!showAdvancedFilter)} title="Gelişmiş Filtre" aria-label={`Gelişmiş filtre${activeFilterCount > 0 ? ` (${activeFilterCount} aktif)` : ""}`} aria-pressed={showAdvancedFilter}>
+            <Filter className="w-4 h-4" aria-hidden="true" />
             {activeFilterCount > 0 && (<span className="ml-1 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">{activeFilterCount}</span>)}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setDonorListReportOpen(true)} title="Bağışçı Listesi Raporu"><FileText className="w-4 h-4" /></Button>
+          <Button variant="outline" size="sm" onClick={() => setDonorListReportOpen(true)} title="Bağışçı Listesi Raporu" aria-label="Bağışçı listesi raporu"><FileText className="w-4 h-4" aria-hidden="true" /></Button>
           <BulkImportDialog />
           <FindDeleteDialog />
-          <Button variant="outline" size="sm" onClick={openTrash} title="Bağış Çöp Kutusu"><Trash2 className="w-4 h-4 mr-1" />Çöp Kutusu</Button>
+          <Button variant="outline" size="sm" onClick={openTrash} title="Bağış Çöp Kutusu" aria-label="Bağış çöp kutusunu aç"><Trash2 className="w-4 h-4 mr-1" aria-hidden="true" />Çöp Kutusu</Button>
           <AddDonorDialog />
         </div>
       </div>

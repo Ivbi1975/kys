@@ -157,20 +157,20 @@ export function KesimKagidiOverlay({
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <button
-        className="absolute left-1 top-1/2 -translate-y-1/2 z-[60] bg-white/20 hover:bg-white/40 text-white rounded-full w-10 h-10 flex items-center justify-center backdrop-blur-sm transition-colors disabled:opacity-30"
+        className="absolute left-1 top-1/2 -translate-y-1/2 z-[60] bg-white/20 hover:bg-white/40 text-white rounded-full w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center backdrop-blur-sm transition-colors disabled:opacity-30"
         onClick={goPrev}
         disabled={currentIndex === 0}
         aria-label="Önceki hayvan"
       >
-        <ChevronLeft className="w-6 h-6" />
+        <ChevronLeft className="w-6 h-6" aria-hidden="true" />
       </button>
       <button
-        className="absolute right-1 top-1/2 -translate-y-1/2 z-[60] bg-white/20 hover:bg-white/40 text-white rounded-full w-10 h-10 flex items-center justify-center backdrop-blur-sm transition-colors disabled:opacity-30"
+        className="absolute right-1 top-1/2 -translate-y-1/2 z-[60] bg-white/20 hover:bg-white/40 text-white rounded-full w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center backdrop-blur-sm transition-colors disabled:opacity-30"
         onClick={goNext}
         disabled={currentIndex === groups.length - 1}
         aria-label="Sonraki hayvan"
       >
-        <ChevronRight className="w-6 h-6" />
+        <ChevronRight className="w-6 h-6" aria-hidden="true" />
       </button>
 
       <div
@@ -190,8 +190,8 @@ export function KesimKagidiOverlay({
             Hayvan {currentIndex + 1} / {groups.length}
           </span>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={onClose} className="text-white hover:bg-white/20 h-8 w-8 p-0">
-              <X className="w-5 h-5" />
+            <Button variant="ghost" size="sm" onClick={onClose} className="text-white hover:bg-white/20 h-12 w-12 min-w-[48px] min-h-[48px] p-0" aria-label="Kesim kağıdını kapat">
+              <X className="w-5 h-5" aria-hidden="true" />
             </Button>
           </div>
         </div>
@@ -208,19 +208,19 @@ export function KesimKagidiOverlay({
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors ${showNotes ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-muted-foreground"}`}
+                  className={`relative w-12 h-12 min-w-[48px] min-h-[48px] rounded-full flex items-center justify-center transition-colors ${showNotes ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-muted-foreground"}`}
                   onClick={() => setShowNotes(!showNotes)}
                   title="Notlar"
                   aria-label={`Notlar${groupNoteCount > 0 ? ` (${groupNoteCount})` : ""}`}
                   aria-pressed={showNotes}
                 >
-                  <MessageSquarePlus className="w-4 h-4" />
+                  <MessageSquarePlus className="w-5 h-5" aria-hidden="true" />
                   {groupNoteCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold">{groupNoteCount}</span>
                   )}
                 </button>
                 <button
-                  className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors ${showPhotos ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-muted-foreground"}`}
+                  className={`relative w-12 h-12 min-w-[48px] min-h-[48px] rounded-full flex items-center justify-center transition-colors ${showPhotos ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-muted-foreground"}`}
                   onClick={() => {
                     setShowPhotos(!showPhotos);
                     if (!showPhotos && photosLoadedFor.current !== group.id) {
@@ -235,7 +235,7 @@ export function KesimKagidiOverlay({
                   aria-label={`Fotoğraflar${photos.length > 0 && photosLoadedFor.current === group.id ? ` (${photos.length})` : ""}`}
                   aria-pressed={showPhotos}
                 >
-                  <Camera className="w-4 h-4" />
+                  <Camera className="w-5 h-5" aria-hidden="true" />
                   {photos.length > 0 && photosLoadedFor.current === group.id && (
                     <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold">{photos.length}</span>
                   )}
@@ -254,17 +254,19 @@ export function KesimKagidiOverlay({
                 <span className="text-xs text-muted-foreground font-medium">Ekip:</span>
                 <div className="flex gap-1 flex-wrap">
                   <button
-                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                    className={`text-xs px-4 py-2 min-h-[48px] rounded-full border transition-colors ${
                       !group.teamId ? "bg-primary/10 border-primary font-semibold" : "bg-background border-border hover:bg-muted"
                     }`}
                     onClick={() => onTeamAssign(group.id, null)}
+                    aria-label="Ekip atamasını kaldır"
+                    aria-pressed={!group.teamId}
                   >
                     Yok
                   </button>
                   {teams.map(t => (
                     <button
                       key={t.id}
-                      className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                      className={`text-xs px-4 py-2 min-h-[48px] rounded-full border transition-colors ${
                         group.teamId === t.id ? "font-semibold" : "hover:opacity-80"
                       }`}
                       style={{
@@ -273,6 +275,8 @@ export function KesimKagidiOverlay({
                         color: t.color,
                       }}
                       onClick={() => onTeamAssign(group.id, t.id)}
+                      aria-label={`${t.name} ekibine ata`}
+                      aria-pressed={group.teamId === t.id}
                     >
                       {t.name}
                     </button>
@@ -400,20 +404,21 @@ export function KesimKagidiOverlay({
 
           <div className="sticky bottom-0 p-4 bg-background border-t">
             <Button
-              className={`w-full h-12 text-base font-semibold ${
+              className={`w-full h-14 min-h-[56px] text-base font-semibold ${
                 group.kesildi
                   ? "bg-orange-500 hover:bg-orange-600 text-white"
                   : "bg-emerald-600 hover:bg-emerald-700 text-white"
               }`}
               onClick={() => onToggle(group)}
               disabled={isToggling}
+              aria-label={group.kesildi ? `Hayvan ${group.animalNo} kesim işaretini kaldır` : `Hayvan ${group.animalNo} kesildi olarak işaretle`}
             >
               {isToggling ? (
-                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                <Loader2 className="w-5 h-5 animate-spin mr-2" aria-hidden="true" />
               ) : group.kesildi ? (
-                <Circle className="w-5 h-5 mr-2" />
+                <Circle className="w-5 h-5 mr-2" aria-hidden="true" />
               ) : (
-                <CheckCircle2 className="w-5 h-5 mr-2" />
+                <CheckCircle2 className="w-5 h-5 mr-2" aria-hidden="true" />
               )}
               {group.kesildi ? "İşareti Kaldır" : "Kesildi Olarak İşaretle"}
             </Button>
@@ -422,10 +427,12 @@ export function KesimKagidiOverlay({
 
         <div className="mt-2 px-2">
           <button
-            className="w-full flex items-center justify-center gap-2 py-1.5 text-white/80 hover:text-white text-xs font-medium transition-colors"
+            className="w-full flex items-center justify-center gap-2 py-3 min-h-[48px] text-white/80 hover:text-white text-xs font-medium transition-colors"
             onClick={() => setShowGrid(!showGrid)}
+            aria-expanded={showGrid}
+            aria-label={showGrid ? "Hayvan listesini gizle" : `Tüm ${groups.length} hayvanı göster`}
           >
-            {showGrid ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+            {showGrid ? <ChevronDown className="w-4 h-4" aria-hidden="true" /> : <ChevronUp className="w-4 h-4" aria-hidden="true" />}
             {showGrid ? "Hayvanları Gizle" : `Tüm Hayvanları Göster (${groups.length})`}
           </button>
 
