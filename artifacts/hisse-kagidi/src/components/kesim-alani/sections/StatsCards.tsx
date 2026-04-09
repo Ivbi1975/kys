@@ -1,7 +1,68 @@
-import React from "react";
-import { AlertTriangle } from "lucide-react";
+import React, { useState } from "react";
+import { AlertTriangle, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useKesimAlaniContext } from "../KesimAlaniContext";
+import type { VekaletConflict } from "../hooks/useVekaletCheck";
+
+function VekaletWarning({
+  allEntries,
+  totalCount,
+  step,
+  siblingKesimAlanlari,
+}: {
+  allEntries: [string, VekaletConflict[]][];
+  totalCount: number;
+  step: number;
+  siblingKesimAlanlari: { id: string; name: string }[];
+}) {
+  const [visibleCount, setVisibleCount] = useState(step);
+  const visibleEntries = allEntries.slice(0, visibleCount);
+  const remaining = totalCount - visibleCount;
+
+  return (
+    <div className="mb-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 p-3">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-1">
+            Çift Vekalet Uyarısı ({totalCount})
+          </p>
+          <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
+            Bu listede bulunan {totalCount} vekalet numarası başka kesim alanlarında da mevcut:
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
+            {visibleEntries.map(([vek, conflicts]) => {
+              const kaNames = conflicts.map(c => {
+                const ka = siblingKesimAlanlari.find(s => s.id === c.kesimAlaniId);
+                return ka?.name || "Bilinmeyen KA";
+              });
+              return (
+                <div key={vek} className="flex items-center gap-2 text-xs min-w-0">
+                  <span className="font-mono font-medium text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-900 px-1.5 py-0.5 rounded shrink-0">
+                    {vek}
+                  </span>
+                  <span className="text-amber-600 dark:text-amber-400 shrink-0">→</span>
+                  <span className="text-amber-700 dark:text-amber-300 truncate">
+                    {kaNames.join(", ")}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {remaining > 0 && (
+            <button
+              onClick={() => setVisibleCount(prev => prev + step)}
+              className="mt-2 flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 transition-colors"
+            >
+              <ChevronDown className="w-3 h-3" />
+              {remaining} tane daha göster
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function StatsCards() {
   const {
@@ -99,40 +160,19 @@ export function StatsCards() {
         )}
       </div>
 
-      {vekaletCheck.hasConflicts && (
-        <div className="mb-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 p-3">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-1">
-                Çift Vekalet Uyarısı
-              </p>
-              <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
-                Bu listede bulunan {vekaletCheck.conflictsByVekalet.size} vekalet numarası başka kesim alanlarında da mevcut:
-              </p>
-              <div className="space-y-1">
-                {Array.from(vekaletCheck.conflictsByVekalet.entries()).map(([vek, conflicts]) => {
-                  const kaNames = conflicts.map(c => {
-                    const ka = siblingKesimAlanlari.find(s => s.id === c.kesimAlaniId);
-                    return ka?.name || "Bilinmeyen KA";
-                  });
-                  return (
-                    <div key={vek} className="flex items-center gap-2 text-xs">
-                      <span className="font-mono font-medium text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-900 px-1.5 py-0.5 rounded">
-                        {vek}
-                      </span>
-                      <span className="text-amber-600 dark:text-amber-400">→</span>
-                      <span className="text-amber-700 dark:text-amber-300 truncate">
-                        {kaNames.join(", ")}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {vekaletCheck.hasConflicts && (() => {
+        const STEP = 5;
+        const allEntries = Array.from(vekaletCheck.conflictsByVekalet.entries());
+        const totalCount = allEntries.length;
+        return (
+          <VekaletWarning
+            allEntries={allEntries}
+            totalCount={totalCount}
+            step={STEP}
+            siblingKesimAlanlari={siblingKesimAlanlari}
+          />
+        );
+      })()}
 
       {(kesim.donations.filter(d => !d.excluded).length > 0 || kesim.animalGroups.length > 0) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
