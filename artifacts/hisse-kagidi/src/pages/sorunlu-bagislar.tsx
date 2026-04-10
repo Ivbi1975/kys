@@ -22,7 +22,10 @@ import {
 } from "@/lib/api";
 import type { FlaggedDonation, Conflict } from "@/lib/api";
 
-type ProblemRow = FlaggedDonation & { conflictInfo?: string };
+type ProblemRow = Omit<FlaggedDonation, "problemType"> & {
+  conflictInfo?: string;
+  problemType: "manual" | "ai_warning" | "conflict";
+};
 
 export default function SorunluBagislarPage() {
   const { id: projectId } = useParams<{ id: string }>();
@@ -35,6 +38,7 @@ export default function SorunluBagislarPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [kaFilter, setKaFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const loadData = useCallback(async () => {
     if (!projectId) return;
@@ -122,7 +126,7 @@ export default function SorunluBagislarPage() {
             kesimAlaniId: e.kesimAlaniId,
             kesimAlaniName: e.kesimAlaniName,
             groups: e.animalGroupId ? [{ groupId: e.animalGroupId, animalNo: e.animalGroupNo ?? 0 }] : [],
-            problemType: "ai_warning",
+            problemType: "conflict",
             conflictInfo: `Çatışma: ${c.displayName}`,
           });
         }
@@ -170,8 +174,16 @@ export default function SorunluBagislarPage() {
       result = result.filter(d => d.kesimAlaniId === kaFilter);
     }
 
+    if (statusFilter !== "all") {
+      if (statusFilter === "unresolved") {
+        result = result.filter(d => d.groups.length === 0);
+      } else if (statusFilter === "assigned") {
+        result = result.filter(d => d.groups.length > 0);
+      }
+    }
+
     return result;
-  }, [allProblems, searchQuery, typeFilter, kaFilter]);
+  }, [allProblems, searchQuery, typeFilter, kaFilter, statusFilter]);
 
   const stats = useMemo(() => ({
     total: allProblems.length,
@@ -275,12 +287,22 @@ export default function SorunluBagislarPage() {
               ))}
             </SelectContent>
           </Select>
-          {(searchQuery || typeFilter !== "all" || kaFilter !== "all") && (
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[160px] h-9 text-sm">
+              <SelectValue placeholder="Durum" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tüm Durumlar</SelectItem>
+              <SelectItem value="unresolved">Çözülmemiş</SelectItem>
+              <SelectItem value="assigned">Gruba Atanmış</SelectItem>
+            </SelectContent>
+          </Select>
+          {(searchQuery || typeFilter !== "all" || kaFilter !== "all" || statusFilter !== "all") && (
             <Button
               variant="ghost"
               size="sm"
               className="h-9"
-              onClick={() => { setSearchQuery(""); setTypeFilter("all"); setKaFilter("all"); }}
+              onClick={() => { setSearchQuery(""); setTypeFilter("all"); setKaFilter("all"); setStatusFilter("all"); }}
             >
               <X className="w-3.5 h-3.5 mr-1" />
               Temizle
@@ -333,7 +355,10 @@ export default function SorunluBagislarPage() {
 
                     const locationParts = [d.kesimAlaniName];
                     if (d.groups.length > 0) {
-                      locationParts.push(`Hayvan #${d.groups[0].animalNo}`);
+                      const g = d.groups[0];
+                      locationParts.push(`Hayvan #${g.animalNo}`);
+                    } else {
+                      locationParts.push("Grupsuz");
                     }
 
                     return (

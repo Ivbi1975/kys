@@ -15,6 +15,7 @@ import {
   fetchJobStatus, fetchProjects, saveAiClassifications,
   transferDonationsToKA, createKesimAlani,
   fetchTags, createTag,
+  flagDonation, unflagDonation,
 } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -256,6 +257,26 @@ export default function BagisHavuzuPage() {
     queryClient.invalidateQueries({ queryKey: ["pool-donations"] });
     queryClient.invalidateQueries({ queryKey: ["pool-stats"] });
   }, [queryClient]);
+
+  const handleFlagDonation = useCallback(async (id: string, reason: string) => {
+    try {
+      await flagDonation(id, reason);
+      invalidatePool();
+      toast({ title: "Bağış işaretlendi", description: reason });
+    } catch (err) {
+      toast({ title: "Hata", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+    }
+  }, [invalidatePool, toast]);
+
+  const handleUnflagDonation = useCallback(async (id: string) => {
+    try {
+      await unflagDonation(id);
+      invalidatePool();
+      toast({ title: "İşaret kaldırıldı" });
+    } catch (err) {
+      toast({ title: "Hata", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+    }
+  }, [invalidatePool, toast]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectAllPages(false);
@@ -655,6 +676,8 @@ export default function BagisHavuzuPage() {
           sortBy={sortBy}
           sortDir={sortDir}
           onColumnSort={handleColumnSort}
+          onFlagDonation={handleFlagDonation}
+          onUnflagDonation={handleUnflagDonation}
         />
 
         {totalPages > 1 && (

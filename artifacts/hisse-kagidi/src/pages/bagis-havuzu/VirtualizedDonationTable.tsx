@@ -1,7 +1,10 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { AlertTriangle, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, Flag, FlagOff } from "lucide-react";
 import type { PoolDonation } from "@/lib/types";
 import { ALL_TABLE_COLUMNS, getStatusLabel, type TableColumnKey } from "./types";
 
@@ -34,6 +37,8 @@ interface VirtualizedDonationTableProps {
   sortBy: string;
   sortDir: "asc" | "desc";
   onColumnSort: (colKey: string) => void;
+  onFlagDonation?: (id: string, reason: string) => void;
+  onUnflagDonation?: (id: string) => void;
 }
 
 const ROW_HEIGHT = 36;
@@ -128,9 +133,50 @@ function getTableWidth(cols: { key: TableColumnKey }[]) {
   return CHECKBOX_WIDTH + cols.reduce((sum, col) => sum + COLUMN_WIDTHS[col.key], 0);
 }
 
+function FlagAction({ d, onFlag, onUnflag }: { d: PoolDonation; onFlag?: (id: string, reason: string) => void; onUnflag?: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+
+  if (d.isFlagged && onUnflag) {
+    return (
+      <Button
+        variant="ghost" size="sm" className="h-6 w-6 p-0 text-amber-600 hover:text-amber-800"
+        title="İşareti kaldır"
+        onClick={(e) => { e.stopPropagation(); onUnflag(d.id); }}
+      >
+        <FlagOff className="w-3.5 h-3.5" />
+      </Button>
+    );
+  }
+  if (!onFlag) return null;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-amber-600" title="Sorunlu işaretle">
+          <Flag className="w-3.5 h-3.5" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-2" align="end" onClick={(e) => e.stopPropagation()}>
+        <p className="text-xs font-medium mb-1">Sorun açıklaması</p>
+        <Input
+          value={reason} onChange={(e) => setReason(e.target.value)}
+          placeholder="Neden sorunlu?" className="h-7 text-xs mb-1"
+          onKeyDown={(e) => { if (e.key === "Enter" && reason.trim()) { onFlag(d.id, reason.trim()); setOpen(false); setReason(""); } }}
+        />
+        <Button size="sm" className="w-full h-6 text-xs"
+          disabled={!reason.trim()}
+          onClick={() => { onFlag(d.id, reason.trim()); setOpen(false); setReason(""); }}
+        >
+          İşaretle
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function VirtualizedDonationTable({
   items, isLoading, activeFilterCount, selectedIds, toggleSelect, toggleSelectAll, multiLocationVekalets, visibleColumns,
-  sortBy, sortDir, onColumnSort,
+  sortBy, sortDir, onColumnSort, onFlagDonation, onUnflagDonation,
 }: VirtualizedDonationTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const rowVirtualizer = useVirtualizer({
@@ -233,6 +279,9 @@ export function VirtualizedDonationTable({
                               {renderCell(d, col.key, isMultiLoc)}
                             </td>
                           ))}
+                          <td className="p-1 text-center" style={{ width: 32 }}>
+                            <FlagAction d={d} onFlag={onFlagDonation} onUnflag={onUnflagDonation} />
+                          </td>
                         </tr>
                       </tbody>
                     </table>

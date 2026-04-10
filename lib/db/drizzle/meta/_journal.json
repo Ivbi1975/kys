@@ -141,6 +141,13 @@
       "when": 1774946200000,
       "tag": "0019_resilience_security",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1774946300000,
+      "tag": "0020_donation_flag_columns",
+      "breakpoints": true
     }
   ]
 }
