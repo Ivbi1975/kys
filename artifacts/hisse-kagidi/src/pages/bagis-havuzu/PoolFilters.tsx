@@ -382,7 +382,7 @@ export function PoolFilters({
           </SelectContent>
         </Select>
 
-        {stats && stats.typeDistribution.length > 0 && (
+        {stats && (stats.typeDistribution.length > 0 || donationTypeFilter.length > 0) && (
           <MultiSelectDropdown
             label="Cinsi"
             options={stats.typeDistribution.map(t => ({ value: t.type, count: t.count }))}
@@ -393,7 +393,7 @@ export function PoolFilters({
           />
         )}
 
-        {stats && stats.birimDistribution.length > 0 && (
+        {stats && (stats.birimDistribution.length > 0 || birimFilter.length > 0) && (
           <MultiSelectDropdown
             label="Birim"
             options={stats.birimDistribution.map(b => ({ value: b.birim, count: b.count }))}
@@ -404,7 +404,7 @@ export function PoolFilters({
           />
         )}
 
-        {stats && stats.temsilciDistribution.length > 0 && (
+        {stats && (stats.temsilciDistribution.length > 0 || temsilciFilter.length > 0) && (
           <MultiSelectDropdown
             label="Temsilci"
             options={stats.temsilciDistribution.map(t => ({ value: t.temsilci, count: t.count }))}
@@ -415,10 +415,10 @@ export function PoolFilters({
           />
         )}
 
-        {stats && stats.ozellikDistribution && stats.ozellikDistribution.length > 0 && (
+        {stats && ((stats.ozellikDistribution && stats.ozellikDistribution.length > 0) || ozellikFilter.length > 0) && (
           <MultiSelectDropdown
             label="Özellik"
-            options={stats.ozellikDistribution.map(o => ({ value: o.ozellik, count: o.count }))}
+            options={(stats.ozellikDistribution || []).map(o => ({ value: o.ozellik, count: o.count }))}
             selected={ozellikFilter}
             onChange={setOzellikFilter}
             excluded={excludeFields.has("ozellik")}
@@ -426,10 +426,10 @@ export function PoolFilters({
           />
         )}
 
-        {stats && stats.fiyatDistribution && stats.fiyatDistribution.length > 0 && (
+        {stats && ((stats.fiyatDistribution && stats.fiyatDistribution.length > 0) || fiyatFilter.length > 0) && (
           <MultiSelectDropdown
             label="Fiyat"
-            options={stats.fiyatDistribution.map(f => ({ value: f.fiyat, count: f.count }))}
+            options={(stats.fiyatDistribution || []).map(f => ({ value: f.fiyat, count: f.count }))}
             selected={fiyatFilter}
             onChange={setFiyatFilter}
             excluded={excludeFields.has("fiyat")}
@@ -437,10 +437,10 @@ export function PoolFilters({
           />
         )}
 
-        {stats && stats.yerTalebiDistribution && stats.yerTalebiDistribution.length > 0 && (
+        {stats && ((stats.yerTalebiDistribution && stats.yerTalebiDistribution.length > 0) || yerTalebiFilter.length > 0) && (
           <MultiSelectDropdown
             label="Yer Talebi"
-            options={stats.yerTalebiDistribution.map(y => ({ value: y.yerTalebi, count: y.count }))}
+            options={(stats.yerTalebiDistribution || []).map(y => ({ value: y.yerTalebi, count: y.count }))}
             selected={yerTalebiFilter}
             onChange={setYerTalebiFilter}
             excluded={excludeFields.has("yerTalebi")}
@@ -448,10 +448,10 @@ export function PoolFilters({
           />
         )}
 
-        {stats && stats.gunTalebiDistribution && stats.gunTalebiDistribution.length > 0 && (
+        {stats && ((stats.gunTalebiDistribution && stats.gunTalebiDistribution.length > 0) || gunTalebiFilter.length > 0) && (
           <MultiSelectDropdown
             label="Gün Talebi"
-            options={stats.gunTalebiDistribution.map(g => ({ value: g.gunTalebi, count: g.count }))}
+            options={(stats.gunTalebiDistribution || []).map(g => ({ value: g.gunTalebi, count: g.count }))}
             selected={gunTalebiFilter}
             onChange={setGunTalebiFilter}
             excluded={excludeFields.has("gunTalebi")}
@@ -459,10 +459,10 @@ export function PoolFilters({
           />
         )}
 
-        {stats && stats.ilkHayvanDistribution && stats.ilkHayvanDistribution.length > 0 && (
+        {stats && ((stats.ilkHayvanDistribution && stats.ilkHayvanDistribution.length > 0) || ilkHayvanFilter.length > 0) && (
           <MultiSelectDropdown
             label="İlk Hayvan"
-            options={stats.ilkHayvanDistribution.map(i => ({ value: i.ilkHayvan, count: i.count }))}
+            options={(stats.ilkHayvanDistribution || []).map(i => ({ value: i.ilkHayvan, count: i.count }))}
             selected={ilkHayvanFilter}
             onChange={setIlkHayvanFilter}
             excluded={excludeFields.has("ilkHayvan")}
@@ -470,10 +470,10 @@ export function PoolFilters({
           />
         )}
 
-        {stats && stats.safiDistribution && stats.safiDistribution.length > 0 && (
+        {stats && ((stats.safiDistribution && stats.safiDistribution.length > 0) || safiFilter.length > 0) && (
           <MultiSelectDropdown
             label="Şafi"
-            options={stats.safiDistribution.map(s => ({ value: s.safi, count: s.count }))}
+            options={(stats.safiDistribution || []).map(s => ({ value: s.safi, count: s.count }))}
             selected={safiFilter}
             onChange={setSafiFilter}
             excluded={excludeFields.has("safi")}

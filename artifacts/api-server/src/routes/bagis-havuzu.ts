@@ -434,15 +434,13 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
       COUNT(d.id)::int AS total,
       COUNT(d.id) FILTER (WHERE d.excluded = false)::int AS active,
       COUNT(d.id) FILTER (WHERE d.excluded = true)::int AS excluded,
-      COALESCE(SUM(d.share_count) FILTER (WHERE d.excluded = false), 0)::int AS total_shares,
-      COUNT(DISTINCT d.birim) FILTER (WHERE d.birim != '' AND d.excluded = false)::int AS birim_count,
-      COUNT(DISTINCT d.temsilci) FILTER (WHERE d.temsilci != '' AND d.excluded = false)::int AS temsilci_count,
-      COUNT(DISTINCT d.donation_type) FILTER (WHERE d.donation_type != '' AND d.excluded = false)::int AS type_count
+      COALESCE(SUM(d.share_count), 0)::int AS total_shares,
+      COUNT(DISTINCT d.birim) FILTER (WHERE d.birim != '')::int AS birim_count,
+      COUNT(DISTINCT d.temsilci) FILTER (WHERE d.temsilci != '')::int AS temsilci_count,
+      COUNT(DISTINCT d.donation_type) FILTER (WHERE d.donation_type != '')::int AS type_count
     FROM donations d
     JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-    WHERE ka.project_id = ${projectId}
-      AND ka.deleted_at IS NULL
-      AND d.deleted_at IS NULL
+    WHERE ${filterWhere}
   `);
 
   const stats = result.rows[0] || { total: 0, active: 0, excluded: 0, total_shares: 0 };
