@@ -70,9 +70,11 @@ export function loadBasketFromStorage(projectId: string | null | undefined): Bas
     const raw = localStorage.getItem(key);
     if (!raw) return [];
     const items = JSON.parse(raw) as BasketItem[];
+    const now = Date.now();
     return items.map(item => ({
       ...item,
       type: item.type || "donation",
+      addedAt: item.addedAt || now,
     }));
   } catch {
     return [];
