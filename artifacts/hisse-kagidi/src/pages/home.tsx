@@ -1,10 +1,21 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Scissors, Search } from "lucide-react";
+import { Scissors, Search, LogOut } from "lucide-react";
 import { HomeSkeleton } from "@/components/skeletons/HomeSkeleton";
 import QrCodeModal from "@/components/QrCodeModal";
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useHomeState } from "@/hooks/useHomeState";
 import { KesimCard } from "@/components/home/KesimCard";
 import { ProjectCard } from "@/components/home/ProjectCard";
@@ -46,6 +57,34 @@ export default function Home() {
             Ara
           </Button>
           <ThemeToggle className="h-8 w-8 p-0" />
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" title="Çıkış Yap">
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Çıkış Yap</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Oturumunuz sonlandırılacak ve giriş ekranına yönlendirileceksiniz. Devam etmek istiyor musunuz?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>İptal</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => {
+                    sessionStorage.removeItem("app_unlocked");
+                    sessionStorage.removeItem("app_api_key");
+                    window.location.reload();
+                  }}
+                >
+                  Çıkış Yap
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <AuditLogViewer />
           <SettingsDialog
             settingsOpen={state.settingsOpen}
