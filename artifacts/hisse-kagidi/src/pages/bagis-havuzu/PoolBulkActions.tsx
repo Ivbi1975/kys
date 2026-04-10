@@ -1,15 +1,16 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRightLeft, Undo2, Trash2, X, Tag } from "lucide-react";
+import { ArrowRightLeft, Undo2, Trash2, X, Tag, StickyNote } from "lucide-react";
 
 interface PoolBulkActionsProps {
   selectedCount: number;
   onTransferOpen: () => void;
   onBulkAction: (action: "exclude" | "include" | "delete") => void;
   onTagOpen: () => void;
+  onNoteOpen: () => void;
   onClearSelection: () => void;
 }
 
-export function PoolBulkActions({ selectedCount, onTransferOpen, onBulkAction, onTagOpen, onClearSelection }: PoolBulkActionsProps) {
+export function PoolBulkActions({ selectedCount, onTransferOpen, onBulkAction, onTagOpen, onNoteOpen, onClearSelection }: PoolBulkActionsProps) {
   if (selectedCount === 0) return null;
 
   return (
@@ -18,6 +19,9 @@ export function PoolBulkActions({ selectedCount, onTransferOpen, onBulkAction, o
       <div className="flex gap-1.5">
         <Button size="sm" variant="outline" onClick={onTagOpen}>
           <Tag className="w-4 h-4 mr-1" />Etiketle
+        </Button>
+        <Button size="sm" variant="outline" onClick={onNoteOpen}>
+          <StickyNote className="w-4 h-4 mr-1" />Not Ekle
         </Button>
         <Button size="sm" variant="outline" onClick={onTransferOpen}>
           <ArrowRightLeft className="w-4 h-4 mr-1" />Listeye Aktar

@@ -116,6 +116,7 @@ export {
   transferDonationsToKA,
   bulkActionDonations,
   bulkTagDonations,
+  bulkNoteDonations,
   checkVekaletConflicts,
 } from "./bagis-havuzu";
 export type { PoolDonationsResponse, PoolFilters, VekaletConflict } from "./bagis-havuzu";

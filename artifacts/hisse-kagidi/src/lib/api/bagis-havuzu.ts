@@ -26,8 +26,18 @@ export interface PoolFilters {
   notesFilter?: string;
   sortBy?: string;
   sortDir?: "asc" | "desc";
+  sortBy2?: string;
+  sortDir2?: "asc" | "desc";
+  sortBy3?: string;
+  sortDir3?: "asc" | "desc";
   limit?: number;
   offset?: number;
+  shareCountMin?: number;
+  shareCountMax?: number;
+  excludeFields?: string;
+  dateField?: string;
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 export async function fetchPoolDonations(projectId: string, filters: PoolFilters = {}): Promise<PoolDonationsResponse> {
@@ -49,8 +59,18 @@ export async function fetchPoolDonations(projectId: string, filters: PoolFilters
   if (filters.notesFilter) params.set("notesFilter", filters.notesFilter);
   if (filters.sortBy) params.set("sortBy", filters.sortBy);
   if (filters.sortDir) params.set("sortDir", filters.sortDir);
+  if (filters.sortBy2) params.set("sortBy2", filters.sortBy2);
+  if (filters.sortDir2) params.set("sortDir2", filters.sortDir2);
+  if (filters.sortBy3) params.set("sortBy3", filters.sortBy3);
+  if (filters.sortDir3) params.set("sortDir3", filters.sortDir3);
   if (filters.limit) params.set("limit", String(filters.limit));
   if (filters.offset !== undefined) params.set("offset", String(filters.offset));
+  if (filters.shareCountMin !== undefined) params.set("shareCountMin", String(filters.shareCountMin));
+  if (filters.shareCountMax !== undefined) params.set("shareCountMax", String(filters.shareCountMax));
+  if (filters.excludeFields) params.set("excludeFields", filters.excludeFields);
+  if (filters.dateField) params.set("dateField", filters.dateField);
+  if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
+  if (filters.dateTo) params.set("dateTo", filters.dateTo);
   const qs = params.toString();
   return apiFetch<PoolDonationsResponse>(`/projects/${projectId}/donations${qs ? `?${qs}` : ""}`);
 }
@@ -125,6 +145,18 @@ export async function bulkTagDonations(
   return apiFetch<{ success: boolean; affected: number }>(`/projects/${projectId}/donations/bulk-tag`, {
     method: "POST",
     body: JSON.stringify({ donationIds, tagId, action }),
+  });
+}
+
+export async function bulkNoteDonations(
+  projectId: string,
+  donationIds: string[],
+  note: string,
+  mode: "append" | "replace" = "append",
+): Promise<{ success: boolean; affected: number }> {
+  return apiFetch<{ success: boolean; affected: number }>(`/projects/${projectId}/donations/bulk-notes`, {
+    method: "POST",
+    body: JSON.stringify({ donationIds, note, mode }),
   });
 }
 

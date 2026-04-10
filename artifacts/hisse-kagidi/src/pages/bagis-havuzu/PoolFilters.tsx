@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Plus, ChevronDown, Check } from "lucide-react";
+import { X, Plus, ChevronDown, Check, Ban } from "lucide-react";
 import type { PoolStats, CustomTag } from "@/lib/types";
 
 interface PoolFiltersProps {
@@ -39,6 +39,26 @@ interface PoolFiltersProps {
   setSortBy: (v: string) => void;
   sortDir: "asc" | "desc";
   setSortDir: (fn: (d: "asc" | "desc") => "asc" | "desc") => void;
+  sortBy2: string;
+  setSortBy2: (v: string) => void;
+  sortDir2: "asc" | "desc";
+  setSortDir2: (fn: (d: "asc" | "desc") => "asc" | "desc") => void;
+  sortBy3: string;
+  setSortBy3: (v: string) => void;
+  sortDir3: "asc" | "desc";
+  setSortDir3: (fn: (d: "asc" | "desc") => "asc" | "desc") => void;
+  shareCountMin: string;
+  setShareCountMin: (v: string) => void;
+  shareCountMax: string;
+  setShareCountMax: (v: string) => void;
+  excludeFields: Set<string>;
+  toggleExcludeField: (field: string) => void;
+  dateField: string;
+  setDateField: (v: string) => void;
+  dateFrom: string;
+  setDateFrom: (v: string) => void;
+  dateTo: string;
+  setDateTo: (v: string) => void;
   stats: PoolStats | undefined;
   kesimAlanlari: { id: string; name: string }[];
   globalTags: CustomTag[];
@@ -49,11 +69,15 @@ function MultiSelectDropdown({
   options,
   selected,
   onChange,
+  excluded,
+  onToggleExclude,
 }: {
   label: string;
   options: { value: string; count?: number; label?: string; color?: string }[];
   selected: string[];
   onChange: (v: string[]) => void;
+  excluded?: boolean;
+  onToggleExclude?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [filterText, setFilterText] = useState("");
@@ -90,15 +114,26 @@ function MultiSelectDropdown({
 
   return (
     <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen(!open)}
-        className={`flex items-center justify-between w-full h-8 px-2.5 text-xs border rounded-md bg-background hover:bg-muted/50 transition-colors ${selected.length > 0 ? "border-primary/50 ring-1 ring-primary/20" : "border-input"}`}
-      >
-        <span className="truncate text-left">
-          {selected.length === 0 ? label : `${label} (${selected.length})`}
-        </span>
-        <ChevronDown className="w-3.5 h-3.5 ml-1 text-muted-foreground flex-shrink-0" />
-      </button>
+      <div className="flex gap-0.5">
+        <button
+          onClick={() => setOpen(!open)}
+          className={`flex items-center justify-between flex-1 h-8 px-2.5 text-xs border rounded-md bg-background hover:bg-muted/50 transition-colors ${selected.length > 0 ? (excluded ? "border-destructive/50 ring-1 ring-destructive/20" : "border-primary/50 ring-1 ring-primary/20") : "border-input"}`}
+        >
+          <span className="truncate text-left">
+            {selected.length === 0 ? label : `${excluded ? "⊘ " : ""}${label} (${selected.length})`}
+          </span>
+          <ChevronDown className="w-3.5 h-3.5 ml-1 text-muted-foreground flex-shrink-0" />
+        </button>
+        {selected.length > 0 && onToggleExclude && (
+          <button
+            onClick={onToggleExclude}
+            title={excluded ? "Dahil et moduna geç" : "Hariç tut moduna geç"}
+            className={`h-8 w-7 flex items-center justify-center rounded-md border text-xs transition-colors ${excluded ? "bg-destructive/10 border-destructive/30 text-destructive hover:bg-destructive/20" : "bg-muted/30 border-input text-muted-foreground hover:bg-muted/50 hover:text-foreground"}`}
+          >
+            <Ban className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
       {open && (
         <div className="absolute left-0 top-full mt-1 z-50 bg-background border rounded-lg shadow-lg min-w-[200px] max-w-[280px]">
           {options.length > 5 && (
@@ -133,7 +168,7 @@ function MultiSelectDropdown({
                   )}
                   <span className="truncate flex-1">{displayText}</span>
                   {opt.count !== undefined && (
-                    <span className="text-muted-foreground ml-1 flex-shrink-0">{opt.count}</span>
+                    <span className="text-muted-foreground ml-1 flex-shrink-0">({opt.count})</span>
                   )}
                 </button>
               );
@@ -157,8 +192,9 @@ function MultiSelectDropdown({
             const disp = getDisplay(s);
             const col = optMap.get(s)?.color;
             return (
-              <Badge key={s} variant="secondary" className="text-[10px] h-4 px-1 flex items-center gap-0.5">
+              <Badge key={s} variant={excluded ? "destructive" : "secondary"} className="text-[10px] h-4 px-1 flex items-center gap-0.5">
                 {col && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: col }} />}
+                {excluded && "⊘ "}
                 {disp.length > 12 ? disp.slice(0, 12) + "…" : disp}
                 <button onClick={() => toggle(s)} className="hover:text-destructive ml-0.5"><X className="w-2.5 h-2.5" /></button>
               </Badge>
@@ -221,6 +257,63 @@ function NotesMultiFilter({ value, onChange }: { value: string; onChange: (v: st
   );
 }
 
+const SORT_OPTIONS = [
+  { value: "sortOrder", label: "Varsayılan" },
+  { value: "name", label: "Adına Kesilen" },
+  { value: "description", label: "Vekaleti Veren" },
+  { value: "donationType", label: "Cinsi" },
+  { value: "birim", label: "Birim" },
+  { value: "temsilci", label: "Temsilci" },
+  { value: "kesimAlaniId", label: "Kesim Listesi" },
+  { value: "vekalet", label: "Vekalet" },
+  { value: "ozellik", label: "Özellik" },
+  { value: "fiyat", label: "Fiyat" },
+  { value: "yerTalebi", label: "Yer Talebi" },
+  { value: "gunTalebi", label: "Gün Talebi" },
+  { value: "ilkHayvan", label: "İlk Hayvan" },
+  { value: "safi", label: "Şafi" },
+  { value: "shareCount", label: "Hisse Sayısı" },
+  { value: "updatedAt", label: "Güncelleme Tarihi" },
+];
+
+function CompactSortLevel({
+  label,
+  value,
+  dir,
+  onChange,
+  onDirChange,
+}: {
+  label: string;
+  value: string;
+  dir: "asc" | "desc";
+  onChange: (v: string) => void;
+  onDirChange: () => void;
+}) {
+  return (
+    <div className="flex gap-1 items-center flex-1 min-w-0">
+      <span className="text-[10px] text-muted-foreground whitespace-nowrap">{label}</span>
+      <Select value={value || "sortOrder"} onValueChange={v => onChange(v === "sortOrder" ? "" : v)}>
+        <SelectTrigger className="h-7 text-xs flex-1 min-w-0"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {SORT_OPTIONS.map(opt => (
+            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {value && value !== "sortOrder" && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-[10px] px-1.5"
+          onClick={onDirChange}
+        >
+          {dir === "asc" ? "↑" : "↓"}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function PoolFilters({
   statusFilter, setStatusFilter,
   kesimAlaniFilter, setKesimAlaniFilter,
@@ -238,10 +331,27 @@ export function PoolFilters({
   notesFilter, setNotesFilter,
   sortBy, setSortBy,
   sortDir, setSortDir,
+  sortBy2, setSortBy2,
+  sortDir2, setSortDir2,
+  sortBy3, setSortBy3,
+  sortDir3, setSortDir3,
+  shareCountMin, setShareCountMin,
+  shareCountMax, setShareCountMax,
+  excludeFields, toggleExcludeField,
+  dateField, setDateField,
+  dateFrom, setDateFrom,
+  dateTo, setDateTo,
   stats,
   kesimAlanlari,
   globalTags,
 }: PoolFiltersProps) {
+  const tagCountMap = new Map<string, number>();
+  if (stats?.tagDistribution) {
+    for (const t of stats.tagDistribution) {
+      tagCountMap.set(t.id, t.count);
+    }
+  }
+
   return (
     <div className="mb-3 p-3 border rounded-lg bg-muted/30 space-y-3">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
@@ -270,6 +380,8 @@ export function PoolFilters({
             options={stats.typeDistribution.map(t => ({ value: t.type, count: t.count }))}
             selected={donationTypeFilter}
             onChange={setDonationTypeFilter}
+            excluded={excludeFields.has("donationType")}
+            onToggleExclude={() => toggleExcludeField("donationType")}
           />
         )}
 
@@ -279,6 +391,8 @@ export function PoolFilters({
             options={stats.birimDistribution.map(b => ({ value: b.birim, count: b.count }))}
             selected={birimFilter}
             onChange={setBirimFilter}
+            excluded={excludeFields.has("birim")}
+            onToggleExclude={() => toggleExcludeField("birim")}
           />
         )}
 
@@ -288,6 +402,8 @@ export function PoolFilters({
             options={stats.temsilciDistribution.map(t => ({ value: t.temsilci, count: t.count }))}
             selected={temsilciFilter}
             onChange={setTemsilciFilter}
+            excluded={excludeFields.has("temsilci")}
+            onToggleExclude={() => toggleExcludeField("temsilci")}
           />
         )}
 
@@ -297,6 +413,8 @@ export function PoolFilters({
             options={stats.ozellikDistribution.map(o => ({ value: o.ozellik, count: o.count }))}
             selected={ozellikFilter}
             onChange={setOzellikFilter}
+            excluded={excludeFields.has("ozellik")}
+            onToggleExclude={() => toggleExcludeField("ozellik")}
           />
         )}
 
@@ -306,6 +424,8 @@ export function PoolFilters({
             options={stats.fiyatDistribution.map(f => ({ value: f.fiyat, count: f.count }))}
             selected={fiyatFilter}
             onChange={setFiyatFilter}
+            excluded={excludeFields.has("fiyat")}
+            onToggleExclude={() => toggleExcludeField("fiyat")}
           />
         )}
 
@@ -315,6 +435,8 @@ export function PoolFilters({
             options={stats.yerTalebiDistribution.map(y => ({ value: y.yerTalebi, count: y.count }))}
             selected={yerTalebiFilter}
             onChange={setYerTalebiFilter}
+            excluded={excludeFields.has("yerTalebi")}
+            onToggleExclude={() => toggleExcludeField("yerTalebi")}
           />
         )}
 
@@ -324,6 +446,8 @@ export function PoolFilters({
             options={stats.gunTalebiDistribution.map(g => ({ value: g.gunTalebi, count: g.count }))}
             selected={gunTalebiFilter}
             onChange={setGunTalebiFilter}
+            excluded={excludeFields.has("gunTalebi")}
+            onToggleExclude={() => toggleExcludeField("gunTalebi")}
           />
         )}
 
@@ -333,6 +457,8 @@ export function PoolFilters({
             options={stats.ilkHayvanDistribution.map(i => ({ value: i.ilkHayvan, count: i.count }))}
             selected={ilkHayvanFilter}
             onChange={setIlkHayvanFilter}
+            excluded={excludeFields.has("ilkHayvan")}
+            onToggleExclude={() => toggleExcludeField("ilkHayvan")}
           />
         )}
 
@@ -342,57 +468,126 @@ export function PoolFilters({
             options={stats.safiDistribution.map(s => ({ value: s.safi, count: s.count }))}
             selected={safiFilter}
             onChange={setSafiFilter}
+            excluded={excludeFields.has("safi")}
+            onToggleExclude={() => toggleExcludeField("safi")}
           />
         )}
 
         {globalTags.length > 0 && (
           <MultiSelectDropdown
             label="Etiket"
-            options={globalTags.map(t => ({ value: t.id, count: undefined, label: t.name, color: t.color }))}
+            options={globalTags.map(t => ({
+              value: t.id,
+              count: tagCountMap.get(t.id) ?? undefined,
+              label: t.name,
+              color: t.color,
+            }))}
             selected={tagFilter}
             onChange={setTagFilter}
+            excluded={excludeFields.has("tags")}
+            onToggleExclude={() => toggleExcludeField("tags")}
           />
         )}
 
-        <Input
-          placeholder="AI Etiketi..."
-          value={aiCategoryFilter}
-          onChange={e => setAiCategoryFilter(e.target.value)}
-          className="h-8 text-xs"
-        />
+        <div className="flex gap-0.5">
+          <Input
+            placeholder="AI Etiketi..."
+            value={aiCategoryFilter}
+            onChange={e => setAiCategoryFilter(e.target.value)}
+            className={`h-8 text-xs flex-1 ${aiCategoryFilter && excludeFields.has("aiCategory") ? "border-destructive/50 ring-1 ring-destructive/20" : ""}`}
+          />
+          {aiCategoryFilter && (
+            <button
+              onClick={() => toggleExcludeField("aiCategory")}
+              title={excludeFields.has("aiCategory") ? "Dahil et moduna geç" : "Hariç tut moduna geç"}
+              className={`h-8 w-7 flex items-center justify-center rounded-md border text-xs transition-colors ${excludeFields.has("aiCategory") ? "bg-destructive/10 border-destructive/30 text-destructive hover:bg-destructive/20" : "bg-muted/30 border-input text-muted-foreground hover:bg-muted/50 hover:text-foreground"}`}
+            >
+              <Ban className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Hisse Sayısı Aralığı</label>
+          <div className="flex gap-1 items-center">
+            <Input
+              type="number"
+              min={1}
+              placeholder="Min"
+              value={shareCountMin}
+              onChange={e => setShareCountMin(e.target.value)}
+              className="h-8 text-xs flex-1"
+            />
+            <span className="text-xs text-muted-foreground">–</span>
+            <Input
+              type="number"
+              min={1}
+              placeholder="Max"
+              value={shareCountMax}
+              onChange={e => setShareCountMax(e.target.value)}
+              className="h-8 text-xs flex-1"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-muted-foreground">Tarih Aralığı</label>
+            <Select value={dateField || "updatedAt"} onValueChange={v => setDateField(v)}>
+              <SelectTrigger className="h-6 text-[10px] w-auto min-w-[120px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="updatedAt">Güncelleme Tarihi</SelectItem>
+                <SelectItem value="transfer">Aktarım Tarihi</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex gap-1 items-center">
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              className="h-8 text-xs flex-1"
+            />
+            <span className="text-xs text-muted-foreground">–</span>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              className="h-8 text-xs flex-1"
+            />
+          </div>
+        </div>
       </div>
 
       <NotesMultiFilter value={notesFilter} onChange={setNotesFilter} />
 
-      <div className="flex gap-2">
-        <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="h-8 text-xs flex-1"><SelectValue placeholder="Sıralama" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="sortOrder">Varsayılan</SelectItem>
-            <SelectItem value="name">Adına Kesilen</SelectItem>
-            <SelectItem value="description">Vekaleti Veren</SelectItem>
-            <SelectItem value="donationType">Cinsi</SelectItem>
-            <SelectItem value="birim">Birim</SelectItem>
-            <SelectItem value="temsilci">Temsilci</SelectItem>
-            <SelectItem value="kesimAlaniId">Kesim Listesi</SelectItem>
-            <SelectItem value="vekalet">Vekalet</SelectItem>
-            <SelectItem value="ozellik">Özellik</SelectItem>
-            <SelectItem value="fiyat">Fiyat</SelectItem>
-            <SelectItem value="yerTalebi">Yer Talebi</SelectItem>
-            <SelectItem value="gunTalebi">Gün Talebi</SelectItem>
-            <SelectItem value="ilkHayvan">İlk Hayvan</SelectItem>
-            <SelectItem value="safi">Şafi</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 text-xs px-2"
-          onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
-        >
-          {sortDir === "asc" ? "A→Z" : "Z→A"}
-        </Button>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-muted-foreground">Sıralama (3 katman)</label>
+        <div className="flex gap-3 flex-wrap">
+          <CompactSortLevel
+            label="1."
+            value={sortBy}
+            dir={sortDir}
+            onChange={setSortBy}
+            onDirChange={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+          />
+          <CompactSortLevel
+            label="2."
+            value={sortBy2}
+            dir={sortDir2}
+            onChange={setSortBy2}
+            onDirChange={() => setSortDir2(d => d === "asc" ? "desc" : "asc")}
+          />
+          <CompactSortLevel
+            label="3."
+            value={sortBy3}
+            dir={sortDir3}
+            onChange={setSortBy3}
+            onDirChange={() => setSortDir3(d => d === "asc" ? "desc" : "asc")}
+          />
+        </div>
       </div>
     </div>
   );

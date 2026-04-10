@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 import {
   fetchPoolDonations, fetchPoolStats,
-  bulkActionDonations, bulkTagDonations, classifyNotesAsync,
+  bulkActionDonations, bulkTagDonations, bulkNoteDonations,
+  classifyNotesAsync,
   fetchJobStatus, fetchProjects, saveAiClassifications,
   transferDonationsToKA, createKesimAlani,
   fetchTags, createTag,
@@ -28,6 +29,7 @@ import { TransferDialog } from "./bagis-havuzu/TransferDialog";
 import { ImportWizard } from "./bagis-havuzu/ImportWizard";
 import { BulkTagDialog } from "./bagis-havuzu/BulkTagDialog";
 import { AutomationRulesPanel } from "./bagis-havuzu/AutomationRulesPanel";
+import { BulkNoteDialog } from "./bagis-havuzu/BulkNoteDialog";
 import { ALL_TABLE_COLUMNS, PAGE_SIZE, type TableColumnKey } from "./bagis-havuzu/types";
 import type { CustomTag } from "@/lib/types";
 
@@ -73,6 +75,19 @@ export default function BagisHavuzuPage() {
   const [showFilters, setShowFilters] = useState(true);
   const [sortBy, setSortBy] = useState(() => urlParams.get("sort") || "sortOrder");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => (urlParams.get("dir") === "desc" ? "desc" : "asc"));
+  const [sortBy2, setSortBy2] = useState(() => urlParams.get("sort2") || "");
+  const [sortDir2, setSortDir2] = useState<"asc" | "desc">(() => (urlParams.get("dir2") === "desc" ? "desc" : "asc"));
+  const [sortBy3, setSortBy3] = useState(() => urlParams.get("sort3") || "");
+  const [sortDir3, setSortDir3] = useState<"asc" | "desc">(() => (urlParams.get("dir3") === "desc" ? "desc" : "asc"));
+  const [shareCountMin, setShareCountMin] = useState(() => urlParams.get("scMin") || "");
+  const [shareCountMax, setShareCountMax] = useState(() => urlParams.get("scMax") || "");
+  const [excludeFields, setExcludeFields] = useState<Set<string>>(() => {
+    const v = urlParams.get("excl");
+    return v ? new Set(v.split(",").filter(Boolean)) : new Set();
+  });
+  const [dateField, setDateField] = useState(() => urlParams.get("dateField") || "updatedAt");
+  const [dateFrom, setDateFrom] = useState(() => urlParams.get("dateFrom") || "");
+  const [dateTo, setDateTo] = useState(() => urlParams.get("dateTo") || "");
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Set<TableColumnKey>>(() => {
     const stored = localStorage.getItem(`bagis-havuzu-columns-${projectId}`);
@@ -86,6 +101,7 @@ export default function BagisHavuzuPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [transferTarget, setTransferTarget] = useState("");
   const [transferring, setTransferring] = useState(false);
   const [newListName, setNewListName] = useState("");
@@ -152,16 +168,36 @@ export default function BagisHavuzuPage() {
     if (notesFilter) p.set("notes", notesFilter);
     if (sortBy !== "sortOrder") p.set("sort", sortBy);
     if (sortDir !== "asc") p.set("dir", sortDir);
+    if (sortBy2) p.set("sort2", sortBy2);
+    if (sortDir2 !== "asc") p.set("dir2", sortDir2);
+    if (sortBy3) p.set("sort3", sortBy3);
+    if (sortDir3 !== "asc") p.set("dir3", sortDir3);
+    if (shareCountMin) p.set("scMin", shareCountMin);
+    if (shareCountMax) p.set("scMax", shareCountMax);
+    if (excludeFields.size > 0) p.set("excl", [...excludeFields].join(","));
+    if (dateField && dateField !== "updatedAt") p.set("dateField", dateField);
+    if (dateFrom) p.set("dateFrom", dateFrom);
+    if (dateTo) p.set("dateTo", dateTo);
     if (page > 0) p.set("p", String(page));
     const qs = p.toString();
     const newUrl = `/bagis-havuzu/${projectId}${qs ? `?${qs}` : ""}`;
     window.history.replaceState(null, "", import.meta.env.BASE_URL.replace(/\/$/, "") + newUrl);
-  }, [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter, notesFilter, sortBy, sortDir, page, projectId]);
+  }, [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter, notesFilter, sortBy, sortDir, sortBy2, sortDir2, sortBy3, sortDir3, shareCountMin, shareCountMax, excludeFields, dateField, dateFrom, dateTo, page, projectId]);
+
+  const toggleExcludeField = useCallback((field: string) => {
+    setExcludeFields(prev => {
+      const next = new Set(prev);
+      if (next.has(field)) next.delete(field); else next.add(field);
+      return next;
+    });
+  }, []);
 
   const activeFilterCount = [
-    debouncedSearch, statusFilter, kesimAlaniFilter, aiCategoryFilter, notesFilter,
+    debouncedSearch, statusFilter, kesimAlaniFilter, aiCategoryFilter, notesFilter, shareCountMin, shareCountMax, dateFrom, dateTo,
   ].filter(Boolean).length
   + [donationTypeFilter, birimFilter, temsilciFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter].filter(a => a.length > 0).length;
+
+  const excludeFieldsStr = useMemo(() => [...excludeFields].join(","), [excludeFields]);
 
   const filters = useMemo(() => ({
     search: debouncedSearch || undefined,
@@ -181,9 +217,19 @@ export default function BagisHavuzuPage() {
     notesFilter: notesFilter || undefined,
     sortBy: sortBy !== "sortOrder" ? sortBy : undefined,
     sortDir: sortDir !== "asc" ? sortDir : undefined,
+    sortBy2: sortBy2 || undefined,
+    sortDir2: sortDir2 !== "asc" ? sortDir2 : undefined,
+    sortBy3: sortBy3 || undefined,
+    sortDir3: sortDir3 !== "asc" ? sortDir3 : undefined,
+    shareCountMin: shareCountMin ? Number(shareCountMin) : undefined,
+    shareCountMax: shareCountMax ? Number(shareCountMax) : undefined,
+    excludeFields: excludeFieldsStr || undefined,
+    dateField: dateField !== "updatedAt" ? dateField : undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
-  }), [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter, notesFilter, sortBy, sortDir, page]);
+  }), [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter, notesFilter, sortBy, sortDir, sortBy2, sortDir2, sortBy3, sortDir3, shareCountMin, shareCountMax, excludeFieldsStr, dateField, dateFrom, dateTo, page]);
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["pool-donations", projectId, filters],
@@ -252,6 +298,11 @@ export default function BagisHavuzuPage() {
     setSafiFilter([]);
     setTagFilter([]);
     setNotesFilter("");
+    setShareCountMin("");
+    setShareCountMax("");
+    setExcludeFields(new Set());
+    setDateFrom("");
+    setDateTo("");
     setPage(0);
   }, []);
 
@@ -336,6 +387,20 @@ export default function BagisHavuzuPage() {
       toast({ title: "Etiketleme başarısız", description: err instanceof Error ? err.message : "Hata", variant: "destructive" });
     }
   }, [effectiveSelectedIds, projectId, globalTags, toast, invalidatePool]);
+
+  const handleBulkNote = useCallback(async (note: string, mode: "append" | "replace") => {
+    const ids = [...effectiveSelectedIds];
+    if (ids.length === 0) return;
+    try {
+      const result = await bulkNoteDonations(projectId, ids, note, mode);
+      toast({ title: `${result.affected} bağışa not ${mode === "append" ? "eklendi" : "güncellendi"}` });
+      setSelectedIds(new Set());
+      setSelectAllPages(false);
+      invalidatePool();
+    } catch (err) {
+      toast({ title: "Not ekleme başarısız", description: err instanceof Error ? err.message : "Hata", variant: "destructive" });
+    }
+  }, [effectiveSelectedIds, projectId, toast, invalidatePool]);
 
   const handleCreateTag = useCallback(async (name: string, color: string): Promise<CustomTag | null> => {
     try {
@@ -615,6 +680,16 @@ export default function BagisHavuzuPage() {
             notesFilter={notesFilter} setNotesFilter={v => { setNotesFilter(v); setPage(0); }}
             sortBy={sortBy} setSortBy={v => { setSortBy(v); setPage(0); }}
             sortDir={sortDir} setSortDir={setSortDir}
+            sortBy2={sortBy2} setSortBy2={v => { setSortBy2(v); setPage(0); }}
+            sortDir2={sortDir2} setSortDir2={setSortDir2}
+            sortBy3={sortBy3} setSortBy3={v => { setSortBy3(v); setPage(0); }}
+            sortDir3={sortDir3} setSortDir3={setSortDir3}
+            shareCountMin={shareCountMin} setShareCountMin={v => { setShareCountMin(v); setPage(0); }}
+            shareCountMax={shareCountMax} setShareCountMax={v => { setShareCountMax(v); setPage(0); }}
+            excludeFields={excludeFields} toggleExcludeField={v => { toggleExcludeField(v); setPage(0); }}
+            dateField={dateField} setDateField={v => { setDateField(v); setPage(0); }}
+            dateFrom={dateFrom} setDateFrom={v => { setDateFrom(v); setPage(0); }}
+            dateTo={dateTo} setDateTo={v => { setDateTo(v); setPage(0); }}
             stats={stats}
             kesimAlanlari={kesimAlanlari}
             globalTags={globalTags}
@@ -712,6 +787,7 @@ export default function BagisHavuzuPage() {
           onTransferOpen={() => setTransferOpen(true)}
           onBulkAction={handleBulkAction}
           onTagOpen={() => setTagDialogOpen(true)}
+          onNoteOpen={() => setNoteDialogOpen(true)}
           onClearSelection={() => { setSelectedIds(new Set()); setSelectAllPages(false); }}
         />
 
@@ -745,6 +821,13 @@ export default function BagisHavuzuPage() {
           selectedCount={effectiveSelectedIds.size}
           onTag={handleBulkTag}
           onCreateTag={handleCreateTag}
+        />
+
+        <BulkNoteDialog
+          open={noteDialogOpen}
+          onOpenChange={setNoteDialogOpen}
+          selectedCount={effectiveSelectedIds.size}
+          onSubmit={handleBulkNote}
         />
       </div>
     </div>

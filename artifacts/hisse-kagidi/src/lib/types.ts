@@ -58,6 +58,7 @@ export interface PoolStats {
   gunTalebiDistribution: { gunTalebi: string; count: number }[];
   ilkHayvanDistribution: { ilkHayvan: string; count: number }[];
   safiDistribution: { safi: string; count: number }[];
+  tagDistribution?: { id: string; name: string; color: string; count: number }[];
 }
 
 export interface Team {

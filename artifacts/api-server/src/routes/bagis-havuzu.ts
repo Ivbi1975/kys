@@ -9,7 +9,7 @@ import {
   animalGroupDonationsTable,
   automationRulesTable,
 } from "@workspace/db/schema";
-import { eq, isNull, and, sql, inArray, ilike, or, asc, desc } from "drizzle-orm";
+import { eq, isNull, and, sql, inArray, ilike, or, asc, desc, notInArray, ne, gte, lte, not } from "drizzle-orm";
 import { z } from "zod";
 import { asyncHandler } from "../middleware/error-handler";
 import { ERROR_MESSAGES } from "../lib/constants";
@@ -47,6 +47,18 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   const notesFilter = typeof req.query.notesFilter === "string" ? req.query.notesFilter.trim() : "";
   const sortByRaw = typeof req.query.sortBy === "string" ? req.query.sortBy : "sortOrder";
   const sortDir = typeof req.query.sortDir === "string" && req.query.sortDir === "desc" ? "desc" : "asc";
+
+  const shareCountMin = req.query.shareCountMin ? Number(req.query.shareCountMin) : null;
+  const shareCountMax = req.query.shareCountMax ? Number(req.query.shareCountMax) : null;
+  const excludeFields = parseMultiValue(req.query.excludeFields);
+  const excludeSet = new Set(excludeFields);
+  const dateField = typeof req.query.dateField === "string" ? req.query.dateField.trim() : "updatedAt";
+  const dateFrom = typeof req.query.dateFrom === "string" ? req.query.dateFrom.trim() : "";
+  const dateTo = typeof req.query.dateTo === "string" ? req.query.dateTo.trim() : "";
+  const sortBy2 = typeof req.query.sortBy2 === "string" ? req.query.sortBy2 : "";
+  const sortDir2 = typeof req.query.sortDir2 === "string" && req.query.sortDir2 === "desc" ? "desc" : "asc";
+  const sortBy3 = typeof req.query.sortBy3 === "string" ? req.query.sortBy3 : "";
+  const sortDir3 = typeof req.query.sortDir3 === "string" && req.query.sortDir3 === "desc" ? "desc" : "asc";
 
   const kaRows = await db.select({ id: kesimAlanlariTable.id, name: kesimAlanlariTable.name })
     .from(kesimAlanlariTable)
@@ -87,42 +99,87 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     );
   }
 
-  if (donationTypes.length === 1) conditions.push(eq(donationsTable.donationType, donationTypes[0]));
-  else if (donationTypes.length > 1) conditions.push(inArray(donationsTable.donationType, donationTypes));
+  function addMultiFilter(col: ReturnType<typeof eq> extends infer T ? Parameters<typeof eq>[0] : never, values: string[], fieldName: string) {
+    if (values.length === 0) return;
+    if (excludeSet.has(fieldName)) {
+      conditions.push(
+        or(
+          sql`${col} IS NULL`,
+          eq(col, ""),
+          values.length === 1 ? ne(col, values[0]) : notInArray(col, values),
+        )!
+      );
+    } else {
+      if (values.length === 1) conditions.push(eq(col, values[0]));
+      else conditions.push(inArray(col, values));
+    }
+  }
 
-  if (birimValues.length === 1) conditions.push(eq(donationsTable.birim, birimValues[0]));
-  else if (birimValues.length > 1) conditions.push(inArray(donationsTable.birim, birimValues));
-
-  if (temsilciValues.length === 1) conditions.push(eq(donationsTable.temsilci, temsilciValues[0]));
-  else if (temsilciValues.length > 1) conditions.push(inArray(donationsTable.temsilci, temsilciValues));
+  addMultiFilter(donationsTable.donationType, donationTypes, "donationType");
+  addMultiFilter(donationsTable.birim, birimValues, "birim");
+  addMultiFilter(donationsTable.temsilci, temsilciValues, "temsilci");
+  addMultiFilter(donationsTable.ozellik, ozellikValues, "ozellik");
+  addMultiFilter(donationsTable.fiyat, fiyatValues, "fiyat");
+  addMultiFilter(donationsTable.yerTalebi, yerTalebiValues, "yerTalebi");
+  addMultiFilter(donationsTable.gunTalebi, gunTalebiValues, "gunTalebi");
+  addMultiFilter(donationsTable.ilkHayvan, ilkHayvanValues, "ilkHayvan");
+  addMultiFilter(donationsTable.safi, safiValues, "safi");
 
   if (kesimAlaniId) conditions.push(eq(donationsTable.kesimAlaniId, kesimAlaniId));
 
-  if (ozellikValues.length === 1) conditions.push(eq(donationsTable.ozellik, ozellikValues[0]));
-  else if (ozellikValues.length > 1) conditions.push(inArray(donationsTable.ozellik, ozellikValues));
-
-  if (fiyatValues.length === 1) conditions.push(eq(donationsTable.fiyat, fiyatValues[0]));
-  else if (fiyatValues.length > 1) conditions.push(inArray(donationsTable.fiyat, fiyatValues));
-
-  if (yerTalebiValues.length === 1) conditions.push(eq(donationsTable.yerTalebi, yerTalebiValues[0]));
-  else if (yerTalebiValues.length > 1) conditions.push(inArray(donationsTable.yerTalebi, yerTalebiValues));
-
-  if (gunTalebiValues.length === 1) conditions.push(eq(donationsTable.gunTalebi, gunTalebiValues[0]));
-  else if (gunTalebiValues.length > 1) conditions.push(inArray(donationsTable.gunTalebi, gunTalebiValues));
-
-  if (ilkHayvanValues.length === 1) conditions.push(eq(donationsTable.ilkHayvan, ilkHayvanValues[0]));
-  else if (ilkHayvanValues.length > 1) conditions.push(inArray(donationsTable.ilkHayvan, ilkHayvanValues));
-
-  if (safiValues.length === 1) conditions.push(eq(donationsTable.safi, safiValues[0]));
-  else if (safiValues.length > 1) conditions.push(inArray(donationsTable.safi, safiValues));
-
   if (tagIdValues.length > 0) {
-    conditions.push(
-      sql`${donationsTable.id} IN (
-        SELECT dt.donation_id FROM donation_tags dt
-        WHERE dt.tag_id IN (${sql.join(tagIdValues.map(t => sql`${t}`), sql`, `)})
-      )`
-    );
+    const tagSql = sql`${donationsTable.id} IN (
+      SELECT dt.donation_id FROM donation_tags dt
+      WHERE dt.tag_id IN (${sql.join(tagIdValues.map(t => sql`${t}`), sql`, `)})
+    )`;
+    if (excludeSet.has("tags")) {
+      conditions.push(not(tagSql));
+    } else {
+      conditions.push(tagSql);
+    }
+  }
+
+  if (shareCountMin !== null && !isNaN(shareCountMin)) {
+    conditions.push(gte(donationsTable.shareCount, shareCountMin));
+  }
+  if (shareCountMax !== null && !isNaN(shareCountMax)) {
+    conditions.push(lte(donationsTable.shareCount, shareCountMax));
+  }
+
+  if (dateField === "transfer" && (dateFrom || dateTo)) {
+    const fromDate = dateFrom ? new Date(dateFrom) : null;
+    const toDate = dateTo ? new Date(dateTo + "T23:59:59.999Z") : null;
+    const fromValid = fromDate && !isNaN(fromDate.getTime());
+    const toValid = toDate && !isNaN(toDate.getTime());
+    if (fromValid && toValid) {
+      conditions.push(sql`EXISTS (
+        SELECT 1 FROM donation_transfers dt2
+        WHERE dt2.donation_id = ${donationsTable.id}
+          AND dt2.created_at >= ${fromDate}
+          AND dt2.created_at <= ${toDate}
+      )`);
+    } else if (fromValid) {
+      conditions.push(sql`EXISTS (
+        SELECT 1 FROM donation_transfers dt2
+        WHERE dt2.donation_id = ${donationsTable.id}
+          AND dt2.created_at >= ${fromDate}
+      )`);
+    } else if (toValid) {
+      conditions.push(sql`EXISTS (
+        SELECT 1 FROM donation_transfers dt2
+        WHERE dt2.donation_id = ${donationsTable.id}
+          AND dt2.created_at <= ${toDate}
+      )`);
+    }
+  } else {
+    if (dateFrom) {
+      const d = new Date(dateFrom);
+      if (!isNaN(d.getTime())) conditions.push(gte(donationsTable.updatedAt, d));
+    }
+    if (dateTo) {
+      const d = new Date(dateTo + "T23:59:59.999Z");
+      if (!isNaN(d.getTime())) conditions.push(lte(donationsTable.updatedAt, d));
+    }
   }
 
   if (status === "excluded") {
@@ -132,7 +189,17 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   }
 
   if (aiCategory) {
-    conditions.push(sql`${donationsTable.aiCategories}::text ILIKE ${'%' + aiCategory + '%'}`);
+    if (excludeSet.has("aiCategory")) {
+      conditions.push(
+        or(
+          sql`${donationsTable.aiCategories} IS NULL`,
+          sql`${donationsTable.aiCategories}::text = '[]'`,
+          sql`NOT (${donationsTable.aiCategories}::text ILIKE ${'%' + aiCategory + '%'})`,
+        )!
+      );
+    } else {
+      conditions.push(sql`${donationsTable.aiCategories}::text ILIKE ${'%' + aiCategory + '%'}`);
+    }
   }
 
   if (notesFilter) {
@@ -161,16 +228,21 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     ilkHayvan: "ilk_hayvan",
     safi: "safi",
     notes: "notes",
+    updatedAt: "updated_at",
   };
 
-  const sortKeys = sortByRaw.split(",").map((s: string) => s.trim()).filter(Boolean).slice(0, 3);
+  const sortLevels = [
+    { key: sortByRaw, dir: sortDir },
+    { key: sortBy2, dir: sortDir2 },
+    { key: sortBy3, dir: sortDir3 },
+  ];
   const sortParts: ReturnType<typeof sql>[] = [];
   const usedCols = new Set<string>();
-  for (const key of sortKeys) {
-    const col = sortColumnMap[key];
+  for (const level of sortLevels) {
+    const col = sortColumnMap[level.key];
     if (col && !usedCols.has(col)) {
       usedCols.add(col);
-      sortParts.push(sortDir === "desc"
+      sortParts.push(level.dir === "desc"
         ? sql`${sql.raw(`"${col}"`)} DESC NULLS LAST`
         : sql`${sql.raw(`"${col}"`)} ASC NULLS LAST`
       );
@@ -365,6 +437,23 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
     distQuery("safi"),
   ]);
 
+  const tagCountResult = await db.execute(sql`
+    SELECT ct.id, ct.name, ct.color, COUNT(d.id)::int AS count
+    FROM custom_tags ct
+    LEFT JOIN donation_tags dt ON dt.tag_id = ct.id
+    LEFT JOIN donations d ON d.id = dt.donation_id AND d.deleted_at IS NULL AND d.excluded = false
+    LEFT JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id AND ka.deleted_at IS NULL
+    WHERE ka.project_id = ${projectId} OR dt.donation_id IS NULL
+    GROUP BY ct.id, ct.name, ct.color
+    ORDER BY count DESC
+  `);
+  const tagDistribution = tagCountResult.rows.map((r: Record<string, unknown>) => ({
+    id: String(r.id),
+    name: String(r.name),
+    color: String(r.color || ""),
+    count: Number(r.count),
+  }));
+
   res.json({
     ...stats,
     birimDistribution: birimDist.rows,
@@ -381,6 +470,7 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
     gunTalebiDistribution: gunTalebiDist.rows.map((r: Record<string, unknown>) => ({ gunTalebi: String(r.value), count: Number(r.count) })),
     ilkHayvanDistribution: ilkHayvanDist.rows.map((r: Record<string, unknown>) => ({ ilkHayvan: String(r.value), count: Number(r.count) })),
     safiDistribution: safiDist.rows.map((r: Record<string, unknown>) => ({ safi: String(r.value), count: Number(r.count) })),
+    tagDistribution,
   });
 }));
 
@@ -885,6 +975,68 @@ router.post("/donations/:id/unflag", asyncHandler(async (req, res) => {
     .set({ isFlagged: false, flagReason: "", flagResolvedAt: new Date(), updatedAt: new Date() })
     .where(eq(donationsTable.id, donationId));
   res.json({ success: true });
+}));
+
+const bulkNotesSchema = z.object({
+  donationIds: z.array(z.string()).min(1).max(50000),
+  note: z.string().min(1).max(5000),
+  mode: z.enum(["append", "replace"]).default("append"),
+});
+
+router.post("/projects/:id/donations/bulk-notes", asyncHandler(async (req, res) => {
+  const projectId = req.params.id;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const parsed = bulkNotesSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
+    return;
+  }
+
+  const { donationIds, note, mode } = parsed.data;
+
+  const projectKAIds = await db.select({ id: kesimAlanlariTable.id })
+    .from(kesimAlanlariTable)
+    .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
+  const validKAIds = projectKAIds.map(k => k.id);
+
+  if (validKAIds.length === 0) {
+    res.json({ success: true, affected: 0 });
+    return;
+  }
+
+  let affected = 0;
+  const CHUNK = 500;
+
+  for (let i = 0; i < donationIds.length; i += CHUNK) {
+    const chunk = donationIds.slice(i, i + CHUNK);
+    const scopedWhere = and(
+      inArray(donationsTable.id, chunk),
+      inArray(donationsTable.kesimAlaniId, validKAIds),
+      isNull(donationsTable.deletedAt),
+    );
+
+    if (mode === "replace") {
+      const result = await db.update(donationsTable)
+        .set({ notes: note, updatedAt: new Date() })
+        .where(scopedWhere)
+        .returning({ id: donationsTable.id });
+      affected += result.length;
+    } else {
+      const result = await db.execute(sql`
+        UPDATE donations SET
+          notes = CASE WHEN notes IS NULL OR notes = '' THEN ${note} ELSE notes || E'\n' || ${note} END,
+          updated_at = NOW()
+        WHERE id IN (${sql.join(chunk.map(id => sql`${id}`), sql`, `)})
+          AND kesim_alani_id IN (${sql.join(validKAIds.map(id => sql`${id}`), sql`, `)})
+          AND deleted_at IS NULL
+      `);
+      affected += Number((result as { rowCount?: number }).rowCount || 0);
+    }
+  }
+
+  res.json({ success: true, affected });
 }));
 
 router.get("/projects/:id/flagged-donations", asyncHandler(async (req, res) => {
