@@ -9,7 +9,7 @@ import { computeEffectiveShares } from "@/lib/grouping";
 import type { BasketItem, ReturnToSourceResult, BasketSortKey, BasketSortDir } from "../hooks/types";
 
 type BasketTab = "contents" | "place" | "transfer";
-type GroupByMode = "none" | "cins" | "share" | "source";
+type GroupByCriterion = "cins" | "share" | "source";
 
 const ITEMS_PER_PAGE = 50;
 const TIMEOUT_WARNING_MS = 2 * 60 * 60 * 1000;
@@ -71,7 +71,7 @@ export function BasketPanel({
   const [shareMin, setShareMin] = useState("");
   const [shareMax, setShareMax] = useState("");
   const [cinsFilter, setCinsFilter] = useState("");
-  const [groupByMode, setGroupByMode] = useState<GroupByMode>("none");
+  const [groupByCriteria, setGroupByCriteria] = useState<Set<GroupByCriterion>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
 
   const [now, setNow] = useState(Date.now());
@@ -243,63 +243,40 @@ export function BasketPanel({
     return `${hours}s ${remainMins}dk`;
   };
 
-  const buildGroupedItems = (items: typeof filteredLocalDonationItems) => {
-    if (groupByMode === "none") {
-      const grouped: { key: string; label: string; items: typeof items }[] = [];
-      const seen = new Map<string, number>();
-      for (const b of items) {
-        const label = (b.description || b.name).trim();
-        const existing = seen.get(label);
-        if (existing !== undefined) {
-          grouped[existing].items.push(b);
-        } else {
-          seen.set(label, grouped.length);
-          grouped.push({ key: label, label, items: [b] });
-        }
-      }
-      return grouped;
-    }
+  const getGroupKey = (b: BasketItem): string => {
+    const parts: string[] = [];
+    if (groupByCriteria.has("cins")) parts.push(b.donationType || "Belirtilmemiş");
+    if (groupByCriteria.has("share")) parts.push(`${b.donorShareCount || 1} Hisse`);
+    if (groupByCriteria.has("source")) parts.push(b.sourceGroupAnimalNo ? `Hayvan ${b.sourceGroupAnimalNo}` : "Bağışçı Listesi");
+    return parts.join(" · ") || "__all__";
+  };
 
-    const sections = new Map<string, typeof items>();
-    for (const b of items) {
-      let key: string;
-      if (groupByMode === "cins") key = b.donationType || "Belirtilmemiş";
-      else if (groupByMode === "share") key = `${b.donorShareCount || 1} Hisse`;
-      else key = b.sourceGroupAnimalNo ? `Hayvan ${b.sourceGroupAnimalNo}` : "Listeden";
-      if (!sections.has(key)) sections.set(key, []);
-      sections.get(key)!.push(b);
-    }
-
+  const buildGroupedChips = (items: typeof filteredLocalDonationItems) => {
     const grouped: { key: string; label: string; items: typeof items }[] = [];
-    for (const [sectionKey, sectionItems] of sections) {
-      const seen = new Map<string, number>();
-      for (const b of sectionItems) {
-        const label = (b.description || b.name).trim();
-        const existing = seen.get(`${sectionKey}::${label}`);
-        if (existing !== undefined) {
-          grouped[existing].items.push(b);
-        } else {
-          seen.set(`${sectionKey}::${label}`, grouped.length);
-          grouped.push({ key: `${sectionKey}::${label}`, label, items: [b] });
-        }
+    const seen = new Map<string, number>();
+    for (const b of items) {
+      const label = (b.description || b.name).trim();
+      const existing = seen.get(label);
+      if (existing !== undefined) {
+        grouped[existing].items.push(b);
+      } else {
+        seen.set(label, grouped.length);
+        grouped.push({ key: label, label, items: [b] });
       }
     }
     return grouped;
   };
 
   const groupedSections = useMemo(() => {
-    if (groupByMode === "none") return null;
+    if (groupByCriteria.size === 0) return null;
     const sections = new Map<string, typeof paginatedItems>();
     for (const b of paginatedItems) {
-      let key: string;
-      if (groupByMode === "cins") key = b.donationType || "Belirtilmemiş";
-      else if (groupByMode === "share") key = `${b.donorShareCount || 1} Hisse`;
-      else key = b.sourceGroupAnimalNo ? `Hayvan ${b.sourceGroupAnimalNo}` : "Listeden";
+      const key = getGroupKey(b);
       if (!sections.has(key)) sections.set(key, []);
       sections.get(key)!.push(b);
     }
     return sections;
-  }, [paginatedItems, groupByMode]);
+  }, [paginatedItems, groupByCriteria]);
 
   const tabs: { id: BasketTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: "contents", label: "Sepet İçeriği", icon: <ShoppingCart className="w-3.5 h-3.5" />, badge: selectedBasketIds.size > 0 ? `${selectedBasketIds.size} seçili` : undefined },
@@ -334,9 +311,7 @@ export function BasketPanel({
           onClick={e => e.stopPropagation()}
         />
         <span className="font-medium">{b.description || b.name}</span>
-        {totalShares > 1 && (
-          <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-100 dark:bg-violet-900/50 px-1 rounded">{totalShares}</span>
-        )}
+        <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-100 dark:bg-violet-900/50 px-1 rounded">{totalShares}</span>
         {b.sourceGroupAnimalNo && <span className="text-[10px] text-amber-600 dark:text-amber-400">H{b.sourceGroupAnimalNo}</span>}
         {timed && (
           <span className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-0.5" title={`Sepette ${timeStr}`}>
@@ -391,9 +366,7 @@ export function BasketPanel({
           onClick={e => e.stopPropagation()}
         />
         <span className="font-medium">{g.label}</span>
-        {totalShares > 1 && (
-          <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-100 dark:bg-violet-900/50 px-1 rounded">{totalShares}</span>
-        )}
+        <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-100 dark:bg-violet-900/50 px-1 rounded">{totalShares}</span>
         {g.items.length > 1 && <span className="text-emerald-500 font-semibold">&times;{g.items.length}</span>}
         {firstItem?.sourceGroupAnimalNo && <span className="text-[10px] text-amber-600 dark:text-amber-400">H{firstItem.sourceGroupAnimalNo}</span>}
         {anyTimedOut && <Clock className="w-2.5 h-2.5 text-amber-500" />}
@@ -405,14 +378,17 @@ export function BasketPanel({
   };
 
   const renderDonorChips = () => {
-    if (groupByMode !== "none" && groupedSections) {
+    if (groupByCriteria.size > 0 && groupedSections) {
       return (
         <div className="space-y-2">
           {Array.from(groupedSections.entries()).map(([sectionKey, sectionItems]) => {
-            const grouped = buildGroupedItems(sectionItems);
+            const grouped = buildGroupedChips(sectionItems);
+            const sectionTotalShares = sectionItems.reduce((sum, b) => sum + (b.donorShareCount || 1), 0);
             return (
               <div key={sectionKey} className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 p-2.5">
-                <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 mb-2">{sectionKey} ({sectionItems.length})</p>
+                <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 mb-2">
+                  {sectionKey} — {sectionItems.length} bağışçı · {sectionTotalShares} hisse
+                </p>
                 <div className="flex flex-wrap gap-1.5">
                   {grouped.map(g => g.items.length === 1 ? renderDonorChip(g.items[0], g.key) : renderGroupedChip(g))}
                 </div>
@@ -423,7 +399,7 @@ export function BasketPanel({
       );
     }
 
-    const grouped = buildGroupedItems(paginatedItems);
+    const grouped = buildGroupedChips(paginatedItems);
     return (
       <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 p-2.5">
         <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 mb-2">Bu Kesim Alanı</p>
@@ -612,19 +588,32 @@ export function BasketPanel({
                                   </SelectContent>
                                 </Select>
                               )}
-                              <Select value={groupByMode} onValueChange={(v) => setGroupByMode(v as GroupByMode)}>
-                                <SelectTrigger className="h-6 w-28 text-xs">
-                                  <SelectValue placeholder="Grupla" />
-                                </SelectTrigger>
-                                <SelectContent side="top">
-                                  <SelectItem value="none">Grupsuz</SelectItem>
-                                  <SelectItem value="cins">Cins</SelectItem>
-                                  <SelectItem value="share">Hisse</SelectItem>
-                                  <SelectItem value="source">Kaynak</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              {(shareMin || shareMax || cinsFilter || groupByMode !== "none") && (
-                                <Button variant="ghost" size="sm" className="h-6 text-xs px-1.5" onClick={() => { setShareMin(""); setShareMax(""); setCinsFilter(""); setGroupByMode("none"); setCurrentPage(1); }}>
+                              <div className="flex items-center gap-1.5 border-l pl-1.5">
+                                <span className="text-[11px] text-muted-foreground whitespace-nowrap">Grupla:</span>
+                                {(["cins", "share", "source"] as GroupByCriterion[]).map(criterion => {
+                                  const labels: Record<GroupByCriterion, string> = { cins: "Cins", share: "Hisse", source: "Kaynak" };
+                                  const isActive = groupByCriteria.has(criterion);
+                                  return (
+                                    <button
+                                      key={criterion}
+                                      className={`px-1.5 py-0.5 rounded text-[11px] border transition-colors ${isActive ? "bg-emerald-100 dark:bg-emerald-900 border-emerald-400 text-emerald-700 dark:text-emerald-300 font-semibold" : "border-border text-muted-foreground hover:bg-muted"}`}
+                                      onClick={() => {
+                                        setGroupByCriteria(prev => {
+                                          const next = new Set(prev);
+                                          if (next.has(criterion)) next.delete(criterion);
+                                          else next.add(criterion);
+                                          return next;
+                                        });
+                                        setCurrentPage(1);
+                                      }}
+                                    >
+                                      {labels[criterion]}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              {(shareMin || shareMax || cinsFilter || groupByCriteria.size > 0) && (
+                                <Button variant="ghost" size="sm" className="h-6 text-xs px-1.5" onClick={() => { setShareMin(""); setShareMax(""); setCinsFilter(""); setGroupByCriteria(new Set()); setCurrentPage(1); }}>
                                   <X className="w-3 h-3" />
                                 </Button>
                               )}
@@ -732,9 +721,7 @@ export function BasketPanel({
                         {foreignBasketItems.map(b => (
                           <span key={b.donationId} className="px-2 py-1 bg-white dark:bg-zinc-900 rounded-md text-xs inline-flex items-center gap-1.5 border border-blue-200 dark:border-blue-800">
                             <span className="font-medium">{b.description || b.name}</span>
-                            {(b.donorShareCount || 1) > 1 && (
-                              <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-100 dark:bg-violet-900/50 px-1 rounded">{b.donorShareCount || 1}</span>
-                            )}
+                            <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-100 dark:bg-violet-900/50 px-1 rounded">{b.donorShareCount || 1}</span>
                             <button onClick={(e) => { e.stopPropagation(); removeFromBasket(b.donationId); }} className="text-muted-foreground hover:text-red-500 transition-colors">
                               <X className="w-3 h-3" />
                             </button>
