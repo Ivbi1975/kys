@@ -1,6 +1,6 @@
 import { db } from "@workspace/db";
 import { kesimAlanlariTable, projectsTable, donationsTable, donationTagsTable } from "@workspace/db/schema";
-import { eq, isNull, isNotNull, inArray, and } from "drizzle-orm";
+import { eq, isNull, isNotNull, inArray, and, ne } from "drizzle-orm";
 import crypto from "crypto";
 import { serviceError, serviceOk, type ServiceResult } from "./result";
 import {
@@ -24,17 +24,13 @@ export async function listKesimAlanlari(includeDeleted: boolean) {
   const { cached, cacheKey } = getCachedKAList(includeDeleted);
   if (cached) return serviceOk({ data: cached });
 
-  const whereClause = includeDeleted ? undefined : isNull(kesimAlanlariTable.deletedAt);
+  const hidePool = ne(kesimAlanlariTable.name, "__havuz__");
+  const whereClause = includeDeleted ? hidePool : and(isNull(kesimAlanlariTable.deletedAt), hidePool);
 
   let rows;
-  if (whereClause) {
-    rows = await db.select().from(kesimAlanlariTable)
-      .where(whereClause)
-      .orderBy(kesimAlanlariTable.createdAt);
-  } else {
-    rows = await db.select().from(kesimAlanlariTable)
-      .orderBy(kesimAlanlariTable.createdAt);
-  }
+  rows = await db.select().from(kesimAlanlariTable)
+    .where(whereClause)
+    .orderBy(kesimAlanlariTable.createdAt);
 
   const results = await getFullKesimAlaniList(rows);
   setCachedKAList(cacheKey, results);

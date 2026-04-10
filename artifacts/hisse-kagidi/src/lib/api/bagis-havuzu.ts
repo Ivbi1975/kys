@@ -61,7 +61,6 @@ export async function bulkImportDonations(projectId: string, donations: Array<{
   shareCount: number; vekalet: string; notes: string; phone: string;
   birim: string; temsilci: string; ozellik: string; fiyat: string;
   yerTalebi: string; gunTalebi: string; ilkHayvan: string; safi: string;
-  kesimAlaniId: string;
 }>): Promise<{ success: boolean; inserted: number }> {
   return apiFetch<{ success: boolean; inserted: number }>(`/projects/${projectId}/donations/bulk-import`, {
     method: "POST",

@@ -156,7 +156,7 @@ export default function BagisHavuzuPage() {
   const projectName = projects?.find(p => p.id === projectId)?.name || "";
   const items = data?.items || [];
   const total = data?.total || 0;
-  const kesimAlanlari = data?.kesimAlanlari || [];
+  const kesimAlanlari = (data?.kesimAlanlari || []).filter(ka => ka.name !== "__havuz__");
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const multiLocationVekalets = useMemo(() => {
@@ -510,7 +510,6 @@ export default function BagisHavuzuPage() {
           open={importOpen}
           onOpenChange={setImportOpen}
           projectId={projectId}
-          kesimAlanlari={kesimAlanlari}
           onSuccess={invalidatePool}
         />
       </div>

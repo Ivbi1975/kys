@@ -15,11 +15,10 @@ interface ImportWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
-  kesimAlanlari: { id: string; name: string }[];
   onSuccess: () => void;
 }
 
-export function ImportWizard({ open, onOpenChange, projectId, kesimAlanlari, onSuccess }: ImportWizardProps) {
+export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: ImportWizardProps) {
   const { toast } = useToast();
   const [importStep, setImportStep] = useState<"input" | "mapping">("input");
   const [importMode, setImportMode] = useState<"upload" | "paste">("upload");
@@ -27,7 +26,6 @@ export function ImportWizard({ open, onOpenChange, projectId, kesimAlanlari, onS
   const [previewData, setPreviewData] = useState<string[][]>([]);
   const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([]);
   const [hasHeaderRow, setHasHeaderRow] = useState(true);
-  const [importTargetKA, setImportTargetKA] = useState("");
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -80,8 +78,8 @@ export function ImportWizard({ open, onOpenChange, projectId, kesimAlanlari, onS
   }, [hasHeaderRow, previewData]);
 
   const handleImport = useCallback(async () => {
-    if (!importTargetKA || displayPreviewRows.length === 0) {
-      toast({ title: "Hedef kesim listesi seçin", variant: "destructive" });
+    if (displayPreviewRows.length === 0) {
+      toast({ title: "Yüklenecek veri bulunamadı", variant: "destructive" });
       return;
     }
     setImporting(true);
@@ -91,14 +89,12 @@ export function ImportWizard({ open, onOpenChange, projectId, kesimAlanlari, onS
         shareCount: number; vekalet: string; notes: string; phone: string;
         birim: string; temsilci: string; ozellik: string; fiyat: string;
         yerTalebi: string; gunTalebi: string; ilkHayvan: string; safi: string;
-        kesimAlaniId: string;
       }
       const donations = displayPreviewRows.map((row): ImportDonation => {
         const d: ImportDonation = {
           id: crypto.randomUUID(), name: "", description: "", donationType: "",
           shareCount: 1, vekalet: "", notes: "", phone: "", birim: "", temsilci: "",
           ozellik: "", fiyat: "", yerTalebi: "", gunTalebi: "", ilkHayvan: "", safi: "",
-          kesimAlaniId: importTargetKA,
         };
         const notesParts: string[] = [];
         for (let c = 0; c < columnMappings.length; c++) {
@@ -171,7 +167,7 @@ export function ImportWizard({ open, onOpenChange, projectId, kesimAlanlari, onS
     } finally {
       setImporting(false);
     }
-  }, [importTargetKA, displayPreviewRows, columnMappings, projectId, toast, onSuccess]);
+  }, [displayPreviewRows, columnMappings, projectId, toast, onSuccess]);
 
   function resetImport() {
     onOpenChange(false);
@@ -181,7 +177,6 @@ export function ImportWizard({ open, onOpenChange, projectId, kesimAlanlari, onS
     setPreviewData([]);
     setColumnMappings([]);
     setHasHeaderRow(true);
-    setImportTargetKA("");
   }
 
   return (
@@ -231,18 +226,6 @@ export function ImportWizard({ open, onOpenChange, projectId, kesimAlanlari, onS
             <div className="flex items-center gap-2 mb-3 flex-shrink-0">
               <input type="checkbox" id="poolHasHeader" checked={hasHeaderRow} onChange={(e) => setHasHeaderRow(e.target.checked)} className="rounded" />
               <label htmlFor="poolHasHeader" className="text-sm font-medium">İlk satır başlık satırıdır</label>
-            </div>
-
-            <div className="mb-3 flex-shrink-0">
-              <label className="text-sm font-medium mb-1 block">Hedef Kesim Listesi</label>
-              <Select value={importTargetKA} onValueChange={setImportTargetKA}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="Yüklenecek kesim listesini seçin..." /></SelectTrigger>
-                <SelectContent>
-                  {kesimAlanlari.map(ka => (
-                    <SelectItem key={ka.id} value={ka.id}>{ka.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="border rounded-lg overflow-hidden min-h-0 flex-1">

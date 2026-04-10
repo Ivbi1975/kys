@@ -99,7 +99,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   }
 
   if (notesFilter) {
-    const noteTerms = notesFilter.split(",").map(t => t.trim()).filter(Boolean);
+    const noteTerms = notesFilter.split(",").map((t: string) => t.trim()).filter(Boolean);
     for (const term of noteTerms) {
       conditions.push(ilike(donationsTable.notes, `%${term}%`));
     }
@@ -279,6 +279,7 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
 }));
 
 const bulkImportSchema = z.object({
+  kesimAlaniId: z.string().min(1).optional(),
   donations: z.array(z.object({
     id: z.string().min(1),
     name: z.string().default(""),
@@ -296,7 +297,7 @@ const bulkImportSchema = z.object({
     gunTalebi: z.string().default(""),
     ilkHayvan: z.string().default(""),
     safi: z.string().default(""),
-    kesimAlaniId: z.string().min(1),
+    kesimAlaniId: z.string().min(1).optional(),
   })).min(1).max(10000),
 });
 
@@ -311,9 +312,49 @@ router.post("/projects/:id/donations/bulk-import", asyncHandler(async (req, res)
     return;
   }
 
-  const { donations } = parsed.data;
+  const { donations, kesimAlaniId: topLevelKaId } = parsed.data;
 
-  const kaIds = [...new Set(donations.map(d => d.kesimAlaniId))];
+  let defaultKaId: string | undefined;
+  if (topLevelKaId) {
+    const [validKA] = await db.select({ id: kesimAlanlariTable.id })
+      .from(kesimAlanlariTable)
+      .where(and(
+        eq(kesimAlanlariTable.id, topLevelKaId),
+        eq(kesimAlanlariTable.projectId, projectId),
+        isNull(kesimAlanlariTable.deletedAt),
+      ));
+    if (validKA) defaultKaId = validKA.id;
+  }
+
+  if (!defaultKaId) {
+    const POOL_KA_NAME = "__havuz__";
+    const [existingPoolKA] = await db.select({ id: kesimAlanlariTable.id })
+      .from(kesimAlanlariTable)
+      .where(and(
+        eq(kesimAlanlariTable.name, POOL_KA_NAME),
+        eq(kesimAlanlariTable.projectId, projectId),
+        isNull(kesimAlanlariTable.deletedAt),
+      ));
+    if (existingPoolKA) {
+      defaultKaId = existingPoolKA.id;
+    } else {
+      const newId = crypto.randomUUID();
+      await db.insert(kesimAlanlariTable).values({
+        id: newId,
+        projectId,
+        name: POOL_KA_NAME,
+        createdAt: new Date(),
+      });
+      defaultKaId = newId;
+    }
+  }
+
+  const donationsWithKa = donations.map(d => ({
+    ...d,
+    kesimAlaniId: d.kesimAlaniId || defaultKaId!,
+  }));
+
+  const kaIds = [...new Set(donationsWithKa.map(d => d.kesimAlaniId))];
   const validKAs = await db.select({ id: kesimAlanlariTable.id })
     .from(kesimAlanlariTable)
     .where(and(
@@ -334,7 +375,7 @@ router.post("/projects/:id/donations/bulk-import", asyncHandler(async (req, res)
     sortOffsets[row.kesim_alani_id] = (row.max_sort || 0) + 1;
   }
 
-  const validDonations = donations.filter(d => validKAIds.has(d.kesimAlaniId));
+  const validDonations = donationsWithKa.filter(d => validKAIds.has(d.kesimAlaniId));
   if (validDonations.length === 0) {
     res.status(400).json({ error: "Geçerli kesim alanı bulunamadı" });
     return;
