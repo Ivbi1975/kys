@@ -13,6 +13,16 @@ export interface RuleCondition {
   value: string | string[] | number | [number, number];
 }
 
+export interface ConditionGroup {
+  logic: "AND" | "OR";
+  conditions: RuleCondition[];
+}
+
+export interface CompoundConditions {
+  logic: "AND" | "OR";
+  groups: ConditionGroup[];
+}
+
 export interface RuleAction {
   type: "transfer_to_ka" | "add_tag" | "flag" | "exclude";
   targetKesimAlaniId?: string;
@@ -146,8 +156,35 @@ function evaluateCondition(donation: Record<string, unknown>, condition: RuleCon
   }
 }
 
-function matchesRule(donation: Record<string, unknown>, conditions: RuleCondition[], donationTags: string[]): boolean {
-  return conditions.every(c => evaluateCondition(donation, c, donationTags));
+function isCompoundConditions(conditions: unknown): conditions is CompoundConditions {
+  return (
+    typeof conditions === "object" &&
+    conditions !== null &&
+    !Array.isArray(conditions) &&
+    "logic" in conditions &&
+    "groups" in conditions
+  );
+}
+
+function normalizeToCompound(conditions: RuleCondition[] | CompoundConditions): CompoundConditions {
+  if (isCompoundConditions(conditions)) return conditions;
+  return { logic: "AND", groups: [{ logic: "AND", conditions }] };
+}
+
+function matchesRule(donation: Record<string, unknown>, conditions: RuleCondition[] | CompoundConditions, donationTags: string[]): boolean {
+  const compound = normalizeToCompound(conditions);
+
+  const groupResults = compound.groups.map(group => {
+    if (!group.conditions || group.conditions.length === 0) return true;
+    const condResults = group.conditions.map(c => evaluateCondition(donation, c, donationTags));
+    return group.logic === "OR"
+      ? condResults.some(Boolean)
+      : condResults.every(Boolean);
+  });
+
+  return compound.logic === "OR"
+    ? groupResults.some(Boolean)
+    : groupResults.every(Boolean);
 }
 
 export async function executeRules(projectId: string): Promise<ExecutionResult> {
@@ -201,15 +238,16 @@ export async function executeRules(projectId: string): Promise<ExecutionResult> 
   const ruleResults: ExecutionSummaryItem[] = [];
 
   for (const rule of rules) {
-    const conditions = rule.conditions as RuleCondition[];
+    const rawConditions = rule.conditions as RuleCondition[] | CompoundConditions;
     const action = rule.action as RuleAction;
 
-    if (!conditions || !Array.isArray(conditions) || conditions.length === 0) continue;
+    if (!rawConditions) continue;
+    if (Array.isArray(rawConditions) && rawConditions.length === 0) continue;
     if (!action || !action.type) continue;
 
     const matchedDonations = donations.filter(d => {
       if (processedIds.has(d.id)) return false;
-      return matchesRule(d as unknown as Record<string, unknown>, conditions, tagsByDonation[d.id] || []);
+      return matchesRule(d as unknown as Record<string, unknown>, rawConditions, tagsByDonation[d.id] || []);
     });
 
     if (matchedDonations.length === 0) {

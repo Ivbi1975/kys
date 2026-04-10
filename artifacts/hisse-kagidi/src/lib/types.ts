@@ -120,6 +120,16 @@ export interface RuleCondition {
   value: string | string[] | number | [number, number];
 }
 
+export interface ConditionGroup {
+  logic: "AND" | "OR";
+  conditions: RuleCondition[];
+}
+
+export interface CompoundConditions {
+  logic: "AND" | "OR";
+  groups: ConditionGroup[];
+}
+
 export interface RuleAction {
   type: "transfer_to_ka" | "add_tag" | "flag" | "exclude";
   targetKesimAlaniId?: string;
@@ -131,7 +141,7 @@ export interface AutomationRule {
   id: string;
   projectId: string;
   name: string;
-  conditions: RuleCondition[];
+  conditions: RuleCondition[] | CompoundConditions;
   action: RuleAction;
   priority: number;
   isActive: boolean;

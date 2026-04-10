@@ -1,4 +1,4 @@
-import type { AutomationRule, RuleCondition, RuleAction, RuleExecutionResult } from "../types";
+import type { AutomationRule, RuleCondition, RuleAction, RuleExecutionResult, CompoundConditions } from "../types";
 import { apiFetch } from "./core";
 
 export async function fetchAutomationRules(projectId: string): Promise<AutomationRule[]> {
@@ -8,7 +8,7 @@ export async function fetchAutomationRules(projectId: string): Promise<Automatio
 
 export async function createAutomationRule(
   projectId: string,
-  data: { name: string; conditions: RuleCondition[]; action: RuleAction; priority?: number; isActive?: boolean },
+  data: { name: string; conditions: RuleCondition[] | CompoundConditions; action: RuleAction; priority?: number; isActive?: boolean },
 ): Promise<AutomationRule> {
   const res = await apiFetch<{ rule: AutomationRule }>(`/projects/${projectId}/automation-rules`, {
     method: "POST",
@@ -20,7 +20,7 @@ export async function createAutomationRule(
 export async function updateAutomationRule(
   projectId: string,
   ruleId: string,
-  data: Partial<{ name: string; conditions: RuleCondition[]; action: RuleAction; priority: number; isActive: boolean }>,
+  data: Partial<{ name: string; conditions: RuleCondition[] | CompoundConditions; action: RuleAction; priority: number; isActive: boolean }>,
 ): Promise<AutomationRule> {
   const res = await apiFetch<{ rule: AutomationRule }>(`/projects/${projectId}/automation-rules/${ruleId}`, {
     method: "PUT",

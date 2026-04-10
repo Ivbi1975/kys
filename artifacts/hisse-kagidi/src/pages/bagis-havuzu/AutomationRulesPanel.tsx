@@ -16,7 +16,7 @@ import {
   fetchAutomationRules, createAutomationRule,
   updateAutomationRule, deleteAutomationRule, executeAutomationRules,
 } from "@/lib/api";
-import type { AutomationRule, RuleCondition, RuleAction, RuleExecutionResult, CustomTag } from "@/lib/types";
+import type { AutomationRule, RuleCondition, RuleAction, RuleExecutionResult, CustomTag, CompoundConditions, ConditionGroup } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
 const FIELD_OPTIONS = [
@@ -95,158 +95,300 @@ interface AutomationRulesPanelProps {
   globalTags: CustomTag[];
 }
 
+function isCompoundConditions(conditions: RuleCondition[] | CompoundConditions): conditions is CompoundConditions {
+  return !Array.isArray(conditions) && "logic" in conditions && "groups" in conditions;
+}
+
+function normalizeToCompound(conditions: RuleCondition[] | CompoundConditions): CompoundConditions {
+  if (isCompoundConditions(conditions)) return conditions;
+  return { logic: "AND", groups: [{ logic: "AND", conditions }] };
+}
+
+function ConditionRow({
+  cond,
+  onUpdate,
+  onRemove,
+  kesimAlanlari,
+  globalTags,
+}: {
+  cond: RuleCondition;
+  onUpdate: (updates: Partial<RuleCondition>) => void;
+  onRemove: () => void;
+  kesimAlanlari: { id: string; name: string }[];
+  globalTags: CustomTag[];
+}) {
+  const opType = getOperatorType(cond.field);
+  const operators = OPERATOR_OPTIONS[opType];
+  const showValue = needsValueInput(cond.operator);
+
+  return (
+    <div className="flex items-start gap-1.5 p-2 border rounded bg-muted/20">
+      <Select value={cond.field} onValueChange={v => onUpdate({ field: v })}>
+        <SelectTrigger className="h-8 text-xs w-[130px] flex-shrink-0">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {FIELD_OPTIONS.map(f => (
+            <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select value={cond.operator} onValueChange={v => onUpdate({ operator: v })}>
+        <SelectTrigger className="h-8 text-xs w-[120px] flex-shrink-0">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {operators.map(o => (
+            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {showValue && (
+        <>
+          {cond.field === "kesimAlaniId" ? (
+            <Select
+              value={String(cond.value)}
+              onValueChange={v => onUpdate({ value: v })}
+            >
+              <SelectTrigger className="h-8 text-xs flex-1">
+                <SelectValue placeholder="Kesim Listesi" />
+              </SelectTrigger>
+              <SelectContent>
+                {kesimAlanlari.map(ka => (
+                  <SelectItem key={ka.id} value={ka.id}>{ka.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : cond.field === "tags" ? (
+            <Select
+              value={String(Array.isArray(cond.value) ? cond.value[0] || "" : cond.value)}
+              onValueChange={v => onUpdate({ value: v })}
+            >
+              <SelectTrigger className="h-8 text-xs flex-1">
+                <SelectValue placeholder="Etiket" />
+              </SelectTrigger>
+              <SelectContent>
+                {globalTags.map(t => (
+                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : cond.operator === "between" ? (
+            <div className="flex gap-1 flex-1">
+              <Input
+                type="number"
+                placeholder="Min"
+                value={Array.isArray(cond.value) ? cond.value[0] : ""}
+                onChange={e => {
+                  const cur = Array.isArray(cond.value) ? cond.value : [0, 0];
+                  onUpdate({ value: [Number(e.target.value), Number(cur[1])] });
+                }}
+                className="h-8 text-xs"
+              />
+              <Input
+                type="number"
+                placeholder="Max"
+                value={Array.isArray(cond.value) ? cond.value[1] : ""}
+                onChange={e => {
+                  const cur = Array.isArray(cond.value) ? cond.value : [0, 0];
+                  onUpdate({ value: [Number(cur[0]), Number(e.target.value)] });
+                }}
+                className="h-8 text-xs"
+              />
+            </div>
+          ) : opType === "number" ? (
+            <Input
+              type="number"
+              placeholder="Değer"
+              value={String(cond.value)}
+              onChange={e => onUpdate({ value: Number(e.target.value) })}
+              className="h-8 text-xs flex-1"
+            />
+          ) : (
+            <Input
+              placeholder="Değer"
+              value={String(cond.value)}
+              onChange={e => onUpdate({ value: e.target.value })}
+              className="h-8 text-xs flex-1"
+            />
+          )}
+        </>
+      )}
+
+      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 flex-shrink-0" onClick={onRemove}>
+        <X className="w-3.5 h-3.5" />
+      </Button>
+    </div>
+  );
+}
+
+function LogicToggle({ value, onChange, size = "sm" }: { value: "AND" | "OR"; onChange: (v: "AND" | "OR") => void; size?: "sm" | "xs" }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(value === "AND" ? "OR" : "AND")}
+      className={`inline-flex items-center rounded-full font-semibold transition-colors ${
+        size === "xs" ? "px-2 py-0.5 text-[10px]" : "px-3 py-1 text-xs"
+      } ${
+        value === "AND"
+          ? "bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300"
+          : "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-300"
+      }`}
+    >
+      {value === "AND" ? "VE" : "VEYA"}
+    </button>
+  );
+}
+
 function ConditionBuilder({
-  conditions,
+  compound,
   onChange,
   kesimAlanlari,
   globalTags,
 }: {
-  conditions: RuleCondition[];
-  onChange: (c: RuleCondition[]) => void;
+  compound: CompoundConditions;
+  onChange: (c: CompoundConditions) => void;
   kesimAlanlari: { id: string; name: string }[];
   globalTags: CustomTag[];
 }) {
-  const addCondition = () => {
-    onChange([...conditions, { field: "birim", operator: "equals", value: "" }]);
-  };
-
-  const updateCondition = (idx: number, updates: Partial<RuleCondition>) => {
-    const next = conditions.map((c, i) => {
-      if (i !== idx) return c;
-      const updated = { ...c, ...updates };
-      if (updates.field && updates.field !== c.field) {
-        const opType = getOperatorType(updates.field);
-        const ops = OPERATOR_OPTIONS[opType];
-        updated.operator = ops[0].value;
-        updated.value = "";
-      }
-      return updated;
+  const addGroup = () => {
+    onChange({
+      ...compound,
+      groups: [...compound.groups, { logic: "AND", conditions: [{ field: "birim", operator: "equals", value: "" }] }],
     });
-    onChange(next);
   };
 
-  const removeCondition = (idx: number) => {
-    onChange(conditions.filter((_, i) => i !== idx));
+  const removeGroup = (groupIdx: number) => {
+    const next = compound.groups.filter((_, i) => i !== groupIdx);
+    onChange({ ...compound, groups: next.length === 0 ? [{ logic: "AND", conditions: [{ field: "birim", operator: "equals", value: "" }] }] : next });
+  };
+
+  const updateGroupLogic = (groupIdx: number, logic: "AND" | "OR") => {
+    const next = compound.groups.map((g, i) => i === groupIdx ? { ...g, logic } : g);
+    onChange({ ...compound, groups: next });
+  };
+
+  const addConditionToGroup = (groupIdx: number) => {
+    const next = compound.groups.map((g, i) =>
+      i === groupIdx ? { ...g, conditions: [...g.conditions, { field: "birim", operator: "equals", value: "" }] } : g
+    );
+    onChange({ ...compound, groups: next });
+  };
+
+  const updateCondition = (groupIdx: number, condIdx: number, updates: Partial<RuleCondition>) => {
+    const next = compound.groups.map((g, gi) => {
+      if (gi !== groupIdx) return g;
+      const conditions = g.conditions.map((c, ci) => {
+        if (ci !== condIdx) return c;
+        const updated = { ...c, ...updates };
+        if (updates.field && updates.field !== c.field) {
+          const opType = getOperatorType(updates.field);
+          const ops = OPERATOR_OPTIONS[opType];
+          updated.operator = ops[0].value;
+          updated.value = "";
+        }
+        return updated;
+      });
+      return { ...g, conditions };
+    });
+    onChange({ ...compound, groups: next });
+  };
+
+  const removeCondition = (groupIdx: number, condIdx: number) => {
+    const next = compound.groups.map((g, gi) => {
+      if (gi !== groupIdx) return g;
+      const conditions = g.conditions.filter((_, ci) => ci !== condIdx);
+      return { ...g, conditions };
+    }).filter(g => g.conditions.length > 0);
+    onChange({ ...compound, groups: next.length === 0 ? [{ logic: "AND", conditions: [] }] : next });
   };
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium">Koşullar (tümü sağlanmalı)</label>
-        <Button variant="outline" size="sm" onClick={addCondition} className="h-7 text-xs">
-          <Plus className="w-3 h-3 mr-1" />Koşul Ekle
-        </Button>
+        <label className="text-sm font-medium">Koşullar</label>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={addGroup} className="h-7 text-xs">
+            <Plus className="w-3 h-3 mr-1" />Grup Ekle
+          </Button>
+        </div>
       </div>
-      {conditions.map((cond, idx) => {
-        const opType = getOperatorType(cond.field);
-        const operators = OPERATOR_OPTIONS[opType];
-        const showValue = needsValueInput(cond.operator);
 
-        return (
-          <div key={idx} className="flex items-start gap-1.5 p-2 border rounded bg-muted/20">
-            <Select value={cond.field} onValueChange={v => updateCondition(idx, { field: v })}>
-              <SelectTrigger className="h-8 text-xs w-[130px] flex-shrink-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {FIELD_OPTIONS.map(f => (
-                  <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={cond.operator} onValueChange={v => updateCondition(idx, { operator: v })}>
-              <SelectTrigger className="h-8 text-xs w-[120px] flex-shrink-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {operators.map(o => (
-                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {showValue && (
-              <>
-                {cond.field === "kesimAlaniId" ? (
-                  <Select
-                    value={String(cond.value)}
-                    onValueChange={v => updateCondition(idx, { value: v })}
-                  >
-                    <SelectTrigger className="h-8 text-xs flex-1">
-                      <SelectValue placeholder="Kesim Listesi" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {kesimAlanlari.map(ka => (
-                        <SelectItem key={ka.id} value={ka.id}>{ka.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : cond.field === "tags" ? (
-                  <Select
-                    value={String(Array.isArray(cond.value) ? cond.value[0] || "" : cond.value)}
-                    onValueChange={v => updateCondition(idx, { value: v })}
-                  >
-                    <SelectTrigger className="h-8 text-xs flex-1">
-                      <SelectValue placeholder="Etiket" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {globalTags.map(t => (
-                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : cond.operator === "between" ? (
-                  <div className="flex gap-1 flex-1">
-                    <Input
-                      type="number"
-                      placeholder="Min"
-                      value={Array.isArray(cond.value) ? cond.value[0] : ""}
-                      onChange={e => {
-                        const cur = Array.isArray(cond.value) ? cond.value : [0, 0];
-                        updateCondition(idx, { value: [Number(e.target.value), Number(cur[1])] });
-                      }}
-                      className="h-8 text-xs"
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Max"
-                      value={Array.isArray(cond.value) ? cond.value[1] : ""}
-                      onChange={e => {
-                        const cur = Array.isArray(cond.value) ? cond.value : [0, 0];
-                        updateCondition(idx, { value: [Number(cur[0]), Number(e.target.value)] });
-                      }}
-                      className="h-8 text-xs"
+      {compound.groups.map((group, groupIdx) => (
+        <div key={groupIdx}>
+          {groupIdx > 0 && (
+            <div className="flex items-center justify-center py-1">
+              <div className="h-px bg-border flex-1" />
+              <LogicToggle
+                value={compound.logic}
+                onChange={(v) => onChange({ ...compound, logic: v })}
+              />
+              <div className="h-px bg-border flex-1" />
+            </div>
+          )}
+          <div className="border rounded-lg p-2 space-y-1.5 bg-muted/10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {group.conditions.length > 1 && (
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <span>Grup içi:</span>
+                    <LogicToggle
+                      value={group.logic}
+                      onChange={(v) => updateGroupLogic(groupIdx, v)}
+                      size="xs"
                     />
                   </div>
-                ) : opType === "number" ? (
-                  <Input
-                    type="number"
-                    placeholder="Değer"
-                    value={String(cond.value)}
-                    onChange={e => updateCondition(idx, { value: Number(e.target.value) })}
-                    className="h-8 text-xs flex-1"
-                  />
-                ) : (
-                  <Input
-                    placeholder="Değer"
-                    value={String(cond.value)}
-                    onChange={e => updateCondition(idx, { value: e.target.value })}
-                    className="h-8 text-xs flex-1"
-                  />
                 )}
-              </>
+                {compound.groups.length === 1 && group.conditions.length <= 1 && (
+                  <span className="text-[10px] text-muted-foreground">Koşul Grubu</span>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => addConditionToGroup(groupIdx)}>
+                  <Plus className="w-3 h-3 mr-0.5" />Koşul
+                </Button>
+                {compound.groups.length > 1 && (
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => removeGroup(groupIdx)}>
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                )}
+              </div>
+            </div>
+            {group.conditions.map((cond, condIdx) => (
+              <div key={condIdx}>
+                {condIdx > 0 && group.conditions.length > 1 && (
+                  <div className="flex items-center justify-center py-0.5">
+                    <span className={`text-[10px] font-semibold px-2 ${
+                      group.logic === "AND"
+                        ? "text-blue-600 dark:text-blue-400"
+                        : "text-amber-600 dark:text-amber-400"
+                    }`}>
+                      {group.logic === "AND" ? "VE" : "VEYA"}
+                    </span>
+                  </div>
+                )}
+                <ConditionRow
+                  cond={cond}
+                  onUpdate={(updates) => updateCondition(groupIdx, condIdx, updates)}
+                  onRemove={() => removeCondition(groupIdx, condIdx)}
+                  kesimAlanlari={kesimAlanlari}
+                  globalTags={globalTags}
+                />
+              </div>
+            ))}
+            {group.conditions.length === 0 && (
+              <p className="text-xs text-muted-foreground text-center py-2">
+                Koşul ekleyin
+              </p>
             )}
-
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 flex-shrink-0" onClick={() => removeCondition(idx)}>
-              <X className="w-3.5 h-3.5" />
-            </Button>
           </div>
-        );
-      })}
-      {conditions.length === 0 && (
+        </div>
+      ))}
+      {compound.groups.length === 0 && (
         <p className="text-xs text-muted-foreground text-center py-3">
-          En az bir koşul ekleyin
+          En az bir koşul grubu ekleyin
         </p>
       )}
     </div>
@@ -390,7 +532,7 @@ export function AutomationRulesPanel({ projectId, kesimAlanlari, globalTags }: A
   const [resultDialogOpen, setResultDialogOpen] = useState(false);
 
   const [ruleName, setRuleName] = useState("");
-  const [conditions, setConditions] = useState<RuleCondition[]>([{ field: "birim", operator: "equals", value: "" }]);
+  const [compound, setCompound] = useState<CompoundConditions>({ logic: "AND", groups: [{ logic: "AND", conditions: [{ field: "birim", operator: "equals", value: "" }] }] });
   const [action, setAction] = useState<RuleAction>({ type: "transfer_to_ka" });
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -408,7 +550,7 @@ export function AutomationRulesPanel({ projectId, kesimAlanlari, globalTags }: A
   const openCreateDialog = useCallback(() => {
     setEditingRule(null);
     setRuleName("");
-    setConditions([{ field: "birim", operator: "equals", value: "" }]);
+    setCompound({ logic: "AND", groups: [{ logic: "AND", conditions: [{ field: "birim", operator: "equals", value: "" }] }] });
     setAction({ type: "transfer_to_ka" });
     setIsActive(true);
     setDialogOpen(true);
@@ -417,7 +559,7 @@ export function AutomationRulesPanel({ projectId, kesimAlanlari, globalTags }: A
   const openEditDialog = useCallback((rule: AutomationRule) => {
     setEditingRule(rule);
     setRuleName(rule.name);
-    setConditions(rule.conditions);
+    setCompound(normalizeToCompound(rule.conditions));
     setAction(rule.action);
     setIsActive(rule.isActive);
     setDialogOpen(true);
@@ -428,7 +570,8 @@ export function AutomationRulesPanel({ projectId, kesimAlanlari, globalTags }: A
       toast({ title: "Kural adı gerekli", variant: "destructive" });
       return;
     }
-    if (conditions.length === 0) {
+    const totalConditions = compound.groups.reduce((sum, g) => sum + g.conditions.length, 0);
+    if (totalConditions === 0) {
       toast({ title: "En az bir koşul ekleyin", variant: "destructive" });
       return;
     }
@@ -441,12 +584,15 @@ export function AutomationRulesPanel({ projectId, kesimAlanlari, globalTags }: A
       return;
     }
 
+    const nonEmptyGroups = compound.groups.filter(g => g.conditions.length > 0);
+    const conditionsToSave: CompoundConditions = { ...compound, groups: nonEmptyGroups };
+
     setSaving(true);
     try {
       if (editingRule) {
         await updateAutomationRule(projectId, editingRule.id, {
           name: ruleName.trim(),
-          conditions,
+          conditions: conditionsToSave,
           action,
           isActive,
         });
@@ -454,7 +600,7 @@ export function AutomationRulesPanel({ projectId, kesimAlanlari, globalTags }: A
       } else {
         await createAutomationRule(projectId, {
           name: ruleName.trim(),
-          conditions,
+          conditions: conditionsToSave,
           action,
           isActive,
         });
@@ -467,7 +613,7 @@ export function AutomationRulesPanel({ projectId, kesimAlanlari, globalTags }: A
     } finally {
       setSaving(false);
     }
-  }, [editingRule, projectId, ruleName, conditions, action, isActive, toast, invalidateRules]);
+  }, [editingRule, projectId, ruleName, compound, action, isActive, toast, invalidateRules]);
 
   const handleDelete = useCallback(async (ruleId: string) => {
     try {
@@ -563,12 +709,37 @@ export function AutomationRulesPanel({ projectId, kesimAlanlari, globalTags }: A
                   )}
                 </div>
                 <div className="space-y-0.5">
-                  <div className="flex flex-wrap gap-1">
-                    {rule.conditions.map((c, ci) => (
-                      <Badge key={ci} variant="secondary" className="text-[10px] h-5">
-                        {getConditionDescription(c, kesimAlanlari, globalTags)}
-                      </Badge>
-                    ))}
+                  <div className="flex flex-wrap gap-1 items-center">
+                    {(() => {
+                      const c = normalizeToCompound(rule.conditions);
+                      return c.groups.map((group, gi) => (
+                        <span key={gi} className="contents">
+                          {gi > 0 && (
+                            <span className={`text-[10px] font-bold px-1 ${
+                              c.logic === "OR" ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400"
+                            }`}>
+                              {c.logic === "AND" ? "VE" : "VEYA"}
+                            </span>
+                          )}
+                          {c.groups.length > 1 && <span className="text-[10px] text-muted-foreground">(</span>}
+                          {group.conditions.map((cond, ci) => (
+                            <span key={ci} className="contents">
+                              {ci > 0 && (
+                                <span className={`text-[10px] font-bold px-0.5 ${
+                                  group.logic === "OR" ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400"
+                                }`}>
+                                  {group.logic === "AND" ? "VE" : "VEYA"}
+                                </span>
+                              )}
+                              <Badge variant="secondary" className="text-[10px] h-5">
+                                {getConditionDescription(cond, kesimAlanlari, globalTags)}
+                              </Badge>
+                            </span>
+                          ))}
+                          {c.groups.length > 1 && <span className="text-[10px] text-muted-foreground">)</span>}
+                        </span>
+                      ));
+                    })()}
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     {getActionIcon(rule.action.type)}
@@ -612,8 +783,8 @@ export function AutomationRulesPanel({ projectId, kesimAlanlari, globalTags }: A
             </div>
 
             <ConditionBuilder
-              conditions={conditions}
-              onChange={setConditions}
+              compound={compound}
+              onChange={setCompound}
               kesimAlanlari={kesimAlanlari}
               globalTags={globalTags}
             />

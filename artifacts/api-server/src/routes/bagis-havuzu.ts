@@ -1295,13 +1295,30 @@ const ALLOWED_RULE_OPERATORS = [
   "is_empty", "is_not_empty",
 ] as const;
 
+const ruleConditionSchema = z.object({
+  field: z.enum(ALLOWED_RULE_FIELDS),
+  operator: z.enum(ALLOWED_RULE_OPERATORS),
+  value: z.union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))]),
+});
+
+const conditionGroupSchema = z.object({
+  logic: z.enum(["AND", "OR"]),
+  conditions: z.array(ruleConditionSchema).min(1),
+});
+
+const compoundConditionsSchema = z.object({
+  logic: z.enum(["AND", "OR"]),
+  groups: z.array(conditionGroupSchema).min(1),
+});
+
+const conditionsFieldSchema = z.union([
+  z.array(ruleConditionSchema).min(1),
+  compoundConditionsSchema,
+]);
+
 const automationRuleSchema = z.object({
   name: z.string().min(1).max(200),
-  conditions: z.array(z.object({
-    field: z.enum(ALLOWED_RULE_FIELDS),
-    operator: z.enum(ALLOWED_RULE_OPERATORS),
-    value: z.union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))]),
-  })).min(1),
+  conditions: conditionsFieldSchema,
   action: z.discriminatedUnion("type", [
     z.object({ type: z.literal("transfer_to_ka"), targetKesimAlaniId: z.string().min(1) }),
     z.object({ type: z.literal("add_tag"), tagId: z.string().min(1) }),
@@ -1373,11 +1390,7 @@ router.put("/projects/:id/automation-rules/:ruleId", asyncHandler(async (req, re
 
   const updateSchema = z.object({
     name: z.string().min(1).max(200).optional(),
-    conditions: z.array(z.object({
-      field: z.enum(ALLOWED_RULE_FIELDS),
-      operator: z.enum(ALLOWED_RULE_OPERATORS),
-      value: z.union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))]),
-    })).min(1).optional(),
+    conditions: conditionsFieldSchema.optional(),
     action: z.discriminatedUnion("type", [
       z.object({ type: z.literal("transfer_to_ka"), targetKesimAlaniId: z.string().min(1) }),
       z.object({ type: z.literal("add_tag"), tagId: z.string().min(1) }),
