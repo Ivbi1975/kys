@@ -940,6 +940,7 @@ router.post("/projects/:projectId/donations/:id/flag", asyncHandler(async (req, 
   await db.update(donationsTable)
     .set({ isFlagged: true, flagReason: parsed.data.reason, flagResolvedAt: null, updatedAt: new Date() })
     .where(eq(donationsTable.id, donationId));
+  invalidateKACache();
   res.json({ success: true });
 }));
 
@@ -956,6 +957,7 @@ router.post("/projects/:projectId/donations/:id/unflag", asyncHandler(async (req
   await db.update(donationsTable)
     .set({ isFlagged: false, flagReason: "", flagResolvedAt: new Date(), updatedAt: new Date() })
     .where(eq(donationsTable.id, donationId));
+  invalidateKACache();
   res.json({ success: true });
 }));
 
@@ -968,6 +970,7 @@ router.post("/donations/:id/flag", asyncHandler(async (req, res) => {
   await db.update(donationsTable)
     .set({ isFlagged: true, flagReason: parsed.data.reason, flagResolvedAt: null, updatedAt: new Date() })
     .where(eq(donationsTable.id, donationId));
+  invalidateKACache();
   res.json({ success: true });
 }));
 
@@ -978,6 +981,7 @@ router.post("/donations/:id/unflag", asyncHandler(async (req, res) => {
   await db.update(donationsTable)
     .set({ isFlagged: false, flagReason: "", flagResolvedAt: new Date(), updatedAt: new Date() })
     .where(eq(donationsTable.id, donationId));
+  invalidateKACache();
   res.json({ success: true });
 }));
 
