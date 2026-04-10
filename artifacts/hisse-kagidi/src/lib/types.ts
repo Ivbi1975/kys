@@ -17,6 +17,12 @@ export interface Donation {
   phone?: string;
   birim?: string;
   temsilci?: string;
+  ozellik?: string;
+  fiyat?: string;
+  yerTalebi?: string;
+  gunTalebi?: string;
+  ilkHayvan?: string;
+  safi?: string;
   excluded?: boolean;
   tags?: string[];
   aiCategories?: string[];
@@ -41,6 +47,12 @@ export interface PoolStats {
   typeDistribution: { type: string; count: number; shares: number }[];
   kesimAlaniDistribution: { id: string; name: string; count: number; shares: number }[];
   multiLocationVekalets: string[];
+  ozellikDistribution: { ozellik: string; count: number }[];
+  fiyatDistribution: { fiyat: string; count: number }[];
+  yerTalebiDistribution: { yerTalebi: string; count: number }[];
+  gunTalebiDistribution: { gunTalebi: string; count: number }[];
+  ilkHayvanDistribution: { ilkHayvan: string; count: number }[];
+  safiDistribution: { safi: string; count: number }[];
 }
 
 export interface Team {

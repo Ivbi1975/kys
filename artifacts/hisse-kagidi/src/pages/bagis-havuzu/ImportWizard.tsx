@@ -89,12 +89,15 @@ export function ImportWizard({ open, onOpenChange, projectId, kesimAlanlari, onS
       interface ImportDonation {
         id: string; name: string; description: string; donationType: string;
         shareCount: number; vekalet: string; notes: string; phone: string;
-        birim: string; temsilci: string; kesimAlaniId: string;
+        birim: string; temsilci: string; ozellik: string; fiyat: string;
+        yerTalebi: string; gunTalebi: string; ilkHayvan: string; safi: string;
+        kesimAlaniId: string;
       }
       const donations = displayPreviewRows.map((row): ImportDonation => {
         const d: ImportDonation = {
           id: crypto.randomUUID(), name: "", description: "", donationType: "",
           shareCount: 1, vekalet: "", notes: "", phone: "", birim: "", temsilci: "",
+          ozellik: "", fiyat: "", yerTalebi: "", gunTalebi: "", ilkHayvan: "", safi: "",
           kesimAlaniId: importTargetKA,
         };
         const notesParts: string[] = [];
@@ -120,6 +123,18 @@ export function ImportWizard({ open, onOpenChange, projectId, kesimAlanlari, onS
             d.birim = val;
           } else if (mapping === "temsilci") {
             d.temsilci = val;
+          } else if (mapping === "ozellik") {
+            d.ozellik = val;
+          } else if (mapping === "fiyat") {
+            d.fiyat = val;
+          } else if (mapping === "yerTalebi") {
+            d.yerTalebi = val;
+          } else if (mapping === "gunTalebi") {
+            d.gunTalebi = val;
+          } else if (mapping === "ilkHayvan") {
+            d.ilkHayvan = val;
+          } else if (mapping === "safi") {
+            d.safi = val;
           }
         }
         d.notes = notesParts.join(" | ");

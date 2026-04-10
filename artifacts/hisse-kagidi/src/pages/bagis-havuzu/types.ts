@@ -1,6 +1,6 @@
-export type ColumnMapping = "name" | "description" | "donationType" | "shareCount" | "vekalet" | "notes" | "phone" | "birim" | "temsilci" | "skip";
+export type ColumnMapping = "name" | "description" | "donationType" | "shareCount" | "vekalet" | "notes" | "phone" | "birim" | "temsilci" | "ozellik" | "fiyat" | "yerTalebi" | "gunTalebi" | "ilkHayvan" | "safi" | "skip";
 
-export type TableColumnKey = "vekalet" | "name" | "description" | "donationType" | "birim" | "temsilci" | "notes" | "kesimAlani" | "durum" | "aiEtiket";
+export type TableColumnKey = "vekalet" | "name" | "description" | "donationType" | "birim" | "temsilci" | "notes" | "ozellik" | "fiyat" | "yerTalebi" | "gunTalebi" | "ilkHayvan" | "safi" | "kesimAlani" | "durum" | "aiEtiket";
 
 export const POOL_COLUMN_OPTIONS: { value: ColumnMapping; label: string }[] = [
   { value: "name", label: "Adına Kesilen" },
@@ -12,6 +12,12 @@ export const POOL_COLUMN_OPTIONS: { value: ColumnMapping; label: string }[] = [
   { value: "phone", label: "Telefon" },
   { value: "birim", label: "Birim" },
   { value: "temsilci", label: "Temsilci" },
+  { value: "ozellik", label: "Özellik" },
+  { value: "fiyat", label: "Fiyat" },
+  { value: "yerTalebi", label: "Yer Talebi" },
+  { value: "gunTalebi", label: "Gün Talebi" },
+  { value: "ilkHayvan", label: "İlk Hayvan" },
+  { value: "safi", label: "Şafi" },
   { value: "skip", label: "Atla (kullanma)" },
 ];
 
@@ -25,6 +31,12 @@ export const POOL_COLUMN_KEYWORDS: Record<Exclude<ColumnMapping, "skip">, string
   phone: ["telefon", "tel", "phone", "gsm", "cep"],
   birim: ["birim", "şube", "sube", "bölge", "bolge", "il", "şehir", "branch"],
   temsilci: ["temsilci", "sorumlu", "yetkili", "representative", "agent"],
+  ozellik: ["özellik", "ozellik", "feature", "property", "nitelik"],
+  fiyat: ["fiyat", "ücret", "ucret", "tutar", "price", "bedel", "miktar"],
+  yerTalebi: ["yer talebi", "yer", "konum", "lokasyon", "location", "mekan"],
+  gunTalebi: ["gün talebi", "gun talebi", "gün", "gun", "tarih", "day"],
+  ilkHayvan: ["ilk hayvan", "hayvan", "animal", "first animal"],
+  safi: ["şafi", "safi", "şafii", "safii", "mezhep"],
 };
 
 export const ALL_TABLE_COLUMNS: { key: TableColumnKey; label: string; defaultVisible: boolean }[] = [
@@ -34,6 +46,12 @@ export const ALL_TABLE_COLUMNS: { key: TableColumnKey; label: string; defaultVis
   { key: "donationType", label: "Cinsi", defaultVisible: true },
   { key: "birim", label: "Birim", defaultVisible: true },
   { key: "temsilci", label: "Temsilci", defaultVisible: true },
+  { key: "ozellik", label: "Özellik", defaultVisible: true },
+  { key: "fiyat", label: "Fiyat", defaultVisible: true },
+  { key: "yerTalebi", label: "Yer Talebi", defaultVisible: true },
+  { key: "gunTalebi", label: "Gün Talebi", defaultVisible: true },
+  { key: "ilkHayvan", label: "İlk Hayvan", defaultVisible: true },
+  { key: "safi", label: "Şafi", defaultVisible: true },
   { key: "notes", label: "Notlar", defaultVisible: true },
   { key: "kesimAlani", label: "Kesim Listesi", defaultVisible: true },
   { key: "durum", label: "Durum", defaultVisible: true },

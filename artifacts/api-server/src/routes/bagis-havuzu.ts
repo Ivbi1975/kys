@@ -28,6 +28,13 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   const temsilci = typeof req.query.temsilci === "string" ? req.query.temsilci.trim() : "";
   const kesimAlaniId = typeof req.query.kesimAlaniId === "string" ? req.query.kesimAlaniId.trim() : "";
   const aiCategory = typeof req.query.aiCategory === "string" ? req.query.aiCategory.trim() : "";
+  const ozellik = typeof req.query.ozellik === "string" ? req.query.ozellik.trim() : "";
+  const fiyat = typeof req.query.fiyat === "string" ? req.query.fiyat.trim() : "";
+  const yerTalebi = typeof req.query.yerTalebi === "string" ? req.query.yerTalebi.trim() : "";
+  const gunTalebi = typeof req.query.gunTalebi === "string" ? req.query.gunTalebi.trim() : "";
+  const ilkHayvan = typeof req.query.ilkHayvan === "string" ? req.query.ilkHayvan.trim() : "";
+  const safi = typeof req.query.safi === "string" ? req.query.safi.trim() : "";
+  const notesFilter = typeof req.query.notesFilter === "string" ? req.query.notesFilter.trim() : "";
   const sortBy = typeof req.query.sortBy === "string" ? req.query.sortBy : "sortOrder";
   const sortDir = typeof req.query.sortDir === "string" && req.query.sortDir === "desc" ? "desc" : "asc";
 
@@ -60,6 +67,12 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
         ilike(donationsTable.phone, pattern),
         ilike(donationsTable.birim, pattern),
         ilike(donationsTable.temsilci, pattern),
+        ilike(donationsTable.ozellik, pattern),
+        ilike(donationsTable.fiyat, pattern),
+        ilike(donationsTable.yerTalebi, pattern),
+        ilike(donationsTable.gunTalebi, pattern),
+        ilike(donationsTable.ilkHayvan, pattern),
+        ilike(donationsTable.safi, pattern),
       )!,
     );
   }
@@ -68,6 +81,12 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   if (birim) conditions.push(eq(donationsTable.birim, birim));
   if (temsilci) conditions.push(eq(donationsTable.temsilci, temsilci));
   if (kesimAlaniId) conditions.push(eq(donationsTable.kesimAlaniId, kesimAlaniId));
+  if (ozellik) conditions.push(eq(donationsTable.ozellik, ozellik));
+  if (fiyat) conditions.push(eq(donationsTable.fiyat, fiyat));
+  if (yerTalebi) conditions.push(eq(donationsTable.yerTalebi, yerTalebi));
+  if (gunTalebi) conditions.push(eq(donationsTable.gunTalebi, gunTalebi));
+  if (ilkHayvan) conditions.push(eq(donationsTable.ilkHayvan, ilkHayvan));
+  if (safi) conditions.push(eq(donationsTable.safi, safi));
 
   if (status === "excluded") {
     conditions.push(eq(donationsTable.excluded, true));
@@ -77,6 +96,13 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
 
   if (aiCategory) {
     conditions.push(sql`${donationsTable.aiCategories}::text ILIKE ${'%' + aiCategory + '%'}`);
+  }
+
+  if (notesFilter) {
+    const noteTerms = notesFilter.split(",").map(t => t.trim()).filter(Boolean);
+    for (const term of noteTerms) {
+      conditions.push(ilike(donationsTable.notes, `%${term}%`));
+    }
   }
 
   const whereClause = and(...conditions)!;
@@ -90,6 +116,12 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     temsilci: "temsilci",
     kesimAlaniId: "kesim_alani_id",
     vekalet: "vekalet",
+    ozellik: "ozellik",
+    fiyat: "fiyat",
+    yerTalebi: "yer_talebi",
+    gunTalebi: "gun_talebi",
+    ilkHayvan: "ilk_hayvan",
+    safi: "safi",
   };
   const sortCol = sortColumnMap[sortBy] || "sort_order";
   const sortDirection = sortDir === "desc" ? sql`DESC` : sql`ASC`;
@@ -128,6 +160,12 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     phone: d.phone || "",
     birim: d.birim || "",
     temsilci: d.temsilci || "",
+    ozellik: d.ozellik || "",
+    fiyat: d.fiyat || "",
+    yerTalebi: d.yerTalebi || "",
+    gunTalebi: d.gunTalebi || "",
+    ilkHayvan: d.ilkHayvan || "",
+    safi: d.safi || "",
     excluded: d.excluded,
     sortOrder: d.sortOrder,
     kesimAlaniId: d.kesimAlaniId,
@@ -207,6 +245,23 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
   `);
   const multiLocationVekalets = multiLocResult.rows.map((r: Record<string, unknown>) => String(r.vekalet));
 
+  const distQuery = (col: string) => db.execute(sql`
+    SELECT ${sql.raw(`d.${col}`)} AS value, COUNT(*)::int AS count
+    FROM donations d
+    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+    WHERE ka.project_id = ${projectId} AND ka.deleted_at IS NULL AND d.deleted_at IS NULL AND d.excluded = false AND ${sql.raw(`d.${col}`)} != ''
+    GROUP BY ${sql.raw(`d.${col}`)} ORDER BY count DESC LIMIT 50
+  `);
+
+  const [ozellikDist, fiyatDist, yerTalebiDist, gunTalebiDist, ilkHayvanDist, safiDist] = await Promise.all([
+    distQuery("ozellik"),
+    distQuery("fiyat"),
+    distQuery("yer_talebi"),
+    distQuery("gun_talebi"),
+    distQuery("ilk_hayvan"),
+    distQuery("safi"),
+  ]);
+
   res.json({
     ...stats,
     birimDistribution: birimDist.rows,
@@ -214,6 +269,12 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
     typeDistribution: typeDist.rows,
     kesimAlaniDistribution: kaDist.rows,
     multiLocationVekalets,
+    ozellikDistribution: ozellikDist.rows.map((r: Record<string, unknown>) => ({ ozellik: String(r.value), count: Number(r.count) })),
+    fiyatDistribution: fiyatDist.rows.map((r: Record<string, unknown>) => ({ fiyat: String(r.value), count: Number(r.count) })),
+    yerTalebiDistribution: yerTalebiDist.rows.map((r: Record<string, unknown>) => ({ yerTalebi: String(r.value), count: Number(r.count) })),
+    gunTalebiDistribution: gunTalebiDist.rows.map((r: Record<string, unknown>) => ({ gunTalebi: String(r.value), count: Number(r.count) })),
+    ilkHayvanDistribution: ilkHayvanDist.rows.map((r: Record<string, unknown>) => ({ ilkHayvan: String(r.value), count: Number(r.count) })),
+    safiDistribution: safiDist.rows.map((r: Record<string, unknown>) => ({ safi: String(r.value), count: Number(r.count) })),
   });
 }));
 
@@ -229,6 +290,12 @@ const bulkImportSchema = z.object({
     phone: z.string().default(""),
     birim: z.string().default(""),
     temsilci: z.string().default(""),
+    ozellik: z.string().default(""),
+    fiyat: z.string().default(""),
+    yerTalebi: z.string().default(""),
+    gunTalebi: z.string().default(""),
+    ilkHayvan: z.string().default(""),
+    safi: z.string().default(""),
     kesimAlaniId: z.string().min(1),
   })).min(1).max(10000),
 });
@@ -295,6 +362,12 @@ router.post("/projects/:id/donations/bulk-import", asyncHandler(async (req, res)
         phone: d.phone,
         birim: d.birim,
         temsilci: d.temsilci,
+        ozellik: d.ozellik,
+        fiyat: d.fiyat,
+        yerTalebi: d.yerTalebi,
+        gunTalebi: d.gunTalebi,
+        ilkHayvan: d.ilkHayvan,
+        safi: d.safi,
         sortOrder,
         excluded: false,
         updatedAt: new Date(),

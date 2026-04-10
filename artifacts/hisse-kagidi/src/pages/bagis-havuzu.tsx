@@ -41,6 +41,13 @@ export default function BagisHavuzuPage() {
   const [temsilciFilter, setTemsilciFilter] = useState("");
   const [kesimAlaniFilter, setKesimAlaniFilter] = useState("");
   const [aiCategoryFilter, setAiCategoryFilter] = useState("");
+  const [ozellikFilter, setOzellikFilter] = useState("");
+  const [fiyatFilter, setFiyatFilter] = useState("");
+  const [yerTalebiFilter, setYerTalebiFilter] = useState("");
+  const [gunTalebiFilter, setGunTalebiFilter] = useState("");
+  const [ilkHayvanFilter, setIlkHayvanFilter] = useState("");
+  const [safiFilter, setSafiFilter] = useState("");
+  const [notesFilter, setNotesFilter] = useState("");
   const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showStats, setShowStats] = useState(false);
@@ -105,7 +112,7 @@ export default function BagisHavuzuPage() {
     };
   }, [showColumnPicker]);
 
-  const activeFilterCount = [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, aiCategoryFilter].filter(Boolean).length;
+  const activeFilterCount = [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, notesFilter].filter(Boolean).length;
 
   const filters = useMemo(() => ({
     search: debouncedSearch || undefined,
@@ -115,11 +122,18 @@ export default function BagisHavuzuPage() {
     temsilci: temsilciFilter || undefined,
     kesimAlaniId: kesimAlaniFilter || undefined,
     aiCategory: aiCategoryFilter || undefined,
+    ozellik: ozellikFilter || undefined,
+    fiyat: fiyatFilter || undefined,
+    yerTalebi: yerTalebiFilter || undefined,
+    gunTalebi: gunTalebiFilter || undefined,
+    ilkHayvan: ilkHayvanFilter || undefined,
+    safi: safiFilter || undefined,
+    notesFilter: notesFilter || undefined,
     sortBy: sortBy !== "sortOrder" ? sortBy : undefined,
     sortDir: sortDir !== "asc" ? sortDir : undefined,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
-  }), [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, aiCategoryFilter, sortBy, sortDir, page]);
+  }), [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, notesFilter, sortBy, sortDir, page]);
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["pool-donations", projectId, filters],
@@ -167,6 +181,13 @@ export default function BagisHavuzuPage() {
     setTemsilciFilter("");
     setKesimAlaniFilter("");
     setAiCategoryFilter("");
+    setOzellikFilter("");
+    setFiyatFilter("");
+    setYerTalebiFilter("");
+    setGunTalebiFilter("");
+    setIlkHayvanFilter("");
+    setSafiFilter("");
+    setNotesFilter("");
     setPage(0);
   }, []);
 
@@ -414,6 +435,13 @@ export default function BagisHavuzuPage() {
             birimFilter={birimFilter} setBirimFilter={setBirimFilter}
             temsilciFilter={temsilciFilter} setTemsilciFilter={setTemsilciFilter}
             aiCategoryFilter={aiCategoryFilter} setAiCategoryFilter={setAiCategoryFilter}
+            ozellikFilter={ozellikFilter} setOzellikFilter={setOzellikFilter}
+            fiyatFilter={fiyatFilter} setFiyatFilter={setFiyatFilter}
+            yerTalebiFilter={yerTalebiFilter} setYerTalebiFilter={setYerTalebiFilter}
+            gunTalebiFilter={gunTalebiFilter} setGunTalebiFilter={setGunTalebiFilter}
+            ilkHayvanFilter={ilkHayvanFilter} setIlkHayvanFilter={setIlkHayvanFilter}
+            safiFilter={safiFilter} setSafiFilter={setSafiFilter}
+            notesFilter={notesFilter} setNotesFilter={setNotesFilter}
             sortBy={sortBy} setSortBy={setSortBy}
             sortDir={sortDir} setSortDir={setSortDir}
             setPage={setPage}

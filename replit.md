@@ -97,7 +97,7 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - Offline mode for tracking page: Service Worker via vite-plugin-pwa caches assets; IndexedDB stores tracking data and queues offline changes (kesildi toggles, notes); auto-sync when back online; offline banner with pending change counter; NetworkFirst caching strategy for API requests
 
 Data model (Donation):
-- `id`, `name` (adına kesilen), `description` (vekaleti veren), `donationType` (cinsi), `shareCount`, `vekalet` (vekalet no), `notes` (notlar), `phone`, `birim`, `temsilci`, `excluded?`, `tags?`
+- `id`, `name` (adına kesilen), `description` (vekaleti veren), `donationType` (cinsi), `shareCount`, `vekalet` (vekalet no), `notes` (notlar), `phone`, `birim`, `temsilci`, `ozellik` (özellik), `fiyat`, `yerTalebi` (yer talebi), `gunTalebi` (gün talebi), `ilkHayvan` (ilk hayvan), `safi` (şafi), `excluded?`, `tags?`
 
 Data model (AnimalGroup):
 - `id`, `animalNo`, `donations[]`, `colorTag?` (green/orange/red), `locked?`, `notes?`, `kesildi?` (boolean, tracks slaughter status)

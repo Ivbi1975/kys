@@ -25,6 +25,12 @@ const COLUMN_WIDTHS: Record<TableColumnKey, number> = {
   donationType: 90,
   birim: 100,
   temsilci: 110,
+  ozellik: 120,
+  fiyat: 90,
+  yerTalebi: 110,
+  gunTalebi: 110,
+  ilkHayvan: 100,
+  safi: 80,
   notes: 150,
   kesimAlani: 120,
   durum: 80,
@@ -51,6 +57,12 @@ function renderCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean) {
     case "donationType": return d.donationType || "—";
     case "birim": return d.birim || "—";
     case "temsilci": return d.temsilci || "—";
+    case "ozellik": return d.ozellik || "—";
+    case "fiyat": return d.fiyat || "—";
+    case "yerTalebi": return d.yerTalebi || "—";
+    case "gunTalebi": return d.gunTalebi || "—";
+    case "ilkHayvan": return d.ilkHayvan || "—";
+    case "safi": return d.safi || "—";
     case "notes": return <span className="max-w-[150px] truncate block" title={d.notes}>{d.notes || "—"}</span>;
     case "kesimAlani": return <Badge variant="outline" className="text-xs">{d.kesimAlaniName}</Badge>;
     case "durum": {

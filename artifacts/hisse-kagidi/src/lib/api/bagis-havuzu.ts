@@ -15,6 +15,13 @@ export interface PoolFilters {
   temsilci?: string;
   kesimAlaniId?: string;
   aiCategory?: string;
+  ozellik?: string;
+  fiyat?: string;
+  yerTalebi?: string;
+  gunTalebi?: string;
+  ilkHayvan?: string;
+  safi?: string;
+  notesFilter?: string;
   sortBy?: string;
   sortDir?: "asc" | "desc";
   limit?: number;
@@ -30,6 +37,13 @@ export async function fetchPoolDonations(projectId: string, filters: PoolFilters
   if (filters.temsilci) params.set("temsilci", filters.temsilci);
   if (filters.kesimAlaniId) params.set("kesimAlaniId", filters.kesimAlaniId);
   if (filters.aiCategory) params.set("aiCategory", filters.aiCategory);
+  if (filters.ozellik) params.set("ozellik", filters.ozellik);
+  if (filters.fiyat) params.set("fiyat", filters.fiyat);
+  if (filters.yerTalebi) params.set("yerTalebi", filters.yerTalebi);
+  if (filters.gunTalebi) params.set("gunTalebi", filters.gunTalebi);
+  if (filters.ilkHayvan) params.set("ilkHayvan", filters.ilkHayvan);
+  if (filters.safi) params.set("safi", filters.safi);
+  if (filters.notesFilter) params.set("notesFilter", filters.notesFilter);
   if (filters.sortBy) params.set("sortBy", filters.sortBy);
   if (filters.sortDir) params.set("sortDir", filters.sortDir);
   if (filters.limit) params.set("limit", String(filters.limit));
@@ -45,7 +59,9 @@ export async function fetchPoolStats(projectId: string): Promise<PoolStats> {
 export async function bulkImportDonations(projectId: string, donations: Array<{
   id: string; name: string; description: string; donationType: string;
   shareCount: number; vekalet: string; notes: string; phone: string;
-  birim: string; temsilci: string; kesimAlaniId: string;
+  birim: string; temsilci: string; ozellik: string; fiyat: string;
+  yerTalebi: string; gunTalebi: string; ilkHayvan: string; safi: string;
+  kesimAlaniId: string;
 }>): Promise<{ success: boolean; inserted: number }> {
   return apiFetch<{ success: boolean; inserted: number }>(`/projects/${projectId}/donations/bulk-import`, {
     method: "POST",
