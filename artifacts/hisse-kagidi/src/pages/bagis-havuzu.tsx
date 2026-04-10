@@ -7,13 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft, Upload, Search, X, Filter, Package,
-  BarChart3, Loader2, Sparkles, AlertTriangle, Settings2, Zap,
+  BarChart3, Loader2, AlertTriangle, Settings2, Zap,
 } from "lucide-react";
 import {
   fetchPoolDonations, fetchPoolStats,
   bulkActionDonations, bulkTagDonations, bulkNoteDonations,
-  classifyNotesAsync,
-  fetchJobStatus, fetchProjects, saveAiClassifications,
+  classifyNotesAsyncChunked, PartialChunkError, ApiFetchError,
+  fetchJobStatus, cancelJob, fetchProjects, saveAiClassifications,
   transferDonationsToKA, createKesimAlani,
   fetchTags, createTag,
   flagDonation, unflagDonation,
@@ -21,7 +21,6 @@ import {
 } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { processAiResultsInWorker } from "@/lib/excel.worker.client";
 import { StatsPanel } from "./bagis-havuzu/StatsPanel";
 import { VirtualizedDonationTable } from "./bagis-havuzu/VirtualizedDonationTable";
 import { PoolFilters } from "./bagis-havuzu/PoolFilters";
@@ -32,6 +31,7 @@ import { BulkTagDialog } from "./bagis-havuzu/BulkTagDialog";
 import { AutomationRulesPanel } from "./bagis-havuzu/AutomationRulesPanel";
 import { BulkNoteDialog } from "./bagis-havuzu/BulkNoteDialog";
 import { CinsStatsBar } from "./bagis-havuzu/CinsStatsBar";
+import { HavuzAiClassification, type HavuzAiResult } from "./bagis-havuzu/HavuzAiClassification";
 import { ALL_TABLE_COLUMNS, PAGE_SIZE, type TableColumnKey } from "./bagis-havuzu/types";
 import type { CustomTag, PoolDonation } from "@/lib/types";
 import { BASKET_STORAGE_KEY, loadBasketFromStorage, saveBasketToStorage } from "@/components/kesim-alani/hooks/types";
@@ -111,8 +111,20 @@ export default function BagisHavuzuPage() {
   const [transferring, setTransferring] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [creatingNewList, setCreatingNewList] = useState(false);
-  const [aiProcessing, setAiProcessing] = useState(false);
-  const aiPollRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  const [aiRunning, setAiRunning] = useState(false);
+  const [aiStopped, setAiStopped] = useState(false);
+  const [aiResults, setAiResults] = useState<Map<string, HavuzAiResult>>(new Map());
+  const [aiProgress, setAiProgress] = useState({ done: 0, total: 0 });
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  const [aiBatchSize, setAiBatchSize] = useState(25);
+  const [aiRangeMode, setAiRangeMode] = useState<"all" | "selected">("all");
+  const [aiSkipClassified, setAiSkipClassified] = useState(false);
+  const [showAiReport, setShowAiReport] = useState(false);
+  const [aiReportCollapsed, setAiReportCollapsed] = useState(false);
+  const [aiErrorBatches, setAiErrorBatches] = useState(0);
+  const [aiTotalBatches, setAiTotalBatches] = useState(0);
+  const activeJobIdsRef = useRef<string[]>([]);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const columnPickerRef = useRef<HTMLDivElement>(null);
 
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -121,11 +133,16 @@ export default function BagisHavuzuPage() {
     return () => clearTimeout(searchTimer.current);
   }, [search]);
 
-  useEffect(() => {
-    return () => {
-      if (aiPollRef.current) clearInterval(aiPollRef.current);
-    };
+  const stopPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
   }, []);
+
+  useEffect(() => {
+    return () => { stopPolling(); };
+  }, [stopPolling]);
 
   useEffect(() => {
     const stored = localStorage.getItem(`bagis-havuzu-columns-${projectId}`);
@@ -543,57 +560,194 @@ export default function BagisHavuzuPage() {
     setPage(0);
   }, []);
 
-  const handleAiClassify = useCallback(async () => {
-    const ids = [...effectiveSelectedIds];
-    const donationsToClassify = ids.length > 0
-      ? items.filter(i => ids.includes(i.id))
-      : items;
-    if (donationsToClassify.length === 0) return;
-    setAiProcessing(true);
-    try {
-      const aiDonations = donationsToClassify.map(d => ({
-        id: d.id, name: d.name, donationType: d.donationType, vekalet: d.vekalet, notes: d.notes,
-      }));
-      const { jobId } = await classifyNotesAsync(aiDonations);
-      toast({ title: `AI sınıflandırma başlatıldı (${aiDonations.length} bağış)` });
-      if (aiPollRef.current) clearInterval(aiPollRef.current);
-      aiPollRef.current = setInterval(async () => {
-        try {
-          const status = await fetchJobStatus(jobId);
-          if (status.status === "completed" || status.status === "failed") {
-            clearInterval(aiPollRef.current);
-            aiPollRef.current = undefined;
-            if (status.status === "completed" && status.results && status.results.length > 0) {
-              const classifications = await processAiResultsInWorker(status.results);
-              await saveAiClassifications(classifications);
-            }
-            setAiProcessing(false);
-            invalidatePool();
-            toast({
-              title: status.status === "completed" ? "AI sınıflandırma tamamlandı" : "AI sınıflandırma başarısız",
-              variant: status.status === "failed" ? "destructive" : undefined,
+  const startPollingJobs = useCallback((jobIds: string[]) => {
+    stopPolling();
+    const finishedJobs = new Set<string>();
+    const jobProgressMap = new Map<string, { done: number; total: number }>();
+    const jobErrorMap = new Map<string, number>();
+    const jobBatchMap = new Map<string, number>();
+    const allCollectedResults: { donationId: string; categories: string[]; warnings: string }[] = [];
+    let isPolling = false;
+
+    const poll = async () => {
+      if (isPolling) return;
+      isPolling = true;
+      try {
+        const activeIds = jobIds.filter(id => !finishedJobs.has(id));
+        const statuses = await Promise.all(activeIds.map(id => fetchJobStatus(id).catch(() => null)));
+
+        for (let i = 0; i < activeIds.length; i++) {
+          const status = statuses[i];
+          if (!status) continue;
+          const jid = activeIds[i];
+
+          const prev = jobProgressMap.get(jid);
+          jobProgressMap.set(jid, {
+            done: status.processedDonations,
+            total: Math.max(status.totalDonations, prev?.total ?? 0),
+          });
+
+          if (status.failedBatchCount !== undefined) {
+            jobErrorMap.set(jid, status.failedBatchCount);
+          }
+          if (status.totalBatches !== undefined) {
+            jobBatchMap.set(jid, status.totalBatches);
+          }
+
+          if (status.results && status.results.length > 0) {
+            setAiResults(prevResults => {
+              const next = new Map(prevResults);
+              for (const r of status.results!) {
+                const cats = Array.isArray(r.categories) ? r.categories : (r.categories ? [String(r.categories)] : []);
+                let warnings = r.warnings || "";
+                next.set(r.donationId, { ...r, categories: cats, warnings });
+              }
+              return next;
             });
           }
-        } catch {
-          clearInterval(aiPollRef.current);
-          aiPollRef.current = undefined;
-          setAiProcessing(false);
-        }
-      }, 3000);
-    } catch (err) {
-      setAiProcessing(false);
-      toast({ title: "AI sınıflandırma başarısız", description: err instanceof Error ? err.message : "Hata", variant: "destructive" });
-    }
-  }, [items, effectiveSelectedIds, toast, invalidatePool]);
 
-  const handleStopAi = useCallback(() => {
-    if (aiPollRef.current) {
-      clearInterval(aiPollRef.current);
-      aiPollRef.current = undefined;
+          if (status.status === "completed" || status.status === "failed" || status.status === "cancelled") {
+            finishedJobs.add(jid);
+            if (status.results && status.results.length > 0) {
+              allCollectedResults.push(...status.results.map(r => ({
+                donationId: r.donationId,
+                categories: Array.isArray(r.categories) ? r.categories : (r.categories ? [String(r.categories)] : []),
+                warnings: r.warnings || "",
+              })));
+            }
+            if (status.status === "cancelled") {
+              setAiStopped(true);
+            }
+            if (status.status === "failed") {
+              toast({ title: "AI İşlemi Başarısız", description: status.error || "Bilinmeyen hata", variant: "destructive" });
+            }
+          }
+        }
+
+        let totalDone = 0;
+        let totalAll = 0;
+        for (const p of jobProgressMap.values()) { totalDone += p.done; totalAll += p.total; }
+        setAiProgress({ done: totalDone, total: totalAll });
+
+        let totalErrors = 0;
+        for (const e of jobErrorMap.values()) totalErrors += e;
+        setAiErrorBatches(totalErrors);
+        let totalBatch = 0;
+        for (const b of jobBatchMap.values()) totalBatch += b;
+        setAiTotalBatches(totalBatch);
+
+        if (finishedJobs.size === jobIds.length) {
+          stopPolling();
+          setAiRunning(false);
+          activeJobIdsRef.current = [];
+
+          if (allCollectedResults.length > 0) {
+            try {
+              const SAVE_CHUNK = 2000;
+              for (let si = 0; si < allCollectedResults.length; si += SAVE_CHUNK) {
+                await saveAiClassifications(allCollectedResults.slice(si, si + SAVE_CHUNK));
+              }
+              invalidatePool();
+            } catch {}
+          }
+
+          setShowAiReport(true);
+          setAiReportCollapsed(false);
+        }
+      } catch {} finally { isPolling = false; }
+    };
+
+    poll();
+    pollIntervalRef.current = setInterval(poll, 3000);
+  }, [stopPolling, toast, invalidatePool]);
+
+  const handleStartAiClassification = useCallback(async (resume = false) => {
+    const donationsToClassify = aiRangeMode === "selected"
+      ? items.filter(i => effectiveSelectedIds.has(i.id))
+      : items;
+
+    setAiRunning(true);
+    setAiStopped(false);
+    setAiErrorBatches(0);
+    setAiTotalBatches(0);
+    setShowAiReport(false);
+    setAiReportCollapsed(false);
+    if (!resume) { setAiResults(new Map()); }
+
+    let withNotes = donationsToClassify.filter(d => (d.notes || "").trim() !== "");
+
+    if (resume) {
+      withNotes = withNotes.filter(d => !aiResults.has(d.id));
     }
-    setAiProcessing(false);
-    toast({ title: "AI sınıflandırma durduruldu" });
-  }, [toast]);
+    if (aiSkipClassified) {
+      withNotes = withNotes.filter(d => !d.aiCategories || d.aiCategories.length === 0);
+    }
+
+    if (withNotes.length === 0) {
+      toast({
+        title: resume ? "Devam edilecek bağış yok" : "İşlenecek bağış yok",
+        description: resume ? "Tüm bağışçılar zaten işlenmiş" : aiSkipClassified ? "Tüm bağışçılar zaten sınıflandırılmış" : "Notu olan bağışçı bulunamadı",
+      });
+      setAiRunning(false);
+      return;
+    }
+
+    const previouslyDone = resume ? aiResults.size : 0;
+    setAiProgress({ done: previouslyDone, total: previouslyDone + withNotes.length });
+
+    try {
+      const { jobIds } = await classifyNotesAsyncChunked(
+        withNotes.map(d => ({ id: d.id, name: d.name || d.description || "", donationType: d.donationType || "", vekalet: d.vekalet || "", notes: d.notes || "" }))
+      );
+      activeJobIdsRef.current = jobIds;
+      startPollingJobs(jobIds);
+    } catch (err) {
+      if (err instanceof PartialChunkError && err.jobIds.length > 0) {
+        activeJobIdsRef.current = err.jobIds;
+        startPollingJobs(err.jobIds);
+        toast({ title: "Kısmi başlatma", description: `${err.message}. Başarılı parçalar işlenmeye devam ediyor.`, variant: "destructive" });
+        return;
+      }
+      setAiRunning(false);
+      const msg = err instanceof Error ? err.message : "Bilinmeyen hata";
+      const details = err instanceof ApiFetchError ? err.details : undefined;
+      const detailStr = details ? details.map(d => `${(d.path || []).join(".")}: ${d.message || ""}`).join(", ") : "";
+      toast({ title: "AI Başlatılamadı", description: detailStr ? `${msg} (${detailStr})` : msg, variant: "destructive" });
+    }
+  }, [items, effectiveSelectedIds, aiRangeMode, aiSkipClassified, aiResults, toast, startPollingJobs]);
+
+  const handleStopAiClassification = useCallback(async () => {
+    const jobIds = activeJobIdsRef.current;
+    if (jobIds.length > 0) {
+      await Promise.all(jobIds.map(id => cancelJob(id).catch(() => {})));
+    }
+    setAiStopped(true);
+  }, []);
+
+  const aiReportStats = useMemo(() => {
+    const results = Array.from(aiResults.values());
+    const withWarnings = results.filter(r => r.warnings && r.warnings.trim() !== "");
+    const withRequests = results.filter(r => r.requests && r.requests.trim() !== "");
+    const categoryMap = new Map<string, number>();
+    const categoryCanonical = new Map<string, string>();
+    for (const r of results) {
+      if (r.categories) for (const cat of r.categories) {
+        const key = cat.toLocaleLowerCase("tr");
+        if (!categoryCanonical.has(key)) categoryCanonical.set(key, cat);
+        const canonical = categoryCanonical.get(key)!;
+        categoryMap.set(canonical, (categoryMap.get(canonical) || 0) + 1);
+      }
+    }
+    return {
+      totalProcessed: results.length,
+      warningDonors: withWarnings,
+      warningCount: withWarnings.length,
+      requestCount: withRequests.length,
+      categoryDistribution: Array.from(categoryMap.entries()).sort((a, b) => b[1] - a[1]),
+      errorBatches: aiErrorBatches,
+      totalBatches: aiTotalBatches,
+    };
+  }, [aiResults, aiErrorBatches, aiTotalBatches]);
 
   if (isLoading && !data) {
     return (
@@ -638,24 +792,40 @@ export default function BagisHavuzuPage() {
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               <Upload className="w-4 h-4 mr-1" />Toplu Yükle
             </Button>
-            {aiProcessing ? (
-              <Button variant="outline" size="sm" onClick={handleStopAi}>
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" />Durdur
-              </Button>
-            ) : (
-              <Button
-                variant="outline" size="sm"
-                onClick={handleAiClassify}
-                disabled={items.length === 0}
-              >
-                <Sparkles className="w-4 h-4 mr-1" />AI Sınıflandır
-              </Button>
-            )}
             <ThemeToggle />
           </div>
         </div>
 
         {showStats && stats && <StatsPanel stats={stats} />}
+
+        <div className="mb-3 space-y-3">
+          <HavuzAiClassification
+            items={items}
+            selectedCount={effectiveSelectedIds.size}
+            aiRunning={aiRunning}
+            aiStopped={aiStopped}
+            aiResults={aiResults}
+            aiProgress={aiProgress}
+            showAiPanel={showAiPanel}
+            setShowAiPanel={setShowAiPanel}
+            rangeMode={aiRangeMode}
+            setRangeMode={setAiRangeMode}
+            batchSize={aiBatchSize}
+            setBatchSize={setAiBatchSize}
+            startAiClassification={handleStartAiClassification}
+            stopAiClassification={handleStopAiClassification}
+            skipClassified={aiSkipClassified}
+            setSkipClassified={setAiSkipClassified}
+            showAiReport={showAiReport}
+            setShowAiReport={setShowAiReport}
+            aiReportCollapsed={aiReportCollapsed}
+            setAiReportCollapsed={setAiReportCollapsed}
+            aiReportStats={aiReportStats}
+            aiCategoryFilter={aiCategoryFilter || null}
+            setAiCategoryFilter={(v) => { setAiCategoryFilter(v || ""); setPage(0); }}
+            total={total}
+          />
+        </div>
 
         {showRules && (
           <div className="mb-3">
