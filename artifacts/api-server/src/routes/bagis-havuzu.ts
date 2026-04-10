@@ -559,9 +559,14 @@ router.post("/projects/:id/donations/bulk-action", asyncHandler(async (req, res)
   res.json({ success: true, affected });
 }));
 
-router.get("/projects/:id/donations/vekalet-check", asyncHandler(async (req, res) => {
+router.post("/projects/:id/donations/vekalet-check", asyncHandler(async (req, res) => {
   const projectId = req.params.id;
-  const vekalets = typeof req.query.vekalets === "string" ? req.query.vekalets.split(",").map((v: string) => v.trim()).filter(Boolean) : [];
+  const body = req.body;
+  const vekalets: string[] = Array.isArray(body?.vekalets)
+    ? body.vekalets.map((v: unknown) => String(v).trim()).filter(Boolean)
+    : typeof body?.vekalets === "string"
+      ? body.vekalets.split(",").map((v: string) => v.trim()).filter(Boolean)
+      : [];
 
   if (vekalets.length === 0) {
     res.json({ conflicts: [] });
@@ -578,18 +583,25 @@ router.get("/projects/:id/donations/vekalet-check", asyncHandler(async (req, res
   }
 
   const kaIds = kaRows.map(k => k.id);
-  const existing = await db.select({
-    vekalet: donationsTable.vekalet,
-    id: donationsTable.id,
-    name: donationsTable.name,
-    kesimAlaniId: donationsTable.kesimAlaniId,
-  }).from(donationsTable).where(and(
-    inArray(donationsTable.kesimAlaniId, kaIds),
-    isNull(donationsTable.deletedAt),
-    inArray(donationsTable.vekalet, vekalets),
-  ));
 
-  res.json({ conflicts: existing });
+  const CHUNK = 500;
+  const allConflicts: Array<{ vekalet: string; id: string; name: string; kesimAlaniId: string }> = [];
+  for (let i = 0; i < vekalets.length; i += CHUNK) {
+    const chunk = vekalets.slice(i, i + CHUNK);
+    const existing = await db.select({
+      vekalet: donationsTable.vekalet,
+      id: donationsTable.id,
+      name: donationsTable.name,
+      kesimAlaniId: donationsTable.kesimAlaniId,
+    }).from(donationsTable).where(and(
+      inArray(donationsTable.kesimAlaniId, kaIds),
+      isNull(donationsTable.deletedAt),
+      inArray(donationsTable.vekalet, chunk),
+    ));
+    allConflicts.push(...existing);
+  }
+
+  res.json({ conflicts: allConflicts });
 }));
 
 export default router;

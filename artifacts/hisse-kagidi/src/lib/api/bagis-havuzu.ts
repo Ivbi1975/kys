@@ -83,8 +83,10 @@ export async function bulkActionDonations(projectId: string, donationIds: string
 }
 
 export async function checkVekaletConflicts(projectId: string, vekalets: string[]): Promise<{ conflicts: Array<{ vekalet: string; id: string; name: string; kesimAlaniId: string }> }> {
-  const qs = vekalets.join(",");
   return apiFetch<{ conflicts: Array<{ vekalet: string; id: string; name: string; kesimAlaniId: string }> }>(
-    `/projects/${projectId}/donations/vekalet-check?vekalets=${encodeURIComponent(qs)}`
+    `/projects/${projectId}/donations/vekalet-check`, {
+      method: "POST",
+      body: JSON.stringify({ vekalets }),
+    }
   );
 }
