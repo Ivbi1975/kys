@@ -118,7 +118,7 @@ export {
   bulkTagDonations,
   checkVekaletConflicts,
 } from "./bagis-havuzu";
-export type { PoolDonationsResponse, PoolFilters } from "./bagis-havuzu";
+export type { PoolDonationsResponse, PoolFilters, VekaletConflict } from "./bagis-havuzu";
 
 export {
   fetchExportCount,

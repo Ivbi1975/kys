@@ -11,6 +11,7 @@ import type { ImportDonationPayload } from "@/lib/api/bagis-havuzu";
 import { ApiFetchError } from "@/lib/api/core";
 import { autoMapColumns, POOL_COLUMN_OPTIONS, type ColumnMapping } from "./types";
 import { parseExcelInWorker } from "@/lib/excel.worker.client";
+import { VekaletConflictDialog, categorizeConflicts, type ConflictRow } from "./VekaletConflictDialog";
 
 interface ImportWizardProps {
   open: boolean;
@@ -30,6 +31,9 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [conflictRows, setConflictRows] = useState<ConflictRow[]>([]);
+  const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+  const conflictResolveRef = useRef<((proceed: boolean) => void) | null>(null);
 
   function processRawData(rows: string[][]) {
     setPreviewData(rows);
@@ -153,10 +157,12 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
         try {
           const { conflicts } = await checkVekaletConflicts(projectId, vekaletValues);
           if (conflicts.length > 0) {
-            const uniqueConflicts = new Set(conflicts.map(c => c.vekalet));
-            const proceed = window.confirm(
-              `Dikkat: ${uniqueConflicts.size} vekalet numarası zaten başka yerlerde mevcut:\n${[...uniqueConflicts].slice(0, 10).join(", ")}${uniqueConflicts.size > 10 ? ` ve ${uniqueConflicts.size - 10} adet daha...` : ""}\n\nDevam etmek istiyor musunuz?`
-            );
+            const rows = categorizeConflicts(conflicts, donations);
+            const proceed = await new Promise<boolean>((resolve) => {
+              conflictResolveRef.current = resolve;
+              setConflictRows(rows);
+              setConflictDialogOpen(true);
+            });
             if (!proceed) {
               setImporting(false);
               setImportProgress("");
@@ -195,7 +201,20 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
     }
   }, [displayPreviewRows, columnMappings, projectId, toast, onSuccess]);
 
+  function handleConflictResolve(proceed: boolean) {
+    setConflictDialogOpen(false);
+    setConflictRows([]);
+    conflictResolveRef.current?.(proceed);
+    conflictResolveRef.current = null;
+  }
+
   function resetImport() {
+    if (conflictResolveRef.current) {
+      conflictResolveRef.current(false);
+      conflictResolveRef.current = null;
+    }
+    setConflictDialogOpen(false);
+    setConflictRows([]);
     onOpenChange(false);
     setImportStep("input");
     setImportMode("upload");
@@ -206,6 +225,13 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
   }
 
   return (
+    <>
+    <VekaletConflictDialog
+      open={conflictDialogOpen}
+      conflicts={conflictRows}
+      onProceed={() => handleConflictResolve(true)}
+      onCancel={() => handleConflictResolve(false)}
+    />
     <Dialog open={open} onOpenChange={(o) => { if (!o) resetImport(); else onOpenChange(true); }}>
       <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader>
@@ -318,5 +344,6 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
         )}
       </DialogContent>
     </Dialog>
+    </>
   );
 }

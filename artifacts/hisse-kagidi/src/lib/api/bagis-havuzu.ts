@@ -128,8 +128,16 @@ export async function bulkTagDonations(
   });
 }
 
-export async function checkVekaletConflicts(projectId: string, vekalets: string[]): Promise<{ conflicts: Array<{ vekalet: string; id: string; name: string; kesimAlaniId: string }> }> {
-  return apiFetch<{ conflicts: Array<{ vekalet: string; id: string; name: string; kesimAlaniId: string }> }>(
+export interface VekaletConflict {
+  vekalet: string;
+  id: string;
+  name: string;
+  kesimAlaniId: string;
+  kesimAlaniName: string;
+}
+
+export async function checkVekaletConflicts(projectId: string, vekalets: string[]): Promise<{ conflicts: VekaletConflict[] }> {
+  return apiFetch<{ conflicts: VekaletConflict[] }>(
     `/projects/${projectId}/donations/vekalet-check`, {
       method: "POST",
       body: JSON.stringify({ vekalets }),
