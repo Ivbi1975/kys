@@ -5,6 +5,7 @@ import {
   kesimAlanlariTable,
   donationsTable,
   donationTagsTable,
+  animalGroupDonationsTable,
 } from "@workspace/db/schema";
 import { eq, isNull, and, sql, inArray, ilike, or, asc } from "drizzle-orm";
 import { z } from "zod";
@@ -13,6 +14,11 @@ import { ERROR_MESSAGES } from "../lib/constants";
 import { refreshProjectStats } from "./projects";
 
 const router: IRouter = Router();
+
+function parseMultiValue(val: unknown): string[] {
+  if (typeof val !== "string" || !val.trim()) return [];
+  return val.split(",").map(v => v.trim()).filter(Boolean);
+}
 
 router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   const projectId = req.params.id;
@@ -23,19 +29,19 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   const offset = Math.max(Number(req.query.offset) || 0, 0);
   const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
   const status = typeof req.query.status === "string" ? req.query.status : "";
-  const donationType = typeof req.query.donationType === "string" ? req.query.donationType.trim() : "";
-  const birim = typeof req.query.birim === "string" ? req.query.birim.trim() : "";
-  const temsilci = typeof req.query.temsilci === "string" ? req.query.temsilci.trim() : "";
+  const donationTypes = parseMultiValue(req.query.donationType);
+  const birimValues = parseMultiValue(req.query.birim);
+  const temsilciValues = parseMultiValue(req.query.temsilci);
   const kesimAlaniId = typeof req.query.kesimAlaniId === "string" ? req.query.kesimAlaniId.trim() : "";
   const aiCategory = typeof req.query.aiCategory === "string" ? req.query.aiCategory.trim() : "";
-  const ozellik = typeof req.query.ozellik === "string" ? req.query.ozellik.trim() : "";
-  const fiyat = typeof req.query.fiyat === "string" ? req.query.fiyat.trim() : "";
-  const yerTalebi = typeof req.query.yerTalebi === "string" ? req.query.yerTalebi.trim() : "";
-  const gunTalebi = typeof req.query.gunTalebi === "string" ? req.query.gunTalebi.trim() : "";
-  const ilkHayvan = typeof req.query.ilkHayvan === "string" ? req.query.ilkHayvan.trim() : "";
-  const safi = typeof req.query.safi === "string" ? req.query.safi.trim() : "";
+  const ozellikValues = parseMultiValue(req.query.ozellik);
+  const fiyatValues = parseMultiValue(req.query.fiyat);
+  const yerTalebiValues = parseMultiValue(req.query.yerTalebi);
+  const gunTalebiValues = parseMultiValue(req.query.gunTalebi);
+  const ilkHayvanValues = parseMultiValue(req.query.ilkHayvan);
+  const safiValues = parseMultiValue(req.query.safi);
   const notesFilter = typeof req.query.notesFilter === "string" ? req.query.notesFilter.trim() : "";
-  const sortBy = typeof req.query.sortBy === "string" ? req.query.sortBy : "sortOrder";
+  const sortByRaw = typeof req.query.sortBy === "string" ? req.query.sortBy : "sortOrder";
   const sortDir = typeof req.query.sortDir === "string" && req.query.sortDir === "desc" ? "desc" : "asc";
 
   const kaRows = await db.select({ id: kesimAlanlariTable.id, name: kesimAlanlariTable.name })
@@ -43,7 +49,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
 
   if (kaRows.length === 0) {
-    res.json({ items: [], total: 0, kesimAlanlari: [] });
+    res.json({ items: [], total: 0, kesimAlanlari: [], allFilteredIds: [] });
     return;
   }
 
@@ -77,16 +83,34 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     );
   }
 
-  if (donationType) conditions.push(eq(donationsTable.donationType, donationType));
-  if (birim) conditions.push(eq(donationsTable.birim, birim));
-  if (temsilci) conditions.push(eq(donationsTable.temsilci, temsilci));
+  if (donationTypes.length === 1) conditions.push(eq(donationsTable.donationType, donationTypes[0]));
+  else if (donationTypes.length > 1) conditions.push(inArray(donationsTable.donationType, donationTypes));
+
+  if (birimValues.length === 1) conditions.push(eq(donationsTable.birim, birimValues[0]));
+  else if (birimValues.length > 1) conditions.push(inArray(donationsTable.birim, birimValues));
+
+  if (temsilciValues.length === 1) conditions.push(eq(donationsTable.temsilci, temsilciValues[0]));
+  else if (temsilciValues.length > 1) conditions.push(inArray(donationsTable.temsilci, temsilciValues));
+
   if (kesimAlaniId) conditions.push(eq(donationsTable.kesimAlaniId, kesimAlaniId));
-  if (ozellik) conditions.push(eq(donationsTable.ozellik, ozellik));
-  if (fiyat) conditions.push(eq(donationsTable.fiyat, fiyat));
-  if (yerTalebi) conditions.push(eq(donationsTable.yerTalebi, yerTalebi));
-  if (gunTalebi) conditions.push(eq(donationsTable.gunTalebi, gunTalebi));
-  if (ilkHayvan) conditions.push(eq(donationsTable.ilkHayvan, ilkHayvan));
-  if (safi) conditions.push(eq(donationsTable.safi, safi));
+
+  if (ozellikValues.length === 1) conditions.push(eq(donationsTable.ozellik, ozellikValues[0]));
+  else if (ozellikValues.length > 1) conditions.push(inArray(donationsTable.ozellik, ozellikValues));
+
+  if (fiyatValues.length === 1) conditions.push(eq(donationsTable.fiyat, fiyatValues[0]));
+  else if (fiyatValues.length > 1) conditions.push(inArray(donationsTable.fiyat, fiyatValues));
+
+  if (yerTalebiValues.length === 1) conditions.push(eq(donationsTable.yerTalebi, yerTalebiValues[0]));
+  else if (yerTalebiValues.length > 1) conditions.push(inArray(donationsTable.yerTalebi, yerTalebiValues));
+
+  if (gunTalebiValues.length === 1) conditions.push(eq(donationsTable.gunTalebi, gunTalebiValues[0]));
+  else if (gunTalebiValues.length > 1) conditions.push(inArray(donationsTable.gunTalebi, gunTalebiValues));
+
+  if (ilkHayvanValues.length === 1) conditions.push(eq(donationsTable.ilkHayvan, ilkHayvanValues[0]));
+  else if (ilkHayvanValues.length > 1) conditions.push(inArray(donationsTable.ilkHayvan, ilkHayvanValues));
+
+  if (safiValues.length === 1) conditions.push(eq(donationsTable.safi, safiValues[0]));
+  else if (safiValues.length > 1) conditions.push(inArray(donationsTable.safi, safiValues));
 
   if (status === "excluded") {
     conditions.push(eq(donationsTable.excluded, true));
@@ -109,6 +133,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
 
   const sortColumnMap: Record<string, string> = {
     name: "name",
+    description: "description",
     sortOrder: "sort_order",
     donationType: "donation_type",
     shareCount: "share_count",
@@ -122,18 +147,39 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     gunTalebi: "gun_talebi",
     ilkHayvan: "ilk_hayvan",
     safi: "safi",
+    notes: "notes",
   };
-  const sortCol = sortColumnMap[sortBy] || "sort_order";
-  const sortDirection = sortDir === "desc" ? sql`DESC` : sql`ASC`;
+
+  const sortKeys = sortByRaw.split(",").map(s => s.trim()).filter(Boolean).slice(0, 3);
+  const sortParts: ReturnType<typeof sql>[] = [];
+  const usedCols = new Set<string>();
+  for (const key of sortKeys) {
+    const col = sortColumnMap[key];
+    if (col && !usedCols.has(col)) {
+      usedCols.add(col);
+      sortParts.push(sortDir === "desc"
+        ? sql`${sql.raw(`"${col}"`)} DESC NULLS LAST`
+        : sql`${sql.raw(`"${col}"`)} ASC NULLS LAST`
+      );
+    }
+  }
+  if (!usedCols.has("sort_order")) {
+    sortParts.push(sql`"sort_order" ASC`);
+  }
 
   const [countResult, rows] = await Promise.all([
     db.select({ count: sql<number>`count(*)::int` }).from(donationsTable).where(whereClause),
     db.select().from(donationsTable).where(whereClause)
-      .orderBy(sql`${sql.raw(sortCol)} ${sortDirection}`, asc(donationsTable.sortOrder))
+      .orderBy(...sortParts)
       .limit(limit).offset(offset),
   ]);
 
   const total = countResult[0]?.count ?? 0;
+
+  const allIdsResult = total > limit
+    ? await db.select({ id: donationsTable.id }).from(donationsTable).where(whereClause)
+    : null;
+  const allFilteredIds = allIdsResult ? allIdsResult.map(r => r.id) : rows.map(r => r.id);
 
   const donationIds = rows.map(r => r.id);
   let tagsByDonation: Record<string, string[]> = {};
@@ -175,7 +221,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     aiWarnings: d.aiWarnings || "",
   }));
 
-  res.json({ items, total, kesimAlanlari: kaRows });
+  res.json({ items, total, kesimAlanlari: kaRows, allFilteredIds });
 }));
 
 router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
@@ -245,6 +291,44 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
   `);
   const multiLocationVekalets = multiLocResult.rows.map((r: Record<string, unknown>) => String(r.vekalet));
 
+  const multiLocByNameResult = await db.execute(sql`
+    SELECT d.name, COUNT(DISTINCT d.kesim_alani_id)::int AS loc_count, array_agg(DISTINCT d.vekalet) AS vekalets
+    FROM donations d
+    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+    WHERE ka.project_id = ${projectId}
+      AND ka.deleted_at IS NULL AND d.deleted_at IS NULL
+      AND d.excluded = false AND d.name IS NOT NULL AND d.name != ''
+    GROUP BY d.name
+    HAVING COUNT(DISTINCT d.kesim_alani_id) > 1
+    LIMIT 100
+  `);
+  const multiLocationNames = multiLocByNameResult.rows.map((r: Record<string, unknown>) => ({
+    name: String(r.name),
+    count: Number(r.loc_count),
+    vekalets: (r.vekalets as string[]) || [],
+  }));
+
+  const transferredCountResult = await db.execute(sql`
+    SELECT COUNT(DISTINCT d.id)::int AS transferred
+    FROM donations d
+    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+    JOIN animal_group_donations agd ON agd.donation_id = d.id
+    WHERE ka.project_id = ${projectId}
+      AND ka.deleted_at IS NULL AND d.deleted_at IS NULL
+      AND ka.name != '__havuz__'
+  `);
+  const transferredToLists = (transferredCountResult.rows[0] as Record<string, unknown>)?.transferred ?? 0;
+
+  const inGroupCountResult = await db.execute(sql`
+    SELECT COUNT(DISTINCT d.id)::int AS in_groups
+    FROM donations d
+    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+    JOIN animal_group_donations agd ON agd.donation_id = d.id
+    WHERE ka.project_id = ${projectId}
+      AND ka.deleted_at IS NULL AND d.deleted_at IS NULL
+  `);
+  const inGroups = (inGroupCountResult.rows[0] as Record<string, unknown>)?.in_groups ?? 0;
+
   const distQuery = (col: string) => db.execute(sql`
     SELECT ${sql.raw(`d.${col}`)} AS value, COUNT(*)::int AS count
     FROM donations d
@@ -269,6 +353,9 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
     typeDistribution: typeDist.rows,
     kesimAlaniDistribution: kaDist.rows,
     multiLocationVekalets,
+    multiLocationNames,
+    transferredToLists: Number(transferredToLists),
+    inGroups: Number(inGroups),
     ozellikDistribution: ozellikDist.rows.map((r: Record<string, unknown>) => ({ ozellik: String(r.value), count: Number(r.count) })),
     fiyatDistribution: fiyatDist.rows.map((r: Record<string, unknown>) => ({ fiyat: String(r.value), count: Number(r.count) })),
     yerTalebiDistribution: yerTalebiDist.rows.map((r: Record<string, unknown>) => ({ yerTalebi: String(r.value), count: Number(r.count) })),
@@ -432,6 +519,7 @@ router.post("/projects/:id/donations/bulk-import", asyncHandler(async (req, res)
 const transferSchema = z.object({
   donationIds: z.array(z.string()).min(1).max(50000),
   targetKesimAlaniId: z.string().min(1),
+  skipExisting: z.boolean().optional(),
 });
 
 router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) => {
@@ -445,7 +533,7 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
     return;
   }
 
-  const { donationIds, targetKesimAlaniId } = parsed.data;
+  const { donationIds, targetKesimAlaniId, skipExisting } = parsed.data;
 
   const [targetKA] = await db.select()
     .from(kesimAlanlariTable)
@@ -456,6 +544,31 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
     ));
   if (!targetKA) {
     res.status(404).json({ error: ERROR_MESSAGES.TARGET_KESIM_NOT_FOUND });
+    return;
+  }
+
+  const existingIds = new Set<string>();
+  const CHUNK = 5000;
+  for (let i = 0; i < donationIds.length; i += CHUNK) {
+    const chunk = donationIds.slice(i, i + CHUNK);
+    const existingInTarget = await db.select({ id: donationsTable.id })
+      .from(donationsTable)
+      .where(and(
+        eq(donationsTable.kesimAlaniId, targetKesimAlaniId),
+        isNull(donationsTable.deletedAt),
+        inArray(donationsTable.id, chunk),
+      ));
+    for (const r of existingInTarget) existingIds.add(r.id);
+  }
+  const alreadyInTarget = existingIds.size;
+
+  let idsToMove = donationIds;
+  if (alreadyInTarget > 0 && skipExisting) {
+    idsToMove = donationIds.filter(id => !existingIds.has(id));
+  }
+
+  if (idsToMove.length === 0 && alreadyInTarget > 0) {
+    res.json({ success: true, moved: 0, alreadyInTarget, skipped: alreadyInTarget });
     return;
   }
 
@@ -471,10 +584,10 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
   `);
   let nextSort = ((maxSortResult.rows[0] as { max_sort: number })?.max_sort ?? -1) + 1;
 
-  const CHUNK = 500;
+  const MOVE_CHUNK = 500;
   let movedCount = 0;
-  for (let i = 0; i < donationIds.length; i += CHUNK) {
-    const chunk = donationIds.slice(i, i + CHUNK);
+  for (let i = 0; i < idsToMove.length; i += MOVE_CHUNK) {
+    const chunk = idsToMove.slice(i, i + MOVE_CHUNK);
     const result = await db.update(donationsTable)
       .set({ kesimAlaniId: targetKesimAlaniId, updatedAt: new Date() })
       .where(and(
@@ -499,7 +612,7 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
   }
 
   refreshProjectStats();
-  res.json({ success: true, moved: movedCount });
+  res.json({ success: true, moved: movedCount, alreadyInTarget, skipped: skipExisting ? alreadyInTarget : 0 });
 }));
 
 const bulkUpdateSchema = z.object({
@@ -573,7 +686,7 @@ router.post("/projects/:id/donations/vekalet-check", asyncHandler(async (req, re
     return;
   }
 
-  const kaRows = await db.select({ id: kesimAlanlariTable.id })
+  const kaRows = await db.select({ id: kesimAlanlariTable.id, name: kesimAlanlariTable.name })
     .from(kesimAlanlariTable)
     .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
 
@@ -583,22 +696,30 @@ router.post("/projects/:id/donations/vekalet-check", asyncHandler(async (req, re
   }
 
   const kaIds = kaRows.map(k => k.id);
+  const kaNameMap: Record<string, string> = {};
+  for (const k of kaRows) kaNameMap[k.id] = k.name;
 
   const CHUNK = 500;
-  const allConflicts: Array<{ vekalet: string; id: string; name: string; kesimAlaniId: string }> = [];
+  const allConflicts: Array<{ vekalet: string; id: string; name: string; description: string; kesimAlaniId: string; kesimAlaniName: string }> = [];
   for (let i = 0; i < vekalets.length; i += CHUNK) {
     const chunk = vekalets.slice(i, i + CHUNK);
     const existing = await db.select({
       vekalet: donationsTable.vekalet,
       id: donationsTable.id,
       name: donationsTable.name,
+      description: donationsTable.description,
       kesimAlaniId: donationsTable.kesimAlaniId,
     }).from(donationsTable).where(and(
       inArray(donationsTable.kesimAlaniId, kaIds),
       isNull(donationsTable.deletedAt),
       inArray(donationsTable.vekalet, chunk),
     ));
-    allConflicts.push(...existing);
+    allConflicts.push(...existing.map(e => ({
+      ...e,
+      vekalet: e.vekalet || "",
+      description: e.description || "",
+      kesimAlaniName: kaNameMap[e.kesimAlaniId] || "",
+    })));
   }
 
   res.json({ conflicts: allConflicts });

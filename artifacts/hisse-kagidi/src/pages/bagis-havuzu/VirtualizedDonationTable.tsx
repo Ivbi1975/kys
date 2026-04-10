@@ -1,9 +1,26 @@
-import { useRef } from "react";
+import { useRef, useCallback } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckSquare, Square } from "lucide-react";
+import { AlertTriangle, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import type { PoolDonation } from "@/lib/types";
 import { ALL_TABLE_COLUMNS, getStatusLabel, type TableColumnKey } from "./types";
+
+const SORT_KEY_MAP: Partial<Record<TableColumnKey, string>> = {
+  vekalet: "vekalet",
+  name: "name",
+  description: "description",
+  donationType: "donationType",
+  birim: "birim",
+  temsilci: "temsilci",
+  ozellik: "ozellik",
+  fiyat: "fiyat",
+  yerTalebi: "yerTalebi",
+  gunTalebi: "gunTalebi",
+  ilkHayvan: "ilkHayvan",
+  safi: "safi",
+  notes: "notes",
+  kesimAlani: "kesimAlaniId",
+};
 
 interface VirtualizedDonationTableProps {
   items: PoolDonation[];
@@ -14,6 +31,9 @@ interface VirtualizedDonationTableProps {
   toggleSelectAll: () => void;
   multiLocationVekalets: Set<string>;
   visibleColumns: Set<TableColumnKey>;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+  onColumnSort: (colKey: string) => void;
 }
 
 const ROW_HEIGHT = 36;
@@ -105,6 +125,7 @@ function getTableWidth(cols: { key: TableColumnKey }[]) {
 
 export function VirtualizedDonationTable({
   items, isLoading, activeFilterCount, selectedIds, toggleSelect, toggleSelectAll, multiLocationVekalets, visibleColumns,
+  sortBy, sortDir, onColumnSort,
 }: VirtualizedDonationTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const rowVirtualizer = useVirtualizer({
@@ -117,9 +138,27 @@ export function VirtualizedDonationTable({
   const cols = ALL_TABLE_COLUMNS.filter(c => visibleColumns.has(c.key));
   const tableWidth = getTableWidth(cols);
 
+  const handleHeaderClick = useCallback((colKey: TableColumnKey) => {
+    const sortKey = SORT_KEY_MAP[colKey];
+    if (sortKey) {
+      onColumnSort(sortKey);
+    }
+  }, [onColumnSort]);
+
+  const getSortIcon = useCallback((colKey: TableColumnKey) => {
+    const sortKey = SORT_KEY_MAP[colKey];
+    if (!sortKey) return null;
+    if (sortBy === sortKey) {
+      return sortDir === "asc"
+        ? <ArrowUp className="w-3 h-3 text-primary" />
+        : <ArrowDown className="w-3 h-3 text-primary" />;
+    }
+    return <ArrowUpDown className="w-3 h-3 text-muted-foreground/40" />;
+  }, [sortBy, sortDir]);
+
   return (
     <div className="border rounded-lg overflow-hidden">
-      <div className="overflow-auto" ref={parentRef} style={{ maxHeight: "calc(100vh - 320px)" }}>
+      <div className="overflow-auto" ref={parentRef} style={{ maxHeight: "calc(100vh - 380px)" }}>
         <div style={{ minWidth: tableWidth }}>
           <table className="w-full text-sm" style={{ tableLayout: "fixed", minWidth: tableWidth }}>
             <ColGroup cols={cols} />
@@ -132,11 +171,21 @@ export function VirtualizedDonationTable({
                       : <Square className="w-4 h-4" />}
                   </button>
                 </th>
-                {cols.map(col => (
-                  <th key={col.key} className="p-2 text-xs font-medium text-muted-foreground text-left">
-                    {col.label}
-                  </th>
-                ))}
+                {cols.map(col => {
+                  const sortable = !!SORT_KEY_MAP[col.key];
+                  return (
+                    <th
+                      key={col.key}
+                      className={`p-2 text-xs font-medium text-muted-foreground text-left ${sortable ? "cursor-pointer hover:text-foreground hover:bg-muted/80 select-none" : ""}`}
+                      onClick={sortable ? () => handleHeaderClick(col.key) : undefined}
+                    >
+                      <span className="flex items-center gap-1">
+                        {col.label}
+                        {getSortIcon(col.key)}
+                      </span>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
           </table>

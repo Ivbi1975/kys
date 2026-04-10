@@ -47,6 +47,9 @@ export interface PoolStats {
   typeDistribution: { type: string; count: number; shares: number }[];
   kesimAlaniDistribution: { id: string; name: string; count: number; shares: number }[];
   multiLocationVekalets: string[];
+  multiLocationNames: { name: string; count: number; vekalets: string[] }[];
+  transferredToLists: number;
+  inGroups: number;
   ozellikDistribution: { ozellik: string; count: number }[];
   fiyatDistribution: { fiyat: string; count: number }[];
   yerTalebiDistribution: { yerTalebi: string; count: number }[];

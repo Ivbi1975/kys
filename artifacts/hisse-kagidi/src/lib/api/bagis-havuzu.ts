@@ -5,6 +5,7 @@ export interface PoolDonationsResponse {
   items: PoolDonation[];
   total: number;
   kesimAlanlari: { id: string; name: string }[];
+  allFilteredIds: string[];
 }
 
 export interface PoolFilters {
@@ -94,10 +95,15 @@ export async function bulkImportDonations(
   return { success: true, inserted: totalInserted };
 }
 
-export async function transferDonationsToKA(projectId: string, donationIds: string[], targetKesimAlaniId: string): Promise<{ success: boolean; moved: number }> {
-  return apiFetch<{ success: boolean; moved: number }>(`/projects/${projectId}/donations/transfer`, {
+export async function transferDonationsToKA(
+  projectId: string,
+  donationIds: string[],
+  targetKesimAlaniId: string,
+  skipExisting?: boolean,
+): Promise<{ success: boolean; moved: number; alreadyInTarget?: number; skipped?: number }> {
+  return apiFetch<{ success: boolean; moved: number; alreadyInTarget?: number; skipped?: number }>(`/projects/${projectId}/donations/transfer`, {
     method: "POST",
-    body: JSON.stringify({ donationIds, targetKesimAlaniId }),
+    body: JSON.stringify({ donationIds, targetKesimAlaniId, skipExisting }),
   });
 }
 

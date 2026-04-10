@@ -1,11 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, ListChecks, ShoppingBasket, Tag, MapPin, Users } from "lucide-react";
+import { Package, ListChecks, ShoppingBasket, Tag, MapPin, Users, ArrowRightLeft, Layers } from "lucide-react";
 import type { PoolStats } from "@/lib/types";
 
 export function StatsPanel({ stats }: { stats: PoolStats }) {
   return (
     <div className="mb-4 space-y-3">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <Card>
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
@@ -33,7 +33,7 @@ export function StatsPanel({ stats }: { stats: PoolStats }) {
             <div className="flex items-center gap-2">
               <ShoppingBasket className="w-4 h-4 text-orange-600" />
               <div>
-                <p className="text-xs text-muted-foreground">Sepet</p>
+                <p className="text-xs text-muted-foreground">Devre Dışı</p>
                 <p className="text-lg font-bold">{stats.excluded}</p>
               </div>
             </div>
@@ -46,6 +46,28 @@ export function StatsPanel({ stats }: { stats: PoolStats }) {
               <div>
                 <p className="text-xs text-muted-foreground">Toplam Hisse</p>
                 <p className="text-lg font-bold">{stats.total_shares}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <ArrowRightLeft className="w-4 h-4 text-purple-600" />
+              <div>
+                <p className="text-xs text-muted-foreground">Listelere Aktarılan</p>
+                <p className="text-lg font-bold">{stats.transferredToLists ?? "—"}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-cyan-600" />
+              <div>
+                <p className="text-xs text-muted-foreground">Gruplara Yerleşen</p>
+                <p className="text-lg font-bold">{stats.inGroups ?? "—"}</p>
               </div>
             </div>
           </CardContent>

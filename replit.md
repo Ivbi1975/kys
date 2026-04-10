@@ -139,8 +139,13 @@ Key files:
 - `src/pages/kesim-rapor.tsx` - Kesim report page (`/rapor/:id`), print-optimized PDF with stats, timeline, team breakdown, notes; accessible from kesim-alani "Rapor" button
 - `src/lib/offlineStore.ts` - IndexedDB wrapper for offline tracking data cache and change queue
 - `src/lib/useOfflineSync.ts` - React hook for offline-aware data loading, change queuing, and sync
-- `src/pages/bagis-havuzu.tsx` - Bağış Havuzu (donation pool) page (`/bagis-havuzu/:id`), central view of all donations across all kesim areas in a project; features filtering by kesim area/type/status/birim/temsilci, search, Excel bulk import with column mapping, transfer to kesim areas, bulk operations (exclude/include/delete), AI classification, statistics panel with distribution breakdowns
-- `src/lib/api/bagis-havuzu.ts` - API client for Bağış Havuzu endpoints (fetchPoolDonations, fetchPoolStats, bulkImportDonations, transferDonationsToKA, bulkActionDonations)
+- `src/pages/bagis-havuzu.tsx` - Bağış Havuzu (donation pool) page (`/bagis-havuzu/:id`), central view of all donations across all kesim areas in a project; features multi-select filtering (birim, temsilci, cinsi, özellik, fiyat, yer talebi, gün talebi, ilk hayvan, şafi), URL filter persistence via replaceState, filters open by default, bold donation count, search, Excel bulk import with column mapping (5000 per chunk), transfer to kesim areas with duplicate detection (skipExisting), select-all across pages, multi-level column sorting (click headers), bulk operations (exclude/include/delete), AI classification with stop button, statistics panel with distribution breakdowns + transferredToLists/inGroups stats, multi-location vekalet/name conflict warnings
+- `src/pages/bagis-havuzu/PoolFilters.tsx` - Multi-select dropdown filters with checkbox lists, inline search for long option lists, badge display of selections
+- `src/pages/bagis-havuzu/VirtualizedDonationTable.tsx` - Virtualized donation table with clickable sortable column headers (ArrowUp/Down/UpDown icons), configurable visible columns
+- `src/pages/bagis-havuzu/TransferDialog.tsx` - Transfer dialog with fresh KA list fetch on open, create-new-list option
+- `src/pages/bagis-havuzu/PoolBulkActions.tsx` - Floating bulk actions bar (Listeye Aktar, Devre Dışı Bırak, Aktif Yap, Sil)
+- `src/pages/bagis-havuzu/StatsPanel.tsx` - Statistics panel with total/active/excluded/shares/transferredToLists/inGroups cards and distribution breakdowns
+- `src/lib/api/bagis-havuzu.ts` - API client for Bağış Havuzu endpoints (fetchPoolDonations, fetchPoolStats, bulkImportDonations, transferDonationsToKA, bulkActionDonations, checkVekaletConflicts)
 
 ## TypeScript & Composite Projects
 

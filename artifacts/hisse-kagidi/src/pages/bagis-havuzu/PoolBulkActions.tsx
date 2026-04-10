@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRightLeft, ShoppingBasket, ListChecks, Trash2, X } from "lucide-react";
+import { ArrowRightLeft, Undo2, Trash2, X } from "lucide-react";
 
 interface PoolBulkActionsProps {
   selectedCount: number;
@@ -19,10 +19,10 @@ export function PoolBulkActions({ selectedCount, onTransferOpen, onBulkAction, o
           <ArrowRightLeft className="w-4 h-4 mr-1" />Listeye Aktar
         </Button>
         <Button size="sm" variant="outline" onClick={() => onBulkAction("exclude")}>
-          <ShoppingBasket className="w-4 h-4 mr-1" />Sepete At
+          <X className="w-4 h-4 mr-1" />Devre Dışı Bırak
         </Button>
         <Button size="sm" variant="outline" onClick={() => onBulkAction("include")}>
-          <ListChecks className="w-4 h-4 mr-1" />Havuza Al
+          <Undo2 className="w-4 h-4 mr-1" />Aktif Yap
         </Button>
         <Button size="sm" variant="destructive" onClick={() => onBulkAction("delete")}>
           <Trash2 className="w-4 h-4 mr-1" />Sil

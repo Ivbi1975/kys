@@ -63,8 +63,6 @@ export function BasketPanel({
   const [basketSortDir, setBasketSortDir] = useState<BasketSortDir>("asc");
   const [lastReturnResult, setLastReturnResult] = useState<ReturnToSourceResult | null>(null);
 
-  if (basketItems.length === 0 && emptyGroupsAfterTransfer.length === 0) return null;
-
   const localDonationItems = useMemo(() => localBasketItems.filter(b => b.type !== "animalGroup"), [localBasketItems]);
   const localAnimalGroupItems = useMemo(() => localBasketItems.filter(b => b.type === "animalGroup"), [localBasketItems]);
 
@@ -99,6 +97,8 @@ export function BasketPanel({
       return basketSortDir === "desc" ? -cmp : cmp;
     });
   }, [localDonationItems, basketSearch, basketSortKey, basketSortDir]);
+
+  if (basketItems.length === 0 && emptyGroupsAfterTransfer.length === 0) return null;
 
   const toggleBasketSelect = (donationId: string) => {
     setSelectedBasketIds(prev => {
