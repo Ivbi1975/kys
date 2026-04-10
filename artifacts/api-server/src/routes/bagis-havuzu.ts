@@ -885,17 +885,18 @@ router.get("/projects/:id/flagged-donations", asyncHandler(async (req, res) => {
 
   const donationIds = flaggedRows.map(d => d.id);
 
-  let groupInfoMap: Record<string, { groupId: string; animalNo: number }[]> = {};
+  let groupInfoMap: Record<string, { groupId: string; animalNo: number; slotIndex: number }[]> = {};
   if (donationIds.length > 0) {
     const groupLinks = await db.execute(sql`
-      SELECT agd.donation_id, agd.group_id, ag.animal_no
+      SELECT agd.donation_id, agd.group_id, ag.animal_no, agd.sort_order
       FROM animal_group_donations agd
       JOIN animal_groups ag ON ag.id = agd.group_id
       WHERE agd.donation_id IN (${sql.join(donationIds.map(id => sql`${id}`), sql`, `)})
+      ORDER BY ag.animal_no, agd.sort_order
     `);
-    for (const row of groupLinks.rows as { donation_id: string; group_id: string; animal_no: number }[]) {
+    for (const row of groupLinks.rows as { donation_id: string; group_id: string; animal_no: number; sort_order: number }[]) {
       if (!groupInfoMap[row.donation_id]) groupInfoMap[row.donation_id] = [];
-      groupInfoMap[row.donation_id].push({ groupId: row.group_id, animalNo: row.animal_no });
+      groupInfoMap[row.donation_id].push({ groupId: row.group_id, animalNo: row.animal_no, slotIndex: row.sort_order });
     }
   }
 

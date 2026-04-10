@@ -28,7 +28,7 @@ export function GroupListPanel() {
     bulkGroupEditOpen, bulkGroupEditValue, bulkMoveTargetGroup, bulkMoveToGroup,
     bulkRemoveFromGroups, cancelSwap, cleanEmptyGroups, collapseAll, collapsedGroups,
     colorTagFilter, columnHeaderLabel, columnHeaderWidth,
-    currentGroupMatches, deleteAnimalGroup, donorListVisible,
+    currentGroupMatches, deleteAnimalGroup, donorListVisible, handleFlagDonation, handleUnflagDonation,
     dragItem, dragOverGroup, dragOverItem, effectiveColumnCount, enhancedRemoveFromGroup,
     expandAll, filteredGroupItems,
     fullscreenMode, groupCinsFilter, groupRows,
@@ -104,6 +104,7 @@ export function GroupListPanel() {
         onToggleGroupDonationSelect={toggleGroupDonationSelect}
         onSelectAllGroupDonations={handleSelectAllGroupDonations}
         onBasketDrop={placeBasketItemInGroup}
+        onFlagDonation={handleFlagDonation} onUnflagDonation={handleUnflagDonation}
         columnHeaderLabel={columnHeaderLabel} columnHeaderWidth={columnHeaderWidth}
       />
     );
@@ -116,7 +117,7 @@ export function GroupListPanel() {
     handleAssignTeam, handleViewPhotos, updateGroupDonation, handleGroupCellTab,
     handleToggleBasketItem, handleSwapSelect, enhancedRemoveFromGroup, updateGroupNotes,
     handleDragStart, handleDragOver, handleDrop, handleDragEnd, handleDragOverCard, handleDragLeave,
-    toggleGroupDonationSelect, handleSelectAllGroupDonations, placeBasketItemInGroup, columnHeaderLabel, columnHeaderWidth,
+    toggleGroupDonationSelect, handleSelectAllGroupDonations, placeBasketItemInGroup, handleFlagDonation, handleUnflagDonation, columnHeaderLabel, columnHeaderWidth,
   ]);
 
   if (!kesim) return null;

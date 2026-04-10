@@ -125,7 +125,7 @@ export default function SorunluBagislarPage() {
             aiCategories: [],
             kesimAlaniId: e.kesimAlaniId,
             kesimAlaniName: e.kesimAlaniName,
-            groups: e.animalGroupId ? [{ groupId: e.animalGroupId, animalNo: e.animalGroupNo ?? 0 }] : [],
+            groups: e.animalGroupId ? [{ groupId: e.animalGroupId, animalNo: e.animalGroupNo ?? 0, slotIndex: 0 }] : [],
             problemType: "conflict",
             conflictInfo: `Çatışma: ${c.displayName}`,
           });
@@ -176,9 +176,9 @@ export default function SorunluBagislarPage() {
 
     if (statusFilter !== "all") {
       if (statusFilter === "unresolved") {
-        result = result.filter(d => d.groups.length === 0);
-      } else if (statusFilter === "assigned") {
-        result = result.filter(d => d.groups.length > 0);
+        result = result.filter(d => d.isFlagged || (d.problemType === "conflict") || (d.problemType === "ai_warning" && !!d.aiWarnings));
+      } else if (statusFilter === "resolved") {
+        result = result.filter(d => !d.isFlagged && d.problemType !== "conflict" && !(d.problemType === "ai_warning" && d.aiWarnings));
       }
     }
 
@@ -294,7 +294,7 @@ export default function SorunluBagislarPage() {
             <SelectContent>
               <SelectItem value="all">Tüm Durumlar</SelectItem>
               <SelectItem value="unresolved">Çözülmemiş</SelectItem>
-              <SelectItem value="assigned">Gruba Atanmış</SelectItem>
+              <SelectItem value="resolved">Çözülmüş</SelectItem>
             </SelectContent>
           </Select>
           {(searchQuery || typeFilter !== "all" || kaFilter !== "all" || statusFilter !== "all") && (
@@ -356,7 +356,7 @@ export default function SorunluBagislarPage() {
                     const locationParts = [d.kesimAlaniName];
                     if (d.groups.length > 0) {
                       const g = d.groups[0];
-                      locationParts.push(`Hayvan #${g.animalNo}`);
+                      locationParts.push(`Hayvan #${g.animalNo} (Sıra ${g.slotIndex + 1})`);
                     } else {
                       locationParts.push("Grupsuz");
                     }

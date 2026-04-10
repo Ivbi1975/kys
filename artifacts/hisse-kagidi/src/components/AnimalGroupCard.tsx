@@ -75,6 +75,8 @@ interface AnimalGroupCardProps {
   onToggleGroupDonationSelect: (donationId: string) => void;
   onSelectAllGroupDonations: (donations: Donation[], allSelected: boolean) => void;
   onBasketDrop?: (donationId: string, targetGroupIdx: number, targetSlotIdx: number) => boolean;
+  onFlagDonation?: (id: string, reason: string) => void;
+  onUnflagDonation?: (id: string) => void;
 
   columnHeaderLabel: (key: ColumnKey) => string;
   columnHeaderWidth: (key: ColumnKey) => string;
@@ -104,6 +106,8 @@ const GroupDonationRow = memo(function GroupDonationRow({
   onDragEnd,
   onToggleSelect,
   onBasketDrop,
+  onFlagDonation,
+  onUnflagDonation,
 }: {
   donation: Donation;
   dIdx: number;
@@ -128,6 +132,8 @@ const GroupDonationRow = memo(function GroupDonationRow({
   onDragEnd: (e: React.DragEvent) => void;
   onToggleSelect: (donationId: string) => void;
   onBasketDrop?: (donationId: string, targetGroupIdx: number, targetSlotIdx: number) => boolean;
+  onFlagDonation?: (id: string, reason: string) => void;
+  onUnflagDonation?: (id: string) => void;
 }) {
   const d = donation;
   const cellPad = compact ? "p-0.5" : "p-1.5";
@@ -286,6 +292,36 @@ const GroupDonationRow = memo(function GroupDonationRow({
                   >
                     <Trash2 className={compact ? "w-2.5 h-2.5 text-destructive" : "w-3 h-3 text-destructive"} />
                   </Button>
+                  {d.isFlagged ? (
+                    onUnflagDonation && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`${compact ? "h-4 w-4" : "h-5 w-5"} p-0 text-amber-600`}
+                        onClick={() => onUnflagDonation(d.id)}
+                        title="İşareti kaldır"
+                        aria-label="İşareti kaldır"
+                      >
+                        <AlertTriangle className={compact ? "w-2.5 h-2.5" : "w-3 h-3"} />
+                      </Button>
+                    )
+                  ) : (
+                    onFlagDonation && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`${compact ? "h-4 w-4" : "h-5 w-5"} p-0 text-muted-foreground hover:text-amber-600`}
+                        onClick={() => {
+                          const reason = window.prompt("Sorun açıklaması:");
+                          if (reason?.trim()) onFlagDonation(d.id, reason.trim());
+                        }}
+                        title="Sorunlu işaretle"
+                        aria-label="Sorunlu işaretle"
+                      >
+                        <AlertTriangle className={compact ? "w-2.5 h-2.5" : "w-3 h-3"} />
+                      </Button>
+                    )
+                  )}
                 </>
               )}
             </div>
@@ -303,6 +339,8 @@ const GroupDonationRow = memo(function GroupDonationRow({
           ? "bg-primary/20 shadow-inner"
           : isSearchMatch
           ? "bg-yellow-100 dark:bg-yellow-900/40"
+          : d.isFlagged
+          ? "bg-amber-50 dark:bg-amber-950/30"
           : selectedGroupDonations.has(d.id)
           ? "bg-blue-50 dark:bg-blue-950/40"
           : "hover:bg-muted/20"
@@ -765,6 +803,8 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
                   onDragEnd={onDragEnd}
                   onToggleSelect={onToggleGroupDonationSelect}
                   onBasketDrop={props.onBasketDrop}
+                  onFlagDonation={props.onFlagDonation}
+                  onUnflagDonation={props.onUnflagDonation}
                 />
               ))}
             </tbody>

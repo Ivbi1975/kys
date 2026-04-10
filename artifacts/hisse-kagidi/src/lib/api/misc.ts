@@ -259,7 +259,7 @@ export interface FlaggedDonation {
   aiCategories: string[];
   kesimAlaniId: string;
   kesimAlaniName: string;
-  groups: { groupId: string; animalNo: number }[];
+  groups: { groupId: string; animalNo: number; slotIndex: number }[];
   problemType: "manual" | "ai_warning";
 }
 
