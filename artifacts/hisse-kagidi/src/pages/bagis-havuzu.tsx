@@ -11,9 +11,10 @@ import {
 } from "lucide-react";
 import {
   fetchPoolDonations, fetchPoolStats,
-  bulkActionDonations, classifyNotesAsync,
+  bulkActionDonations, bulkTagDonations, classifyNotesAsync,
   fetchJobStatus, fetchProjects, saveAiClassifications,
   transferDonationsToKA, createKesimAlani,
+  fetchTags, createTag,
 } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -24,7 +25,9 @@ import { PoolFilters } from "./bagis-havuzu/PoolFilters";
 import { PoolBulkActions } from "./bagis-havuzu/PoolBulkActions";
 import { TransferDialog } from "./bagis-havuzu/TransferDialog";
 import { ImportWizard } from "./bagis-havuzu/ImportWizard";
+import { BulkTagDialog } from "./bagis-havuzu/BulkTagDialog";
 import { ALL_TABLE_COLUMNS, PAGE_SIZE, type TableColumnKey } from "./bagis-havuzu/types";
+import type { CustomTag } from "@/lib/types";
 
 function parseUrlMulti(val: string | null): string[] {
   if (!val) return [];
@@ -59,6 +62,7 @@ export default function BagisHavuzuPage() {
   const [gunTalebiFilter, setGunTalebiFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("gun")));
   const [ilkHayvanFilter, setIlkHayvanFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("hayvan")));
   const [safiFilter, setSafiFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("safi")));
+  const [tagFilter, setTagFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("tags")));
   const [notesFilter, setNotesFilter] = useState(() => urlParams.get("notes") || "");
   const [page, setPage] = useState(() => Number(urlParams.get("p")) || 0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -78,6 +82,7 @@ export default function BagisHavuzuPage() {
 
   const [importOpen, setImportOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [transferTarget, setTransferTarget] = useState("");
   const [transferring, setTransferring] = useState(false);
   const [newListName, setNewListName] = useState("");
@@ -140,6 +145,7 @@ export default function BagisHavuzuPage() {
     if (gunTalebiFilter.length) p.set("gun", serializeMulti(gunTalebiFilter));
     if (ilkHayvanFilter.length) p.set("hayvan", serializeMulti(ilkHayvanFilter));
     if (safiFilter.length) p.set("safi", serializeMulti(safiFilter));
+    if (tagFilter.length) p.set("tags", serializeMulti(tagFilter));
     if (notesFilter) p.set("notes", notesFilter);
     if (sortBy !== "sortOrder") p.set("sort", sortBy);
     if (sortDir !== "asc") p.set("dir", sortDir);
@@ -147,12 +153,12 @@ export default function BagisHavuzuPage() {
     const qs = p.toString();
     const newUrl = `/bagis-havuzu/${projectId}${qs ? `?${qs}` : ""}`;
     window.history.replaceState(null, "", import.meta.env.BASE_URL.replace(/\/$/, "") + newUrl);
-  }, [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, notesFilter, sortBy, sortDir, page, projectId]);
+  }, [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter, notesFilter, sortBy, sortDir, page, projectId]);
 
   const activeFilterCount = [
     debouncedSearch, statusFilter, kesimAlaniFilter, aiCategoryFilter, notesFilter,
   ].filter(Boolean).length
-  + [donationTypeFilter, birimFilter, temsilciFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter].filter(a => a.length > 0).length;
+  + [donationTypeFilter, birimFilter, temsilciFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter].filter(a => a.length > 0).length;
 
   const filters = useMemo(() => ({
     search: debouncedSearch || undefined,
@@ -168,12 +174,13 @@ export default function BagisHavuzuPage() {
     gunTalebi: gunTalebiFilter.length ? serializeMulti(gunTalebiFilter) : undefined,
     ilkHayvan: ilkHayvanFilter.length ? serializeMulti(ilkHayvanFilter) : undefined,
     safi: safiFilter.length ? serializeMulti(safiFilter) : undefined,
+    tagIds: tagFilter.length ? serializeMulti(tagFilter) : undefined,
     notesFilter: notesFilter || undefined,
     sortBy: sortBy !== "sortOrder" ? sortBy : undefined,
     sortDir: sortDir !== "asc" ? sortDir : undefined,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
-  }), [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, notesFilter, sortBy, sortDir, page]);
+  }), [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter, notesFilter, sortBy, sortDir, page]);
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["pool-donations", projectId, filters],
@@ -186,6 +193,11 @@ export default function BagisHavuzuPage() {
     queryKey: ["pool-stats", projectId],
     queryFn: () => fetchPoolStats(projectId),
     enabled: !!projectId,
+  });
+
+  const { data: globalTags = [] } = useQuery({
+    queryKey: ["tags"],
+    queryFn: fetchTags,
   });
 
   const { data: projects } = useQuery({
@@ -235,6 +247,7 @@ export default function BagisHavuzuPage() {
     setGunTalebiFilter([]);
     setIlkHayvanFilter([]);
     setSafiFilter([]);
+    setTagFilter([]);
     setNotesFilter("");
     setPage(0);
   }, []);
@@ -285,6 +298,32 @@ export default function BagisHavuzuPage() {
       toast({ title: "İşlem başarısız", description: err instanceof Error ? err.message : "Hata", variant: "destructive" });
     }
   }, [effectiveSelectedIds, projectId, toast, invalidatePool]);
+
+  const handleBulkTag = useCallback(async (tagId: string, action: "add" | "remove") => {
+    const ids = [...effectiveSelectedIds];
+    if (ids.length === 0) return;
+    try {
+      const result = await bulkTagDonations(projectId, ids, tagId, action);
+      const tagName = globalTags.find(t => t.id === tagId)?.name || tagId;
+      toast({ title: `${result.affected} bağışa "${tagName}" etiketi ${action === "add" ? "eklendi" : "kaldırıldı"}` });
+      setSelectedIds(new Set());
+      setSelectAllPages(false);
+      invalidatePool();
+    } catch (err) {
+      toast({ title: "Etiketleme başarısız", description: err instanceof Error ? err.message : "Hata", variant: "destructive" });
+    }
+  }, [effectiveSelectedIds, projectId, globalTags, toast, invalidatePool]);
+
+  const handleCreateTag = useCallback(async (name: string, color: string): Promise<CustomTag | null> => {
+    try {
+      const newTag = await createTag({ id: crypto.randomUUID(), name, color });
+      queryClient.invalidateQueries({ queryKey: ["tags"] });
+      return newTag;
+    } catch (err) {
+      toast({ title: "Etiket oluşturulamadı", description: err instanceof Error ? err.message : "Hata", variant: "destructive" });
+      return null;
+    }
+  }, [queryClient, toast]);
 
   const handleTransfer = useCallback(async () => {
     const ids = [...effectiveSelectedIds];
@@ -536,11 +575,13 @@ export default function BagisHavuzuPage() {
             gunTalebiFilter={gunTalebiFilter} setGunTalebiFilter={v => { setGunTalebiFilter(v); setPage(0); }}
             ilkHayvanFilter={ilkHayvanFilter} setIlkHayvanFilter={v => { setIlkHayvanFilter(v); setPage(0); }}
             safiFilter={safiFilter} setSafiFilter={v => { setSafiFilter(v); setPage(0); }}
+            tagFilter={tagFilter} setTagFilter={v => { setTagFilter(v); setPage(0); }}
             notesFilter={notesFilter} setNotesFilter={v => { setNotesFilter(v); setPage(0); }}
             sortBy={sortBy} setSortBy={v => { setSortBy(v); setPage(0); }}
             sortDir={sortDir} setSortDir={setSortDir}
             stats={stats}
             kesimAlanlari={kesimAlanlari}
+            globalTags={globalTags}
           />
         )}
 
@@ -632,6 +673,7 @@ export default function BagisHavuzuPage() {
           selectedCount={effectiveSelectedIds.size}
           onTransferOpen={() => setTransferOpen(true)}
           onBulkAction={handleBulkAction}
+          onTagOpen={() => setTagDialogOpen(true)}
           onClearSelection={() => { setSelectedIds(new Set()); setSelectAllPages(false); }}
         />
 
@@ -656,6 +698,15 @@ export default function BagisHavuzuPage() {
           onOpenChange={setImportOpen}
           projectId={projectId}
           onSuccess={invalidatePool}
+        />
+
+        <BulkTagDialog
+          open={tagDialogOpen}
+          onOpenChange={setTagDialogOpen}
+          tags={globalTags}
+          selectedCount={effectiveSelectedIds.size}
+          onTag={handleBulkTag}
+          onCreateTag={handleCreateTag}
         />
       </div>
     </div>

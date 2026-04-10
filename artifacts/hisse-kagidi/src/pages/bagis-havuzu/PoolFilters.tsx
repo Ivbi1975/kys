@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { X, Plus, ChevronDown, Check } from "lucide-react";
-import type { PoolStats } from "@/lib/types";
+import type { PoolStats, CustomTag } from "@/lib/types";
 
 interface PoolFiltersProps {
   statusFilter: string;
@@ -31,6 +31,8 @@ interface PoolFiltersProps {
   setIlkHayvanFilter: (v: string[]) => void;
   safiFilter: string[];
   setSafiFilter: (v: string[]) => void;
+  tagFilter: string[];
+  setTagFilter: (v: string[]) => void;
   notesFilter: string;
   setNotesFilter: (v: string) => void;
   sortBy: string;
@@ -39,6 +41,7 @@ interface PoolFiltersProps {
   setSortDir: (fn: (d: "asc" | "desc") => "asc" | "desc") => void;
   stats: PoolStats | undefined;
   kesimAlanlari: { id: string; name: string }[];
+  globalTags: CustomTag[];
 }
 
 function MultiSelectDropdown({
@@ -48,7 +51,7 @@ function MultiSelectDropdown({
   onChange,
 }: {
   label: string;
-  options: { value: string; count?: number }[];
+  options: { value: string; count?: number; label?: string; color?: string }[];
   selected: string[];
   onChange: (v: string[]) => void;
 }) {
@@ -76,9 +79,14 @@ function MultiSelectDropdown({
     onChange(selected.includes(val) ? selected.filter(s => s !== val) : [...selected, val]);
   }, [selected, onChange]);
 
-  const filtered = options.filter(o =>
-    !filterText || o.value.toLocaleLowerCase("tr").includes(filterText.toLocaleLowerCase("tr"))
-  );
+  const optMap = new Map(options.map(o => [o.value, o]));
+  const getDisplay = (val: string) => optMap.get(val)?.label || val;
+
+  const filtered = options.filter(o => {
+    if (!filterText) return true;
+    const text = (o.label || o.value).toLocaleLowerCase("tr");
+    return text.includes(filterText.toLocaleLowerCase("tr"));
+  });
 
   return (
     <div className="relative" ref={ref}>
@@ -110,6 +118,7 @@ function MultiSelectDropdown({
             )}
             {filtered.map(opt => {
               const isChecked = selected.includes(opt.value);
+              const displayText = opt.label || opt.value;
               return (
                 <button
                   key={opt.value}
@@ -119,7 +128,10 @@ function MultiSelectDropdown({
                   <span className={`flex-shrink-0 w-4 h-4 border rounded flex items-center justify-center ${isChecked ? "bg-primary border-primary text-primary-foreground" : "border-input"}`}>
                     {isChecked && <Check className="w-3 h-3" />}
                   </span>
-                  <span className="truncate flex-1">{opt.value}</span>
+                  {opt.color && (
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: opt.color }} />
+                  )}
+                  <span className="truncate flex-1">{displayText}</span>
                   {opt.count !== undefined && (
                     <span className="text-muted-foreground ml-1 flex-shrink-0">{opt.count}</span>
                   )}
@@ -141,12 +153,17 @@ function MultiSelectDropdown({
       )}
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-0.5 mt-1">
-          {selected.slice(0, 3).map(s => (
-            <Badge key={s} variant="secondary" className="text-[10px] h-4 px-1 flex items-center gap-0.5">
-              {s.length > 12 ? s.slice(0, 12) + "…" : s}
-              <button onClick={() => toggle(s)} className="hover:text-destructive ml-0.5"><X className="w-2.5 h-2.5" /></button>
-            </Badge>
-          ))}
+          {selected.slice(0, 3).map(s => {
+            const disp = getDisplay(s);
+            const col = optMap.get(s)?.color;
+            return (
+              <Badge key={s} variant="secondary" className="text-[10px] h-4 px-1 flex items-center gap-0.5">
+                {col && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: col }} />}
+                {disp.length > 12 ? disp.slice(0, 12) + "…" : disp}
+                <button onClick={() => toggle(s)} className="hover:text-destructive ml-0.5"><X className="w-2.5 h-2.5" /></button>
+              </Badge>
+            );
+          })}
           {selected.length > 3 && (
             <Badge variant="outline" className="text-[10px] h-4 px-1">+{selected.length - 3}</Badge>
           )}
@@ -217,11 +234,13 @@ export function PoolFilters({
   gunTalebiFilter, setGunTalebiFilter,
   ilkHayvanFilter, setIlkHayvanFilter,
   safiFilter, setSafiFilter,
+  tagFilter, setTagFilter,
   notesFilter, setNotesFilter,
   sortBy, setSortBy,
   sortDir, setSortDir,
   stats,
   kesimAlanlari,
+  globalTags,
 }: PoolFiltersProps) {
   return (
     <div className="mb-3 p-3 border rounded-lg bg-muted/30 space-y-3">
@@ -323,6 +342,15 @@ export function PoolFilters({
             options={stats.safiDistribution.map(s => ({ value: s.safi, count: s.count }))}
             selected={safiFilter}
             onChange={setSafiFilter}
+          />
+        )}
+
+        {globalTags.length > 0 && (
+          <MultiSelectDropdown
+            label="Etiket"
+            options={globalTags.map(t => ({ value: t.id, count: undefined, label: t.name, color: t.color }))}
+            selected={tagFilter}
+            onChange={setTagFilter}
           />
         )}
 

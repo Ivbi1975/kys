@@ -5,6 +5,7 @@ import {
   kesimAlanlariTable,
   donationsTable,
   donationTagsTable,
+  customTagsTable,
   animalGroupDonationsTable,
 } from "@workspace/db/schema";
 import { eq, isNull, and, sql, inArray, ilike, or, asc } from "drizzle-orm";
@@ -40,6 +41,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   const gunTalebiValues = parseMultiValue(req.query.gunTalebi);
   const ilkHayvanValues = parseMultiValue(req.query.ilkHayvan);
   const safiValues = parseMultiValue(req.query.safi);
+  const tagIdValues = parseMultiValue(req.query.tagIds);
   const notesFilter = typeof req.query.notesFilter === "string" ? req.query.notesFilter.trim() : "";
   const sortByRaw = typeof req.query.sortBy === "string" ? req.query.sortBy : "sortOrder";
   const sortDir = typeof req.query.sortDir === "string" && req.query.sortDir === "desc" ? "desc" : "asc";
@@ -112,6 +114,15 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   if (safiValues.length === 1) conditions.push(eq(donationsTable.safi, safiValues[0]));
   else if (safiValues.length > 1) conditions.push(inArray(donationsTable.safi, safiValues));
 
+  if (tagIdValues.length > 0) {
+    conditions.push(
+      sql`${donationsTable.id} IN (
+        SELECT dt.donation_id FROM donation_tags dt
+        WHERE dt.tag_id IN (${sql.join(tagIdValues.map(t => sql`${t}`), sql`, `)})
+      )`
+    );
+  }
+
   if (status === "excluded") {
     conditions.push(eq(donationsTable.excluded, true));
   } else if (status === "active") {
@@ -150,7 +161,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     notes: "notes",
   };
 
-  const sortKeys = sortByRaw.split(",").map(s => s.trim()).filter(Boolean).slice(0, 3);
+  const sortKeys = sortByRaw.split(",").map((s: string) => s.trim()).filter(Boolean).slice(0, 3);
   const sortParts: ReturnType<typeof sql>[] = [];
   const usedCols = new Set<string>();
   for (const key of sortKeys) {
@@ -733,6 +744,80 @@ router.post("/projects/:id/donations/vekalet-check", asyncHandler(async (req, re
   }
 
   res.json({ conflicts: allConflicts });
+}));
+
+const bulkTagSchema = z.object({
+  donationIds: z.array(z.string()).min(1).max(50000),
+  tagId: z.string().min(1),
+  action: z.enum(["add", "remove"]).default("add"),
+});
+
+router.post("/projects/:id/donations/bulk-tag", asyncHandler(async (req, res) => {
+  const projectId = req.params.id;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const parsed = bulkTagSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
+    return;
+  }
+
+  const { donationIds, tagId, action } = parsed.data;
+
+  const [tag] = await db.select().from(customTagsTable).where(eq(customTagsTable.id, tagId));
+  if (!tag) {
+    res.status(404).json({ error: "Etiket bulunamadı" });
+    return;
+  }
+
+  const projectKAIds = await db.select({ id: kesimAlanlariTable.id })
+    .from(kesimAlanlariTable)
+    .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
+  const validKAIds = projectKAIds.map(k => k.id);
+
+  if (validKAIds.length === 0) {
+    res.json({ success: true, affected: 0 });
+    return;
+  }
+
+  let affected = 0;
+  const CHUNK = 500;
+
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < donationIds.length; i += CHUNK) {
+      const chunk = donationIds.slice(i, i + CHUNK);
+      const validDonations = await tx.select({ id: donationsTable.id })
+        .from(donationsTable)
+        .where(and(
+          inArray(donationsTable.id, chunk),
+          inArray(donationsTable.kesimAlaniId, validKAIds),
+          isNull(donationsTable.deletedAt),
+        ));
+
+      const validIds = validDonations.map(d => d.id);
+      if (validIds.length === 0) continue;
+
+      if (action === "add") {
+        const values = validIds.map(donationId => ({ donationId, tagId }));
+        const result = await tx.insert(donationTagsTable)
+          .values(values)
+          .onConflictDoNothing()
+          .returning({ donationId: donationTagsTable.donationId });
+        affected += result.length;
+      } else {
+        const result = await tx.delete(donationTagsTable)
+          .where(and(
+            inArray(donationTagsTable.donationId, validIds),
+            eq(donationTagsTable.tagId, tagId),
+          ))
+          .returning({ donationId: donationTagsTable.donationId });
+        affected += result.length;
+      }
+    }
+  });
+
+  res.json({ success: true, affected });
 }));
 
 export default router;

@@ -22,6 +22,7 @@ export interface PoolFilters {
   gunTalebi?: string;
   ilkHayvan?: string;
   safi?: string;
+  tagIds?: string;
   notesFilter?: string;
   sortBy?: string;
   sortDir?: "asc" | "desc";
@@ -44,6 +45,7 @@ export async function fetchPoolDonations(projectId: string, filters: PoolFilters
   if (filters.gunTalebi) params.set("gunTalebi", filters.gunTalebi);
   if (filters.ilkHayvan) params.set("ilkHayvan", filters.ilkHayvan);
   if (filters.safi) params.set("safi", filters.safi);
+  if (filters.tagIds) params.set("tagIds", filters.tagIds);
   if (filters.notesFilter) params.set("notesFilter", filters.notesFilter);
   if (filters.sortBy) params.set("sortBy", filters.sortBy);
   if (filters.sortDir) params.set("sortDir", filters.sortDir);
@@ -111,6 +113,18 @@ export async function bulkActionDonations(projectId: string, donationIds: string
   return apiFetch<{ success: boolean; affected: number }>(`/projects/${projectId}/donations/bulk-action`, {
     method: "POST",
     body: JSON.stringify({ donationIds, action }),
+  });
+}
+
+export async function bulkTagDonations(
+  projectId: string,
+  donationIds: string[],
+  tagId: string,
+  action: "add" | "remove" = "add",
+): Promise<{ success: boolean; affected: number }> {
+  return apiFetch<{ success: boolean; affected: number }>(`/projects/${projectId}/donations/bulk-tag`, {
+    method: "POST",
+    body: JSON.stringify({ donationIds, tagId, action }),
   });
 }
 
