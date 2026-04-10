@@ -109,9 +109,11 @@ export default function SorunluBagislarPage() {
       });
     }
 
+    const seenConflictIds = new Set(items.map(i => i.id));
     for (const c of conflicts) {
       for (const e of c.entries) {
-        if (!items.some(i => i.id === e.donationId)) {
+        if (!seenConflictIds.has(e.donationId)) {
+          seenConflictIds.add(e.donationId);
           result.push({
             id: e.donationId,
             name: e.donationName,

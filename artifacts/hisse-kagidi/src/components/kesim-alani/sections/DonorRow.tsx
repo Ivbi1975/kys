@@ -165,8 +165,8 @@ function DonorRowOverflowMenu({
                   value={flagReasonInput}
                   onChange={(e) => setFlagReasonInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      onFlagDonation(d.id, flagReasonInput);
+                    if (e.key === "Enter" && flagReasonInput.trim()) {
+                      onFlagDonation(d.id, flagReasonInput.trim());
                       setFlagReasonInput("");
                       setShowFlagInput(false);
                       setOpen(false);
@@ -176,8 +176,9 @@ function DonorRowOverflowMenu({
                 />
                 <div className="flex gap-1">
                   <button
-                    className="flex-1 text-center px-1 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors"
-                    onClick={() => { onFlagDonation(d.id, flagReasonInput); setFlagReasonInput(""); setShowFlagInput(false); setOpen(false); }}
+                    className="flex-1 text-center px-1 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors disabled:opacity-50"
+                    disabled={!flagReasonInput.trim()}
+                    onClick={() => { onFlagDonation(d.id, flagReasonInput.trim()); setFlagReasonInput(""); setShowFlagInput(false); setOpen(false); }}
                   >
                     İşaretle
                   </button>
