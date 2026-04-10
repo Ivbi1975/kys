@@ -53,6 +53,7 @@ export function GroupListPanel() {
     toggleGroupCollapse, toggleGroupDonationSelect, toggleGroupLock, toggleGroupSelect,
     updateGroupDonation, updateGroupNotes, workspace, addGroupToBasket,
     addWholeAnimalToBasket, basketAnimalGroupIds,
+    placeBasketItemInGroup,
   } = ctx;
 
   const [groupSearchInput, setGroupSearchInput] = useState("");
@@ -102,6 +103,7 @@ export function GroupListPanel() {
         onDragEnd={handleDragEnd} onDragOverCard={handleDragOverCard} onDragLeaveCard={handleDragLeave}
         onToggleGroupDonationSelect={toggleGroupDonationSelect}
         onSelectAllGroupDonations={handleSelectAllGroupDonations}
+        onBasketDrop={placeBasketItemInGroup}
         columnHeaderLabel={columnHeaderLabel} columnHeaderWidth={columnHeaderWidth}
       />
     );
@@ -114,7 +116,7 @@ export function GroupListPanel() {
     handleAssignTeam, handleViewPhotos, updateGroupDonation, handleGroupCellTab,
     handleToggleBasketItem, handleSwapSelect, enhancedRemoveFromGroup, updateGroupNotes,
     handleDragStart, handleDragOver, handleDrop, handleDragEnd, handleDragOverCard, handleDragLeave,
-    toggleGroupDonationSelect, handleSelectAllGroupDonations, columnHeaderLabel, columnHeaderWidth,
+    toggleGroupDonationSelect, handleSelectAllGroupDonations, placeBasketItemInGroup, columnHeaderLabel, columnHeaderWidth,
   ]);
 
   if (!kesim) return null;

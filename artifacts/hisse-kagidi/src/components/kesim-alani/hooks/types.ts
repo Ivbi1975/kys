@@ -30,6 +30,7 @@ export interface BasketItem {
   sourceGroupId?: string;
   sourceGroupAnimalNo?: number;
   sourceSlotIndex?: number;
+  addedAt?: number;
   donationSnapshots?: Array<{
     id: string;
     name: string;

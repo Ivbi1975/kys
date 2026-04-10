@@ -73,6 +73,7 @@ interface AnimalGroupCardProps {
   onDragLeaveCard: (e: React.DragEvent, groupIdx: number) => void;
   onToggleGroupDonationSelect: (donationId: string) => void;
   onSelectAllGroupDonations: (donations: Donation[], allSelected: boolean) => void;
+  onBasketDrop?: (donationId: string, targetGroupIdx: number, targetSlotIdx: number) => boolean;
 
   columnHeaderLabel: (key: ColumnKey) => string;
   columnHeaderWidth: (key: ColumnKey) => string;
@@ -101,6 +102,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
   onDrop,
   onDragEnd,
   onToggleSelect,
+  onBasketDrop,
 }: {
   donation: Donation;
   dIdx: number;
@@ -124,6 +126,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
   onDrop: (groupIdx: number, donationIdx: number) => void;
   onDragEnd: (e: React.DragEvent) => void;
   onToggleSelect: (donationId: string) => void;
+  onBasketDrop?: (donationId: string, targetGroupIdx: number, targetSlotIdx: number) => boolean;
 }) {
   const d = donation;
   const cellPad = compact ? "p-0.5" : "p-1.5";
@@ -300,8 +303,20 @@ const GroupDonationRow = memo(function GroupDonationRow({
       } ${isDragSource ? "opacity-50 scale-95" : ""}`}
       draggable
       onDragStart={(e) => onDragStart(groupIdx, dIdx, e)}
-      onDragOver={(e) => onDragOver(e, groupIdx, dIdx)}
-      onDrop={() => onDrop(groupIdx, dIdx)}
+      onDragOver={(e) => { e.preventDefault(); onDragOver(e, groupIdx, dIdx); }}
+      onDrop={(e) => {
+        const basketData = e.dataTransfer.getData("application/basket-item");
+        if (basketData && onBasketDrop) {
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            const parsed = JSON.parse(basketData);
+            onBasketDrop(parsed.donationId, groupIdx, dIdx);
+          } catch {}
+          return;
+        }
+        onDrop(groupIdx, dIdx);
+      }}
       onDragEnd={onDragEnd}
     >
       <td className={compact ? "p-0.5" : "p-1.5"}>
@@ -563,6 +578,17 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
       style={group.colorTag ? { borderLeft: `4px solid ${COLOR_MAP[group.colorTag]}` } : (highlightIncomplete && isIncomplete ? { borderLeft: "4px solid #f97316" } : {})}
       onDragOver={(e) => { e.preventDefault(); onDragOverCard(e, groupIdx); }}
       onDragLeave={(e) => onDragLeaveCard(e, groupIdx)}
+      onDrop={(e) => {
+        const basketData = e.dataTransfer.getData("application/basket-item");
+        if (basketData && props.onBasketDrop) {
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            const parsed = JSON.parse(basketData);
+            props.onBasketDrop(parsed.donationId, groupIdx, 0);
+          } catch {}
+        }
+      }}
     >
       <div
         className={`flex items-center justify-between ${compact ? "p-2" : "p-3"} ${group.locked ? "bg-amber-500/10" : "bg-primary/10"} cursor-pointer`}
@@ -732,6 +758,7 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
                   onDrop={onDrop}
                   onDragEnd={onDragEnd}
                   onToggleSelect={onToggleGroupDonationSelect}
+                  onBasketDrop={props.onBasketDrop}
                 />
               ))}
             </tbody>

@@ -1,14 +1,18 @@
-import { useState, useMemo } from "react";
-import type { KesimAlani, Donation } from "@/lib/types";
+import { useState, useMemo, useEffect } from "react";
+import type { KesimAlani } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpDown, ChevronUp, CornerDownLeft, ListPlus, Loader2, MoveRight, Package, Search, Send, ShoppingBag, UserPlus, Wand2, X, ShoppingCart, ArrowRightLeft } from "lucide-react";
+import { ArrowUpDown, ChevronUp, ChevronLeft, ChevronRight, CornerDownLeft, Filter, ListPlus, Loader2, MoveRight, Package, Search, Send, ShoppingBag, UserPlus, Wand2, X, ShoppingCart, ArrowRightLeft, Clock, AlertTriangle, GripVertical } from "lucide-react";
 import { COLOR_MAP } from "@/lib/constants";
 import { computeEffectiveShares } from "@/lib/grouping";
 import type { BasketItem, ReturnToSourceResult, BasketSortKey, BasketSortDir } from "../hooks/types";
 
 type BasketTab = "contents" | "place" | "transfer";
+type GroupByMode = "none" | "cins" | "share" | "source";
+
+const ITEMS_PER_PAGE = 50;
+const TIMEOUT_WARNING_MS = 2 * 60 * 60 * 1000;
 
 interface BasketPanelProps {
   kesim: KesimAlani;
@@ -63,6 +67,19 @@ export function BasketPanel({
   const [basketSortDir, setBasketSortDir] = useState<BasketSortDir>("asc");
   const [lastReturnResult, setLastReturnResult] = useState<ReturnToSourceResult | null>(null);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [shareMin, setShareMin] = useState("");
+  const [shareMax, setShareMax] = useState("");
+  const [cinsFilter, setCinsFilter] = useState("");
+  const [groupByMode, setGroupByMode] = useState<GroupByMode>("none");
+  const [showFilters, setShowFilters] = useState(false);
+
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
   const localDonationItems = useMemo(() => localBasketItems.filter(b => b.type !== "animalGroup"), [localBasketItems]);
   const localAnimalGroupItems = useMemo(() => localBasketItems.filter(b => b.type === "animalGroup"), [localBasketItems]);
 
@@ -79,6 +96,14 @@ export function BasketPanel({
     return { basketTotalShares: total, basketAnimals: Math.ceil(total / 7) };
   }, [localDonationItems, localAnimalGroupItems, kesim.donations, kesim.animalGroups]);
 
+  const allCinsValues = useMemo(() => {
+    const set = new Set<string>();
+    for (const b of localDonationItems) {
+      if (b.donationType) set.add(b.donationType);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "tr"));
+  }, [localDonationItems]);
+
   const filteredLocalDonationItems = useMemo(() => {
     let items = localDonationItems;
     if (basketSearch.trim()) {
@@ -89,6 +114,17 @@ export function BasketPanel({
         (b.vekalet && b.vekalet.toLowerCase().includes(q))
       );
     }
+    if (shareMin) {
+      const min = parseInt(shareMin);
+      if (!isNaN(min)) items = items.filter(b => (b.donorShareCount || 1) >= min);
+    }
+    if (shareMax) {
+      const max = parseInt(shareMax);
+      if (!isNaN(max)) items = items.filter(b => (b.donorShareCount || 1) <= max);
+    }
+    if (cinsFilter) {
+      items = items.filter(b => b.donationType === cinsFilter);
+    }
     return [...items].sort((a, b) => {
       let cmp = 0;
       if (basketSortKey === "name") cmp = (a.description || a.name).localeCompare(b.description || b.name, "tr");
@@ -96,7 +132,31 @@ export function BasketPanel({
       else if (basketSortKey === "source") cmp = (a.sourceGroupAnimalNo || 0) - (b.sourceGroupAnimalNo || 0);
       return basketSortDir === "desc" ? -cmp : cmp;
     });
-  }, [localDonationItems, basketSearch, basketSortKey, basketSortDir]);
+  }, [localDonationItems, basketSearch, basketSortKey, basketSortDir, shareMin, shareMax, cinsFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLocalDonationItems.length / ITEMS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [totalPages, currentPage]);
+
+  const paginatedItems = useMemo(() => {
+    const start = (safePage - 1) * ITEMS_PER_PAGE;
+    return filteredLocalDonationItems.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredLocalDonationItems, safePage]);
+
+  const timedOutIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const b of localBasketItems) {
+      if (b.addedAt && (now - b.addedAt) >= TIMEOUT_WARNING_MS) {
+        ids.add(b.donationId);
+      }
+    }
+    return ids;
+  }, [localBasketItems, now]);
+
+  const timedOutCount = timedOutIds.size;
 
   if (basketItems.length === 0 && emptyGroupsAfterTransfer.length === 0) return null;
 
@@ -162,11 +222,217 @@ export function BasketPanel({
     }
   };
 
+  const handleBasketDragStart = (e: React.DragEvent, item: BasketItem) => {
+    e.dataTransfer.setData("application/basket-item", JSON.stringify({
+      donationId: item.donationId,
+      type: item.type,
+      name: item.description || item.name,
+    }));
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const isTimedOut = (item: BasketItem) => timedOutIds.has(item.donationId);
+
+  const formatTimeInBasket = (addedAt?: number) => {
+    if (!addedAt) return null;
+    const elapsed = now - addedAt;
+    const minutes = Math.floor(elapsed / 60_000);
+    if (minutes < 60) return `${minutes}dk`;
+    const hours = Math.floor(minutes / 60);
+    const remainMins = minutes % 60;
+    return `${hours}s ${remainMins}dk`;
+  };
+
+  const buildGroupedItems = (items: typeof filteredLocalDonationItems) => {
+    if (groupByMode === "none") {
+      const grouped: { key: string; label: string; items: typeof items }[] = [];
+      const seen = new Map<string, number>();
+      for (const b of items) {
+        const label = (b.description || b.name).trim();
+        const existing = seen.get(label);
+        if (existing !== undefined) {
+          grouped[existing].items.push(b);
+        } else {
+          seen.set(label, grouped.length);
+          grouped.push({ key: label, label, items: [b] });
+        }
+      }
+      return grouped;
+    }
+
+    const sections = new Map<string, typeof items>();
+    for (const b of items) {
+      let key: string;
+      if (groupByMode === "cins") key = b.donationType || "Belirtilmemiş";
+      else if (groupByMode === "share") key = `${b.donorShareCount || 1} Hisse`;
+      else key = b.sourceGroupAnimalNo ? `Hayvan ${b.sourceGroupAnimalNo}` : "Listeden";
+      if (!sections.has(key)) sections.set(key, []);
+      sections.get(key)!.push(b);
+    }
+
+    const grouped: { key: string; label: string; items: typeof items }[] = [];
+    for (const [sectionKey, sectionItems] of sections) {
+      const seen = new Map<string, number>();
+      for (const b of sectionItems) {
+        const label = (b.description || b.name).trim();
+        const existing = seen.get(`${sectionKey}::${label}`);
+        if (existing !== undefined) {
+          grouped[existing].items.push(b);
+        } else {
+          seen.set(`${sectionKey}::${label}`, grouped.length);
+          grouped.push({ key: `${sectionKey}::${label}`, label, items: [b] });
+        }
+      }
+    }
+    return grouped;
+  };
+
+  const groupedSections = useMemo(() => {
+    if (groupByMode === "none") return null;
+    const sections = new Map<string, typeof paginatedItems>();
+    for (const b of paginatedItems) {
+      let key: string;
+      if (groupByMode === "cins") key = b.donationType || "Belirtilmemiş";
+      else if (groupByMode === "share") key = `${b.donorShareCount || 1} Hisse`;
+      else key = b.sourceGroupAnimalNo ? `Hayvan ${b.sourceGroupAnimalNo}` : "Listeden";
+      if (!sections.has(key)) sections.set(key, []);
+      sections.get(key)!.push(b);
+    }
+    return sections;
+  }, [paginatedItems, groupByMode]);
+
   const tabs: { id: BasketTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: "contents", label: "Sepet İçeriği", icon: <ShoppingCart className="w-3.5 h-3.5" />, badge: selectedBasketIds.size > 0 ? `${selectedBasketIds.size} seçili` : undefined },
     { id: "place", label: "Yerleştir", icon: <Package className="w-3.5 h-3.5" /> },
     { id: "transfer", label: "Aktar", icon: <ArrowRightLeft className="w-3.5 h-3.5" /> },
   ];
+
+  const renderDonorChip = (b: BasketItem, groupKey?: string) => {
+    const totalShares = b.donorShareCount || 1;
+    const timed = isTimedOut(b);
+    const timeStr = formatTimeInBasket(b.addedAt);
+    return (
+      <span
+        key={groupKey || b.donationId}
+        draggable={b.type === "donation"}
+        onDragStart={b.type === "donation" ? (e) => handleBasketDragStart(e, b) : undefined}
+        className={`px-2 py-1 bg-white dark:bg-zinc-900 rounded-md text-xs inline-flex items-center gap-1.5 cursor-pointer transition-all border ${
+          selectedBasketIds.has(b.donationId)
+            ? "ring-2 ring-emerald-400 border-emerald-300"
+            : timed
+              ? "border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/40"
+              : "border-emerald-200 dark:border-emerald-800 hover:border-emerald-300"
+        }`}
+        onClick={() => toggleBasketSelect(b.donationId)}
+      >
+        {b.type === "donation" && <GripVertical className="w-3 h-3 text-muted-foreground/50 cursor-grab" />}
+        <input
+          type="checkbox"
+          className="rounded w-3 h-3"
+          checked={selectedBasketIds.has(b.donationId)}
+          onChange={() => toggleBasketSelect(b.donationId)}
+          onClick={e => e.stopPropagation()}
+        />
+        <span className="font-medium">{b.description || b.name}</span>
+        {totalShares > 1 && (
+          <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-100 dark:bg-violet-900/50 px-1 rounded">{totalShares}</span>
+        )}
+        {b.sourceGroupAnimalNo && <span className="text-[10px] text-amber-600 dark:text-amber-400">H{b.sourceGroupAnimalNo}</span>}
+        {timed && (
+          <span className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-0.5" title={`Sepette ${timeStr}`}>
+            <Clock className="w-2.5 h-2.5" />
+            {timeStr}
+          </span>
+        )}
+        <button onClick={(e) => { e.stopPropagation(); removeFromBasket(b.donationId); setSelectedBasketIds(prev => { const next = new Set(prev); next.delete(b.donationId); return next; }); }} className="ml-0.5 text-muted-foreground hover:text-red-500 transition-colors">
+          <X className="w-3 h-3" />
+        </button>
+      </span>
+    );
+  };
+
+  const renderGroupedChip = (g: { key: string; label: string; items: BasketItem[] }) => {
+    const allSelected = g.items.every(item => selectedBasketIds.has(item.donationId));
+    const anyTimedOut = g.items.some(item => isTimedOut(item));
+    const toggleGroup = () => {
+      setSelectedBasketIds(prev => {
+        const next = new Set(prev);
+        if (allSelected) {
+          g.items.forEach(item => next.delete(item.donationId));
+        } else {
+          g.items.forEach(item => next.add(item.donationId));
+        }
+        return next;
+      });
+    };
+    const totalShares = g.items.reduce((sum, item) => sum + (item.donorShareCount || 1), 0);
+    const firstItem = g.items[0];
+
+    return (
+      <span
+        key={g.key}
+        draggable={g.items.length === 1 && g.items[0].type === "donation"}
+        onDragStart={g.items.length === 1 && g.items[0].type === "donation" ? (e) => handleBasketDragStart(e, g.items[0]) : undefined}
+        className={`px-2 py-1 bg-white dark:bg-zinc-900 rounded-md text-xs inline-flex items-center gap-1.5 cursor-pointer transition-all border ${
+          allSelected
+            ? "ring-2 ring-emerald-400 border-emerald-300"
+            : anyTimedOut
+              ? "border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/40"
+              : "border-emerald-200 dark:border-emerald-800 hover:border-emerald-300"
+        }`}
+        onClick={toggleGroup}
+      >
+        {g.items.length === 1 && g.items[0].type === "donation" && <GripVertical className="w-3 h-3 text-muted-foreground/50 cursor-grab" />}
+        <input
+          type="checkbox"
+          className="rounded w-3 h-3"
+          checked={allSelected}
+          onChange={toggleGroup}
+          onClick={e => e.stopPropagation()}
+        />
+        <span className="font-medium">{g.label}</span>
+        {totalShares > 1 && (
+          <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-100 dark:bg-violet-900/50 px-1 rounded">{totalShares}</span>
+        )}
+        {g.items.length > 1 && <span className="text-emerald-500 font-semibold">&times;{g.items.length}</span>}
+        {firstItem?.sourceGroupAnimalNo && <span className="text-[10px] text-amber-600 dark:text-amber-400">H{firstItem.sourceGroupAnimalNo}</span>}
+        {anyTimedOut && <Clock className="w-2.5 h-2.5 text-amber-500" />}
+        <button onClick={(e) => { e.stopPropagation(); g.items.forEach(item => { removeFromBasket(item.donationId); setSelectedBasketIds(prev => { const next = new Set(prev); next.delete(item.donationId); return next; }); }); }} className="ml-0.5 text-muted-foreground hover:text-red-500 transition-colors">
+          <X className="w-3 h-3" />
+        </button>
+      </span>
+    );
+  };
+
+  const renderDonorChips = () => {
+    if (groupByMode !== "none" && groupedSections) {
+      return (
+        <div className="space-y-2">
+          {Array.from(groupedSections.entries()).map(([sectionKey, sectionItems]) => {
+            const grouped = buildGroupedItems(sectionItems);
+            return (
+              <div key={sectionKey} className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 p-2.5">
+                <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 mb-2">{sectionKey} ({sectionItems.length})</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {grouped.map(g => g.items.length === 1 ? renderDonorChip(g.items[0], g.key) : renderGroupedChip(g))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    const grouped = buildGroupedItems(paginatedItems);
+    return (
+      <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 p-2.5">
+        <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 mb-2">Bu Kesim Alanı</p>
+        <div className="flex flex-wrap gap-1.5">
+          {grouped.map(g => g.items.length === 1 ? renderDonorChip(g.items[0], g.key) : renderGroupedChip(g))}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -188,6 +454,12 @@ export function BasketPanel({
             </span>
           </div>
           <div className="flex items-center gap-1.5 ml-auto mr-2">
+            {timedOutCount > 0 && (
+              <span className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                {timedOutCount} bekliyor
+              </span>
+            )}
             {foreignBasketItems.length > 0 && (
               <span className="text-[11px] text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded-full font-semibold">
                 {foreignBasketItems.length} diğer KA
@@ -261,41 +533,103 @@ export function BasketPanel({
                         </div>
                       </div>
                       {localDonationItems.length > 5 && (
-                        <div className="flex items-center gap-2">
-                          <div className="relative flex-1">
-                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                            <Input
-                              className="h-7 text-xs pl-7 pr-2"
-                              placeholder="Sepette ara..."
-                              value={basketSearch}
-                              onChange={(e) => setBasketSearch(e.target.value)}
-                            />
-                            {basketSearch && (
-                              <button className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => setBasketSearch("")}>
-                                <X className="w-3 h-3 text-muted-foreground hover:text-foreground" />
-                              </button>
-                            )}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="relative flex-1">
+                              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                              <Input
+                                className="h-7 text-xs pl-7 pr-2"
+                                placeholder="Sepette ara..."
+                                value={basketSearch}
+                                onChange={(e) => { setBasketSearch(e.target.value); setCurrentPage(1); }}
+                              />
+                              {basketSearch && (
+                                <button className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => { setBasketSearch(""); setCurrentPage(1); }}>
+                                  <X className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                                </button>
+                              )}
+                            </div>
+                            <Button
+                              variant={showFilters ? "default" : "outline"}
+                              size="sm"
+                              className="h-7 text-xs"
+                              onClick={() => setShowFilters(f => !f)}
+                            >
+                              <Filter className="w-3 h-3 mr-1" />
+                              Filtre
+                            </Button>
+                            <Select value={basketSortKey} onValueChange={(v) => setBasketSortKey(v as BasketSortKey)}>
+                              <SelectTrigger className="h-7 w-24 text-xs">
+                                <ArrowUpDown className="w-3 h-3 mr-1" />
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent side="top">
+                                <SelectItem value="name">Ad</SelectItem>
+                                <SelectItem value="type">Tür</SelectItem>
+                                <SelectItem value="source">Kaynak</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => setBasketSortDir(d => d === "asc" ? "desc" : "asc")}
+                              title={basketSortDir === "asc" ? "Artan" : "Azalan"}
+                            >
+                              <ArrowUpDown className={`w-3.5 h-3.5 ${basketSortDir === "desc" ? "rotate-180" : ""}`} />
+                            </Button>
                           </div>
-                          <Select value={basketSortKey} onValueChange={(v) => setBasketSortKey(v as BasketSortKey)}>
-                            <SelectTrigger className="h-7 w-24 text-xs">
-                              <ArrowUpDown className="w-3 h-3 mr-1" />
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent side="top">
-                              <SelectItem value="name">Ad</SelectItem>
-                              <SelectItem value="type">Tür</SelectItem>
-                              <SelectItem value="source">Kaynak</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={() => setBasketSortDir(d => d === "asc" ? "desc" : "asc")}
-                            title={basketSortDir === "asc" ? "Artan" : "Azalan"}
-                          >
-                            <ArrowUpDown className={`w-3.5 h-3.5 ${basketSortDir === "desc" ? "rotate-180" : ""}`} />
-                          </Button>
+                          {showFilters && (
+                            <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/40 border">
+                              <div className="flex items-center gap-1">
+                                <span className="text-[11px] text-muted-foreground whitespace-nowrap">Hisse:</span>
+                                <Input
+                                  className="h-6 w-14 text-xs px-1.5"
+                                  placeholder="Min"
+                                  type="number"
+                                  value={shareMin}
+                                  onChange={(e) => { setShareMin(e.target.value); setCurrentPage(1); }}
+                                />
+                                <span className="text-[11px] text-muted-foreground">-</span>
+                                <Input
+                                  className="h-6 w-14 text-xs px-1.5"
+                                  placeholder="Max"
+                                  type="number"
+                                  value={shareMax}
+                                  onChange={(e) => { setShareMax(e.target.value); setCurrentPage(1); }}
+                                />
+                              </div>
+                              {allCinsValues.length > 0 && (
+                                <Select value={cinsFilter} onValueChange={(v) => { setCinsFilter(v === "__all__" ? "" : v); setCurrentPage(1); }}>
+                                  <SelectTrigger className="h-6 w-28 text-xs">
+                                    <SelectValue placeholder="Cins" />
+                                  </SelectTrigger>
+                                  <SelectContent side="top">
+                                    <SelectItem value="__all__">Tümü</SelectItem>
+                                    {allCinsValues.map(c => (
+                                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                              <Select value={groupByMode} onValueChange={(v) => setGroupByMode(v as GroupByMode)}>
+                                <SelectTrigger className="h-6 w-28 text-xs">
+                                  <SelectValue placeholder="Grupla" />
+                                </SelectTrigger>
+                                <SelectContent side="top">
+                                  <SelectItem value="none">Grupsuz</SelectItem>
+                                  <SelectItem value="cins">Cins</SelectItem>
+                                  <SelectItem value="share">Hisse</SelectItem>
+                                  <SelectItem value="source">Kaynak</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              {(shareMin || shareMax || cinsFilter || groupByMode !== "none") && (
+                                <Button variant="ghost" size="sm" className="h-6 text-xs px-1.5" onClick={() => { setShareMin(""); setShareMax(""); setCinsFilter(""); setGroupByMode("none"); setCurrentPage(1); }}>
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                     </>
@@ -311,7 +645,13 @@ export function BasketPanel({
                         {localAnimalGroupItems.map(b => (
                           <span
                             key={b.animalGroupId}
-                            className={`px-2 py-1 bg-white dark:bg-zinc-900 rounded-md text-xs inline-flex items-center gap-1.5 cursor-pointer transition-all border ${selectedBasketIds.has(b.donationId) ? "ring-2 ring-orange-400 border-orange-300" : "border-orange-200 dark:border-orange-800 hover:border-orange-300"}`}
+                            className={`px-2 py-1 bg-white dark:bg-zinc-900 rounded-md text-xs inline-flex items-center gap-1.5 cursor-pointer transition-all border ${
+                              selectedBasketIds.has(b.donationId)
+                                ? "ring-2 ring-orange-400 border-orange-300"
+                                : isTimedOut(b)
+                                  ? "border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/40"
+                                  : "border-orange-200 dark:border-orange-800 hover:border-orange-300"
+                            }`}
                             style={b.colorTag && b.colorTag in COLOR_MAP ? { borderLeft: `3px solid ${COLOR_MAP[b.colorTag as keyof typeof COLOR_MAP]}` } : {}}
                             onClick={() => toggleBasketSelect(b.donationId)}
                           >
@@ -324,6 +664,12 @@ export function BasketPanel({
                             />
                             <span className="font-medium">Hayvan {b.animalNo}</span>
                             <span className="text-muted-foreground">({b.filledCount} kişi)</span>
+                            {isTimedOut(b) && (
+                              <span className="text-[10px] text-amber-600 flex items-center gap-0.5">
+                                <Clock className="w-2.5 h-2.5" />
+                                {formatTimeInBasket(b.addedAt)}
+                              </span>
+                            )}
                             <button onClick={(e) => { e.stopPropagation(); removeFromBasket(b.donationId); setSelectedBasketIds(prev => { const next = new Set(prev); next.delete(b.donationId); return next; }); }} className="ml-0.5 text-muted-foreground hover:text-red-500 transition-colors">
                               <X className="w-3 h-3" />
                             </button>
@@ -333,72 +679,28 @@ export function BasketPanel({
                     </div>
                   )}
 
-                  {filteredLocalDonationItems.length > 0 && (() => {
-                    const grouped: { key: string; label: string; items: typeof filteredLocalDonationItems }[] = [];
-                    const seen = new Map<string, number>();
-                    for (const b of filteredLocalDonationItems) {
-                      const label = (b.description || b.name).trim();
-                      const existing = seen.get(label);
-                      if (existing !== undefined) {
-                        grouped[existing].items.push(b);
-                      } else {
-                        seen.set(label, grouped.length);
-                        grouped.push({ key: label, label, items: [b] });
-                      }
-                    }
-                    return (
-                      <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 p-2.5">
-                        <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 mb-2">Bu Kesim Alanı</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {grouped.map(g => {
-                            const allSelected = g.items.every(item => selectedBasketIds.has(item.donationId));
-                            const toggleGroup = () => {
-                              setSelectedBasketIds(prev => {
-                                const next = new Set(prev);
-                                if (allSelected) {
-                                  g.items.forEach(item => next.delete(item.donationId));
-                                } else {
-                                  g.items.forEach(item => next.add(item.donationId));
-                                }
-                                return next;
-                              });
-                            };
-                            return (
-                              <span
-                                key={g.key}
-                                className={`px-2 py-1 bg-white dark:bg-zinc-900 rounded-md text-xs inline-flex items-center gap-1.5 cursor-pointer transition-all border ${allSelected ? "ring-2 ring-emerald-400 border-emerald-300" : "border-emerald-200 dark:border-emerald-800 hover:border-emerald-300"}`}
-                                onClick={toggleGroup}
-                              >
-                                <input
-                                  type="checkbox"
-                                  className="rounded w-3 h-3"
-                                  checked={allSelected}
-                                  onChange={toggleGroup}
-                                  onClick={e => e.stopPropagation()}
-                                />
-                                <span className="font-medium">{g.label}</span>
-                                {(() => {
-                                  const totalShares = g.items.reduce((sum, item) => sum + (item.donorShareCount || 1), 0);
-                                  return (
-                                    <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-100 dark:bg-violet-900/50 px-1 rounded">{totalShares}h</span>
-                                  );
-                                })()}
-                                {g.items.length > 1 && <span className="text-emerald-500 font-semibold">×{g.items.length}</span>}
-                                {g.items[0]?.sourceGroupAnimalNo && <span className="text-[10px] text-amber-600 dark:text-amber-400">H{g.items[0].sourceGroupAnimalNo}</span>}
-                                <button onClick={(e) => { e.stopPropagation(); g.items.forEach(item => { removeFromBasket(item.donationId); setSelectedBasketIds(prev => { const next = new Set(prev); next.delete(item.donationId); return next; }); }); }} className="ml-0.5 text-muted-foreground hover:text-red-500 transition-colors">
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </span>
-                            );
-                          })}
-                        </div>
+                  {paginatedItems.length > 0 && renderDonorChips()}
+
+                  {filteredLocalDonationItems.length > ITEMS_PER_PAGE && (
+                    <div className="flex items-center justify-between py-1">
+                      <span className="text-[11px] text-muted-foreground">
+                        {filteredLocalDonationItems.length} sonuçtan {((safePage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(safePage * ITEMS_PER_PAGE, filteredLocalDonationItems.length)} arası
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button variant="outline" size="sm" className="h-6 w-6 p-0" disabled={safePage <= 1} onClick={() => setCurrentPage(p => p - 1)}>
+                          <ChevronLeft className="w-3 h-3" />
+                        </Button>
+                        <span className="text-xs font-medium px-2">{safePage}/{totalPages}</span>
+                        <Button variant="outline" size="sm" className="h-6 w-6 p-0" disabled={safePage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+                          <ChevronRight className="w-3 h-3" />
+                        </Button>
                       </div>
-                    );
-                  })()}
+                    </div>
+                  )}
 
                   {basketSearch && filteredLocalDonationItems.length === 0 && localDonationItems.length > 0 && (
                     <div className="text-center py-3 text-xs text-muted-foreground">
-                      "{basketSearch}" ile eşleşen sonuç bulunamadı
+                      &ldquo;{basketSearch}&rdquo; ile eşleşen sonuç bulunamadı
                     </div>
                   )}
 
@@ -430,7 +732,9 @@ export function BasketPanel({
                         {foreignBasketItems.map(b => (
                           <span key={b.donationId} className="px-2 py-1 bg-white dark:bg-zinc-900 rounded-md text-xs inline-flex items-center gap-1.5 border border-blue-200 dark:border-blue-800">
                             <span className="font-medium">{b.description || b.name}</span>
-                            <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-100 dark:bg-violet-900/50 px-1 rounded">{b.donorShareCount || 1}h</span>
+                            {(b.donorShareCount || 1) > 1 && (
+                              <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-100 dark:bg-violet-900/50 px-1 rounded">{b.donorShareCount || 1}</span>
+                            )}
                             <button onClick={(e) => { e.stopPropagation(); removeFromBasket(b.donationId); }} className="text-muted-foreground hover:text-red-500 transition-colors">
                               <X className="w-3 h-3" />
                             </button>
@@ -454,6 +758,17 @@ export function BasketPanel({
 
               {activeTab === "place" && (
                 <div className="space-y-3">
+                  {localDonationItems.length > 0 && (
+                    <Button
+                      size="sm"
+                      className="w-full h-10 text-sm font-semibold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-md"
+                      onClick={autoDistributeBasket}
+                    >
+                      <Wand2 className="w-4 h-4 mr-2" />
+                      Otomatik Dağıt ({basketTotalShares} hisse &rarr; ~{basketAnimals} hayvan)
+                    </Button>
+                  )}
+
                   {selectedBasketIds.size > 0 && (
                     <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 p-3">
                       <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200 mb-2.5">
@@ -511,7 +826,7 @@ export function BasketPanel({
                   {localDonationItems.length > 0 && (
                     <div className="rounded-lg border bg-muted/30 p-3">
                       <p className="text-xs font-semibold mb-2.5">Tüm Sepeti Yerleştir</p>
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2">
                         <Select value={String(basketTransferTarget)} onValueChange={(v) => setBasketTransferTarget(parseInt(v))}>
                           <SelectTrigger className="h-8 flex-1 text-xs">
                             <SelectValue placeholder="Hedef hayvan grubu seçin..." />
@@ -532,26 +847,20 @@ export function BasketPanel({
                           Yerleştir
                         </Button>
                       </div>
-                      <Button variant="secondary" size="sm" className="h-8 text-xs w-full" onClick={autoDistributeBasket}>
-                        <Wand2 className="w-3.5 h-3.5 mr-1" />
-                        Otomatik Dağıt ({basketTotalShares} hisse → ~{basketAnimals} hayvan)
-                      </Button>
                     </div>
                   )}
 
                   {selectedBasketIds.size === 0 && localDonationItems.length === 0 && (
                     <div className="text-center py-4 text-sm text-muted-foreground">
-                      Yerleştirmek için önce "Sepet İçeriği" sekmesinden öğe seçin
+                      Yerleştirmek için önce &ldquo;Sepet İçeriği&rdquo; sekmesinden öğe seçin
                     </div>
                   )}
                   {selectedBasketIds.size === 0 && localDonationItems.length > 0 && (
-                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-                      <span className="text-xs text-amber-700 dark:text-amber-300">
-                        Belirli öğeleri yerleştirmek için "Sepet İçeriği" sekmesinden seçim yapın
+                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                      <GripVertical className="w-4 h-4 text-emerald-500" />
+                      <span className="text-xs text-emerald-700 dark:text-emerald-300">
+                        Sepetteki öğeleri sürükleyerek hayvan gruplarına bırakabilirsiniz
                       </span>
-                      <Button variant="outline" size="sm" className="h-7 text-xs shrink-0" onClick={() => setActiveTab("contents")}>
-                        Sepete Git
-                      </Button>
                     </div>
                   )}
                 </div>
@@ -559,38 +868,39 @@ export function BasketPanel({
 
               {activeTab === "transfer" && (
                 <div className="space-y-3">
-                  {siblingKesimAlanlari.length > 0 && localBasketItems.length > 0 && (
+                  {localBasketItems.length > 0 && (
                     <div className="rounded-lg border bg-muted/30 p-3">
                       <p className="text-xs font-semibold mb-2.5">Başka Kesim Alanına Aktar</p>
-                      <div className="flex items-center gap-2">
-                        <Select value={basketCrossKATarget} onValueChange={setBasketCrossKATarget}>
-                          <SelectTrigger className="h-8 flex-1 text-xs">
-                            <SelectValue placeholder="Hedef kesim alanı seçin..." />
-                          </SelectTrigger>
-                          <SelectContent side="top">
-                            {siblingKesimAlanlari.map(ka => (
-                              <SelectItem key={ka.id} value={ka.id}>
-                                {ka.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          size="sm"
-                          className="h-8 text-xs"
-                          onClick={() => setCrossKAConfirmOpen(true)}
-                          disabled={!basketCrossKATarget || crossKATransferring}
-                        >
-                          {crossKATransferring ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Send className="w-3.5 h-3.5 mr-1" />}
-                          Aktar
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {siblingKesimAlanlari.length === 0 && !sendSelectedToPool && (
-                    <div className="text-center py-4 text-sm text-muted-foreground">
-                      Aktarım yapılabilecek başka kesim alanı bulunmuyor
+                      {siblingKesimAlanlari.length > 0 ? (
+                        <div className="flex items-center gap-2">
+                          <Select value={basketCrossKATarget} onValueChange={setBasketCrossKATarget}>
+                            <SelectTrigger className="h-8 flex-1 text-xs">
+                              <SelectValue placeholder="Hedef kesim alanı seçin..." />
+                            </SelectTrigger>
+                            <SelectContent side="top">
+                              {siblingKesimAlanlari.map(ka => (
+                                <SelectItem key={ka.id} value={ka.id}>
+                                  {ka.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={() => setCrossKAConfirmOpen(true)}
+                            disabled={!basketCrossKATarget || crossKATransferring}
+                          >
+                            {crossKATransferring ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Send className="w-3.5 h-3.5 mr-1" />}
+                            Aktar
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-muted-foreground space-y-2">
+                          <p>Henüz başka kesim alanı bulunmuyor.</p>
+                          <p className="text-[11px]">Başka bir sekmede yeni bir kesim alanı oluşturun, ardından buradan aktarım yapabilirsiniz.</p>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -626,7 +936,7 @@ export function BasketPanel({
                   {sendSelectedToPool && selectedBasketIds.size === 0 && localBasketItems.length > 0 && (
                     <div className="flex items-center gap-2 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
                       <span className="text-xs text-blue-700 dark:text-blue-300">
-                        Havuza göndermek için "Sepet İçeriği" sekmesinden seçim yapın
+                        Havuza göndermek için &ldquo;Sepet İçeriği&rdquo; sekmesinden seçim yapın
                       </span>
                       <Button variant="outline" size="sm" className="h-7 text-xs shrink-0" onClick={() => setActiveTab("contents")}>
                         Sepete Git
@@ -680,7 +990,7 @@ export function BasketPanel({
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setCrossKAConfirmOpen(false); }}>
             <div className="absolute inset-0 bg-black/50" />
             <div className="relative bg-background rounded-xl shadow-2xl border p-6 w-[440px] max-w-full" onClick={e => e.stopPropagation()}>
-              <h3 className="font-semibold text-base mb-3">Başka KA'ya Aktar</h3>
+              <h3 className="font-semibold text-base mb-3">Başka KA&apos;ya Aktar</h3>
               <p className="text-sm text-muted-foreground mb-2">
                 Aşağıdaki öğeleri <strong>{targetKAName}</strong> kesim alanına aktarmak istediğinize emin misiniz?
               </p>
