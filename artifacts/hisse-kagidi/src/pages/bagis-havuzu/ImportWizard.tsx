@@ -279,7 +279,7 @@ export function ImportWizard({ open, onOpenChange, projectId, kesimAlanlari, onS
             </div>
             <div className="flex gap-2 pt-4 flex-shrink-0">
               <Button variant="outline" onClick={() => setImportStep("input")} className="flex-1">Geri</Button>
-              <Button onClick={handleImport} className="flex-1" disabled={importing || !importTargetKA}>
+              <Button onClick={handleImport} className="flex-1" disabled={importing}>
                 {importing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
                 {displayPreviewRows.length} Bağış Yükle
               </Button>

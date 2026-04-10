@@ -23,11 +23,9 @@ const COLUMN_WIDTHS: Record<TableColumnKey, number> = {
   name: 150,
   description: 150,
   donationType: 90,
-  shareCount: 70,
   birim: 100,
   temsilci: 110,
   notes: 150,
-  phone: 110,
   kesimAlani: 120,
   durum: 80,
   aiEtiket: 130,
@@ -51,11 +49,9 @@ function renderCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean) {
     case "name": return <span className="font-medium">{d.name || "—"}</span>;
     case "description": return d.description || "—";
     case "donationType": return d.donationType || "—";
-    case "shareCount": return <span className="font-mono">{d.shareCount}</span>;
     case "birim": return d.birim || "—";
     case "temsilci": return d.temsilci || "—";
     case "notes": return <span className="max-w-[150px] truncate block" title={d.notes}>{d.notes || "—"}</span>;
-    case "phone": return d.phone || "—";
     case "kesimAlani": return <Badge variant="outline" className="text-xs">{d.kesimAlaniName}</Badge>;
     case "durum": {
       const { label, color } = getStatusLabel(d);
@@ -125,7 +121,7 @@ export function VirtualizedDonationTable({
                   </button>
                 </th>
                 {cols.map(col => (
-                  <th key={col.key} className={`p-2 text-xs font-medium text-muted-foreground ${col.key === "shareCount" ? "text-center" : "text-left"}`}>
+                  <th key={col.key} className="p-2 text-xs font-medium text-muted-foreground text-left">
                     {col.label}
                   </th>
                 ))}
@@ -167,7 +163,7 @@ export function VirtualizedDonationTable({
                             </button>
                           </td>
                           {cols.map(col => (
-                            <td key={col.key} className={`p-2 text-xs overflow-hidden text-ellipsis whitespace-nowrap ${col.key === "shareCount" ? "text-center" : ""} ${col.key === "vekalet" ? "font-mono" : ""}`}>
+                            <td key={col.key} className={`p-2 text-xs overflow-hidden text-ellipsis whitespace-nowrap ${col.key === "vekalet" ? "font-mono" : ""}`}>
                               {renderCell(d, col.key, isMultiLoc)}
                             </td>
                           ))}
