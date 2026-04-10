@@ -125,7 +125,7 @@ export function useDonations({
   async function handleFlagDonation(id: string, reason: string) {
     if (!kesim) return;
     try {
-      await apiFlagDonation(id, reason);
+      await apiFlagDonation(kesim.projectId || "", id, reason);
       const updated = produce(kesim, (draft) => {
         const d = draft.donations.find((d) => d.id === id);
         if (d) { d.isFlagged = true; d.flagReason = reason; }
@@ -144,7 +144,7 @@ export function useDonations({
   async function handleUnflagDonation(id: string) {
     if (!kesim) return;
     try {
-      await apiUnflagDonation(id);
+      await apiUnflagDonation(kesim.projectId || "", id);
       const updated = produce(kesim, (draft) => {
         const d = draft.donations.find((d) => d.id === id);
         if (d) { d.isFlagged = false; d.flagReason = ""; }

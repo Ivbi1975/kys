@@ -264,15 +264,15 @@ export interface FlaggedDonation {
   problemType: "manual" | "ai_warning" | "resolved";
 }
 
-export async function flagDonation(donationId: string, reason: string): Promise<{ success: boolean }> {
-  return apiFetch<{ success: boolean }>(`/donations/${donationId}/flag`, {
+export async function flagDonation(projectId: string, donationId: string, reason: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/projects/${projectId}/donations/${donationId}/flag`, {
     method: "POST",
     body: JSON.stringify({ reason }),
   });
 }
 
-export async function unflagDonation(donationId: string): Promise<{ success: boolean }> {
-  return apiFetch<{ success: boolean }>(`/donations/${donationId}/unflag`, {
+export async function unflagDonation(projectId: string, donationId: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/projects/${projectId}/donations/${donationId}/unflag`, {
     method: "POST",
   });
 }

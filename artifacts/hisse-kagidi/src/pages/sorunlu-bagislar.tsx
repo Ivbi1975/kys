@@ -67,7 +67,7 @@ export default function SorunluBagislarPage() {
 
   const handleUnflag = useCallback(async (donationId: string) => {
     try {
-      await unflagDonation(donationId);
+      await unflagDonation(projectId, donationId);
       setItems(prev => prev.map(d => {
         if (d.id !== donationId) return d;
         return {
@@ -86,7 +86,7 @@ export default function SorunluBagislarPage() {
         variant: "destructive",
       });
     }
-  }, [toast]);
+  }, [projectId, toast]);
 
   const conflictDonationIds = useMemo(() => {
     const ids = new Set<string>();

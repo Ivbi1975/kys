@@ -34,7 +34,7 @@ import { CinsStatsBar } from "./bagis-havuzu/CinsStatsBar";
 import { HavuzAiClassification, type HavuzAiResult } from "./bagis-havuzu/HavuzAiClassification";
 import { ALL_TABLE_COLUMNS, PAGE_SIZE, type TableColumnKey } from "./bagis-havuzu/types";
 import type { CustomTag, PoolDonation } from "@/lib/types";
-import { BASKET_STORAGE_KEY, loadBasketFromStorage, saveBasketToStorage } from "@/components/kesim-alani/hooks/types";
+import { loadBasketFromStorage, saveBasketToStorage } from "@/components/kesim-alani/hooks/types";
 import type { BasketItem } from "@/components/kesim-alani/hooks/types";
 import type { TransferredItem } from "@/lib/api/bagis-havuzu";
 
@@ -340,23 +340,23 @@ export default function BagisHavuzuPage() {
 
   const handleFlagDonation = useCallback(async (id: string, reason: string) => {
     try {
-      await flagDonation(id, reason);
+      await flagDonation(projectId, id, reason);
       invalidatePool();
       toast({ title: "Bağış işaretlendi", description: reason });
     } catch (err) {
       toast({ title: "Hata", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
     }
-  }, [invalidatePool, toast]);
+  }, [projectId, invalidatePool, toast]);
 
   const handleUnflagDonation = useCallback(async (id: string) => {
     try {
-      await unflagDonation(id);
+      await unflagDonation(projectId, id);
       invalidatePool();
       toast({ title: "İşaret kaldırıldı" });
     } catch (err) {
       toast({ title: "Hata", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
     }
-  }, [invalidatePool, toast]);
+  }, [projectId, invalidatePool, toast]);
 
   const handleInlineEdit = useCallback(async (donationId: string, field: string, value: string) => {
     const isNumeric = field === "shareCount";

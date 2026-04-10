@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState } from "react";
+import { useRef, useCallback, useState, useMemo } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -271,9 +271,9 @@ export function VirtualizedDonationTable({
     overscan: 20,
   });
 
-  const cols = ALL_TABLE_COLUMNS.filter(c => visibleColumns.has(c.key));
-  const editableCols = cols.filter(c => EDITABLE_COLUMNS.has(c.key));
-  const tableWidth = getTableWidth(cols);
+  const cols = useMemo(() => ALL_TABLE_COLUMNS.filter(c => visibleColumns.has(c.key)), [visibleColumns]);
+  const editableCols = useMemo(() => cols.filter(c => EDITABLE_COLUMNS.has(c.key)), [cols]);
+  const tableWidth = useMemo(() => getTableWidth(cols), [cols]);
 
   const handleHeaderClick = useCallback((colKey: TableColumnKey) => {
     const sortKey = SORT_KEY_MAP[colKey];
