@@ -7,12 +7,14 @@ import {
   donationTagsTable,
   customTagsTable,
   animalGroupDonationsTable,
+  automationRulesTable,
 } from "@workspace/db/schema";
-import { eq, isNull, and, sql, inArray, ilike, or, asc } from "drizzle-orm";
+import { eq, isNull, and, sql, inArray, ilike, or, asc, desc } from "drizzle-orm";
 import { z } from "zod";
 import { asyncHandler } from "../middleware/error-handler";
 import { ERROR_MESSAGES } from "../lib/constants";
 import { refreshProjectStats } from "./projects";
+import { executeRules } from "../services/rule-engine.service";
 
 const router: IRouter = Router();
 
@@ -950,6 +952,153 @@ router.get("/projects/:id/flagged-donations", asyncHandler(async (req, res) => {
   }));
 
   res.json({ items });
+}));
+
+const ALLOWED_RULE_FIELDS = [
+  "birim", "temsilci", "donationType", "ozellik", "fiyat",
+  "yerTalebi", "gunTalebi", "ilkHayvan", "safi", "name",
+  "description", "vekalet", "notes", "phone", "kesimAlaniId",
+  "shareCount", "tags", "aiCategories",
+] as const;
+
+const ALLOWED_RULE_OPERATORS = [
+  "equals", "not_equals", "contains", "not_contains",
+  "in", "not_in", "gt", "gte", "lt", "lte", "between",
+  "is_empty", "is_not_empty",
+] as const;
+
+const automationRuleSchema = z.object({
+  name: z.string().min(1).max(200),
+  conditions: z.array(z.object({
+    field: z.enum(ALLOWED_RULE_FIELDS),
+    operator: z.enum(ALLOWED_RULE_OPERATORS),
+    value: z.union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))]),
+  })).min(1),
+  action: z.discriminatedUnion("type", [
+    z.object({ type: z.literal("transfer_to_ka"), targetKesimAlaniId: z.string().min(1) }),
+    z.object({ type: z.literal("add_tag"), tagId: z.string().min(1) }),
+    z.object({ type: z.literal("flag"), flagReason: z.string().optional() }),
+    z.object({ type: z.literal("exclude") }),
+  ]),
+  priority: z.number().int().min(0).optional(),
+  isActive: z.boolean().optional(),
+});
+
+router.get("/projects/:id/automation-rules", asyncHandler(async (req, res) => {
+  const projectId = req.params.id;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const rules = await db.select()
+    .from(automationRulesTable)
+    .where(eq(automationRulesTable.projectId, projectId))
+    .orderBy(asc(automationRulesTable.priority));
+
+  res.json({ rules });
+}));
+
+router.post("/projects/:id/automation-rules", asyncHandler(async (req, res) => {
+  const projectId = req.params.id;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const parsed = automationRuleSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
+    return;
+  }
+
+  const maxPriorityResult = await db.execute(sql`
+    SELECT COALESCE(MAX(priority), -1)::int AS max_priority
+    FROM automation_rules
+    WHERE project_id = ${projectId}
+  `);
+  const nextPriority = parsed.data.priority ?? (((maxPriorityResult.rows[0] as { max_priority: number })?.max_priority ?? -1) + 1);
+
+  const id = crypto.randomUUID();
+  const now = new Date();
+
+  await db.insert(automationRulesTable).values({
+    id,
+    projectId,
+    name: parsed.data.name,
+    conditions: parsed.data.conditions,
+    action: parsed.data.action,
+    priority: nextPriority,
+    isActive: parsed.data.isActive ?? true,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const [rule] = await db.select().from(automationRulesTable).where(eq(automationRulesTable.id, id));
+  res.status(201).json({ rule });
+}));
+
+router.put("/projects/:id/automation-rules/:ruleId", asyncHandler(async (req, res) => {
+  const { id: projectId, ruleId } = req.params;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const [existing] = await db.select().from(automationRulesTable)
+    .where(and(eq(automationRulesTable.id, ruleId), eq(automationRulesTable.projectId, projectId)));
+  if (!existing) { res.status(404).json({ error: "Kural bulunamadı" }); return; }
+
+  const updateSchema = z.object({
+    name: z.string().min(1).max(200).optional(),
+    conditions: z.array(z.object({
+      field: z.enum(ALLOWED_RULE_FIELDS),
+      operator: z.enum(ALLOWED_RULE_OPERATORS),
+      value: z.union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))]),
+    })).min(1).optional(),
+    action: z.discriminatedUnion("type", [
+      z.object({ type: z.literal("transfer_to_ka"), targetKesimAlaniId: z.string().min(1) }),
+      z.object({ type: z.literal("add_tag"), tagId: z.string().min(1) }),
+      z.object({ type: z.literal("flag"), flagReason: z.string().optional() }),
+      z.object({ type: z.literal("exclude") }),
+    ]).optional(),
+    priority: z.number().int().min(0).optional(),
+    isActive: z.boolean().optional(),
+  });
+  const parsed = updateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
+    return;
+  }
+
+  const updateData: Record<string, unknown> = { updatedAt: new Date() };
+  if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
+  if (parsed.data.conditions !== undefined) updateData.conditions = parsed.data.conditions;
+  if (parsed.data.action !== undefined) updateData.action = parsed.data.action;
+  if (parsed.data.priority !== undefined) updateData.priority = parsed.data.priority;
+  if (parsed.data.isActive !== undefined) updateData.isActive = parsed.data.isActive;
+
+  await db.update(automationRulesTable).set(updateData).where(eq(automationRulesTable.id, ruleId));
+
+  const [rule] = await db.select().from(automationRulesTable).where(eq(automationRulesTable.id, ruleId));
+  res.json({ rule });
+}));
+
+router.delete("/projects/:id/automation-rules/:ruleId", asyncHandler(async (req, res) => {
+  const { id: projectId, ruleId } = req.params;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const [existing] = await db.select().from(automationRulesTable)
+    .where(and(eq(automationRulesTable.id, ruleId), eq(automationRulesTable.projectId, projectId)));
+  if (!existing) { res.status(404).json({ error: "Kural bulunamadı" }); return; }
+
+  await db.delete(automationRulesTable).where(eq(automationRulesTable.id, ruleId));
+  res.json({ success: true });
+}));
+
+router.post("/projects/:id/automation-rules/execute", asyncHandler(async (req, res) => {
+  const projectId = req.params.id;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const result = await executeRules(projectId);
+  refreshProjectStats();
+  res.json(result);
 }));
 
 export default router;

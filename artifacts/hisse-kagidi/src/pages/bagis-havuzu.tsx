@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft, Upload, Search, X, Filter, Package,
-  BarChart3, Loader2, Sparkles, AlertTriangle, Settings2,
+  BarChart3, Loader2, Sparkles, AlertTriangle, Settings2, Zap,
 } from "lucide-react";
 import {
   fetchPoolDonations, fetchPoolStats,
@@ -27,6 +27,7 @@ import { PoolBulkActions } from "./bagis-havuzu/PoolBulkActions";
 import { TransferDialog } from "./bagis-havuzu/TransferDialog";
 import { ImportWizard } from "./bagis-havuzu/ImportWizard";
 import { BulkTagDialog } from "./bagis-havuzu/BulkTagDialog";
+import { AutomationRulesPanel } from "./bagis-havuzu/AutomationRulesPanel";
 import { ALL_TABLE_COLUMNS, PAGE_SIZE, type TableColumnKey } from "./bagis-havuzu/types";
 import type { CustomTag } from "@/lib/types";
 
@@ -81,6 +82,7 @@ export default function BagisHavuzuPage() {
     return new Set(ALL_TABLE_COLUMNS.filter(c => c.defaultVisible).map(c => c.key));
   });
 
+  const [showRules, setShowRules] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
@@ -490,6 +492,9 @@ export default function BagisHavuzuPage() {
             <Button variant="outline" size="sm" onClick={() => setShowStats(!showStats)}>
               <BarChart3 className="w-4 h-4 mr-1" />İstatistik
             </Button>
+            <Button variant={showRules ? "default" : "outline"} size="sm" onClick={() => setShowRules(!showRules)}>
+              <Zap className="w-4 h-4 mr-1" />Kurallar
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               <Upload className="w-4 h-4 mr-1" />Toplu Yükle
             </Button>
@@ -511,6 +516,16 @@ export default function BagisHavuzuPage() {
         </div>
 
         {showStats && stats && <StatsPanel stats={stats} />}
+
+        {showRules && (
+          <div className="mb-3">
+            <AutomationRulesPanel
+              projectId={projectId}
+              kesimAlanlari={kesimAlanlari}
+              globalTags={globalTags}
+            />
+          </div>
+        )}
 
         <div className="flex items-center gap-2 mb-3">
           <div className="relative flex-1 max-w-md">

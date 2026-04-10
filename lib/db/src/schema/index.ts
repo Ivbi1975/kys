@@ -289,3 +289,20 @@ export const auditLogsTable = pgTable("audit_logs", {
 ]);
 
 export type AuditLogRow = typeof auditLogsTable.$inferSelect;
+
+export const automationRulesTable = pgTable("automation_rules", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").notNull().references(() => projectsTable.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  conditions: jsonb("conditions").notNull().default("[]"),
+  action: jsonb("action").notNull().default("{}"),
+  priority: integer("priority").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("idx_automation_rules_project_id").on(table.projectId),
+  index("idx_automation_rules_project_active").on(table.projectId, table.priority).where(sql`is_active = true`),
+]);
+
+export type AutomationRuleRow = typeof automationRulesTable.$inferSelect;

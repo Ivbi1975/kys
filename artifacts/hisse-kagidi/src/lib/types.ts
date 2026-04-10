@@ -112,3 +112,41 @@ export interface Project {
   archivedAt?: string | null;
   stats: ProjectStats;
 }
+
+export interface RuleCondition {
+  field: string;
+  operator: string;
+  value: string | string[] | number | [number, number];
+}
+
+export interface RuleAction {
+  type: "transfer_to_ka" | "add_tag" | "flag" | "exclude";
+  targetKesimAlaniId?: string;
+  tagId?: string;
+  flagReason?: string;
+}
+
+export interface AutomationRule {
+  id: string;
+  projectId: string;
+  name: string;
+  conditions: RuleCondition[];
+  action: RuleAction;
+  priority: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RuleExecutionSummaryItem {
+  ruleId: string;
+  ruleName: string;
+  action: RuleAction;
+  affectedCount: number;
+  affectedDonationIds: string[];
+}
+
+export interface RuleExecutionResult {
+  totalAffected: number;
+  ruleResults: RuleExecutionSummaryItem[];
+}

@@ -155,6 +155,13 @@
       "when": 1774946400000,
       "tag": "0021_donation_flag_resolved_at",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1774946500000,
+      "tag": "0022_automation_rules",
+      "breakpoints": true
     }
   ]
 }
