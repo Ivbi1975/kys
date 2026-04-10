@@ -25,6 +25,12 @@ const donationPayloadSchema = z.object({
   phone: z.string().optional().default(""),
   birim: z.string().optional().default(""),
   temsilci: z.string().optional().default(""),
+  ozellik: z.string().optional().default(""),
+  fiyat: z.string().optional().default(""),
+  yerTalebi: z.string().optional().default(""),
+  gunTalebi: z.string().optional().default(""),
+  ilkHayvan: z.string().optional().default(""),
+  safi: z.string().optional().default(""),
   excluded: z.boolean().optional().default(false),
   tags: z.array(z.string()).optional().default([]),
 });

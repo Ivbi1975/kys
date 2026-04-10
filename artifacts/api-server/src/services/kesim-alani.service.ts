@@ -59,6 +59,12 @@ export interface DonationOutput {
   phone: string;
   birim: string;
   temsilci: string;
+  ozellik: string;
+  fiyat: string;
+  yerTalebi: string;
+  gunTalebi: string;
+  ilkHayvan: string;
+  safi: string;
   excluded: boolean;
   tags: string[];
   aiCategories: string[];
@@ -95,6 +101,12 @@ export function assembleKesimAlani(
       phone: d.phone || "",
       birim: d.birim || "",
       temsilci: d.temsilci || "",
+      ozellik: d.ozellik || "",
+      fiyat: d.fiyat || "",
+      yerTalebi: d.yerTalebi || "",
+      gunTalebi: d.gunTalebi || "",
+      ilkHayvan: d.ilkHayvan || "",
+      safi: d.safi || "",
       excluded: d.excluded,
       tags: tagsByDonation[d.id] || [],
       aiCategories: d.aiCategories ? JSON.parse(d.aiCategories) : [],
@@ -158,6 +170,7 @@ export async function getFullKesimAlaniList(kaRows: KesimAlaniRow[]) {
             don.id, don.name, don.description, don.donation_type,
             don.share_count, don.vekalet, don.notes, don.phone,
             don.birim, don.temsilci,
+            don.ozellik, don.fiyat, don.yer_talebi, don.gun_talebi, don.ilk_hayvan, don.safi,
             don.excluded, don.sort_order, don.ai_categories, don.ai_warnings,
             don.is_flagged, don.flag_reason, don.flag_resolved_at,
             COALESCE((
@@ -299,6 +312,7 @@ export async function getFullKesimAlani(id: string) {
             don.id, don.name, don.description, don.donation_type,
             don.share_count, don.vekalet, don.notes, don.phone,
             don.birim, don.temsilci,
+            don.ozellik, don.fiyat, don.yer_talebi, don.gun_talebi, don.ilk_hayvan, don.safi,
             don.excluded, don.sort_order, don.ai_categories, don.ai_warnings,
             don.is_flagged, don.flag_reason, don.flag_resolved_at,
             COALESCE((
@@ -629,6 +643,9 @@ export async function upsertDonationsBatch(tx: Tx, kesimAlaniId: string, donatio
     sortOrder: sortOrderOffset + i,
   }));
 
+  // IMPORTANT: The SET clause intentionally excludes havuz metadata fields
+  // (ozellik, fiyat, yerTalebi, gunTalebi, ilkHayvan, safi, birim, temsilci).
+  // These are set during pool import and must be preserved by kesim alanı operations.
   for (let i = 0; i < upsertRows.length; i += BATCH_SIZE) {
     const batch = upsertRows.slice(i, i + BATCH_SIZE);
     await tx.insert(donationsTable).values(batch).onConflictDoUpdate({
@@ -717,6 +734,9 @@ export async function diffUpdateDonations(tx: Tx, kesimAlaniId: string, incoming
     sortOrder: i,
   }));
 
+  // IMPORTANT: The SET clause intentionally excludes havuz metadata fields
+  // (ozellik, fiyat, yerTalebi, gunTalebi, ilkHayvan, safi, birim, temsilci).
+  // These are set during pool import and must be preserved by kesim alanı operations.
   for (let i = 0; i < upsertRows.length; i += BATCH_SIZE) {
     const batch = upsertRows.slice(i, i + BATCH_SIZE);
     await tx.insert(donationsTable).values(batch).onConflictDoUpdate({

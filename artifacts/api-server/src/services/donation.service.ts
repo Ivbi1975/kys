@@ -74,6 +74,12 @@ function mapDonationRow(d: typeof donationsTable.$inferSelect, tags: string[]) {
     phone: d.phone || "",
     birim: d.birim || "",
     temsilci: d.temsilci || "",
+    ozellik: d.ozellik || "",
+    fiyat: d.fiyat || "",
+    yerTalebi: d.yerTalebi || "",
+    gunTalebi: d.gunTalebi || "",
+    ilkHayvan: d.ilkHayvan || "",
+    safi: d.safi || "",
     excluded: d.excluded,
     sortOrder: d.sortOrder,
     tags,
@@ -175,6 +181,12 @@ interface DonationInput {
   phone?: string;
   birim?: string;
   temsilci?: string;
+  ozellik?: string;
+  fiyat?: string;
+  yerTalebi?: string;
+  gunTalebi?: string;
+  ilkHayvan?: string;
+  safi?: string;
   excluded?: boolean;
   tags?: string[];
 }
@@ -199,6 +211,12 @@ export async function createDonation(kesimAlaniId: string, donation: DonationInp
       phone: donation.phone || "",
       birim: donation.birim || "",
       temsilci: donation.temsilci || "",
+      ozellik: donation.ozellik || "",
+      fiyat: donation.fiyat || "",
+      yerTalebi: donation.yerTalebi || "",
+      gunTalebi: donation.gunTalebi || "",
+      ilkHayvan: donation.ilkHayvan || "",
+      safi: donation.safi || "",
       excluded: donation.excluded || false,
       sortOrder,
     });
@@ -233,6 +251,12 @@ export async function updateDonation(kesimAlaniId: string, donationId: string, u
   if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
   if (updates.birim !== undefined) dbUpdates.birim = updates.birim;
   if (updates.temsilci !== undefined) dbUpdates.temsilci = updates.temsilci;
+  if (updates.ozellik !== undefined) dbUpdates.ozellik = updates.ozellik;
+  if (updates.fiyat !== undefined) dbUpdates.fiyat = updates.fiyat;
+  if (updates.yerTalebi !== undefined) dbUpdates.yerTalebi = updates.yerTalebi;
+  if (updates.gunTalebi !== undefined) dbUpdates.gunTalebi = updates.gunTalebi;
+  if (updates.ilkHayvan !== undefined) dbUpdates.ilkHayvan = updates.ilkHayvan;
+  if (updates.safi !== undefined) dbUpdates.safi = updates.safi;
   if (updates.excluded !== undefined) dbUpdates.excluded = updates.excluded;
 
   await db.transaction(async (tx) => {
