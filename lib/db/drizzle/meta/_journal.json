@@ -148,6 +148,13 @@
       "when": 1774946300000,
       "tag": "0020_donation_flag_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1774946400000,
+      "tag": "0021_donation_flag_resolved_at",
+      "breakpoints": true
     }
   ]
 }

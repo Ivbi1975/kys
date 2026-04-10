@@ -72,6 +72,7 @@ export const donationsTable = pgTable("donations", {
   aiWarnings: text("ai_warnings"),
   isFlagged: boolean("is_flagged").notNull().default(false),
   flagReason: text("flag_reason").notNull().default(""),
+  flagResolvedAt: timestamp("flag_resolved_at", { withTimezone: true }),
 }, (table) => [
   index("idx_donations_kesim_alani_id").on(table.kesimAlaniId),
   index("idx_donations_ka_deleted_sort").on(table.kesimAlaniId, table.deletedAt, table.sortOrder),

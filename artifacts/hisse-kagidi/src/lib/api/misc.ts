@@ -260,7 +260,8 @@ export interface FlaggedDonation {
   kesimAlaniId: string;
   kesimAlaniName: string;
   groups: { groupId: string; animalNo: number; slotIndex: number }[];
-  problemType: "manual" | "ai_warning";
+  flagResolvedAt: string | null;
+  problemType: "manual" | "ai_warning" | "resolved";
 }
 
 export async function flagDonation(donationId: string, reason: string): Promise<{ success: boolean }> {

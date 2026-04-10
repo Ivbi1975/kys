@@ -24,7 +24,7 @@ import type { FlaggedDonation, Conflict } from "@/lib/api";
 
 type ProblemRow = Omit<FlaggedDonation, "problemType"> & {
   conflictInfo?: string;
-  problemType: "manual" | "ai_warning" | "conflict";
+  problemType: "manual" | "ai_warning" | "conflict" | "resolved";
 };
 
 export default function SorunluBagislarPage() {
@@ -68,12 +68,15 @@ export default function SorunluBagislarPage() {
   const handleUnflag = useCallback(async (donationId: string) => {
     try {
       await unflagDonation(donationId);
-      setItems(prev => prev.flatMap(d => {
-        if (d.id !== donationId) return [d];
-        if (d.aiWarnings) {
-          return [{ ...d, isFlagged: false, flagReason: "", problemType: "ai_warning" as const }];
-        }
-        return [];
+      setItems(prev => prev.map(d => {
+        if (d.id !== donationId) return d;
+        return {
+          ...d,
+          isFlagged: false,
+          flagReason: "",
+          flagResolvedAt: new Date().toISOString(),
+          problemType: d.aiWarnings ? ("ai_warning" as const) : ("resolved" as const),
+        };
       }));
       toast({ title: "Sorun kaldırıldı" });
     } catch (err) {
@@ -126,6 +129,7 @@ export default function SorunluBagislarPage() {
             kesimAlaniId: e.kesimAlaniId,
             kesimAlaniName: e.kesimAlaniName,
             groups: e.animalGroupId ? [{ groupId: e.animalGroupId, animalNo: e.animalGroupNo ?? 0, slotIndex: 0 }] : [],
+            flagResolvedAt: null,
             problemType: "conflict",
             conflictInfo: `Çatışma: ${c.displayName}`,
           });
@@ -176,9 +180,9 @@ export default function SorunluBagislarPage() {
 
     if (statusFilter !== "all") {
       if (statusFilter === "unresolved") {
-        result = result.filter(d => d.isFlagged || (d.problemType === "conflict") || (d.problemType === "ai_warning" && !!d.aiWarnings));
+        result = result.filter(d => d.isFlagged || d.problemType === "conflict" || d.problemType === "ai_warning");
       } else if (statusFilter === "resolved") {
-        result = result.filter(d => !d.isFlagged && d.problemType !== "conflict" && !(d.problemType === "ai_warning" && d.aiWarnings));
+        result = result.filter(d => d.problemType === "resolved" || (!!d.flagResolvedAt && !d.isFlagged));
       }
     }
 

@@ -826,6 +826,27 @@ const flagSchema = z.object({
   reason: z.string().default(""),
 });
 
+router.post("/projects/:projectId/donations/:id/flag", asyncHandler(async (req, res) => {
+  const { projectId, id: donationId } = req.params;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+  const parsed = flagSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA });
+    return;
+  }
+  const kaIds = (await db.select({ id: kesimAlanlariTable.id }).from(kesimAlanlariTable)
+    .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)))).map(k => k.id);
+  if (kaIds.length === 0) { res.status(404).json({ error: "Bağış bulunamadı" }); return; }
+  const [donation] = await db.select().from(donationsTable)
+    .where(and(eq(donationsTable.id, donationId), inArray(donationsTable.kesimAlaniId, kaIds), isNull(donationsTable.deletedAt)));
+  if (!donation) { res.status(404).json({ error: "Bağış bulunamadı" }); return; }
+  await db.update(donationsTable)
+    .set({ isFlagged: true, flagReason: parsed.data.reason, flagResolvedAt: null, updatedAt: new Date() })
+    .where(eq(donationsTable.id, donationId));
+  res.json({ success: true });
+}));
+
 router.post("/donations/:id/flag", asyncHandler(async (req, res) => {
   const donationId = req.params.id;
   const parsed = flagSchema.safeParse(req.body);
@@ -833,26 +854,36 @@ router.post("/donations/:id/flag", asyncHandler(async (req, res) => {
     res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA });
     return;
   }
-  const [donation] = await db.select().from(donationsTable).where(eq(donationsTable.id, donationId));
-  if (!donation || donation.deletedAt) {
-    res.status(404).json({ error: "Bağış bulunamadı" });
-    return;
-  }
+  const [donation] = await db.select().from(donationsTable).where(and(eq(donationsTable.id, donationId), isNull(donationsTable.deletedAt)));
+  if (!donation) { res.status(404).json({ error: "Bağış bulunamadı" }); return; }
   await db.update(donationsTable)
-    .set({ isFlagged: true, flagReason: parsed.data.reason, updatedAt: new Date() })
+    .set({ isFlagged: true, flagReason: parsed.data.reason, flagResolvedAt: null, updatedAt: new Date() })
+    .where(eq(donationsTable.id, donationId));
+  res.json({ success: true });
+}));
+
+router.post("/projects/:projectId/donations/:id/unflag", asyncHandler(async (req, res) => {
+  const { projectId, id: donationId } = req.params;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+  const kaIds = (await db.select({ id: kesimAlanlariTable.id }).from(kesimAlanlariTable)
+    .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)))).map(k => k.id);
+  if (kaIds.length === 0) { res.status(404).json({ error: "Bağış bulunamadı" }); return; }
+  const [donation] = await db.select().from(donationsTable)
+    .where(and(eq(donationsTable.id, donationId), inArray(donationsTable.kesimAlaniId, kaIds), isNull(donationsTable.deletedAt)));
+  if (!donation) { res.status(404).json({ error: "Bağış bulunamadı" }); return; }
+  await db.update(donationsTable)
+    .set({ isFlagged: false, flagReason: "", flagResolvedAt: new Date(), updatedAt: new Date() })
     .where(eq(donationsTable.id, donationId));
   res.json({ success: true });
 }));
 
 router.post("/donations/:id/unflag", asyncHandler(async (req, res) => {
   const donationId = req.params.id;
-  const [donation] = await db.select().from(donationsTable).where(eq(donationsTable.id, donationId));
-  if (!donation || donation.deletedAt) {
-    res.status(404).json({ error: "Bağış bulunamadı" });
-    return;
-  }
+  const [donation] = await db.select().from(donationsTable).where(and(eq(donationsTable.id, donationId), isNull(donationsTable.deletedAt)));
+  if (!donation) { res.status(404).json({ error: "Bağış bulunamadı" }); return; }
   await db.update(donationsTable)
-    .set({ isFlagged: false, flagReason: "", updatedAt: new Date() })
+    .set({ isFlagged: false, flagReason: "", flagResolvedAt: new Date(), updatedAt: new Date() })
     .where(eq(donationsTable.id, donationId));
   res.json({ success: true });
 }));
@@ -879,7 +910,7 @@ router.get("/projects/:id/flagged-donations", asyncHandler(async (req, res) => {
     .where(and(
       inArray(donationsTable.kesimAlaniId, kaIds),
       isNull(donationsTable.deletedAt),
-      sql`(${donationsTable.isFlagged} = true OR (${donationsTable.aiWarnings} IS NOT NULL AND ${donationsTable.aiWarnings} != ''))`,
+      sql`(${donationsTable.isFlagged} = true OR (${donationsTable.aiWarnings} IS NOT NULL AND ${donationsTable.aiWarnings} != '') OR ${donationsTable.flagResolvedAt} IS NOT NULL)`,
     ))
     .orderBy(sql`"updated_at" DESC`);
 
@@ -917,7 +948,8 @@ router.get("/projects/:id/flagged-donations", asyncHandler(async (req, res) => {
     kesimAlaniId: d.kesimAlaniId,
     kesimAlaniName: kaNameMap[d.kesimAlaniId] || "",
     groups: groupInfoMap[d.id] || [],
-    problemType: d.isFlagged ? "manual" : "ai_warning",
+    flagResolvedAt: d.flagResolvedAt ? d.flagResolvedAt.toISOString() : null,
+    problemType: d.isFlagged ? "manual" : (d.aiWarnings ? "ai_warning" : "resolved"),
   }));
 
   res.json({ items });
