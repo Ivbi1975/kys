@@ -79,6 +79,8 @@ function mapDonationRow(d: typeof donationsTable.$inferSelect, tags: string[]) {
     tags,
     aiCategories: d.aiCategories ? JSON.parse(d.aiCategories) : [],
     aiWarnings: d.aiWarnings || "",
+    isFlagged: d.isFlagged,
+    flagReason: d.flagReason,
   };
 }
 

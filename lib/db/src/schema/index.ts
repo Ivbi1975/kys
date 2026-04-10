@@ -70,6 +70,8 @@ export const donationsTable = pgTable("donations", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   aiCategories: text("ai_categories"),
   aiWarnings: text("ai_warnings"),
+  isFlagged: boolean("is_flagged").notNull().default(false),
+  flagReason: text("flag_reason").notNull().default(""),
 }, (table) => [
   index("idx_donations_kesim_alani_id").on(table.kesimAlaniId),
   index("idx_donations_ka_deleted_sort").on(table.kesimAlaniId, table.deletedAt, table.sortOrder),

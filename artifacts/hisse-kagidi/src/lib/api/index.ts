@@ -135,6 +135,9 @@ export {
   runIntegrityCheck,
   repairIntegrity,
   globalSearch,
+  flagDonation,
+  unflagDonation,
+  fetchFlaggedDonations,
 } from "./misc";
 export type {
   ConflictEntry,
@@ -147,4 +150,5 @@ export type {
   IntegrityReport,
   IntegrityRepairResult,
   GlobalSearchResult,
+  FlaggedDonation,
 } from "./misc";

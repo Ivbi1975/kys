@@ -20,7 +20,7 @@ export function DonorListPanel() {
   const ctx = useKesimAlaniContext();
   const {
     kesim, activeFilterCount, addDonorToBasket, basketItemIds, commitEdit,
-    debouncedSearchQuery, deleteDonation, descCountMap, donorListVisible,
+    debouncedSearchQuery, deleteDonation, handleFlagDonation, handleUnflagDonation, descCountMap, donorListVisible,
     editDraft, editingCell, effectiveShareMap, filterUngrouped, filteredDonations,
     globalTags, groupedDonorIds, handleDonorCellKeyDown, handleSort,
     openTrash, removeFromBasket, removedFromGroupIds, searchInputRef,
@@ -180,6 +180,8 @@ export function DonorListPanel() {
                   onSmartPlace={setSmartPlacePopover}
                   onSplitShare={setSplitShareDialog}
                   onDelete={deleteDonation}
+                  onFlagDonation={handleFlagDonation}
+                  onUnflagDonation={handleUnflagDonation}
                 />
               );
             }}

@@ -47,6 +47,8 @@ Frontend-only React + Vite app for managing Kurban Bayramı share certificates. 
 - Create cutting areas (kesim alanları)
 - Add donors via manual entry, Excel upload (.xlsx/.xls/.csv), or copy-paste with column mapping
 - High-share review step: rows with >50 total shares per description group are flagged; user can exclude, add to basket, or transfer directly to another cutting list
+- Donation flagging: manual flag/unflag with reason text, yellow triangle indicators in DonorRow overflow menu, pool table, and AnimalGroupCard vekalet cells
+- Sorunlu Bağışlar page: centralized view of all problem donations (manual flags, AI warnings, vekalet conflicts) with search, type/location filters, and unflag actions
 - Multi-select checkboxes for bulk deletion and bulk editing of donors
 - Same-name auto-count: if a name appears N times, effectiveShare=N is used
 - Smart auto-grouping: distributes donors into groups of 7 (one animal per group) using bin-packing

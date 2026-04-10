@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  AlertTriangle, Eye, EyeOff, MoreHorizontal, Scissors, ShoppingBag, Tag, Trash2, UserCog, Wand2,
+  AlertTriangle, Eye, EyeOff, Flag, MoreHorizontal, Scissors, ShoppingBag, Tag, Trash2, UserCog, Wand2,
 } from "lucide-react";
 
 interface DonorRowProps {
@@ -37,6 +37,8 @@ interface DonorRowProps {
   onSmartPlace: (id: string) => void;
   onSplitShare: (params: { donationId: string; totalShares: number }) => void;
   onDelete: (id: string) => void;
+  onFlagDonation?: (id: string, reason: string) => void;
+  onUnflagDonation?: (id: string) => void;
 }
 
 function EditableCell({
@@ -63,7 +65,7 @@ function EditableCell({
 function DonorRowOverflowMenu({
   d, isGrouped, canSplit, splitShares, globalTags, tagPopoverOpen,
   onSetPersonEditDesc, onUpdateField, onToggleTag, onSetTagPopover,
-  onSmartPlace, onSplitShare, onDelete,
+  onSmartPlace, onSplitShare, onDelete, onFlagDonation, onUnflagDonation,
 }: {
   d: Donation;
   isGrouped: boolean;
@@ -78,8 +80,12 @@ function DonorRowOverflowMenu({
   onSmartPlace: (id: string) => void;
   onSplitShare: (params: { donationId: string; totalShares: number }) => void;
   onDelete: (id: string) => void;
+  onFlagDonation?: (id: string, reason: string) => void;
+  onUnflagDonation?: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [flagReasonInput, setFlagReasonInput] = useState("");
+  const [showFlagInput, setShowFlagInput] = useState(false);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -142,6 +148,58 @@ function DonorRowOverflowMenu({
 
           <div className="h-px bg-border my-1" />
 
+          {onFlagDonation && onUnflagDonation && (
+            d.isFlagged ? (
+              <button
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950 transition-colors"
+                onClick={() => { onUnflagDonation(d.id); setOpen(false); }}
+              >
+                <Flag className="w-3.5 h-3.5" />
+                Sorunu Kaldır
+              </button>
+            ) : showFlagInput ? (
+              <div className="px-2 py-1.5 space-y-1">
+                <Input
+                  className="h-7 text-xs"
+                  placeholder="Sorun açıklaması..."
+                  value={flagReasonInput}
+                  onChange={(e) => setFlagReasonInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      onFlagDonation(d.id, flagReasonInput);
+                      setFlagReasonInput("");
+                      setShowFlagInput(false);
+                      setOpen(false);
+                    }
+                  }}
+                  autoFocus
+                />
+                <div className="flex gap-1">
+                  <button
+                    className="flex-1 text-center px-1 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors"
+                    onClick={() => { onFlagDonation(d.id, flagReasonInput); setFlagReasonInput(""); setShowFlagInput(false); setOpen(false); }}
+                  >
+                    İşaretle
+                  </button>
+                  <button
+                    className="px-1 py-0.5 rounded text-[10px] text-muted-foreground hover:bg-muted transition-colors"
+                    onClick={() => { setShowFlagInput(false); setFlagReasonInput(""); }}
+                  >
+                    İptal
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950 transition-colors"
+                onClick={() => setShowFlagInput(true)}
+              >
+                <Flag className="w-3.5 h-3.5" />
+                Sorunlu İşaretle
+              </button>
+            )
+          )}
+
           <button
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-destructive hover:bg-destructive/10 transition-colors"
             onClick={() => { onDelete(d.id); setOpen(false); }}
@@ -161,9 +219,19 @@ function DonorRowInner({
   onToggleSelect, onStartEditing, onSetEditDraft, onCommitEdit, onKeyDown,
   onSetPersonEditDesc, onUpdateField, onToggleTag, onSetTagPopover,
   onAddToBasket, onRemoveFromBasket, onSmartPlace, onSplitShare, onDelete,
+  onFlagDonation, onUnflagDonation,
 }: DonorRowProps) {
   return (<>
-    <td className="p-2"><input type="checkbox" checked={isSelected} onChange={() => onToggleSelect(d.id)} className="rounded" /></td>
+    <td className="p-2">
+      <div className="flex items-center gap-1">
+        <input type="checkbox" checked={isSelected} onChange={() => onToggleSelect(d.id)} className="rounded" />
+        {d.isFlagged && (
+          <span title={d.flagReason || "Sorunlu bağış"}>
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+          </span>
+        )}
+      </div>
+    </td>
     <td className="p-2 text-muted-foreground">{idx + 1}</td>
     <td className="p-2">
       <EditableCell d={d} field="vekalet" isEditing={isEditing && editField === "vekalet"}
@@ -263,6 +331,8 @@ function DonorRowInner({
           onSmartPlace={onSmartPlace}
           onSplitShare={onSplitShare}
           onDelete={onDelete}
+          onFlagDonation={onFlagDonation}
+          onUnflagDonation={onUnflagDonation}
         />
       </div>
     </td>

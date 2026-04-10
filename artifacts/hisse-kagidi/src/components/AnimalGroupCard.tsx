@@ -23,6 +23,7 @@ import {
   Camera,
   Package,
   MoreHorizontal,
+  AlertTriangle,
 } from "lucide-react";
 
 interface AnimalGroupCardProps {
@@ -161,14 +162,19 @@ const GroupDonationRow = memo(function GroupDonationRow({
       case "vekalet":
         return (
           <td key={colKey} className={cellPad} data-group-cell={`${groupIdx}-${dIdx}-vekalet`}>
-            <LocalInput
-              className={inputClass}
-              value={d.vekalet || ""}
-              onCommit={(v) => handleCommit("vekalet", v)}
-              onKeyDown={handleKeyDown("vekalet")}
-              placeholder="—"
-              aria-label={`Satır ${dIdx + 1} Vekalet`}
-            />
+            <div className="flex items-center gap-0.5">
+              {d.isFlagged && (
+                <AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" title={d.flagReason || "Sorunlu bağış"} />
+              )}
+              <LocalInput
+                className={inputClass}
+                value={d.vekalet || ""}
+                onCommit={(v) => handleCommit("vekalet", v)}
+                onKeyDown={handleKeyDown("vekalet")}
+                placeholder="—"
+                aria-label={`Satır ${dIdx + 1} Vekalet`}
+              />
+            </div>
           </td>
         );
       case "description":

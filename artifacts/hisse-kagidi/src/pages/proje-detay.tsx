@@ -8,6 +8,7 @@ import {
   Search,
   Archive,
   Package,
+  AlertTriangle,
 } from "lucide-react";
 import QrCodeModal from "@/components/QrCodeModal";
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
@@ -74,6 +75,16 @@ export default function ProjeDetayPage() {
             >
               <Package className="w-4 h-4 mr-1" />
               Bağış Havuzu
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              title="Sorunlu Bağışlar"
+              className="text-amber-700 border-amber-200 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-950"
+              onClick={() => state.setLocation(`/sorunlu-bagislar/${state.project!.id}`)}
+            >
+              <AlertTriangle className="w-4 h-4 mr-1" />
+              Sorunlu
             </Button>
             <Button
               variant="outline"

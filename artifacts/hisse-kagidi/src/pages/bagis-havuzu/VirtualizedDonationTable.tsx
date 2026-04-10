@@ -64,6 +64,11 @@ function renderCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean) {
     case "vekalet":
       return (
         <>
+          {d.isFlagged && (
+            <span className="mr-1 text-amber-500" title={d.flagReason || "Sorunlu bağış"}>
+              <AlertTriangle className="w-3 h-3 inline" />
+            </span>
+          )}
           {d.vekalet || "—"}
           {isMultiLoc && (
             <span className="ml-1 text-orange-500" title="Bu vekalet birden fazla listede mevcut">
@@ -217,7 +222,7 @@ export function VirtualizedDonationTable({
                     <table className="w-full text-sm" style={{ tableLayout: "fixed", minWidth: tableWidth }}>
                       <ColGroup cols={cols} />
                       <tbody>
-                        <tr className={`border-b hover:bg-muted/30 transition-colors ${isSelected ? "bg-primary/5" : virtualRow.index % 2 === 1 ? "bg-muted/10" : ""}`}>
+                        <tr className={`border-b hover:bg-muted/30 transition-colors ${d.isFlagged ? "bg-amber-50/50 dark:bg-amber-950/20" : isSelected ? "bg-primary/5" : virtualRow.index % 2 === 1 ? "bg-muted/10" : ""}`}>
                           <td className="p-2 text-center">
                             <button onClick={() => toggleSelect(d.id)} className="text-muted-foreground hover:text-foreground">
                               {isSelected ? <CheckSquare className="w-4 h-4 text-primary" /> : <Square className="w-4 h-4" />}

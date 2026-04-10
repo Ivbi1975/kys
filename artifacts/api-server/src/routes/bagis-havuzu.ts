@@ -230,6 +230,8 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     tags: tagsByDonation[d.id] || [],
     aiCategories: d.aiCategories ? (() => { try { const p = JSON.parse(d.aiCategories); return Array.isArray(p) ? p.map(String) : []; } catch { return []; } })() : [],
     aiWarnings: d.aiWarnings || "",
+    isFlagged: d.isFlagged,
+    flagReason: d.flagReason,
   }));
 
   res.json({ items, total, kesimAlanlari: kaRows, allFilteredIds });
@@ -818,6 +820,106 @@ router.post("/projects/:id/donations/bulk-tag", asyncHandler(async (req, res) =>
   });
 
   res.json({ success: true, affected });
+}));
+
+const flagSchema = z.object({
+  reason: z.string().default(""),
+});
+
+router.post("/donations/:id/flag", asyncHandler(async (req, res) => {
+  const donationId = req.params.id;
+  const parsed = flagSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA });
+    return;
+  }
+  const [donation] = await db.select().from(donationsTable).where(eq(donationsTable.id, donationId));
+  if (!donation || donation.deletedAt) {
+    res.status(404).json({ error: "Bağış bulunamadı" });
+    return;
+  }
+  await db.update(donationsTable)
+    .set({ isFlagged: true, flagReason: parsed.data.reason, updatedAt: new Date() })
+    .where(eq(donationsTable.id, donationId));
+  res.json({ success: true });
+}));
+
+router.post("/donations/:id/unflag", asyncHandler(async (req, res) => {
+  const donationId = req.params.id;
+  const [donation] = await db.select().from(donationsTable).where(eq(donationsTable.id, donationId));
+  if (!donation || donation.deletedAt) {
+    res.status(404).json({ error: "Bağış bulunamadı" });
+    return;
+  }
+  await db.update(donationsTable)
+    .set({ isFlagged: false, flagReason: "", updatedAt: new Date() })
+    .where(eq(donationsTable.id, donationId));
+  res.json({ success: true });
+}));
+
+router.get("/projects/:id/flagged-donations", asyncHandler(async (req, res) => {
+  const projectId = req.params.id;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const kaRows = await db.select({ id: kesimAlanlariTable.id, name: kesimAlanlariTable.name })
+    .from(kesimAlanlariTable)
+    .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
+
+  if (kaRows.length === 0) {
+    res.json({ items: [] });
+    return;
+  }
+
+  const kaIds = kaRows.map(k => k.id);
+  const kaNameMap: Record<string, string> = {};
+  for (const k of kaRows) kaNameMap[k.id] = k.name;
+
+  const flaggedRows = await db.select().from(donationsTable)
+    .where(and(
+      inArray(donationsTable.kesimAlaniId, kaIds),
+      isNull(donationsTable.deletedAt),
+      sql`(${donationsTable.isFlagged} = true OR (${donationsTable.aiWarnings} IS NOT NULL AND ${donationsTable.aiWarnings} != ''))`,
+    ))
+    .orderBy(sql`"updated_at" DESC`);
+
+  const donationIds = flaggedRows.map(d => d.id);
+
+  let groupInfoMap: Record<string, { groupId: string; animalNo: number }[]> = {};
+  if (donationIds.length > 0) {
+    const groupLinks = await db.execute(sql`
+      SELECT agd.donation_id, agd.group_id, ag.animal_no
+      FROM animal_group_donations agd
+      JOIN animal_groups ag ON ag.id = agd.group_id
+      WHERE agd.donation_id IN (${sql.join(donationIds.map(id => sql`${id}`), sql`, `)})
+    `);
+    for (const row of groupLinks.rows as { donation_id: string; group_id: string; animal_no: number }[]) {
+      if (!groupInfoMap[row.donation_id]) groupInfoMap[row.donation_id] = [];
+      groupInfoMap[row.donation_id].push({ groupId: row.group_id, animalNo: row.animal_no });
+    }
+  }
+
+  const items = flaggedRows.map(d => ({
+    id: d.id,
+    name: d.name,
+    description: d.description,
+    donationType: d.donationType,
+    shareCount: d.shareCount,
+    vekalet: d.vekalet,
+    notes: d.notes,
+    phone: d.phone || "",
+    excluded: d.excluded,
+    isFlagged: d.isFlagged,
+    flagReason: d.flagReason,
+    aiWarnings: d.aiWarnings || "",
+    aiCategories: d.aiCategories ? (() => { try { const p = JSON.parse(d.aiCategories); return Array.isArray(p) ? p.map(String) : []; } catch { return []; } })() : [],
+    kesimAlaniId: d.kesimAlaniId,
+    kesimAlaniName: kaNameMap[d.kesimAlaniId] || "",
+    groups: groupInfoMap[d.id] || [],
+    problemType: d.isFlagged ? "manual" : "ai_warning",
+  }));
+
+  res.json({ items });
 }));
 
 export default router;

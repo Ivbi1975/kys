@@ -27,6 +27,8 @@ export interface Donation {
   tags?: string[];
   aiCategories?: string[];
   aiWarnings?: string;
+  isFlagged?: boolean;
+  flagReason?: string;
 }
 
 export interface PoolDonation extends Donation {

@@ -243,6 +243,43 @@ export interface GlobalSearchResult {
   animalNo: number | null;
 }
 
+export interface FlaggedDonation {
+  id: string;
+  name: string;
+  description: string;
+  donationType: string;
+  shareCount: number;
+  vekalet: string;
+  notes: string;
+  phone: string;
+  excluded: boolean;
+  isFlagged: boolean;
+  flagReason: string;
+  aiWarnings: string;
+  aiCategories: string[];
+  kesimAlaniId: string;
+  kesimAlaniName: string;
+  groups: { groupId: string; animalNo: number }[];
+  problemType: "manual" | "ai_warning";
+}
+
+export async function flagDonation(donationId: string, reason: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/donations/${donationId}/flag`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function unflagDonation(donationId: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/donations/${donationId}/unflag`, {
+    method: "POST",
+  });
+}
+
+export async function fetchFlaggedDonations(projectId: string): Promise<{ items: FlaggedDonation[] }> {
+  return apiFetch<{ items: FlaggedDonation[] }>(`/projects/${projectId}/flagged-donations`);
+}
+
 export async function globalSearch(
   q: string,
   column: string = "all",

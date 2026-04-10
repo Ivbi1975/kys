@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { produce } from "immer";
 import type { Donation, KesimAlani } from "@/lib/types";
 import { turkishNormalize } from "@/lib/utils";
-import { apiSoftDeleteDonation, apiUpdateSingleDonation } from "@/lib/api";
+import { apiSoftDeleteDonation, apiUpdateSingleDonation, flagDonation as apiFlagDonation, unflagDonation as apiUnflagDonation } from "@/lib/api";
 import { trCollator } from "@/lib/grouping";
 import { MAX_SHARES_PER_ANIMAL } from "@/lib/constants";
 import type { ColumnKey } from "@/lib/useWorkspacePreferences";
@@ -119,6 +119,44 @@ export function useDonations({
         description: err instanceof Error ? err.message : "Bilinmeyen hata",
         variant: "destructive",
       });
+    }
+  }
+
+  async function handleFlagDonation(id: string, reason: string) {
+    if (!kesim) return;
+    try {
+      await apiFlagDonation(id, reason);
+      const updated = produce(kesim, (draft) => {
+        const d = draft.donations.find((d) => d.id === id);
+        if (d) { d.isFlagged = true; d.flagReason = reason; }
+        for (const g of draft.animalGroups) {
+          const gd = g.donations.find((d) => d.id === id);
+          if (gd) { gd.isFlagged = true; gd.flagReason = reason; }
+        }
+      });
+      setKesim(updated);
+      toast({ title: "Bağış işaretlendi", description: reason });
+    } catch (err) {
+      toast({ title: "Hata", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+    }
+  }
+
+  async function handleUnflagDonation(id: string) {
+    if (!kesim) return;
+    try {
+      await apiUnflagDonation(id);
+      const updated = produce(kesim, (draft) => {
+        const d = draft.donations.find((d) => d.id === id);
+        if (d) { d.isFlagged = false; d.flagReason = ""; }
+        for (const g of draft.animalGroups) {
+          const gd = g.donations.find((d) => d.id === id);
+          if (gd) { gd.isFlagged = false; gd.flagReason = ""; }
+        }
+      });
+      setKesim(updated);
+      toast({ title: "İşaret kaldırıldı" });
+    } catch (err) {
+      toast({ title: "Hata", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
     }
   }
 
@@ -489,6 +527,8 @@ export function useDonations({
     saveSingleDonationField,
     addDonation,
     deleteDonation,
+    handleFlagDonation,
+    handleUnflagDonation,
     deleteSelected,
     toggleSelect,
     toggleSelectAll,
