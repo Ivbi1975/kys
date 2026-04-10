@@ -377,6 +377,12 @@ export function BasketPanel({
                                   onClick={e => e.stopPropagation()}
                                 />
                                 <span className="font-medium">{g.label}</span>
+                                {(() => {
+                                  const totalShares = g.items.reduce((sum, item) => sum + (item.donorShareCount || 1), 0);
+                                  return (
+                                    <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-100 dark:bg-violet-900/50 px-1 rounded">{totalShares}h</span>
+                                  );
+                                })()}
                                 {g.items.length > 1 && <span className="text-emerald-500 font-semibold">×{g.items.length}</span>}
                                 {g.items[0]?.sourceGroupAnimalNo && <span className="text-[10px] text-amber-600 dark:text-amber-400">H{g.items[0].sourceGroupAnimalNo}</span>}
                                 <button onClick={(e) => { e.stopPropagation(); g.items.forEach(item => { removeFromBasket(item.donationId); setSelectedBasketIds(prev => { const next = new Set(prev); next.delete(item.donationId); return next; }); }); }} className="ml-0.5 text-muted-foreground hover:text-red-500 transition-colors">
@@ -424,6 +430,7 @@ export function BasketPanel({
                         {foreignBasketItems.map(b => (
                           <span key={b.donationId} className="px-2 py-1 bg-white dark:bg-zinc-900 rounded-md text-xs inline-flex items-center gap-1.5 border border-blue-200 dark:border-blue-800">
                             <span className="font-medium">{b.description || b.name}</span>
+                            <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-100 dark:bg-violet-900/50 px-1 rounded">{b.donorShareCount || 1}h</span>
                             <button onClick={(e) => { e.stopPropagation(); removeFromBasket(b.donationId); }} className="text-muted-foreground hover:text-red-500 transition-colors">
                               <X className="w-3 h-3" />
                             </button>
