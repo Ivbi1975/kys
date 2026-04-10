@@ -180,9 +180,9 @@ export default function SorunluBagislarPage() {
 
     if (statusFilter !== "all") {
       if (statusFilter === "unresolved") {
-        result = result.filter(d => d.isFlagged || d.problemType === "conflict" || d.problemType === "ai_warning");
+        result = result.filter(d => d.isFlagged || !!d.conflictInfo || (d.problemType === "ai_warning" && !!d.aiWarnings));
       } else if (statusFilter === "resolved") {
-        result = result.filter(d => d.problemType === "resolved" || (!!d.flagResolvedAt && !d.isFlagged));
+        result = result.filter(d => !d.isFlagged && !d.conflictInfo && !(d.aiWarnings && d.problemType === "ai_warning") && !!d.flagResolvedAt);
       }
     }
 
