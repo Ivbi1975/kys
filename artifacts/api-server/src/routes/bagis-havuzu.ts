@@ -1133,8 +1133,19 @@ router.patch("/projects/:projectId/donations/:id", asyncHandler(async (req, res)
     ));
   if (!donation) { res.status(404).json({ error: "Bağış bulunamadı" }); return; }
 
+  let dbValue: string | number = parsed.data.value;
+  if (EDITABLE_POOL_NUMERIC_FIELDS.has(parsed.data.field)) {
+    const num = typeof dbValue === "number" ? dbValue : parseInt(String(dbValue), 10);
+    if (isNaN(num) || num < 1 || num > 7) {
+      res.status(400).json({ error: "Geçersiz sayısal değer" }); return;
+    }
+    dbValue = num;
+  } else {
+    dbValue = String(dbValue);
+  }
+
   await db.update(donationsTable)
-    .set({ [parsed.data.field]: parsed.data.value, updatedAt: new Date() })
+    .set({ [parsed.data.field]: dbValue, updatedAt: new Date() })
     .where(eq(donationsTable.id, donationId));
 
   invalidateKACache();
