@@ -298,7 +298,7 @@ const bulkImportSchema = z.object({
     ilkHayvan: z.string().default(""),
     safi: z.string().default(""),
     kesimAlaniId: z.string().min(1).optional(),
-  })).min(1).max(10000),
+  })).min(1).max(50000),
 });
 
 router.post("/projects/:id/donations/bulk-import", asyncHandler(async (req, res) => {
@@ -430,7 +430,7 @@ router.post("/projects/:id/donations/bulk-import", asyncHandler(async (req, res)
 }));
 
 const transferSchema = z.object({
-  donationIds: z.array(z.string()).min(1).max(10000),
+  donationIds: z.array(z.string()).min(1).max(50000),
   targetKesimAlaniId: z.string().min(1),
 });
 
@@ -503,7 +503,7 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
 }));
 
 const bulkUpdateSchema = z.object({
-  donationIds: z.array(z.string()).min(1).max(10000),
+  donationIds: z.array(z.string()).min(1).max(50000),
   action: z.enum(["exclude", "include", "delete"]),
 });
 

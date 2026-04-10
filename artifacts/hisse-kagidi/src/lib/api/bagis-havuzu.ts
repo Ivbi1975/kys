@@ -56,16 +56,42 @@ export async function fetchPoolStats(projectId: string): Promise<PoolStats> {
   return apiFetch<PoolStats>(`/projects/${projectId}/donations/stats`);
 }
 
-export async function bulkImportDonations(projectId: string, donations: Array<{
+export type ImportDonationPayload = {
   id: string; name: string; description: string; donationType: string;
   shareCount: number; vekalet: string; notes: string; phone: string;
   birim: string; temsilci: string; ozellik: string; fiyat: string;
   yerTalebi: string; gunTalebi: string; ilkHayvan: string; safi: string;
-}>): Promise<{ success: boolean; inserted: number }> {
-  return apiFetch<{ success: boolean; inserted: number }>(`/projects/${projectId}/donations/bulk-import`, {
-    method: "POST",
-    body: JSON.stringify({ donations }),
-  });
+};
+
+const IMPORT_CHUNK_SIZE = 5000;
+
+export async function bulkImportDonations(
+  projectId: string,
+  donations: ImportDonationPayload[],
+  onProgress?: (inserted: number, total: number, chunkIndex: number, totalChunks: number) => void,
+): Promise<{ success: boolean; inserted: number }> {
+  if (donations.length <= IMPORT_CHUNK_SIZE) {
+    return apiFetch<{ success: boolean; inserted: number }>(`/projects/${projectId}/donations/bulk-import`, {
+      method: "POST",
+      body: JSON.stringify({ donations }),
+    });
+  }
+
+  let totalInserted = 0;
+  const totalChunks = Math.ceil(donations.length / IMPORT_CHUNK_SIZE);
+
+  for (let i = 0; i < donations.length; i += IMPORT_CHUNK_SIZE) {
+    const chunk = donations.slice(i, i + IMPORT_CHUNK_SIZE);
+    const chunkIndex = Math.floor(i / IMPORT_CHUNK_SIZE);
+    const result = await apiFetch<{ success: boolean; inserted: number }>(`/projects/${projectId}/donations/bulk-import`, {
+      method: "POST",
+      body: JSON.stringify({ donations: chunk }),
+    });
+    totalInserted += result.inserted;
+    onProgress?.(totalInserted, donations.length, chunkIndex + 1, totalChunks);
+  }
+
+  return { success: true, inserted: totalInserted };
 }
 
 export async function transferDonationsToKA(projectId: string, donationIds: string[], targetKesimAlaniId: string): Promise<{ success: boolean; moved: number }> {

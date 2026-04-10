@@ -7,6 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import {
   bulkImportDonations, checkVekaletConflicts,
 } from "@/lib/api";
+import type { ImportDonationPayload } from "@/lib/api/bagis-havuzu";
+import { ApiFetchError } from "@/lib/api/core";
 import { autoMapColumns, POOL_COLUMN_OPTIONS, type ColumnMapping } from "./types";
 import { parseExcelInWorker } from "@/lib/excel.worker.client";
 
@@ -26,6 +28,7 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
   const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([]);
   const [hasHeaderRow, setHasHeaderRow] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function processRawData(rows: string[][]) {
@@ -76,97 +79,119 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
     return previewData[0];
   }, [hasHeaderRow, previewData]);
 
+  function buildDonationsFromRows(rows: string[][]): ImportDonationPayload[] {
+    return rows.map((row): ImportDonationPayload => {
+      const d: ImportDonationPayload = {
+        id: crypto.randomUUID(), name: "", description: "", donationType: "",
+        shareCount: 1, vekalet: "", notes: "", phone: "", birim: "", temsilci: "",
+        ozellik: "", fiyat: "", yerTalebi: "", gunTalebi: "", ilkHayvan: "", safi: "",
+      };
+      const notesParts: string[] = [];
+      for (let c = 0; c < columnMappings.length; c++) {
+        const mapping = columnMappings[c];
+        const val = String(row[c] ?? "").trim();
+        if (mapping === "skip" || !val) continue;
+        if (mapping === "shareCount") {
+          d.shareCount = Math.max(1, parseInt(val, 10) || 1);
+        } else if (mapping === "notes") {
+          notesParts.push(val);
+        } else {
+          const key = mapping as keyof ImportDonationPayload;
+          if (key in d && key !== "id" && key !== "shareCount") {
+            (d as Record<string, unknown>)[key] = val;
+          }
+        }
+      }
+      d.notes = notesParts.join(" | ");
+      return d;
+    }).filter((d) => d.name);
+  }
+
+  function getErrorMessage(err: unknown): string {
+    if (err instanceof ApiFetchError) {
+      if (err.details && err.details.length > 0) {
+        const detail = err.details[0];
+        if (detail.message?.includes("too_big") || detail.message?.includes("at most")) {
+          return "Çok fazla satır var. Lütfen daha küçük dosyalar halinde yükleyin.";
+        }
+        if (detail.path) {
+          return `Veri hatası (${detail.path.join(".")}): ${detail.message}`;
+        }
+        return detail.message || err.message;
+      }
+      return err.message;
+    }
+    if (err instanceof Error) {
+      if (err.message === "Failed to fetch" || err.message.includes("NetworkError")) {
+        return "Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.";
+      }
+      return err.message;
+    }
+    return String(err);
+  }
+
   const handleImport = useCallback(async () => {
     if (displayPreviewRows.length === 0) {
       toast({ title: "Yüklenecek veri bulunamadı", variant: "destructive" });
       return;
     }
     setImporting(true);
+    setImportProgress("Veriler hazırlanıyor...");
     try {
-      interface ImportDonation {
-        id: string; name: string; description: string; donationType: string;
-        shareCount: number; vekalet: string; notes: string; phone: string;
-        birim: string; temsilci: string; ozellik: string; fiyat: string;
-        yerTalebi: string; gunTalebi: string; ilkHayvan: string; safi: string;
-      }
-      const donations = displayPreviewRows.map((row): ImportDonation => {
-        const d: ImportDonation = {
-          id: crypto.randomUUID(), name: "", description: "", donationType: "",
-          shareCount: 1, vekalet: "", notes: "", phone: "", birim: "", temsilci: "",
-          ozellik: "", fiyat: "", yerTalebi: "", gunTalebi: "", ilkHayvan: "", safi: "",
-        };
-        const notesParts: string[] = [];
-        for (let c = 0; c < columnMappings.length; c++) {
-          const mapping = columnMappings[c];
-          const val = String(row[c] ?? "").trim();
-          if (mapping === "skip" || !val) continue;
-          if (mapping === "shareCount") {
-            d.shareCount = Math.max(1, parseInt(val, 10) || 1);
-          } else if (mapping === "notes") {
-            notesParts.push(val);
-          } else if (mapping === "name") {
-            d.name = val;
-          } else if (mapping === "description") {
-            d.description = val;
-          } else if (mapping === "donationType") {
-            d.donationType = val;
-          } else if (mapping === "vekalet") {
-            d.vekalet = val;
-          } else if (mapping === "phone") {
-            d.phone = val;
-          } else if (mapping === "birim") {
-            d.birim = val;
-          } else if (mapping === "temsilci") {
-            d.temsilci = val;
-          } else if (mapping === "ozellik") {
-            d.ozellik = val;
-          } else if (mapping === "fiyat") {
-            d.fiyat = val;
-          } else if (mapping === "yerTalebi") {
-            d.yerTalebi = val;
-          } else if (mapping === "gunTalebi") {
-            d.gunTalebi = val;
-          } else if (mapping === "ilkHayvan") {
-            d.ilkHayvan = val;
-          } else if (mapping === "safi") {
-            d.safi = val;
-          }
-        }
-        d.notes = notesParts.join(" | ");
-        return d;
-      }).filter((d: ImportDonation) => d.name);
+      const donations = buildDonationsFromRows(displayPreviewRows);
 
       if (donations.length === 0) {
         toast({ title: "İsim sütunu eşleştirilmemiş veya boş", variant: "destructive" });
         setImporting(false);
+        setImportProgress("");
         return;
       }
 
+      setImportProgress("Vekalet kontrolleri yapılıyor...");
       const vekaletValues = donations.map(d => d.vekalet).filter(Boolean);
       if (vekaletValues.length > 0) {
-        const { conflicts } = await checkVekaletConflicts(projectId, vekaletValues);
-        if (conflicts.length > 0) {
-          const uniqueConflicts = new Set(conflicts.map(c => c.vekalet));
+        try {
+          const { conflicts } = await checkVekaletConflicts(projectId, vekaletValues);
+          if (conflicts.length > 0) {
+            const uniqueConflicts = new Set(conflicts.map(c => c.vekalet));
+            const proceed = window.confirm(
+              `Dikkat: ${uniqueConflicts.size} vekalet numarası zaten başka yerlerde mevcut:\n${[...uniqueConflicts].slice(0, 10).join(", ")}${uniqueConflicts.size > 10 ? ` ve ${uniqueConflicts.size - 10} adet daha...` : ""}\n\nDevam etmek istiyor musunuz?`
+            );
+            if (!proceed) {
+              setImporting(false);
+              setImportProgress("");
+              return;
+            }
+          }
+        } catch (vekaletErr) {
+          console.error("Vekalet check error:", vekaletErr);
           const proceed = window.confirm(
-            `Dikkat: ${uniqueConflicts.size} vekalet numarası zaten başka yerlerde mevcut:\n${[...uniqueConflicts].slice(0, 10).join(", ")}${uniqueConflicts.size > 10 ? ` ve ${uniqueConflicts.size - 10} adet daha...` : ""}\n\nDevam etmek istiyor musunuz?`
+            "Vekalet kontrolü sırasında bir hata oluştu. Kontrol atlanarak devam edilsin mi?"
           );
           if (!proceed) {
             setImporting(false);
+            setImportProgress("");
             return;
           }
         }
       }
 
-      const result = await bulkImportDonations(projectId, donations);
-      toast({ title: `${result.inserted} bağış eklendi` });
+      setImportProgress(`${donations.length} bağış yükleniyor...`);
+      const result = await bulkImportDonations(projectId, donations, (inserted, total, chunkIdx, totalChunks) => {
+        if (totalChunks > 1) {
+          setImportProgress(`Yükleniyor: ${inserted}/${total} (parça ${chunkIdx}/${totalChunks})`);
+        }
+      });
+      toast({ title: `${result.inserted} bağış başarıyla eklendi` });
       resetImport();
       onSuccess();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
       console.error("Bulk import error:", err);
+      const msg = getErrorMessage(err);
       toast({ title: "Yükleme başarısız", description: msg, variant: "destructive" });
     } finally {
       setImporting(false);
+      setImportProgress("");
     }
   }, [displayPreviewRows, columnMappings, projectId, toast, onSuccess]);
 
@@ -276,11 +301,17 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
                 </div>
               )}
             </div>
+            {importing && importProgress && (
+              <div className="p-2 text-sm text-center text-muted-foreground bg-blue-50 dark:bg-blue-950/30 rounded-md">
+                <Loader2 className="w-4 h-4 inline mr-2 animate-spin" />
+                {importProgress}
+              </div>
+            )}
             <div className="flex gap-2 pt-4 flex-shrink-0">
-              <Button variant="outline" onClick={() => setImportStep("input")} className="flex-1">Geri</Button>
+              <Button variant="outline" onClick={() => setImportStep("input")} className="flex-1" disabled={importing}>Geri</Button>
               <Button onClick={handleImport} className="flex-1" disabled={importing}>
                 {importing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
-                {displayPreviewRows.length} Bağış Yükle
+                {importing ? "Yükleniyor..." : `${displayPreviewRows.length} Bağış Yükle`}
               </Button>
             </div>
           </div>
