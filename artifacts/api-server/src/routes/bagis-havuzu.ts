@@ -217,7 +217,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     kesimAlaniId: d.kesimAlaniId,
     kesimAlaniName: kaNameMap[d.kesimAlaniId] || "",
     tags: tagsByDonation[d.id] || [],
-    aiCategories: d.aiCategories ? JSON.parse(d.aiCategories) : [],
+    aiCategories: d.aiCategories ? (() => { try { const p = JSON.parse(d.aiCategories); return Array.isArray(p) ? p.map(String) : []; } catch { return []; } })() : [],
     aiWarnings: d.aiWarnings || "",
   }));
 
@@ -329,13 +329,17 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
   `);
   const inGroups = (inGroupCountResult.rows[0] as Record<string, unknown>)?.in_groups ?? 0;
 
-  const distQuery = (col: string) => db.execute(sql`
-    SELECT ${sql.raw(`d.${col}`)} AS value, COUNT(*)::int AS count
-    FROM donations d
-    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-    WHERE ka.project_id = ${projectId} AND ka.deleted_at IS NULL AND d.deleted_at IS NULL AND d.excluded = false AND ${sql.raw(`d.${col}`)} != ''
-    GROUP BY ${sql.raw(`d.${col}`)} ORDER BY count DESC LIMIT 50
-  `);
+  const DIST_ALLOWED_COLS = new Set(["ozellik", "fiyat", "yer_talebi", "gun_talebi", "ilk_hayvan", "safi"]);
+  const distQuery = (col: string) => {
+    if (!DIST_ALLOWED_COLS.has(col)) throw new Error(`Invalid dist column: ${col}`);
+    return db.execute(sql`
+      SELECT ${sql.raw(`d.${col}`)} AS value, COUNT(*)::int AS count
+      FROM donations d
+      JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+      WHERE ka.project_id = ${projectId} AND ka.deleted_at IS NULL AND d.deleted_at IS NULL AND d.excluded = false AND ${sql.raw(`d.${col}`)} != ''
+      GROUP BY ${sql.raw(`d.${col}`)} ORDER BY count DESC LIMIT 50
+    `);
+  };
 
   const [ozellikDist, fiyatDist, yerTalebiDist, gunTalebiDist, ilkHayvanDist, safiDist] = await Promise.all([
     distQuery("ozellik"),
@@ -574,42 +578,45 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
 
   const projectKAIds = await db.select({ id: kesimAlanlariTable.id })
     .from(kesimAlanlariTable)
-    .where(eq(kesimAlanlariTable.projectId, projectId));
+    .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
   const validKAIds = new Set(projectKAIds.map(k => k.id));
 
-  const maxSortResult = await db.execute(sql`
-    SELECT COALESCE(MAX(sort_order), -1)::int AS max_sort
-    FROM donations
-    WHERE kesim_alani_id = ${targetKesimAlaniId} AND deleted_at IS NULL
-  `);
-  let nextSort = ((maxSortResult.rows[0] as { max_sort: number })?.max_sort ?? -1) + 1;
-
-  const MOVE_CHUNK = 500;
   let movedCount = 0;
-  for (let i = 0; i < idsToMove.length; i += MOVE_CHUNK) {
-    const chunk = idsToMove.slice(i, i + MOVE_CHUNK);
-    const result = await db.update(donationsTable)
-      .set({ kesimAlaniId: targetKesimAlaniId, updatedAt: new Date() })
-      .where(and(
-        inArray(donationsTable.id, chunk),
-        inArray(donationsTable.kesimAlaniId, [...validKAIds]),
-        isNull(donationsTable.deletedAt),
-      ))
-      .returning({ id: donationsTable.id });
 
-    if (result.length > 0) {
-      const caseParts = result.map((r, idx) =>
-        sql`WHEN ${r.id} THEN ${nextSort + idx}`
-      );
-      const ids = result.map(r => r.id);
-      await db.execute(sql`
-        UPDATE donations SET sort_order = CASE id ${sql.join(caseParts, sql` `)} END
-        WHERE id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})
-      `);
-      nextSort += result.length;
+  await db.transaction(async (tx) => {
+    const maxSortResult = await tx.execute(sql`
+      SELECT COALESCE(MAX(sort_order), -1)::int AS max_sort
+      FROM donations
+      WHERE kesim_alani_id = ${targetKesimAlaniId} AND deleted_at IS NULL
+    `);
+    let nextSort = ((maxSortResult.rows[0] as { max_sort: number })?.max_sort ?? -1) + 1;
+
+    const MOVE_CHUNK = 500;
+    for (let i = 0; i < idsToMove.length; i += MOVE_CHUNK) {
+      const chunk = idsToMove.slice(i, i + MOVE_CHUNK);
+      const result = await tx.update(donationsTable)
+        .set({ kesimAlaniId: targetKesimAlaniId, updatedAt: new Date() })
+        .where(and(
+          inArray(donationsTable.id, chunk),
+          inArray(donationsTable.kesimAlaniId, [...validKAIds]),
+          isNull(donationsTable.deletedAt),
+        ))
+        .returning({ id: donationsTable.id });
+
+      if (result.length > 0) {
+        const caseParts = result.map((r, idx) =>
+          sql`WHEN ${r.id} THEN ${nextSort + idx}`
+        );
+        const ids = result.map(r => r.id);
+        await tx.execute(sql`
+          UPDATE donations SET sort_order = CASE id ${sql.join(caseParts, sql` `)} END
+          WHERE id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})
+        `);
+        nextSort += result.length;
+      }
+      movedCount += result.length;
     }
-    movedCount += result.length;
-  }
+  });
 
   refreshProjectStats();
   res.json({ success: true, moved: movedCount, alreadyInTarget, skipped: skipExisting ? alreadyInTarget : 0 });
@@ -635,7 +642,7 @@ router.post("/projects/:id/donations/bulk-action", asyncHandler(async (req, res)
 
   const projectKAIds = await db.select({ id: kesimAlanlariTable.id })
     .from(kesimAlanlariTable)
-    .where(eq(kesimAlanlariTable.projectId, projectId));
+    .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
   const validKAIds = projectKAIds.map(k => k.id);
 
   const CHUNK = 500;
@@ -672,19 +679,22 @@ router.post("/projects/:id/donations/bulk-action", asyncHandler(async (req, res)
   res.json({ success: true, affected });
 }));
 
+const vekaletCheckSchema = z.object({
+  vekalets: z.array(z.string().trim().min(1)).min(1).max(10000),
+});
+
 router.post("/projects/:id/donations/vekalet-check", asyncHandler(async (req, res) => {
   const projectId = req.params.id;
-  const body = req.body;
-  const vekalets: string[] = Array.isArray(body?.vekalets)
-    ? body.vekalets.map((v: unknown) => String(v).trim()).filter(Boolean)
-    : typeof body?.vekalets === "string"
-      ? body.vekalets.split(",").map((v: string) => v.trim()).filter(Boolean)
-      : [];
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
 
-  if (vekalets.length === 0) {
+  const parsed = vekaletCheckSchema.safeParse(req.body);
+  if (!parsed.success) {
     res.json({ conflicts: [] });
     return;
   }
+
+  const vekalets = parsed.data.vekalets;
 
   const kaRows = await db.select({ id: kesimAlanlariTable.id, name: kesimAlanlariTable.name })
     .from(kesimAlanlariTable)
