@@ -847,21 +847,6 @@ router.post("/projects/:projectId/donations/:id/flag", asyncHandler(async (req, 
   res.json({ success: true });
 }));
 
-router.post("/donations/:id/flag", asyncHandler(async (req, res) => {
-  const donationId = req.params.id;
-  const parsed = flagSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA });
-    return;
-  }
-  const [donation] = await db.select().from(donationsTable).where(and(eq(donationsTable.id, donationId), isNull(donationsTable.deletedAt)));
-  if (!donation) { res.status(404).json({ error: "Bağış bulunamadı" }); return; }
-  await db.update(donationsTable)
-    .set({ isFlagged: true, flagReason: parsed.data.reason, flagResolvedAt: null, updatedAt: new Date() })
-    .where(eq(donationsTable.id, donationId));
-  res.json({ success: true });
-}));
-
 router.post("/projects/:projectId/donations/:id/unflag", asyncHandler(async (req, res) => {
   const { projectId, id: donationId } = req.params;
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -874,6 +859,18 @@ router.post("/projects/:projectId/donations/:id/unflag", asyncHandler(async (req
   if (!donation) { res.status(404).json({ error: "Bağış bulunamadı" }); return; }
   await db.update(donationsTable)
     .set({ isFlagged: false, flagReason: "", flagResolvedAt: new Date(), updatedAt: new Date() })
+    .where(eq(donationsTable.id, donationId));
+  res.json({ success: true });
+}));
+
+router.post("/donations/:id/flag", asyncHandler(async (req, res) => {
+  const donationId = req.params.id;
+  const parsed = flagSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA }); return; }
+  const [donation] = await db.select().from(donationsTable).where(and(eq(donationsTable.id, donationId), isNull(donationsTable.deletedAt)));
+  if (!donation) { res.status(404).json({ error: "Bağış bulunamadı" }); return; }
+  await db.update(donationsTable)
+    .set({ isFlagged: true, flagReason: parsed.data.reason, flagResolvedAt: null, updatedAt: new Date() })
     .where(eq(donationsTable.id, donationId));
   res.json({ success: true });
 }));
