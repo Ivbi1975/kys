@@ -17,6 +17,7 @@ import {
   transferDonationsToKA, createKesimAlani,
   fetchTags, createTag,
   flagDonation, unflagDonation,
+  updatePoolDonationField,
 } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -31,7 +32,7 @@ import { BulkTagDialog } from "./bagis-havuzu/BulkTagDialog";
 import { AutomationRulesPanel } from "./bagis-havuzu/AutomationRulesPanel";
 import { BulkNoteDialog } from "./bagis-havuzu/BulkNoteDialog";
 import { ALL_TABLE_COLUMNS, PAGE_SIZE, type TableColumnKey } from "./bagis-havuzu/types";
-import type { CustomTag } from "@/lib/types";
+import type { CustomTag, PoolDonation } from "@/lib/types";
 
 function parseUrlMulti(val: string | null): string[] {
   if (!val) return [];
@@ -335,6 +336,30 @@ export default function BagisHavuzuPage() {
       toast({ title: "Hata", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
     }
   }, [invalidatePool, toast]);
+
+  const handleInlineEdit = useCallback(async (donationId: string, field: string, value: string) => {
+    const queryKey = ["pool-donations", projectId];
+    queryClient.setQueriesData<{ items: PoolDonation[]; total: number; kesimAlanlari: { id: string; name: string }[]; allFilteredIds: string[] }>(
+      { queryKey },
+      (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          items: old.items.map(d =>
+            d.id === donationId ? { ...d, [field]: value } : d
+          ),
+        };
+      },
+    );
+
+    try {
+      await updatePoolDonationField(projectId, donationId, field, value);
+      invalidatePool();
+    } catch (err) {
+      invalidatePool();
+      toast({ title: "Güncelleme hatası", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+    }
+  }, [projectId, queryClient, invalidatePool, toast]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectAllPages(false);
@@ -773,6 +798,7 @@ export default function BagisHavuzuPage() {
           onColumnSort={handleColumnSort}
           onFlagDonation={handleFlagDonation}
           onUnflagDonation={handleUnflagDonation}
+          onInlineEdit={handleInlineEdit}
         />
 
         {totalPages > 1 && (

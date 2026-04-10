@@ -25,6 +25,12 @@ const SORT_KEY_MAP: Partial<Record<TableColumnKey, string>> = {
   kesimAlani: "kesimAlaniId",
 };
 
+const EDITABLE_COLUMNS: Set<TableColumnKey> = new Set([
+  "vekalet", "name", "description", "donationType",
+  "birim", "temsilci", "ozellik", "fiyat",
+  "yerTalebi", "gunTalebi", "ilkHayvan", "safi", "notes",
+]);
+
 interface VirtualizedDonationTableProps {
   items: PoolDonation[];
   isLoading: boolean;
@@ -39,6 +45,7 @@ interface VirtualizedDonationTableProps {
   onColumnSort: (colKey: string) => void;
   onFlagDonation?: (id: string, reason: string) => void;
   onUnflagDonation?: (id: string) => void;
+  onInlineEdit?: (donationId: string, field: string, value: string) => void;
 }
 
 const ROW_HEIGHT = 36;
@@ -65,36 +72,27 @@ const COLUMN_WIDTHS: Record<TableColumnKey, number> = {
 const CHECKBOX_WIDTH = 40;
 const FLAG_ACTION_WIDTH = 32;
 
-function renderCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean) {
+function getFieldValue(d: PoolDonation, key: TableColumnKey): string {
   switch (key) {
-    case "vekalet":
-      return (
-        <>
-          {d.isFlagged && (
-            <span className="mr-1 text-amber-500" title={d.flagReason || "Sorunlu bağış"}>
-              <AlertTriangle className="w-3 h-3 inline" />
-            </span>
-          )}
-          {d.vekalet || "—"}
-          {isMultiLoc && (
-            <span className="ml-1 text-orange-500" title="Bu vekalet birden fazla listede mevcut">
-              <AlertTriangle className="w-3 h-3 inline" />
-            </span>
-          )}
-        </>
-      );
-    case "name": return <span className="font-medium">{d.name || "—"}</span>;
-    case "description": return d.description || "—";
-    case "donationType": return d.donationType || "—";
-    case "birim": return d.birim || "—";
-    case "temsilci": return d.temsilci || "—";
-    case "ozellik": return d.ozellik || "—";
-    case "fiyat": return d.fiyat || "—";
-    case "yerTalebi": return d.yerTalebi || "—";
-    case "gunTalebi": return d.gunTalebi || "—";
-    case "ilkHayvan": return d.ilkHayvan || "—";
-    case "safi": return d.safi || "—";
-    case "notes": return <span className="max-w-[150px] truncate block" title={d.notes}>{d.notes || "—"}</span>;
+    case "vekalet": return d.vekalet || "";
+    case "name": return d.name || "";
+    case "description": return d.description || "";
+    case "donationType": return d.donationType || "";
+    case "birim": return d.birim || "";
+    case "temsilci": return d.temsilci || "";
+    case "ozellik": return d.ozellik || "";
+    case "fiyat": return d.fiyat || "";
+    case "yerTalebi": return d.yerTalebi || "";
+    case "gunTalebi": return d.gunTalebi || "";
+    case "ilkHayvan": return d.ilkHayvan || "";
+    case "safi": return d.safi || "";
+    case "notes": return d.notes || "";
+    default: return "";
+  }
+}
+
+function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean) {
+  switch (key) {
     case "kesimAlani": return <Badge variant="outline" className="text-xs">{d.kesimAlaniName}</Badge>;
     case "durum": {
       const { label, color } = getStatusLabel(d);
@@ -116,6 +114,30 @@ function renderCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean) {
         </>
       );
     default: return "—";
+  }
+}
+
+function renderDisplayValue(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean) {
+  switch (key) {
+    case "vekalet":
+      return (
+        <>
+          {d.isFlagged && (
+            <span className="mr-1 text-amber-500" title={d.flagReason || "Sorunlu bağış"}>
+              <AlertTriangle className="w-3 h-3 inline" />
+            </span>
+          )}
+          {d.vekalet || "—"}
+          {isMultiLoc && (
+            <span className="ml-1 text-orange-500" title="Bu vekalet birden fazla listede mevcut">
+              <AlertTriangle className="w-3 h-3 inline" />
+            </span>
+          )}
+        </>
+      );
+    case "name": return <span className="font-medium">{d.name || "—"}</span>;
+    case "notes": return <span className="max-w-[150px] truncate block" title={d.notes}>{d.notes || "—"}</span>;
+    default: return getFieldValue(d, key) || "—";
   }
 }
 
@@ -176,11 +198,63 @@ function FlagAction({ d, onFlag, onUnflag }: { d: PoolDonation; onFlag?: (id: st
   );
 }
 
+function InlineEditInput({
+  initialValue,
+  onCommit,
+  onCancel,
+  onTab,
+}: {
+  initialValue: string;
+  onCommit: (value: string) => void;
+  onCancel: () => void;
+  onTab: (shiftKey: boolean) => void;
+}) {
+  const [value, setValue] = useState(initialValue);
+  const committedRef = useRef(false);
+
+  const commit = useCallback(() => {
+    if (committedRef.current) return;
+    committedRef.current = true;
+    if (value !== initialValue) {
+      onCommit(value);
+    } else {
+      onCancel();
+    }
+  }, [value, initialValue, onCommit, onCancel]);
+
+  return (
+    <Input
+      className="h-7 text-xs ring-2 ring-primary/40 bg-primary/5 w-full"
+      value={value}
+      onChange={(e) => { committedRef.current = false; setValue(e.target.value); }}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commit();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          committedRef.current = true;
+          onCancel();
+        } else if (e.key === "Tab") {
+          e.preventDefault();
+          commit();
+          onTab(e.shiftKey);
+        }
+      }}
+      autoFocus
+    />
+  );
+}
+
 export function VirtualizedDonationTable({
   items, isLoading, activeFilterCount, selectedIds, toggleSelect, toggleSelectAll, multiLocationVekalets, visibleColumns,
-  sortBy, sortDir, onColumnSort, onFlagDonation, onUnflagDonation,
+  sortBy, sortDir, onColumnSort, onFlagDonation, onUnflagDonation, onInlineEdit,
 }: VirtualizedDonationTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<TableColumnKey | null>(null);
+
   const rowVirtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => parentRef.current,
@@ -189,6 +263,7 @@ export function VirtualizedDonationTable({
   });
 
   const cols = ALL_TABLE_COLUMNS.filter(c => visibleColumns.has(c.key));
+  const editableCols = cols.filter(c => EDITABLE_COLUMNS.has(c.key));
   const tableWidth = getTableWidth(cols);
 
   const handleHeaderClick = useCallback((colKey: TableColumnKey) => {
@@ -208,6 +283,50 @@ export function VirtualizedDonationTable({
     }
     return <ArrowUpDown className="w-3 h-3 text-muted-foreground/40" />;
   }, [sortBy, sortDir]);
+
+  const startEditing = useCallback((id: string, field: TableColumnKey) => {
+    if (!onInlineEdit || !EDITABLE_COLUMNS.has(field)) return;
+    setEditingId(id);
+    setEditingField(field);
+  }, [onInlineEdit]);
+
+  const clearEditing = useCallback(() => {
+    setEditingId(null);
+    setEditingField(null);
+  }, []);
+
+  const handleCommit = useCallback((donationId: string, field: TableColumnKey, value: string) => {
+    onInlineEdit?.(donationId, field, value);
+    clearEditing();
+  }, [onInlineEdit, clearEditing]);
+
+  const handleTab = useCallback((donationId: string, currentField: TableColumnKey, shiftKey: boolean) => {
+    const currentIdx = editableCols.findIndex(c => c.key === currentField);
+    if (currentIdx < 0) { clearEditing(); return; }
+
+    const rowIdx = items.findIndex(d => d.id === donationId);
+    if (rowIdx < 0) { clearEditing(); return; }
+
+    if (!shiftKey) {
+      if (currentIdx < editableCols.length - 1) {
+        setEditingField(editableCols[currentIdx + 1].key);
+      } else if (rowIdx < items.length - 1) {
+        setEditingId(items[rowIdx + 1].id);
+        setEditingField(editableCols[0].key);
+      } else {
+        clearEditing();
+      }
+    } else {
+      if (currentIdx > 0) {
+        setEditingField(editableCols[currentIdx - 1].key);
+      } else if (rowIdx > 0) {
+        setEditingId(items[rowIdx - 1].id);
+        setEditingField(editableCols[editableCols.length - 1].key);
+      } else {
+        clearEditing();
+      }
+    }
+  }, [editableCols, items, clearEditing]);
 
   return (
     <div className="border rounded-lg overflow-hidden">
@@ -256,6 +375,7 @@ export function VirtualizedDonationTable({
                 const d = items[virtualRow.index];
                 const isSelected = selectedIds.has(d.id);
                 const isMultiLoc = multiLocationVekalets.has((d.vekalet || "").trim());
+                const isRowEditing = editingId === d.id;
                 return (
                   <div
                     key={d.id}
@@ -277,11 +397,41 @@ export function VirtualizedDonationTable({
                               {isSelected ? <CheckSquare className="w-4 h-4 text-primary" /> : <Square className="w-4 h-4" />}
                             </button>
                           </td>
-                          {cols.map(col => (
-                            <td key={col.key} className={`p-2 text-xs overflow-hidden text-ellipsis whitespace-nowrap ${col.key === "vekalet" ? "font-mono" : ""}`}>
-                              {renderCell(d, col.key, isMultiLoc)}
-                            </td>
-                          ))}
+                          {cols.map(col => {
+                            const isEditable = EDITABLE_COLUMNS.has(col.key) && !!onInlineEdit;
+                            const isCellEditing = isRowEditing && editingField === col.key;
+
+                            if (isCellEditing) {
+                              return (
+                                <td key={col.key} className="p-1">
+                                  <InlineEditInput
+                                    initialValue={getFieldValue(d, col.key)}
+                                    onCommit={(val) => handleCommit(d.id, col.key, val)}
+                                    onCancel={clearEditing}
+                                    onTab={(shift) => handleTab(d.id, col.key, shift)}
+                                  />
+                                </td>
+                              );
+                            }
+
+                            if (isEditable) {
+                              return (
+                                <td
+                                  key={col.key}
+                                  className={`p-2 text-xs overflow-hidden text-ellipsis whitespace-nowrap cursor-text hover:bg-muted/50 ${col.key === "vekalet" ? "font-mono" : ""}`}
+                                  onClick={() => startEditing(d.id, col.key)}
+                                >
+                                  {renderDisplayValue(d, col.key, isMultiLoc)}
+                                </td>
+                              );
+                            }
+
+                            return (
+                              <td key={col.key} className={`p-2 text-xs overflow-hidden text-ellipsis whitespace-nowrap ${col.key === "vekalet" ? "font-mono" : ""}`}>
+                                {renderReadOnlyCell(d, col.key, isMultiLoc)}
+                              </td>
+                            );
+                          })}
                           <td className="p-1 text-center" style={{ width: 32 }}>
                             <FlagAction d={d} onFlag={onFlagDonation} onUnflag={onUnflagDonation} />
                           </td>

@@ -193,6 +193,18 @@ export interface VekaletConflict {
   kesimAlaniName: string;
 }
 
+export async function updatePoolDonationField(
+  projectId: string,
+  donationId: string,
+  field: string,
+  value: string,
+): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/projects/${projectId}/donations/${donationId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ field, value }),
+  });
+}
+
 export async function checkVekaletConflicts(projectId: string, vekalets: string[]): Promise<{ conflicts: VekaletConflict[] }> {
   return apiFetch<{ conflicts: VekaletConflict[] }>(
     `/projects/${projectId}/donations/vekalet-check`, {

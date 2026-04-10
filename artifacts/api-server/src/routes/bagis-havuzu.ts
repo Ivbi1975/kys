@@ -1095,6 +1095,47 @@ router.post("/donations/:id/unflag", asyncHandler(async (req, res) => {
   res.json({ success: true });
 }));
 
+const EDITABLE_POOL_FIELDS = new Set([
+  "vekalet", "name", "description", "donationType", "notes",
+  "birim", "temsilci", "ozellik", "fiyat",
+  "yerTalebi", "gunTalebi", "ilkHayvan", "safi",
+]);
+
+const inlineEditSchema = z.object({
+  field: z.string().refine(f => EDITABLE_POOL_FIELDS.has(f), { message: "Invalid field" }),
+  value: z.string().max(5000),
+});
+
+router.patch("/projects/:projectId/donations/:id", asyncHandler(async (req, res) => {
+  const { projectId, id: donationId } = req.params;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const parsed = inlineEditSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA }); return; }
+
+  const projectKAs = await db.select({ id: kesimAlanlariTable.id })
+    .from(kesimAlanlariTable)
+    .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
+  const kaIds = projectKAs.map(k => k.id);
+  if (kaIds.length === 0) { res.status(404).json({ error: "Bağış bulunamadı" }); return; }
+
+  const [donation] = await db.select().from(donationsTable)
+    .where(and(
+      eq(donationsTable.id, donationId),
+      isNull(donationsTable.deletedAt),
+      inArray(donationsTable.kesimAlaniId, kaIds),
+    ));
+  if (!donation) { res.status(404).json({ error: "Bağış bulunamadı" }); return; }
+
+  await db.update(donationsTable)
+    .set({ [parsed.data.field]: parsed.data.value, updatedAt: new Date() })
+    .where(eq(donationsTable.id, donationId));
+
+  invalidateKACache();
+  res.json({ success: true });
+}));
+
 const bulkNotesSchema = z.object({
   donationIds: z.array(z.string()).min(1).max(50000),
   note: z.string().min(1).max(5000),
