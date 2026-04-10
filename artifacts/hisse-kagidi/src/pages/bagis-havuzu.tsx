@@ -199,7 +199,7 @@ export default function BagisHavuzuPage() {
 
   const excludeFieldsStr = useMemo(() => [...excludeFields].join(","), [excludeFields]);
 
-  const filters = useMemo(() => ({
+  const statsFilters = useMemo(() => ({
     search: debouncedSearch || undefined,
     status: statusFilter || undefined,
     donationType: donationTypeFilter.length ? serializeMulti(donationTypeFilter) : undefined,
@@ -215,21 +215,25 @@ export default function BagisHavuzuPage() {
     safi: safiFilter.length ? serializeMulti(safiFilter) : undefined,
     tagIds: tagFilter.length ? serializeMulti(tagFilter) : undefined,
     notesFilter: notesFilter || undefined,
-    sortBy: sortBy !== "sortOrder" ? sortBy : undefined,
-    sortDir: sortDir !== "asc" ? sortDir : undefined,
-    sortBy2: sortBy2 || undefined,
-    sortDir2: sortDir2 !== "asc" ? sortDir2 : undefined,
-    sortBy3: sortBy3 || undefined,
-    sortDir3: sortDir3 !== "asc" ? sortDir3 : undefined,
     shareCountMin: shareCountMin ? Number(shareCountMin) : undefined,
     shareCountMax: shareCountMax ? Number(shareCountMax) : undefined,
     excludeFields: excludeFieldsStr || undefined,
     dateField: dateField !== "updatedAt" ? dateField : undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
+  }), [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter, notesFilter, shareCountMin, shareCountMax, excludeFieldsStr, dateField, dateFrom, dateTo]);
+
+  const filters = useMemo(() => ({
+    ...statsFilters,
+    sortBy: sortBy !== "sortOrder" ? sortBy : undefined,
+    sortDir: sortDir !== "asc" ? sortDir : undefined,
+    sortBy2: sortBy2 || undefined,
+    sortDir2: sortDir2 !== "asc" ? sortDir2 : undefined,
+    sortBy3: sortBy3 || undefined,
+    sortDir3: sortDir3 !== "asc" ? sortDir3 : undefined,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
-  }), [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter, notesFilter, sortBy, sortDir, sortBy2, sortDir2, sortBy3, sortDir3, shareCountMin, shareCountMax, excludeFieldsStr, dateField, dateFrom, dateTo, page]);
+  }), [statsFilters, sortBy, sortDir, sortBy2, sortDir2, sortBy3, sortDir3, page]);
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["pool-donations", projectId, filters],
@@ -239,9 +243,10 @@ export default function BagisHavuzuPage() {
   });
 
   const { data: stats } = useQuery({
-    queryKey: ["pool-stats", projectId],
-    queryFn: () => fetchPoolStats(projectId),
+    queryKey: ["pool-stats", projectId, statsFilters],
+    queryFn: () => fetchPoolStats(projectId, statsFilters),
     enabled: !!projectId,
+    placeholderData: (prev) => prev,
   });
 
   const { data: globalTags = [] } = useQuery({

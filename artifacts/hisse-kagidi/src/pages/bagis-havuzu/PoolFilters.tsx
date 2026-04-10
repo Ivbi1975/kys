@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -103,10 +103,18 @@ function MultiSelectDropdown({
     onChange(selected.includes(val) ? selected.filter(s => s !== val) : [...selected, val]);
   }, [selected, onChange]);
 
-  const optMap = new Map(options.map(o => [o.value, o]));
+  const mergedOptions = useMemo(() => {
+    const optSet = new Set(options.map(o => o.value));
+    const missing: typeof options = selected
+      .filter(s => !optSet.has(s))
+      .map(s => ({ value: s, count: 0, label: undefined, color: undefined }));
+    return [...options, ...missing];
+  }, [options, selected]);
+
+  const optMap = new Map(mergedOptions.map(o => [o.value, o]));
   const getDisplay = (val: string) => optMap.get(val)?.label || val;
 
-  const filtered = options.filter(o => {
+  const filtered = mergedOptions.filter(o => {
     if (!filterText) return true;
     const text = (o.label || o.value).toLocaleLowerCase("tr");
     return text.includes(filterText.toLocaleLowerCase("tr"));

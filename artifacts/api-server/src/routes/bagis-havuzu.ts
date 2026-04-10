@@ -24,6 +24,116 @@ function parseMultiValue(val: unknown): string[] {
   return val.split(",").map(v => v.trim()).filter(Boolean);
 }
 
+function buildStatsFilterSQL(projectId: string, query: Record<string, unknown>) {
+  const parts: ReturnType<typeof sql>[] = [
+    sql`ka.project_id = ${projectId}`,
+    sql`ka.deleted_at IS NULL`,
+    sql`d.deleted_at IS NULL`,
+  ];
+
+  const status = typeof query.status === "string" ? query.status : "";
+  if (status === "excluded") parts.push(sql`d.excluded = true`);
+  else if (status === "active") parts.push(sql`d.excluded = false`);
+
+  const excludeFieldsArr = parseMultiValue(query.excludeFields);
+  const excludeSet = new Set(excludeFieldsArr);
+
+  const search = typeof query.search === "string" ? query.search.trim() : "";
+  if (search) {
+    const pattern = `%${search}%`;
+    parts.push(sql`(d.name ILIKE ${pattern} OR d.description ILIKE ${pattern} OR d.vekalet ILIKE ${pattern} OR d.notes ILIKE ${pattern} OR d.phone ILIKE ${pattern} OR d.birim ILIKE ${pattern} OR d.temsilci ILIKE ${pattern} OR d.ozellik ILIKE ${pattern} OR d.fiyat ILIKE ${pattern} OR d.yer_talebi ILIKE ${pattern} OR d.gun_talebi ILIKE ${pattern} OR d.ilk_hayvan ILIKE ${pattern} OR d.safi ILIKE ${pattern})`);
+  }
+
+  function addMulti(col: string, values: string[], fieldName: string) {
+    if (values.length === 0) return;
+    if (excludeSet.has(fieldName)) {
+      if (values.length === 1) {
+        parts.push(sql`(${sql.raw(`d.${col}`)} IS NULL OR ${sql.raw(`d.${col}`)} = '' OR ${sql.raw(`d.${col}`)} != ${values[0]})`);
+      } else {
+        parts.push(sql`(${sql.raw(`d.${col}`)} IS NULL OR ${sql.raw(`d.${col}`)} = '' OR ${sql.raw(`d.${col}`)} NOT IN (${sql.join(values.map(v => sql`${v}`), sql`, `)}))`);
+      }
+    } else {
+      if (values.length === 1) parts.push(sql`${sql.raw(`d.${col}`)} = ${values[0]}`);
+      else parts.push(sql`${sql.raw(`d.${col}`)} IN (${sql.join(values.map(v => sql`${v}`), sql`, `)})`);
+    }
+  }
+
+  addMulti("donation_type", parseMultiValue(query.donationType), "donationType");
+  addMulti("birim", parseMultiValue(query.birim), "birim");
+  addMulti("temsilci", parseMultiValue(query.temsilci), "temsilci");
+  addMulti("ozellik", parseMultiValue(query.ozellik), "ozellik");
+  addMulti("fiyat", parseMultiValue(query.fiyat), "fiyat");
+  addMulti("yer_talebi", parseMultiValue(query.yerTalebi), "yerTalebi");
+  addMulti("gun_talebi", parseMultiValue(query.gunTalebi), "gunTalebi");
+  addMulti("ilk_hayvan", parseMultiValue(query.ilkHayvan), "ilkHayvan");
+  addMulti("safi", parseMultiValue(query.safi), "safi");
+
+  const kesimAlaniId = typeof query.kesimAlaniId === "string" ? query.kesimAlaniId.trim() : "";
+  if (kesimAlaniId) parts.push(sql`d.kesim_alani_id = ${kesimAlaniId}`);
+
+  const tagIdValues = parseMultiValue(query.tagIds);
+  if (tagIdValues.length > 0) {
+    const tagSub = sql`d.id IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id IN (${sql.join(tagIdValues.map(t => sql`${t}`), sql`, `)}))`;
+    if (excludeSet.has("tags")) {
+      parts.push(sql`NOT (${tagSub})`);
+    } else {
+      parts.push(tagSub);
+    }
+  }
+
+  const shareCountMin = query.shareCountMin ? Number(query.shareCountMin) : null;
+  const shareCountMax = query.shareCountMax ? Number(query.shareCountMax) : null;
+  if (shareCountMin !== null && !isNaN(shareCountMin)) parts.push(sql`d.share_count >= ${shareCountMin}`);
+  if (shareCountMax !== null && !isNaN(shareCountMax)) parts.push(sql`d.share_count <= ${shareCountMax}`);
+
+  const aiCategory = typeof query.aiCategory === "string" ? query.aiCategory.trim() : "";
+  if (aiCategory) {
+    if (excludeSet.has("aiCategory")) {
+      parts.push(sql`(d.ai_categories IS NULL OR d.ai_categories::text = '[]' OR NOT (d.ai_categories::text ILIKE ${'%' + aiCategory + '%'}))`);
+    } else {
+      parts.push(sql`d.ai_categories::text ILIKE ${'%' + aiCategory + '%'}`);
+    }
+  }
+
+  const notesFilter = typeof query.notesFilter === "string" ? query.notesFilter.trim() : "";
+  if (notesFilter) {
+    const noteTerms = notesFilter.split(",").map((t: string) => t.trim()).filter(Boolean);
+    for (const term of noteTerms) {
+      parts.push(sql`d.notes ILIKE ${'%' + term + '%'}`);
+    }
+  }
+
+  const dateField = typeof query.dateField === "string" ? query.dateField.trim() : "updatedAt";
+  const dateFrom = typeof query.dateFrom === "string" ? query.dateFrom.trim() : "";
+  const dateTo = typeof query.dateTo === "string" ? query.dateTo.trim() : "";
+
+  if (dateField === "transfer" && (dateFrom || dateTo)) {
+    const dtParts: ReturnType<typeof sql>[] = [sql`dt2.donation_id = d.id`];
+    if (dateFrom) {
+      const d = new Date(dateFrom);
+      if (!isNaN(d.getTime())) dtParts.push(sql`dt2.created_at >= ${d}`);
+    }
+    if (dateTo) {
+      const d = new Date(dateTo + "T23:59:59.999Z");
+      if (!isNaN(d.getTime())) dtParts.push(sql`dt2.created_at <= ${d}`);
+    }
+    if (dtParts.length > 1) {
+      parts.push(sql`EXISTS (SELECT 1 FROM donation_transfers dt2 WHERE ${sql.join(dtParts, sql` AND `)})`);
+    }
+  } else {
+    if (dateFrom) {
+      const d = new Date(dateFrom);
+      if (!isNaN(d.getTime())) parts.push(sql`d.updated_at >= ${d}`);
+    }
+    if (dateTo) {
+      const d = new Date(dateTo + "T23:59:59.999Z");
+      if (!isNaN(d.getTime())) parts.push(sql`d.updated_at <= ${d}`);
+    }
+  }
+
+  return sql.join(parts, sql` AND `);
+}
+
 router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   const projectId = req.params.id;
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -317,6 +427,8 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
   if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
 
+  const filterWhere = buildStatsFilterSQL(projectId, req.query as Record<string, unknown>);
+
   const result = await db.execute(sql`
     SELECT
       COUNT(d.id)::int AS total,
@@ -339,7 +451,7 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
     SELECT d.birim, COUNT(*)::int AS count, SUM(d.share_count)::int AS shares
     FROM donations d
     JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-    WHERE ka.project_id = ${projectId} AND ka.deleted_at IS NULL AND d.deleted_at IS NULL AND d.excluded = false AND d.birim != ''
+    WHERE ${filterWhere} AND d.birim != ''
     GROUP BY d.birim ORDER BY count DESC LIMIT 50
   `);
 
@@ -347,7 +459,7 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
     SELECT d.temsilci, COUNT(*)::int AS count, SUM(d.share_count)::int AS shares
     FROM donations d
     JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-    WHERE ka.project_id = ${projectId} AND ka.deleted_at IS NULL AND d.deleted_at IS NULL AND d.excluded = false AND d.temsilci != ''
+    WHERE ${filterWhere} AND d.temsilci != ''
     GROUP BY d.temsilci ORDER BY count DESC LIMIT 50
   `);
 
@@ -355,7 +467,7 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
     SELECT d.donation_type AS type, COUNT(*)::int AS count, SUM(d.share_count)::int AS shares
     FROM donations d
     JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-    WHERE ka.project_id = ${projectId} AND ka.deleted_at IS NULL AND d.deleted_at IS NULL AND d.excluded = false AND d.donation_type != ''
+    WHERE ${filterWhere} AND d.donation_type != ''
     GROUP BY d.donation_type ORDER BY count DESC LIMIT 50
   `);
 
@@ -363,7 +475,7 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
     SELECT ka.id, ka.name, COUNT(d.id)::int AS count, SUM(d.share_count)::int AS shares
     FROM donations d
     JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-    WHERE ka.project_id = ${projectId} AND ka.deleted_at IS NULL AND d.deleted_at IS NULL AND d.excluded = false
+    WHERE ${filterWhere}
     GROUP BY ka.id, ka.name ORDER BY ka.name
   `);
 
@@ -424,7 +536,7 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
       SELECT ${sql.raw(`d.${col}`)} AS value, COUNT(*)::int AS count
       FROM donations d
       JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-      WHERE ka.project_id = ${projectId} AND ka.deleted_at IS NULL AND d.deleted_at IS NULL AND d.excluded = false AND ${sql.raw(`d.${col}`)} != ''
+      WHERE ${filterWhere} AND ${sql.raw(`d.${col}`)} != ''
       GROUP BY ${sql.raw(`d.${col}`)} ORDER BY count DESC LIMIT 50
     `);
   };
@@ -440,11 +552,11 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
 
   const tagCountResult = await db.execute(sql`
     SELECT ct.id, ct.name, ct.color, COUNT(d.id)::int AS count
-    FROM custom_tags ct
-    LEFT JOIN donation_tags dt ON dt.tag_id = ct.id
-    LEFT JOIN donations d ON d.id = dt.donation_id AND d.deleted_at IS NULL AND d.excluded = false
-    LEFT JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id AND ka.deleted_at IS NULL
-    WHERE ka.project_id = ${projectId} OR dt.donation_id IS NULL
+    FROM donations d
+    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+    JOIN donation_tags dt ON dt.donation_id = d.id
+    JOIN custom_tags ct ON ct.id = dt.tag_id
+    WHERE ${filterWhere}
     GROUP BY ct.id, ct.name, ct.color
     ORDER BY count DESC
   `);

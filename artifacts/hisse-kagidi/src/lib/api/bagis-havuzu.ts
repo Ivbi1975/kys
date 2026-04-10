@@ -75,8 +75,33 @@ export async function fetchPoolDonations(projectId: string, filters: PoolFilters
   return apiFetch<PoolDonationsResponse>(`/projects/${projectId}/donations${qs ? `?${qs}` : ""}`);
 }
 
-export async function fetchPoolStats(projectId: string): Promise<PoolStats> {
-  return apiFetch<PoolStats>(`/projects/${projectId}/donations/stats`);
+export type StatsFilters = Omit<PoolFilters, 'sortBy' | 'sortDir' | 'sortBy2' | 'sortDir2' | 'sortBy3' | 'sortDir3' | 'limit' | 'offset'>;
+
+export async function fetchPoolStats(projectId: string, filters: StatsFilters = {}): Promise<PoolStats> {
+  const params = new URLSearchParams();
+  if (filters.search) params.set("search", filters.search);
+  if (filters.status) params.set("status", filters.status);
+  if (filters.donationType) params.set("donationType", filters.donationType);
+  if (filters.birim) params.set("birim", filters.birim);
+  if (filters.temsilci) params.set("temsilci", filters.temsilci);
+  if (filters.kesimAlaniId) params.set("kesimAlaniId", filters.kesimAlaniId);
+  if (filters.aiCategory) params.set("aiCategory", filters.aiCategory);
+  if (filters.ozellik) params.set("ozellik", filters.ozellik);
+  if (filters.fiyat) params.set("fiyat", filters.fiyat);
+  if (filters.yerTalebi) params.set("yerTalebi", filters.yerTalebi);
+  if (filters.gunTalebi) params.set("gunTalebi", filters.gunTalebi);
+  if (filters.ilkHayvan) params.set("ilkHayvan", filters.ilkHayvan);
+  if (filters.safi) params.set("safi", filters.safi);
+  if (filters.tagIds) params.set("tagIds", filters.tagIds);
+  if (filters.notesFilter) params.set("notesFilter", filters.notesFilter);
+  if (filters.shareCountMin !== undefined) params.set("shareCountMin", String(filters.shareCountMin));
+  if (filters.shareCountMax !== undefined) params.set("shareCountMax", String(filters.shareCountMax));
+  if (filters.excludeFields) params.set("excludeFields", filters.excludeFields);
+  if (filters.dateField) params.set("dateField", filters.dateField);
+  if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
+  if (filters.dateTo) params.set("dateTo", filters.dateTo);
+  const qs = params.toString();
+  return apiFetch<PoolStats>(`/projects/${projectId}/donations/stats${qs ? `?${qs}` : ""}`);
 }
 
 export type ImportDonationPayload = {
