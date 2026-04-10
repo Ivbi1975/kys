@@ -63,6 +63,7 @@ const COLUMN_WIDTHS: Record<TableColumnKey, number> = {
 };
 
 const CHECKBOX_WIDTH = 40;
+const FLAG_ACTION_WIDTH = 32;
 
 function renderCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean) {
   switch (key) {
@@ -125,12 +126,13 @@ function ColGroup({ cols }: { cols: { key: TableColumnKey; label: string }[] }) 
       {cols.map(col => (
         <col key={col.key} style={{ width: COLUMN_WIDTHS[col.key] }} />
       ))}
+      <col style={{ width: FLAG_ACTION_WIDTH }} />
     </colgroup>
   );
 }
 
 function getTableWidth(cols: { key: TableColumnKey }[]) {
-  return CHECKBOX_WIDTH + cols.reduce((sum, col) => sum + COLUMN_WIDTHS[col.key], 0);
+  return CHECKBOX_WIDTH + cols.reduce((sum, col) => sum + COLUMN_WIDTHS[col.key], 0) + FLAG_ACTION_WIDTH;
 }
 
 function FlagAction({ d, onFlag, onUnflag }: { d: PoolDonation; onFlag?: (id: string, reason: string) => void; onUnflag?: (id: string) => void }) {
@@ -237,6 +239,7 @@ export function VirtualizedDonationTable({
                     </th>
                   );
                 })}
+                <th style={{ width: FLAG_ACTION_WIDTH }} />
               </tr>
             </thead>
           </table>
