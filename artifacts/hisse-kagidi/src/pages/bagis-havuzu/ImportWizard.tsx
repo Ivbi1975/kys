@@ -162,7 +162,9 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
       resetImport();
       onSuccess();
     } catch (err) {
-      toast({ title: "Yükleme başarısız", description: err instanceof Error ? err.message : "Hata", variant: "destructive" });
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Bulk import error:", err);
+      toast({ title: "Yükleme başarısız", description: msg, variant: "destructive" });
     } finally {
       setImporting(false);
     }
