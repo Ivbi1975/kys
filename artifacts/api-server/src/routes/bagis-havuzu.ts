@@ -1095,15 +1095,20 @@ router.post("/donations/:id/unflag", asyncHandler(async (req, res) => {
   res.json({ success: true });
 }));
 
-const EDITABLE_POOL_FIELDS = new Set([
+const EDITABLE_POOL_STRING_FIELDS = new Set([
   "vekalet", "name", "description", "donationType", "notes",
   "birim", "temsilci", "ozellik", "fiyat",
-  "yerTalebi", "gunTalebi", "ilkHayvan", "safi",
+  "yerTalebi", "gunTalebi", "ilkHayvan", "safi", "phone",
 ]);
 
+const EDITABLE_POOL_NUMERIC_FIELDS = new Set(["shareCount"]);
+
 const inlineEditSchema = z.object({
-  field: z.string().refine(f => EDITABLE_POOL_FIELDS.has(f), { message: "Invalid field" }),
-  value: z.string().max(5000),
+  field: z.string().refine(
+    f => EDITABLE_POOL_STRING_FIELDS.has(f) || EDITABLE_POOL_NUMERIC_FIELDS.has(f),
+    { message: "Invalid field" },
+  ),
+  value: z.union([z.string().max(5000), z.number()]),
 });
 
 router.patch("/projects/:projectId/donations/:id", asyncHandler(async (req, res) => {

@@ -338,6 +338,10 @@ export default function BagisHavuzuPage() {
   }, [invalidatePool, toast]);
 
   const handleInlineEdit = useCallback(async (donationId: string, field: string, value: string) => {
+    const isNumeric = field === "shareCount";
+    const apiValue: string | number = isNumeric ? parseInt(value, 10) || 1 : value;
+    const cacheValue = isNumeric ? (parseInt(value, 10) || 1) : value;
+
     const queryKey = ["pool-donations", projectId];
     queryClient.setQueriesData<{ items: PoolDonation[]; total: number; kesimAlanlari: { id: string; name: string }[]; allFilteredIds: string[] }>(
       { queryKey },
@@ -346,14 +350,14 @@ export default function BagisHavuzuPage() {
         return {
           ...old,
           items: old.items.map(d =>
-            d.id === donationId ? { ...d, [field]: value } : d
+            d.id === donationId ? { ...d, [field]: cacheValue } : d
           ),
         };
       },
     );
 
     try {
-      await updatePoolDonationField(projectId, donationId, field, value);
+      await updatePoolDonationField(projectId, donationId, field, apiValue);
       invalidatePool();
     } catch (err) {
       invalidatePool();

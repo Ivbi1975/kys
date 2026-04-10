@@ -197,7 +197,7 @@ export async function updatePoolDonationField(
   projectId: string,
   donationId: string,
   field: string,
-  value: string,
+  value: string | number,
 ): Promise<{ success: boolean }> {
   return apiFetch<{ success: boolean }>(`/projects/${projectId}/donations/${donationId}`, {
     method: "PATCH",

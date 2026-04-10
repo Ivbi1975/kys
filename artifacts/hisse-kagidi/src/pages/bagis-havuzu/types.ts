@@ -1,6 +1,6 @@
 export type ColumnMapping = "name" | "description" | "donationType" | "shareCount" | "vekalet" | "notes" | "phone" | "birim" | "temsilci" | "ozellik" | "fiyat" | "yerTalebi" | "gunTalebi" | "ilkHayvan" | "safi" | "skip";
 
-export type TableColumnKey = "vekalet" | "name" | "description" | "donationType" | "birim" | "temsilci" | "notes" | "ozellik" | "fiyat" | "yerTalebi" | "gunTalebi" | "ilkHayvan" | "safi" | "kesimAlani" | "durum" | "aiEtiket";
+export type TableColumnKey = "vekalet" | "name" | "description" | "donationType" | "birim" | "temsilci" | "notes" | "ozellik" | "fiyat" | "yerTalebi" | "gunTalebi" | "ilkHayvan" | "safi" | "phone" | "shareCount" | "kesimAlani" | "durum" | "aiEtiket";
 
 export const POOL_COLUMN_OPTIONS: { value: ColumnMapping; label: string }[] = [
   { value: "name", label: "Adına Kesilen" },
@@ -52,6 +52,8 @@ export const ALL_TABLE_COLUMNS: { key: TableColumnKey; label: string; defaultVis
   { key: "gunTalebi", label: "Gün Talebi", defaultVisible: true },
   { key: "ilkHayvan", label: "İlk Hayvan", defaultVisible: true },
   { key: "safi", label: "Şafi", defaultVisible: true },
+  { key: "phone", label: "Telefon", defaultVisible: false },
+  { key: "shareCount", label: "Hisse", defaultVisible: false },
   { key: "notes", label: "Notlar", defaultVisible: true },
   { key: "kesimAlani", label: "Kesim Listesi", defaultVisible: true },
   { key: "durum", label: "Durum", defaultVisible: true },

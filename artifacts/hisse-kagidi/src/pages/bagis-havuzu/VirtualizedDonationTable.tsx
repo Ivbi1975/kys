@@ -22,6 +22,8 @@ const SORT_KEY_MAP: Partial<Record<TableColumnKey, string>> = {
   ilkHayvan: "ilkHayvan",
   safi: "safi",
   notes: "notes",
+  phone: "phone",
+  shareCount: "shareCount",
   kesimAlani: "kesimAlaniId",
 };
 
@@ -29,6 +31,7 @@ const EDITABLE_COLUMNS: Set<TableColumnKey> = new Set([
   "vekalet", "name", "description", "donationType",
   "birim", "temsilci", "ozellik", "fiyat",
   "yerTalebi", "gunTalebi", "ilkHayvan", "safi", "notes",
+  "phone", "shareCount",
 ]);
 
 interface VirtualizedDonationTableProps {
@@ -64,6 +67,8 @@ const COLUMN_WIDTHS: Record<TableColumnKey, number> = {
   ilkHayvan: 100,
   safi: 80,
   notes: 150,
+  phone: 110,
+  shareCount: 70,
   kesimAlani: 120,
   durum: 80,
   aiEtiket: 130,
@@ -87,6 +92,8 @@ function getFieldValue(d: PoolDonation, key: TableColumnKey): string {
     case "ilkHayvan": return d.ilkHayvan || "";
     case "safi": return d.safi || "";
     case "notes": return d.notes || "";
+    case "phone": return d.phone || "";
+    case "shareCount": return String(d.shareCount ?? 1);
     default: return "";
   }
 }
@@ -137,6 +144,8 @@ function renderDisplayValue(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
       );
     case "name": return <span className="font-medium">{d.name || "—"}</span>;
     case "notes": return <span className="max-w-[150px] truncate block" title={d.notes}>{d.notes || "—"}</span>;
+    case "phone": return d.phone || "—";
+    case "shareCount": return <span className="font-bold">{d.shareCount ?? 1}</span>;
     default: return getFieldValue(d, key) || "—";
   }
 }
