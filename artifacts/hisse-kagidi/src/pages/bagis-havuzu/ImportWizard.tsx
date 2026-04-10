@@ -256,7 +256,7 @@ export function ImportWizard({ open, onOpenChange, projectId, kesimAlanlari, onS
                             <SelectTrigger className={`h-8 text-xs ${mapping === "skip" ? "border-orange-400 bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-400 font-semibold" : ""}`}>
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="max-h-60 overflow-y-auto">
                               {POOL_COLUMN_OPTIONS.map(opt => (
                                 <SelectItem key={opt.value} value={opt.value}>
                                   {opt.value === "skip" ? <span className="text-orange-600 font-semibold flex items-center gap-1"><Ban className="w-3.5 h-3.5" />{opt.label}</span> : opt.label}
