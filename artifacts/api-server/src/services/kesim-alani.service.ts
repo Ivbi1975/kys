@@ -401,6 +401,7 @@ export async function getFullKesimAlani(id: string) {
       aiWarnings: d.ai_warnings,
       isFlagged: d.is_flagged ?? false,
       flagReason: d.flag_reason || "",
+      flagResolvedAt: d.flag_resolved_at ? new Date(d.flag_resolved_at) : null,
       ozellik: d.ozellik || "",
       fiyat: d.fiyat || "",
       yerTalebi: d.yer_talebi || "",

@@ -24,7 +24,7 @@ export function PoolBulkActions({ selectedCount, onTransferOpen, onBulkAction, o
           <StickyNote className="w-4 h-4 mr-1" />Not Ekle
         </Button>
         <Button size="sm" variant="outline" onClick={onTransferOpen}>
-          <ArrowRightLeft className="w-4 h-4 mr-1" />Listeye Aktar
+          <ArrowRightLeft className="w-4 h-4 mr-1" />Kesim Listesine Aktar
         </Button>
         <Button size="sm" variant="outline" onClick={() => onBulkAction("exclude")}>
           <X className="w-4 h-4 mr-1" />Sepetten Çıkar

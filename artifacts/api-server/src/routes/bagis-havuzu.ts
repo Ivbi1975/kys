@@ -15,6 +15,7 @@ import { asyncHandler } from "../middleware/error-handler";
 import { ERROR_MESSAGES } from "../lib/constants";
 import { refreshProjectStats } from "./projects";
 import { executeRules } from "../services/rule-engine.service";
+import { invalidateKACache } from "../services/kesim-alani.service";
 
 const router: IRouter = Router();
 
@@ -723,6 +724,7 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
     }
   });
 
+  invalidateKACache();
   refreshProjectStats();
   res.json({ success: true, moved: movedCount, alreadyInTarget, skipped: skipExisting ? alreadyInTarget : 0 });
 }));
@@ -780,6 +782,7 @@ router.post("/projects/:id/donations/bulk-action", asyncHandler(async (req, res)
     affected += result.length;
   }
 
+  invalidateKACache();
   refreshProjectStats();
   res.json({ success: true, affected });
 }));
@@ -911,6 +914,7 @@ router.post("/projects/:id/donations/bulk-tag", asyncHandler(async (req, res) =>
     }
   });
 
+  invalidateKACache();
   res.json({ success: true, affected });
 }));
 
@@ -1036,6 +1040,7 @@ router.post("/projects/:id/donations/bulk-notes", asyncHandler(async (req, res) 
     }
   }
 
+  invalidateKACache();
   res.json({ success: true, affected });
 }));
 
