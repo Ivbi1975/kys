@@ -23,10 +23,10 @@ export function PoolBulkActions({ selectedCount, onTransferOpen, onBulkAction, o
           <ArrowRightLeft className="w-4 h-4 mr-1" />Listeye Aktar
         </Button>
         <Button size="sm" variant="outline" onClick={() => onBulkAction("exclude")}>
-          <X className="w-4 h-4 mr-1" />Devre Dışı Bırak
+          <X className="w-4 h-4 mr-1" />Sepetten Çıkar
         </Button>
         <Button size="sm" variant="outline" onClick={() => onBulkAction("include")}>
-          <Undo2 className="w-4 h-4 mr-1" />Aktif Yap
+          <Undo2 className="w-4 h-4 mr-1" />Sepete Ekle
         </Button>
         <Button size="sm" variant="destructive" onClick={() => onBulkAction("delete")}>
           <Trash2 className="w-4 h-4 mr-1" />Sil

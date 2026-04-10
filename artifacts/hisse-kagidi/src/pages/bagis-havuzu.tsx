@@ -287,7 +287,7 @@ export default function BagisHavuzuPage() {
   const handleBulkAction = useCallback(async (action: "exclude" | "include" | "delete") => {
     const ids = [...effectiveSelectedIds];
     if (ids.length === 0) return;
-    const labels: Record<string, string> = { exclude: "sepete atıldı", include: "aktif yapıldı", delete: "silindi" };
+    const labels: Record<string, string> = { exclude: "sepetten çıkarıldı", include: "sepete eklendi", delete: "silindi" };
     try {
       const result = await bulkActionDonations(projectId, ids, action);
       toast({ title: `${result.affected} bağış ${labels[action]}` });

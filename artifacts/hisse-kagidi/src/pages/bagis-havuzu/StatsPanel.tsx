@@ -33,7 +33,7 @@ export function StatsPanel({ stats }: { stats: PoolStats }) {
             <div className="flex items-center gap-2">
               <ShoppingBasket className="w-4 h-4 text-orange-600" />
               <div>
-                <p className="text-xs text-muted-foreground">Devre Dışı</p>
+                <p className="text-xs text-muted-foreground">Sepet Dışı</p>
                 <p className="text-lg font-bold">{stats.excluded}</p>
               </div>
             </div>

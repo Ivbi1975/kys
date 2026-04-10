@@ -162,7 +162,7 @@ export function VirtualizedDonationTable({
         <div style={{ minWidth: tableWidth }}>
           <table className="w-full text-sm" style={{ tableLayout: "fixed", minWidth: tableWidth }}>
             <ColGroup cols={cols} />
-            <thead className="bg-muted/50 sticky top-0 z-10">
+            <thead className="bg-background sticky top-0 z-10 shadow-sm">
               <tr className="border-b">
                 <th className="p-2 text-center">
                   <button onClick={toggleSelectAll} className="text-muted-foreground hover:text-foreground">
