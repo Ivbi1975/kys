@@ -170,7 +170,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
           <td key={colKey} className={cellPad} data-group-cell={`${groupIdx}-${dIdx}-vekalet`}>
             <div className="flex items-center gap-0.5">
               {d.isFlagged && (
-                <AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" title={d.flagReason || "Sorunlu bağış"} />
+                <span title={d.flagReason || "Sorunlu bağış"}><AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" /></span>
               )}
               <LocalInput
                 className={inputClass}
