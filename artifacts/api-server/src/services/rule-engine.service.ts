@@ -78,7 +78,7 @@ function evaluateCondition(donation: Record<string, unknown>, condition: RuleCon
   const { field, operator, value } = condition;
 
   if (field === "tags") {
-    const tagValues = Array.isArray(value) ? value : [String(value)];
+    const tagValues = Array.isArray(value) ? value.map(String) : [String(value)];
     switch (operator) {
       case "in":
         return tagValues.some(t => donationTags.includes(t));
@@ -97,7 +97,7 @@ function evaluateCondition(donation: Record<string, unknown>, condition: RuleCon
     const raw = getFieldValue(donation, "aiCategories");
     let cats: string[] = [];
     try { const p = JSON.parse(raw); if (Array.isArray(p)) cats = p.map(String); } catch {}
-    const catValues = Array.isArray(value) ? value : [String(value)];
+    const catValues = Array.isArray(value) ? value.map(String) : [String(value)];
     switch (operator) {
       case "contains":
         return catValues.some(v => cats.some(c => c.toLowerCase().includes(v.toLowerCase())));
