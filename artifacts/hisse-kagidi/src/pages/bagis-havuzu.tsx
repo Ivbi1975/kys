@@ -34,6 +34,9 @@ import { BulkNoteDialog } from "./bagis-havuzu/BulkNoteDialog";
 import { CinsStatsBar } from "./bagis-havuzu/CinsStatsBar";
 import { ALL_TABLE_COLUMNS, PAGE_SIZE, type TableColumnKey } from "./bagis-havuzu/types";
 import type { CustomTag, PoolDonation } from "@/lib/types";
+import { BASKET_STORAGE_KEY, loadBasketFromStorage, saveBasketToStorage } from "@/components/kesim-alani/hooks/types";
+import type { BasketItem } from "@/components/kesim-alani/hooks/types";
+import type { TransferredItem } from "@/lib/api/bagis-havuzu";
 
 function parseUrlMulti(val: string | null): string[] {
   if (!val) return [];
@@ -476,6 +479,43 @@ export default function BagisHavuzuPage() {
       if (result.alreadyInTarget && result.alreadyInTarget > 0) {
         msg += ` (${result.alreadyInTarget} bağış zaten bu listede)`;
       }
+
+      if (result.moved > 0 && result.transferredItems && result.transferredItems.length > 0) {
+        const targetKAName = (creatingNewList && newListName.trim())
+          ? newListName.trim()
+          : kesimAlanlari.find(ka => ka.id === targetId)?.name || "";
+        const existingBasket = loadBasketFromStorage(projectId);
+        const seenIds = new Set(existingBasket.map(b => b.donationId));
+        const now = Date.now();
+        const newBasketItems: BasketItem[] = result.transferredItems
+          .filter(item => {
+            if (seenIds.has(item.id)) return false;
+            seenIds.add(item.id);
+            return true;
+          })
+          .map(item => ({
+            type: "donation" as const,
+            donationId: item.id,
+            kesimAlaniId: targetId,
+            kesimAlaniName: targetKAName,
+            name: item.name,
+            description: item.description || "",
+            donationType: item.donationType || "",
+            donorShareCount: item.shareCount || 1,
+            vekalet: item.vekalet || "",
+            donorNotes: item.notes || "",
+            addedAt: now,
+          }));
+        if (newBasketItems.length > 0) {
+          saveBasketToStorage([...existingBasket, ...newBasketItems], projectId);
+          try {
+            const channel = new BroadcastChannel(`basket-${projectId}`);
+            channel.postMessage({ type: "basket-update", items: [...existingBasket, ...newBasketItems] });
+            channel.close();
+          } catch {}
+        }
+      }
+
       toast({ title: msg });
       setSelectedIds(new Set());
       setSelectAllPages(false);
@@ -489,7 +529,7 @@ export default function BagisHavuzuPage() {
     } finally {
       setTransferring(false);
     }
-  }, [effectiveSelectedIds, transferTarget, creatingNewList, newListName, projectId, toast, invalidatePool]);
+  }, [effectiveSelectedIds, transferTarget, creatingNewList, newListName, projectId, toast, invalidatePool, kesimAlanlari]);
 
   const handleColumnSort = useCallback((colKey: string) => {
     setSortBy(prev => {

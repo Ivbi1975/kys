@@ -142,13 +142,23 @@ export async function bulkImportDonations(
   return { success: true, inserted: totalInserted };
 }
 
+export interface TransferredItem {
+  id: string;
+  name: string;
+  description: string;
+  donationType: string;
+  shareCount: number;
+  vekalet: string;
+  notes: string;
+}
+
 export async function transferDonationsToKA(
   projectId: string,
   donationIds: string[],
   targetKesimAlaniId: string,
   skipExisting?: boolean,
-): Promise<{ success: boolean; moved: number; alreadyInTarget?: number; skipped?: number }> {
-  return apiFetch<{ success: boolean; moved: number; alreadyInTarget?: number; skipped?: number }>(`/projects/${projectId}/donations/transfer`, {
+): Promise<{ success: boolean; moved: number; alreadyInTarget?: number; skipped?: number; transferredItems?: TransferredItem[] }> {
+  return apiFetch<{ success: boolean; moved: number; alreadyInTarget?: number; skipped?: number; transferredItems?: TransferredItem[] }>(`/projects/${projectId}/donations/transfer`, {
     method: "POST",
     body: JSON.stringify({ donationIds, targetKesimAlaniId, skipExisting }),
   });

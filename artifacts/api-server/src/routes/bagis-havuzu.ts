@@ -834,9 +834,42 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
     }
   });
 
+  let transferredItems: Array<{
+    id: string; name: string; description: string; donationType: string;
+    shareCount: number; vekalet: string; notes: string;
+  }> = [];
+  if (movedCount > 0) {
+    const FETCH_CHUNK = 500;
+    for (let i = 0; i < idsToMove.length; i += FETCH_CHUNK) {
+      const chunk = idsToMove.slice(i, i + FETCH_CHUNK);
+      const rows = await db.select({
+        id: donationsTable.id,
+        name: donationsTable.name,
+        description: donationsTable.description,
+        donationType: donationsTable.donationType,
+        shareCount: donationsTable.shareCount,
+        vekalet: donationsTable.vekalet,
+        notes: donationsTable.notes,
+      }).from(donationsTable).where(and(
+        inArray(donationsTable.id, chunk),
+        eq(donationsTable.kesimAlaniId, targetKesimAlaniId),
+        isNull(donationsTable.deletedAt),
+      ));
+      transferredItems.push(...rows.map(r => ({
+        id: r.id,
+        name: r.name ?? "",
+        description: r.description ?? "",
+        donationType: r.donationType ?? "",
+        shareCount: r.shareCount ?? 1,
+        vekalet: r.vekalet ?? "",
+        notes: r.notes ?? "",
+      })));
+    }
+  }
+
   invalidateKACache();
   refreshProjectStats();
-  res.json({ success: true, moved: movedCount, alreadyInTarget, skipped: skipExisting ? alreadyInTarget : 0 });
+  res.json({ success: true, moved: movedCount, alreadyInTarget, skipped: skipExisting ? alreadyInTarget : 0, transferredItems });
 }));
 
 const bulkUpdateSchema = z.object({
