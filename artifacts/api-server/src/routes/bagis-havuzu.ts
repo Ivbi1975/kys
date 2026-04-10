@@ -364,15 +364,21 @@ router.post("/projects/:id/donations/bulk-import", asyncHandler(async (req, res)
     ));
   const validKAIds = new Set(validKAs.map(k => k.id));
 
-  const sortOrderCounts = await db.execute(sql`
-    SELECT kesim_alani_id, MAX(sort_order)::int AS max_sort
-    FROM donations
-    WHERE kesim_alani_id = ANY(${kaIds}) AND deleted_at IS NULL
-    GROUP BY kesim_alani_id
-  `);
+  const sortOrderCounts = kaIds.length > 0
+    ? await db.select({
+        kesimAlaniId: donationsTable.kesimAlaniId,
+        maxSort: sql<number>`MAX(${donationsTable.sortOrder})::int`,
+      })
+      .from(donationsTable)
+      .where(and(
+        inArray(donationsTable.kesimAlaniId, kaIds),
+        isNull(donationsTable.deletedAt),
+      ))
+      .groupBy(donationsTable.kesimAlaniId)
+    : [];
   const sortOffsets: Record<string, number> = {};
-  for (const row of sortOrderCounts.rows as { kesim_alani_id: string; max_sort: number }[]) {
-    sortOffsets[row.kesim_alani_id] = (row.max_sort || 0) + 1;
+  for (const row of sortOrderCounts) {
+    sortOffsets[row.kesimAlaniId] = (row.maxSort || 0) + 1;
   }
 
   const validDonations = donationsWithKa.filter(d => validKAIds.has(d.kesimAlaniId));
