@@ -41,10 +41,12 @@ const sslConfig = resolveSsl();
 export const pool = new Pool({
   connectionString,
   max: poolMax,
-  idleTimeoutMillis: 30_000,
+  idleTimeoutMillis: 10_000,
   connectionTimeoutMillis: 5_000,
   statement_timeout: 30_000,
   ssl: sslConfig,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10_000,
 });
 
 pool.on("error", (err) => {

@@ -1,5 +1,36 @@
-import type { Project } from "../types";
+import type { Project, KesimAlani, CustomTag } from "../types";
 import { apiFetch } from "./core";
+
+export interface HomeData {
+  kesimAlanlari: KesimAlani[];
+  deletedKesimAlanlari: KesimAlani[];
+  tags: CustomTag[];
+  logo: string | null;
+  projects: Project[];
+  deletedProjects: Project[];
+  archivedProjects: Project[];
+}
+
+interface HomeDataCache {
+  data: HomeData;
+  expiresAt: number;
+}
+
+let homeDataCache: HomeDataCache | null = null;
+const HOME_DATA_TTL_MS = 30_000;
+
+export function invalidateHomeDataCache(): void {
+  homeDataCache = null;
+}
+
+export async function fetchHomeData(): Promise<HomeData> {
+  if (homeDataCache && Date.now() < homeDataCache.expiresAt) {
+    return homeDataCache.data;
+  }
+  const data = await apiFetch<HomeData>("/home-data");
+  homeDataCache = { data, expiresAt: Date.now() + HOME_DATA_TTL_MS };
+  return data;
+}
 
 export async function fetchProjects(): Promise<Project[]> {
   return apiFetch<Project[]>("/projects");

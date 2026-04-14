@@ -2,16 +2,16 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import type { KesimAlani, CustomTag, Project } from "@/lib/types";
 import {
+  fetchHomeData,
+  invalidateHomeDataCache,
   fetchKesimAlanlari,
   createKesimAlani,
   apiPermanentDeleteKesimAlani,
   apiRestoreKesimAlani,
   fetchDeletedKesimAlanlari,
-  fetchTags,
   createTag,
   updateTag,
   deleteTagApi,
-  fetchLogo,
   saveLogoApi,
   deleteLogoApi,
   exportBackupApi,
@@ -23,8 +23,6 @@ import {
   deleteProject,
   permanentDeleteProject,
   restoreProject,
-  fetchDeletedProjects,
-  fetchArchivedProjects,
   unarchiveProject,
   moveKesimAlani,
   downloadCsvExport,
@@ -111,32 +109,20 @@ export function useHomeState() {
   const [pendingImportJson, setPendingImportJson] = useState<string | null>(null);
 
   useEffect(() => {
+    migrateLocalStorageToApi().then(migrated => {
+      if (migrated) setMigrationDone(true);
+    }).catch(() => {});
+
     async function init() {
       try {
-        const migrated = await migrateLocalStorageToApi();
-        if (migrated) setMigrationDone(true);
-        const [ka, tags, logo, projs] = await Promise.all([
-          fetchKesimAlanlari(),
-          fetchTags(),
-          fetchLogo(),
-          fetchProjects(),
-        ]);
-        setKesimAlanlari(ka);
-        setGlobalTags(tags);
-        setLogoPreview(logo);
-        setProjects(projs);
-        try {
-          const [deleted, deletedProjs, archivedProjs] = await Promise.all([
-            fetchDeletedKesimAlanlari(),
-            fetchDeletedProjects(),
-            fetchArchivedProjects(),
-          ]);
-          setDeletedKesimAlanlari(deleted);
-          setDeletedProjects(deletedProjs);
-          setArchivedProjects(archivedProjs);
-        } catch (delErr) {
-          console.warn("Silinen öğeler yüklenemedi:", delErr instanceof Error ? delErr.message : delErr);
-        }
+        const homeData = await fetchHomeData();
+        setKesimAlanlari(homeData.kesimAlanlari);
+        setGlobalTags(homeData.tags);
+        setLogoPreview(homeData.logo);
+        setProjects(homeData.projects);
+        setDeletedKesimAlanlari(homeData.deletedKesimAlanlari);
+        setDeletedProjects(homeData.deletedProjects);
+        setArchivedProjects(homeData.archivedProjects);
       } catch (err) {
         toast({
           title: "Veri yüklenemedi",
@@ -159,6 +145,7 @@ export function useHomeState() {
     };
     try {
       await createTag(tag);
+      invalidateHomeDataCache();
       setGlobalTags(prev => [...prev, tag]);
       setNewTagName("");
       setNewTagColor("#3b82f6");
@@ -176,6 +163,7 @@ export function useHomeState() {
     const tag = globalTags.find(t => t.id === id);
     try {
       await deleteTagApi(id);
+      invalidateHomeDataCache();
       setGlobalTags(prev => prev.filter(t => t.id !== id));
       toast({ title: "Etiket silindi", description: tag?.name || "" });
     } catch (err) {
@@ -201,6 +189,7 @@ export function useHomeState() {
     const updated = { id: editingTagId, name: editTagName.trim(), color: editTagColor };
     try {
       await updateTag(updated);
+      invalidateHomeDataCache();
       setGlobalTags(prev => prev.map(t =>
         t.id === editingTagId ? updated : t
       ));
@@ -227,6 +216,7 @@ export function useHomeState() {
     };
     try {
       await createKesimAlani(newKesim);
+      invalidateHomeDataCache();
       setNewName("");
       setDialogOpen(false);
       setCreateProjectId(null);
@@ -245,6 +235,7 @@ export function useHomeState() {
     if (!newProjectName.trim()) return;
     try {
       const proj = await createProject(newProjectName.trim());
+      invalidateHomeDataCache();
       setProjects(prev => [...prev, proj]);
       setNewProjectName("");
       setProjectDialogOpen(false);
@@ -262,6 +253,7 @@ export function useHomeState() {
     if (!editingProject || !editingProject.name.trim()) return;
     try {
       const updated = await updateProject(editingProject.id, editingProject.name.trim());
+      invalidateHomeDataCache();
       setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
       setEditProjectDialogOpen(false);
       setEditingProject(null);
@@ -279,6 +271,7 @@ export function useHomeState() {
     if (!deleteProjectConfirm) return;
     try {
       await deleteProject(deleteProjectConfirm.id);
+      invalidateHomeDataCache();
       const deletedProj = projects.find(p => p.id === deleteProjectConfirm.id);
       setProjects(prev => prev.filter(p => p.id !== deleteProjectConfirm.id));
       if (deletedProj) {
@@ -298,6 +291,7 @@ export function useHomeState() {
   const handleRestoreProject = useCallback(async (id: string) => {
     try {
       const restored = await restoreProject(id);
+      invalidateHomeDataCache();
       setDeletedProjects(prev => prev.filter(p => p.id !== id));
       setProjects(prev => [...prev, restored]);
       toast({ title: "Proje geri yüklendi", description: restored.name });
@@ -313,6 +307,7 @@ export function useHomeState() {
   const handleUnarchiveProject = useCallback(async (id: string) => {
     try {
       const restored = await unarchiveProject(id);
+      invalidateHomeDataCache();
       setArchivedProjects(prev => prev.filter(p => p.id !== id));
       setProjects(prev => [...prev, restored]);
       const freshKesimAlanlari = await fetchKesimAlanlari();
@@ -332,6 +327,7 @@ export function useHomeState() {
     const targetId = moveTargetProjectId === "__none__" ? null : moveTargetProjectId;
     try {
       const updated = await moveKesimAlani(movingKesim.id, targetId);
+      invalidateHomeDataCache();
       setKesimAlanlari(prev => prev.map(k => k.id === updated.id ? updated : k));
       const targetName = targetId ? projects.find(p => p.id === targetId)?.name : "Projesiz";
       toast({ title: "Taşındı", description: `"${movingKesim.name}" → ${targetName}` });
@@ -377,6 +373,7 @@ export function useHomeState() {
     if (!permanentDeleteConfirm) return;
     try {
       await apiPermanentDeleteKesimAlani(permanentDeleteConfirm.id);
+      invalidateHomeDataCache();
       setDeletedKesimAlanlari(prev => prev.filter(k => k.id !== permanentDeleteConfirm.id));
       toast({ title: "Kalıcı olarak silindi", description: `"${permanentDeleteConfirm.name}" tamamen silindi.` });
     } catch (err) {
@@ -402,6 +399,7 @@ export function useHomeState() {
     if (!permanentDeleteProjectConfirm) return;
     try {
       await permanentDeleteProject(permanentDeleteProjectConfirm.id);
+      invalidateHomeDataCache();
       setDeletedProjects(prev => prev.filter(p => p.id !== permanentDeleteProjectConfirm.id));
       setDeletedKesimAlanlari(prev => prev.filter(k => k.projectId !== permanentDeleteProjectConfirm.id));
       setKesimAlanlari(prev => prev.filter(k => k.projectId !== permanentDeleteProjectConfirm.id));
@@ -432,6 +430,7 @@ export function useHomeState() {
       const base64 = evt.target?.result as string;
       try {
         await saveLogoApi(base64);
+        invalidateHomeDataCache();
         setLogoPreview(base64);
         toast({ title: "Logo yüklendi" });
       } catch (err) {
@@ -449,6 +448,7 @@ export function useHomeState() {
   const handleDeleteLogo = useCallback(async () => {
     try {
       await deleteLogoApi();
+      invalidateHomeDataCache();
       setLogoPreview(null);
       toast({ title: "Logo kaldırıldı" });
     } catch (err) {
@@ -508,12 +508,11 @@ export function useHomeState() {
   const executeImport = useCallback(async (json: string, mode: "replace" | "merge") => {
     const result = await importBackupApi(json, mode);
     if (result.success) {
-      const ka = await fetchKesimAlanlari();
-      setKesimAlanlari(ka);
-      const logo = await fetchLogo();
-      setLogoPreview(logo);
-      const tags = await fetchTags();
-      setGlobalTags(tags);
+      invalidateHomeDataCache();
+      const homeData = await fetchHomeData();
+      setKesimAlanlari(homeData.kesimAlanlari);
+      setLogoPreview(homeData.logo);
+      setGlobalTags(homeData.tags);
       toast({
         title: "Yedek başarıyla yüklendi",
         description: `${result.count} kesim alanı ${mode === "merge" ? "birleştirildi" : "değiştirildi"}`,

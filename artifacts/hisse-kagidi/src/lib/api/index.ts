@@ -2,6 +2,8 @@ export { getApiKey, apiFetch, API_BASE, ApiFetchError } from "./core";
 export { fetchPhotoToken, clearPhotoTokenCache } from "./signed-url";
 
 export {
+  fetchHomeData,
+  invalidateHomeDataCache,
   fetchProjects,
   createProject,
   updateProject,
@@ -14,7 +16,7 @@ export {
   unarchiveProject,
   fetchPendingEditRequests,
 } from "./projects";
-export type { PendingEditRequest } from "./projects";
+export type { PendingEditRequest, HomeData } from "./projects";
 
 export {
   fetchKesimAlanlari,

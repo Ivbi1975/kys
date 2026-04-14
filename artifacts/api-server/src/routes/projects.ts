@@ -373,22 +373,33 @@ router.get("/projects/:id/dashboard", asyncHandler(async (req, res) => {
   const cached = cacheGet<unknown>(dashCacheKey);
   if (cached) { res.json(cached); return; }
 
-  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
-
-  const areaStats = await db.execute(sql`
+  const combined = await db.execute(sql`
     SELECT
+      p.id AS project_id,
+      p.name AS project_name,
+      p.deleted_at,
       ka.id,
       ka.name,
       COUNT(ag.id)::int AS total_animals,
       COUNT(ag.id) FILTER (WHERE ag.kesildi = true)::int AS kesildi_count,
       MAX(ag.kesildi_at) AS last_kesildi_at
-    FROM kesim_alanlari ka
+    FROM projects p
+    LEFT JOIN kesim_alanlari ka ON ka.project_id = p.id AND ka.deleted_at IS NULL
     LEFT JOIN animal_groups ag ON ag.kesim_alani_id = ka.id AND ag.deleted_at IS NULL
-    WHERE ka.project_id = ${id} AND ka.deleted_at IS NULL
-    GROUP BY ka.id, ka.name
+    WHERE p.id = ${id}
+    GROUP BY p.id, p.name, p.deleted_at, ka.id, ka.name
     ORDER BY ka.name
   `);
+
+  if (combined.rows.length === 0) {
+    res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND });
+    return;
+  }
+
+  const firstRow = combined.rows[0] as { project_id: string; project_name: string; deleted_at: string | null };
+  if (!firstRow.project_id) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
+
+  const areaStats = { rows: combined.rows.filter((r: unknown) => (r as { id: string | null }).id !== null) };
 
   type AreaStatRow = { id: string; name: string; total_animals: number; kesildi_count: number; last_kesildi_at: string | null };
   const rows = areaStats.rows as AreaStatRow[];
@@ -415,7 +426,7 @@ router.get("/projects/:id/dashboard", asyncHandler(async (req, res) => {
 
   const response = {
     projectId: id,
-    projectName: project.name,
+    projectName: firstRow.project_name,
     totalAnimals,
     kesildiCount,
     remainingCount: totalAnimals - kesildiCount,

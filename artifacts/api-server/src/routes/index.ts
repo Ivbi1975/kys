@@ -11,11 +11,13 @@ import integrityRouter from "./integrity";
 import bagisHavuzuRouter from "./bagis-havuzu";
 import authRouter from "./auth";
 import auditLogsRouter from "./audit-logs";
+import homeDataRouter from "./home-data";
 
 const router: IRouter = Router();
 
 router.use(authRouter);
 router.use(healthRouter);
+router.use(homeDataRouter);
 router.use(projectsRouter);
 router.use(bagisHavuzuRouter);
 router.use(kesimAlanlariRouter);
