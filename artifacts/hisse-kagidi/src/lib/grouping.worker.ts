@@ -51,6 +51,32 @@ function createEmptyDonation(): Donation {
   };
 }
 
+function normalizeDonationType(t: string): string {
+  return (t || "").trim().toUpperCase();
+}
+
+const DONATION_TYPE_ALIASES: Record<string, string> = {
+  "VACİP": "VACIP", "VACİB": "VACIP", "VACIB": "VACIP",
+  "AKİKA": "AKIKA",
+  "MEVTA KURBANI": "MEVTA",
+  "ŞÜKÜR KURBANI": "ŞÜKÜR", "SUKUR": "ŞÜKÜR", "ŞUKUR": "ŞÜKÜR",
+};
+
+const DONATION_TYPE_PRIORITY_ORDER: string[] = ["VACIP", "ADAK", "AKIKA", "ŞÜKÜR", "MEVTA"];
+
+function canonicalizeDonationType(t: string): string {
+  const normalized = normalizeDonationType(t);
+  return DONATION_TYPE_ALIASES[normalized] ?? normalized;
+}
+
+function getDonationTypePriority(t: string): number {
+  const canonical = canonicalizeDonationType(t);
+  const idx = DONATION_TYPE_PRIORITY_ORDER.indexOf(canonical);
+  return idx >= 0 ? idx : DONATION_TYPE_PRIORITY_ORDER.length;
+}
+
+const trCollator = new Intl.Collator("tr");
+
 function buildGroupDonations(segments: GroupedSegment[]): Donation[] {
   const groupDonations: Donation[] = [];
   for (const g of segments) {
@@ -68,12 +94,16 @@ function buildGroupDonations(segments: GroupedSegment[]): Donation[] {
 
   const filled = groupDonations.filter(d => d.name.trim() || d.description.trim());
   const empty = groupDonations.filter(d => !d.name.trim() && !d.description.trim());
-  filled.sort((a, b) => {
-    const surnameA = getSurname(a.description || a.name);
-    const surnameB = getSurname(b.description || b.name);
-    return surnameA.localeCompare(surnameB, "tr");
+  const filledKeys = filled.map(d => ({
+    d,
+    surname: getSurname(d.description || d.name),
+    typePriority: getDonationTypePriority(d.donationType),
+  }));
+  filledKeys.sort((a, b) => {
+    if (a.typePriority !== b.typePriority) return a.typePriority - b.typePriority;
+    return trCollator.compare(a.surname, b.surname);
   });
-  const sorted = [...filled, ...empty];
+  const sorted: Donation[] = [...filledKeys.map(k => k.d), ...empty];
 
   while (sorted.length < 7) {
     sorted.push(createEmptyDonation());
@@ -353,7 +383,23 @@ function performIncrementalGroup(
   lockedIndices: Set<number>
 ): AnimalGroup[] {
   if (changedIds.size === 0) {
-    return existingGroups.map((g, i) => ({ ...g, animalNo: i + 1 }));
+    return existingGroups.map((g, i) => {
+      if (lockedIndices.has(i)) return { ...g, animalNo: i + 1 };
+      const filled = g.donations.filter(d => d.name.trim() || d.description.trim());
+      const empty = g.donations.filter(d => !d.name.trim() && !d.description.trim());
+      const filledKeys = filled.map(d => ({
+        d,
+        surname: getSurname(d.description || d.name),
+        typePriority: getDonationTypePriority(d.donationType),
+      }));
+      filledKeys.sort((a, b) => {
+        if (a.typePriority !== b.typePriority) return a.typePriority - b.typePriority;
+        return trCollator.compare(a.surname, b.surname);
+      });
+      const sorted: Donation[] = [...filledKeys.map(k => k.d), ...empty];
+      while (sorted.length < 7) sorted.push(createEmptyDonation());
+      return { ...g, animalNo: i + 1, donations: sorted.slice(0, 7) };
+    });
   }
 
   const donationsToRegroup: Donation[] = [];

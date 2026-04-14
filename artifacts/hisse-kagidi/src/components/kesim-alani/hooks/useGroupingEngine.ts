@@ -110,7 +110,8 @@ export function useGroupingEngine({
             current.name !== d.name ||
             current.description !== d.description ||
             current.shareCount !== d.shareCount ||
-            current.excluded !== d.excluded
+            current.excluded !== d.excluded ||
+            current.donationType !== d.donationType
           ) {
             changedIdSet.add(d.id);
           }

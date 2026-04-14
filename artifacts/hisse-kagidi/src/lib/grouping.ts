@@ -530,7 +530,23 @@ export function performIncrementalGroup(
   lockedIndices: Set<number>
 ): AnimalGroup[] {
   if (changedIds.size === 0) {
-    return existingGroups.map((g, i) => ({ ...g, animalNo: i + 1 }));
+    return existingGroups.map((g, i) => {
+      if (lockedIndices.has(i)) return { ...g, animalNo: i + 1 };
+      const filled = g.donations.filter(d => d.name.trim() || d.description.trim());
+      const empty = g.donations.filter(d => !d.name.trim() && !d.description.trim());
+      const filledKeys = filled.map(d => ({
+        d,
+        surname: getSurname(d.description || d.name),
+        typePriority: getDonationTypePriority(d.donationType),
+      }));
+      filledKeys.sort((a, b) => {
+        if (a.typePriority !== b.typePriority) return a.typePriority - b.typePriority;
+        return trCollator.compare(a.surname, b.surname);
+      });
+      const sorted: Donation[] = [...filledKeys.map(k => k.d), ...empty];
+      while (sorted.length < 7) sorted.push(createEmptyDonation());
+      return { ...g, animalNo: i + 1, donations: sorted.slice(0, 7) };
+    });
   }
 
   const donationsToRegroup: Donation[] = [];
