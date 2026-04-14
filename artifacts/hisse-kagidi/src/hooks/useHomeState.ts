@@ -80,6 +80,7 @@ export function useHomeState() {
   }, []);
 
   const onDeleted = useCallback((id: string) => {
+    invalidateHomeDataCache();
     setKesimAlanlari(prev => {
       const deletedItem = prev.find(k => k.id === id);
       if (deletedItem) {
@@ -109,11 +110,14 @@ export function useHomeState() {
   const [pendingImportJson, setPendingImportJson] = useState<string | null>(null);
 
   useEffect(() => {
-    migrateLocalStorageToApi().then(migrated => {
-      if (migrated) setMigrationDone(true);
-    }).catch(() => {});
-
     async function init() {
+      const MIGRATION_FLAG = "hisse-kagidi-migrated-to-db";
+      if (!localStorage.getItem(MIGRATION_FLAG)) {
+        try {
+          const migrated = await migrateLocalStorageToApi();
+          if (migrated) setMigrationDone(true);
+        } catch {}
+      }
       try {
         const homeData = await fetchHomeData();
         setKesimAlanlari(homeData.kesimAlanlari);
@@ -348,6 +352,7 @@ export function useHomeState() {
   const handleRestore = useCallback(async (id: string) => {
     try {
       const restored = await apiRestoreKesimAlani(id);
+      invalidateHomeDataCache();
       setDeletedKesimAlanlari(prev => prev.filter(k => k.id !== id));
       setKesimAlanlari(prev => [...prev, restored]);
       toast({ title: "Geri yüklendi", description: `"${restored.name}" başarıyla geri yüklendi.` });
