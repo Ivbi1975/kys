@@ -158,6 +158,25 @@ export function BasketPanel({
 
   const timedOutCount = timedOutIds.size;
 
+  const getGroupKey = (b: BasketItem): string => {
+    const parts: string[] = [];
+    if (groupByCriteria.has("cins")) parts.push(b.donationType || "Belirtilmemiş");
+    if (groupByCriteria.has("share")) parts.push(`${b.donorShareCount || 1} Hisse`);
+    if (groupByCriteria.has("source")) parts.push(b.sourceGroupAnimalNo ? `Hayvan ${b.sourceGroupAnimalNo}` : "Bağışçı Listesi");
+    return parts.join(" · ") || "__all__";
+  };
+
+  const groupedSections = useMemo(() => {
+    if (groupByCriteria.size === 0) return null;
+    const sections = new Map<string, typeof paginatedItems>();
+    for (const b of paginatedItems) {
+      const key = getGroupKey(b);
+      if (!sections.has(key)) sections.set(key, []);
+      sections.get(key)!.push(b);
+    }
+    return sections;
+  }, [paginatedItems, groupByCriteria]);
+
   if (basketItems.length === 0 && emptyGroupsAfterTransfer.length === 0) return null;
 
   const toggleBasketSelect = (donationId: string) => {
@@ -243,14 +262,6 @@ export function BasketPanel({
     return `${hours}s ${remainMins}dk`;
   };
 
-  const getGroupKey = (b: BasketItem): string => {
-    const parts: string[] = [];
-    if (groupByCriteria.has("cins")) parts.push(b.donationType || "Belirtilmemiş");
-    if (groupByCriteria.has("share")) parts.push(`${b.donorShareCount || 1} Hisse`);
-    if (groupByCriteria.has("source")) parts.push(b.sourceGroupAnimalNo ? `Hayvan ${b.sourceGroupAnimalNo}` : "Bağışçı Listesi");
-    return parts.join(" · ") || "__all__";
-  };
-
   const buildGroupedChips = (items: typeof filteredLocalDonationItems) => {
     const grouped: { key: string; label: string; items: typeof items }[] = [];
     const seen = new Map<string, number>();
@@ -266,17 +277,6 @@ export function BasketPanel({
     }
     return grouped;
   };
-
-  const groupedSections = useMemo(() => {
-    if (groupByCriteria.size === 0) return null;
-    const sections = new Map<string, typeof paginatedItems>();
-    for (const b of paginatedItems) {
-      const key = getGroupKey(b);
-      if (!sections.has(key)) sections.set(key, []);
-      sections.get(key)!.push(b);
-    }
-    return sections;
-  }, [paginatedItems, groupByCriteria]);
 
   const tabs: { id: BasketTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: "contents", label: "Sepet İçeriği", icon: <ShoppingCart className="w-3.5 h-3.5" />, badge: selectedBasketIds.size > 0 ? `${selectedBasketIds.size} seçili` : undefined },
