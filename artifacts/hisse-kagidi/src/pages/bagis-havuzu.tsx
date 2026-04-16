@@ -6,8 +6,18 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   ArrowLeft, Upload, Search, X, Filter, Package,
-  BarChart3, Loader2, AlertTriangle, Settings2, Zap,
+  BarChart3, Loader2, AlertTriangle, Settings2, Zap, Trash2,
 } from "lucide-react";
 import {
   fetchPoolDonations, fetchPoolStats,
@@ -18,6 +28,7 @@ import {
   fetchTags, createTag,
   flagDonation, unflagDonation,
   updatePoolDonationField,
+  deleteAllPoolDonations,
 } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -107,6 +118,8 @@ export default function BagisHavuzuPage() {
   const [transferOpen, setTransferOpen] = useState(false);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
   const [transferTarget, setTransferTarget] = useState("");
   const [transferring, setTransferring] = useState(false);
   const [newListName, setNewListName] = useState("");
@@ -548,6 +561,22 @@ export default function BagisHavuzuPage() {
     }
   }, [effectiveSelectedIds, transferTarget, creatingNewList, newListName, projectId, toast, invalidatePool, kesimAlanlari]);
 
+  const handleDeleteAll = useCallback(async () => {
+    setDeletingAll(true);
+    try {
+      const result = await deleteAllPoolDonations(projectId);
+      toast({ title: `${result.affected} bağış silindi` });
+      setSelectedIds(new Set());
+      setSelectAllPages(false);
+      invalidatePool();
+    } catch (err) {
+      toast({ title: "Silme başarısız", description: err instanceof Error ? err.message : "Hata", variant: "destructive" });
+    } finally {
+      setDeletingAll(false);
+      setDeleteAllDialogOpen(false);
+    }
+  }, [projectId, toast, invalidatePool]);
+
   const handleColumnSort = useCallback((colKey: string) => {
     setSortBy(prev => {
       if (prev === colKey) {
@@ -791,6 +820,14 @@ export default function BagisHavuzuPage() {
             </Button>
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               <Upload className="w-4 h-4 mr-1" />Toplu Yükle
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+              onClick={() => setDeleteAllDialogOpen(true)}
+            >
+              <Trash2 className="w-4 h-4 mr-1" />Tüm Bağışları Sil
             </Button>
             <ThemeToggle />
           </div>
@@ -1087,6 +1124,28 @@ export default function BagisHavuzuPage() {
           selectedCount={effectiveSelectedIds.size}
           onSubmit={handleBulkNote}
         />
+
+        <AlertDialog open={deleteAllDialogOpen} onOpenChange={setDeleteAllDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Tüm bağışları sil</AlertDialogTitle>
+              <AlertDialogDescription>
+                Bu havuzdaki <strong>{total}</strong> bağışın tamamı kalıcı olarak silinecek. Bu işlem geri alınamaz.
+                Devam etmek istediğinize emin misiniz?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deletingAll}>Vazgeç</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={deletingAll}
+                onClick={(e) => { e.preventDefault(); handleDeleteAll(); }}
+              >
+                {deletingAll ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Siliniyor...</> : "Evet, tümünü sil"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

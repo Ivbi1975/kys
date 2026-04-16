@@ -121,6 +121,7 @@ export {
   bulkNoteDonations,
   checkVekaletConflicts,
   updatePoolDonationField,
+  deleteAllPoolDonations,
 } from "./bagis-havuzu";
 export type { PoolDonationsResponse, PoolFilters, VekaletConflict } from "./bagis-havuzu";
 

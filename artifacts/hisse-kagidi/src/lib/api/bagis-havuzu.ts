@@ -223,3 +223,9 @@ export async function checkVekaletConflicts(projectId: string, vekalets: string[
     }
   );
 }
+
+export async function deleteAllPoolDonations(projectId: string): Promise<{ success: boolean; affected: number }> {
+  return apiFetch<{ success: boolean; affected: number }>(`/projects/${projectId}/donations`, {
+    method: "DELETE",
+  });
+}

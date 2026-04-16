@@ -930,6 +930,34 @@ router.post("/projects/:id/donations/bulk-action", asyncHandler(async (req, res)
   res.json({ success: true, affected });
 }));
 
+router.delete("/projects/:id/donations", asyncHandler(async (req, res) => {
+  const projectId = req.params.id;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const projectKAIds = await db.select({ id: kesimAlanlariTable.id })
+    .from(kesimAlanlariTable)
+    .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
+  const validKAIds = projectKAIds.map(k => k.id);
+
+  if (validKAIds.length === 0) {
+    res.json({ success: true, affected: 0 });
+    return;
+  }
+
+  const result = await db.update(donationsTable)
+    .set({ deletedAt: new Date(), updatedAt: new Date() })
+    .where(and(
+      inArray(donationsTable.kesimAlaniId, validKAIds),
+      isNull(donationsTable.deletedAt),
+    ))
+    .returning({ id: donationsTable.id });
+
+  invalidateKACache();
+  refreshProjectStats();
+  res.json({ success: true, affected: result.length });
+}));
+
 const vekaletCheckSchema = z.object({
   vekalets: z.array(z.string().trim().min(1)).min(1).max(10000),
 });
