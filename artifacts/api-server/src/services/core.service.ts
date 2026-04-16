@@ -94,13 +94,14 @@ interface CreateKesimAlaniParams {
   name: string;
   createdAt?: string;
   kesimListeId?: string | null;
+  yetkili?: string | null;
   projectId?: string | null;
   donations: DonationPayload[];
   animalGroups: AnimalGroupPayload[];
 }
 
 export async function createKesimAlani(params: CreateKesimAlaniParams) {
-  const { id, name, createdAt, kesimListeId, donations, animalGroups } = params;
+  const { id, name, createdAt, kesimListeId, yetkili, donations, animalGroups } = params;
   const projectId = params.projectId || null;
 
   await db.transaction(async (tx) => {
@@ -111,6 +112,7 @@ export async function createKesimAlani(params: CreateKesimAlaniParams) {
       projectId,
       trackingToken: crypto.randomBytes(16).toString("hex"),
       kesimListeId: kesimListeId ?? null,
+      yetkili: yetkili ?? null,
     });
 
     if (donations.length > 0) {
@@ -143,18 +145,20 @@ export async function moveKesimAlani(id: string, projectId: string | null | unde
 export async function updateKesimAlani(id: string, params: {
   name?: string;
   kesimListeId?: string | null;
+  yetkili?: string | null;
   donations?: DonationPayload[];
   animalGroups?: AnimalGroupPayload[];
 }): Promise<ServiceResult<{ data: unknown }>> {
   const kaCheck = await requireActiveKesimAlani(id);
   if (kaCheck.error) return serviceError(kaCheck.error, kaCheck.status);
 
-  const { name, kesimListeId, donations, animalGroups } = params;
+  const { name, kesimListeId, yetkili, donations, animalGroups } = params;
 
   await db.transaction(async (tx) => {
     const kaUpdates: Record<string, string | null> = {};
     if (name !== undefined) kaUpdates.name = name;
     if (kesimListeId !== undefined) kaUpdates.kesimListeId = kesimListeId ?? null;
+    if (yetkili !== undefined) kaUpdates.yetkili = yetkili ?? null;
     if (Object.keys(kaUpdates).length > 0) {
       await tx.update(kesimAlanlariTable).set(kaUpdates).where(eq(kesimAlanlariTable.id, id));
     }
@@ -178,7 +182,7 @@ export async function updateKesimAlaniDonationsChunked(
   totalChunks: number,
   sortOrderOffset: number,
   allDonationIds?: string[],
-  metaUpdates?: { name?: string; kesimListeId?: string | null },
+  metaUpdates?: { name?: string; kesimListeId?: string | null; yetkili?: string | null },
 ): Promise<ServiceResult<{ chunkIndex: number; totalChunks: number; savedCount: number; data?: unknown }>> {
   const kaCheck = await requireActiveKesimAlani(id);
   if (kaCheck.error) return serviceError(kaCheck.error, kaCheck.status);
@@ -190,6 +194,7 @@ export async function updateKesimAlaniDonationsChunked(
       const kaUpdates: Record<string, string | null> = {};
       if (metaUpdates.name !== undefined) kaUpdates.name = metaUpdates.name;
       if (metaUpdates.kesimListeId !== undefined) kaUpdates.kesimListeId = metaUpdates.kesimListeId ?? null;
+      if (metaUpdates.yetkili !== undefined) kaUpdates.yetkili = metaUpdates.yetkili ?? null;
       if (Object.keys(kaUpdates).length > 0) {
         await tx.update(kesimAlanlariTable).set(kaUpdates).where(eq(kesimAlanlariTable.id, id));
       }

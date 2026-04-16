@@ -388,6 +388,7 @@ export function PoolFilters({
             <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Kesim Listesi" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Tümü</SelectItem>
+              <SelectItem value="none">Aktarılmamış</SelectItem>
               {kesimAlanlari.map(ka => {
                 const cnt = kesimAlaniCountMap.get(ka.id);
                 return (

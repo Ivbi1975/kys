@@ -73,6 +73,23 @@ export function KesimAlaniHeader() {
                 }}
               />
             </div>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground">Yetkili:</span>
+              <Input
+                className="h-6 text-xs w-28 px-1.5"
+                placeholder="Yetkili"
+                aria-label="Yetkili"
+                value={kesim.yetkili || ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const updated = { ...kesim, yetkili: val || null };
+                  save(updated, undefined, false);
+                }}
+                onBlur={() => {
+                  save(kesim, undefined, true);
+                }}
+              />
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">

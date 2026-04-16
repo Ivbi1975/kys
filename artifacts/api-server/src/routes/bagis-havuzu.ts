@@ -82,7 +82,11 @@ function buildStatsFilterSQL(projectId: string, query: Record<string, unknown>) 
   addMulti("safi", parseMultiValue(query.safi), "safi");
 
   const kesimAlaniId = typeof query.kesimAlaniId === "string" ? query.kesimAlaniId.trim() : "";
-  if (kesimAlaniId) parts.push(sql`d.kesim_alani_id = ${kesimAlaniId}`);
+  if (kesimAlaniId === "none") {
+    parts.push(sql`d.kesim_alani_id IN (SELECT id FROM kesim_alanlari WHERE project_id = ${projectId} AND name = '__havuz__')`);
+  } else if (kesimAlaniId) {
+    parts.push(sql`d.kesim_alani_id = ${kesimAlaniId}`);
+  }
 
   const tagIdValues = parseMultiValue(query.tagIds);
   if (tagIdValues.length > 0) {
@@ -257,7 +261,16 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   addMultiFilter(donationsTable.ilkHayvan, ilkHayvanValues, "ilkHayvan");
   addMultiFilter(donationsTable.safi, safiValues, "safi");
 
-  if (kesimAlaniId) conditions.push(eq(donationsTable.kesimAlaniId, kesimAlaniId));
+  if (kesimAlaniId === "none") {
+    const havuzKa = kaRows.find(k => k.name === "__havuz__");
+    if (havuzKa) {
+      conditions.push(eq(donationsTable.kesimAlaniId, havuzKa.id));
+    } else {
+      conditions.push(sql`false`);
+    }
+  } else if (kesimAlaniId) {
+    conditions.push(eq(donationsTable.kesimAlaniId, kesimAlaniId));
+  }
 
   if (tagIdValues.length > 0) {
     const tagSql = sql`${donationsTable.id} IN (

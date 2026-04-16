@@ -361,6 +361,21 @@ export default function BagisHavuzuPage() {
   const donorMissedCounts = data?.donorMissedCounts || {};
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
+  const kesimAlaniColorMap = useMemo(() => {
+    if (kesimAlaniFilter) return {};
+    if (kesimAlanlari.length <= 1) return {};
+    const map: Record<string, string> = {};
+    kesimAlanlari.forEach((ka) => {
+      let hash = 0;
+      for (let i = 0; i < ka.id.length; i++) {
+        hash = (hash * 31 + ka.id.charCodeAt(i)) >>> 0;
+      }
+      const hue = hash % 360;
+      map[ka.id] = `hsla(${hue}, 65%, 55%, 0.12)`;
+    });
+    return map;
+  }, [kesimAlanlari, kesimAlaniFilter]);
+
   const multiLocationVekalets = useMemo(() => {
     return new Set(stats?.multiLocationVekalets || []);
   }, [stats?.multiLocationVekalets]);
@@ -1240,6 +1255,7 @@ export default function BagisHavuzuPage() {
           onUnflagDonation={handleUnflagDonation}
           onInlineEdit={handleInlineEdit}
           donorMissedCounts={donorMissedCounts}
+          kesimAlaniColorMap={kesimAlaniColorMap}
         />
 
         {totalPages > 1 && (

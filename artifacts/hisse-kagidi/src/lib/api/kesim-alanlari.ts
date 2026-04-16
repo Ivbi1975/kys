@@ -216,6 +216,7 @@ export async function apiUpdateKesimAlani(
       payload.allDonationIds = allDonationIds;
       if (data.name) payload.name = data.name;
       if (data.kesimListeId !== undefined) payload.kesimListeId = data.kesimListeId;
+      if (data.yetkili !== undefined) payload.yetkili = data.yetkili;
     }
 
     const result = await apiFetch<{ chunkIndex: number; totalChunks: number; savedCount: number; data?: KesimAlani }>(

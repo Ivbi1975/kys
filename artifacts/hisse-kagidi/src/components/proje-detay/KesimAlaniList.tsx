@@ -73,7 +73,7 @@ function KesimAlaniCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             {isChild && <CornerDownRight className="w-4 h-4 text-blue-500 flex-shrink-0" />}
-            <h3 className="font-semibold text-foreground">{k.name}</h3>
+            <h3 className="font-semibold text-foreground">{k.name}{k.yetkili ? <span className="ml-2 font-normal text-muted-foreground">{k.yetkili}</span> : null}</h3>
             {isSplit && (
               <Badge variant="outline" className="bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700 text-[10px]">
                 <GitBranch className="w-3 h-3 mr-0.5" />

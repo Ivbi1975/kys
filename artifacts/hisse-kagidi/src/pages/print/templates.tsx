@@ -55,13 +55,11 @@ function renderAnimalTable({ group, visibleColumns, isColumnHidden, shouldHideCo
   );
 }
 
-function PageFooter({ kesim, pageLabel, trackingUrl, showQrCode }: { kesim: KesimAlani; pageLabel: string; trackingUrl: string | null; showQrCode: boolean }) {
+function PageFooter({ kesim, trackingUrl, showQrCode }: { kesim: KesimAlani; pageLabel: string; trackingUrl: string | null; showQrCode: boolean }) {
   return (
     <>
       <div className="page-footer">
         <span>{kesim.name}</span>
-        <span>{pageLabel}</span>
-        <span>{new Date().toLocaleDateString("tr-TR")}</span>
       </div>
       {showQrCode && trackingUrl && (
         <div className="print-qr-code">

@@ -162,6 +162,13 @@
       "when": 1774946500000,
       "tag": "0022_automation_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1774946600000,
+      "tag": "0023_kesim_alani_yetkili",
+      "breakpoints": true
     }
   ]
 }

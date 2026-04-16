@@ -173,7 +173,7 @@ export function useProjeDetayState() {
     }
   }, [showTransferLog, projectId, loadTransferLog]);
 
-  const handleCreateKesimAlani = useCallback(async () => {
+  const handleCreateKesimAlani = useCallback(async (yetkili?: string) => {
     if (!newKesimAdi.trim()) return;
     try {
       const newKA: KesimAlani = {
@@ -183,6 +183,7 @@ export function useProjeDetayState() {
         animalGroups: [],
         createdAt: new Date().toISOString(),
         projectId: projectId,
+        yetkili: yetkili?.trim() || null,
       };
       await createKesimAlani(newKA);
       setNewKesimAdi("");

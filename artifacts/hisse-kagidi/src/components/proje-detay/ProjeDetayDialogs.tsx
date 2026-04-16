@@ -1,3 +1,4 @@
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -103,10 +104,15 @@ function CreateKesimAlaniDialog({
   setDialogOpen: (open: boolean) => void;
   newKesimAdi: string;
   setNewKesimAdi: (name: string) => void;
-  handleCreateKesimAlani: () => void;
+  handleCreateKesimAlani: (yetkili?: string) => void;
 }) {
+  const [yetkili, setYetkili] = React.useState("");
+  const handleCreate = () => {
+    handleCreateKesimAlani(yetkili || undefined);
+    setYetkili("");
+  };
   return (
-    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setYetkili(""); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Yeni Kesim Alanı</DialogTitle>
@@ -116,10 +122,16 @@ function CreateKesimAlaniDialog({
             placeholder="Kesim alanı adı"
             value={newKesimAdi}
             onChange={(e) => setNewKesimAdi(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleCreateKesimAlani()}
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
             autoFocus
           />
-          <Button onClick={handleCreateKesimAlani} className="w-full" disabled={!newKesimAdi.trim()}>
+          <Input
+            placeholder="Yetkili (isteğe bağlı)"
+            value={yetkili}
+            onChange={(e) => setYetkili(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+          />
+          <Button onClick={handleCreate} className="w-full" disabled={!newKesimAdi.trim()}>
             Oluştur
           </Button>
         </div>
