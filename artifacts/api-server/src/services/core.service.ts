@@ -256,7 +256,7 @@ export async function deleteKesimAlani(id: string, permanent: boolean): Promise<
 
       const donations = await tx.select({ id: donationsTable.id })
         .from(donationsTable)
-        .where(eq(donationsTable.kesimAlaniId, id));
+        .where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)));
 
       if (donations.length > 0) {
         const donationIds = donations.map(d => d.id);

@@ -24,6 +24,8 @@ function parseMultiValue(val: unknown): string[] {
   return val.split(",").map(v => v.trim()).filter(Boolean);
 }
 
+// Builds a WHERE clause for project-wide donation stats.
+// Includes ALL non-deleted kesim alanları (not just __havuz__) — project-wide scope by design.
 function buildStatsFilterSQL(projectId: string, query: Record<string, unknown>) {
   const parts: ReturnType<typeof sql>[] = [
     sql`ka.project_id = ${projectId}`,
@@ -151,6 +153,9 @@ function buildStatsFilterSQL(projectId: string, query: Record<string, unknown>) 
   return sql.join(parts, sql` AND `);
 }
 
+// Returns ALL donations in the project across every kesim alanı (including __havuz__).
+// This is intentional: the "bağış havuzu" view is project-wide, not limited to the pool KA.
+// Frontend KA dropdown filters out __havuz__ for transfer targets, but the data shown is project-wide.
 router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   const projectId = req.params.id;
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -906,39 +911,40 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
     return;
   }
 
-  const existingIds = new Set<string>();
-  const CHUNK = 5000;
-  for (let i = 0; i < donationIds.length; i += CHUNK) {
-    const chunk = donationIds.slice(i, i + CHUNK);
-    const existingInTarget = await db.select({ id: donationsTable.id })
-      .from(donationsTable)
-      .where(and(
-        eq(donationsTable.kesimAlaniId, targetKesimAlaniId),
-        isNull(donationsTable.deletedAt),
-        inArray(donationsTable.id, chunk),
-      ));
-    for (const r of existingInTarget) existingIds.add(r.id);
-  }
-  const alreadyInTarget = existingIds.size;
-
-  let idsToMove = donationIds;
-  if (alreadyInTarget > 0 && skipExisting) {
-    idsToMove = donationIds.filter(id => !existingIds.has(id));
-  }
-
-  if (idsToMove.length === 0 && alreadyInTarget > 0) {
-    res.json({ success: true, moved: 0, alreadyInTarget, skipped: alreadyInTarget });
-    return;
-  }
-
   const projectKAIds = await db.select({ id: kesimAlanlariTable.id })
     .from(kesimAlanlariTable)
     .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
   const validKAIds = new Set(projectKAIds.map(k => k.id));
+  // Source KAs exclude the target so donations already there are never "re-moved" to themselves
+  const sourceKAIds = [...validKAIds].filter(id => id !== targetKesimAlaniId);
 
   let movedCount = 0;
+  let alreadyInTarget = 0;
+  let idsToMove: string[] = donationIds;
 
   await db.transaction(async (tx) => {
+    // Check inside the transaction for accuracy (avoids TOCTOU race with automation rules or concurrent requests)
+    const CHUNK = 5000;
+    const existingIds = new Set<string>();
+    for (let i = 0; i < donationIds.length; i += CHUNK) {
+      const chunk = donationIds.slice(i, i + CHUNK);
+      const existingInTarget = await tx.select({ id: donationsTable.id })
+        .from(donationsTable)
+        .where(and(
+          eq(donationsTable.kesimAlaniId, targetKesimAlaniId),
+          isNull(donationsTable.deletedAt),
+          inArray(donationsTable.id, chunk),
+        ));
+      for (const r of existingInTarget) existingIds.add(r.id);
+    }
+    alreadyInTarget = existingIds.size;
+
+    if (skipExisting && alreadyInTarget > 0) {
+      idsToMove = donationIds.filter(id => !existingIds.has(id));
+    }
+
+    if (idsToMove.length === 0 || sourceKAIds.length === 0) return;
+
     const maxSortResult = await tx.execute(sql`
       SELECT COALESCE(MAX(sort_order), -1)::int AS max_sort
       FROM donations
@@ -953,7 +959,7 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
         .set({ kesimAlaniId: targetKesimAlaniId, updatedAt: new Date() })
         .where(and(
           inArray(donationsTable.id, chunk),
-          inArray(donationsTable.kesimAlaniId, [...validKAIds]),
+          inArray(donationsTable.kesimAlaniId, sourceKAIds),
           isNull(donationsTable.deletedAt),
         ))
         .returning({ id: donationsTable.id });
@@ -972,6 +978,13 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
       movedCount += result.length;
     }
   });
+
+  if (movedCount === 0 && alreadyInTarget > 0) {
+    invalidateKACache();
+    refreshProjectStats();
+    res.json({ success: true, moved: 0, alreadyInTarget, skipped: alreadyInTarget });
+    return;
+  }
 
   let transferredItems: Array<{
     id: string; name: string; description: string; donationType: string;
