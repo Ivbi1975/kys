@@ -1056,6 +1056,100 @@ router.post("/projects/:id/donations/bulk-action", asyncHandler(async (req, res)
   res.json({ success: true, affected });
 }));
 
+router.post("/projects/:id/donations/bulk-delete-preview", asyncHandler(async (req, res) => {
+  const projectId = req.params.id;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const kaRows = await db.select({ id: kesimAlanlariTable.id, name: kesimAlanlariTable.name })
+    .from(kesimAlanlariTable)
+    .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
+
+  if (kaRows.length === 0) {
+    res.json({ total: 0, inKesimListesi: 0, kesimListeleri: [] });
+    return;
+  }
+
+  const filterWhere = buildStatsFilterSQL(projectId, req.body as Record<string, unknown>);
+
+  const allMatchingResult = await db.execute(sql`
+    SELECT d.id, ka.name AS ka_name, ka.id AS ka_id
+    FROM donations d
+    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+    WHERE ${filterWhere}
+  `);
+
+  const allRows = allMatchingResult.rows as { id: string; ka_name: string; ka_id: string }[];
+  const total = allRows.length;
+
+  const inKesimMap = new Map<string, { id: string; name: string; count: number }>();
+  for (const row of allRows) {
+    if (row.ka_name !== "__havuz__") {
+      const existing = inKesimMap.get(row.ka_id);
+      if (existing) {
+        existing.count++;
+      } else {
+        inKesimMap.set(row.ka_id, { id: row.ka_id, name: row.ka_name, count: 1 });
+      }
+    }
+  }
+
+  const kesimListeleri = Array.from(inKesimMap.values());
+  const inKesimListesi = kesimListeleri.reduce((acc, k) => acc + k.count, 0);
+
+  res.json({ total, inKesimListesi, kesimListeleri });
+}));
+
+router.post("/projects/:id/donations/bulk-delete", asyncHandler(async (req, res) => {
+  const projectId = req.params.id;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const body = req.body as Record<string, unknown>;
+  if (body.force !== true) {
+    res.status(400).json({ error: "force: true bayrağı zorunludur" });
+    return;
+  }
+
+  const kaRows = await db.select({ id: kesimAlanlariTable.id })
+    .from(kesimAlanlariTable)
+    .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
+
+  if (kaRows.length === 0) {
+    res.json({ success: true, affected: 0 });
+    return;
+  }
+
+  const filterWhere = buildStatsFilterSQL(projectId, body);
+
+  const matchingIdsResult = await db.execute(sql`
+    SELECT d.id
+    FROM donations d
+    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+    WHERE ${filterWhere}
+  `);
+
+  const ids = (matchingIdsResult.rows as { id: string }[]).map(r => r.id);
+
+  if (ids.length === 0) {
+    res.json({ success: true, affected: 0 });
+    return;
+  }
+
+  await db.transaction(async (tx) => {
+    const CHUNK = 1000;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      await tx.delete(donationTagsTable).where(inArray(donationTagsTable.donationId, chunk));
+      await tx.delete(donationsTable).where(inArray(donationsTable.id, chunk));
+    }
+  });
+
+  invalidateKACache();
+  refreshProjectStats();
+  res.json({ success: true, affected: ids.length });
+}));
+
 router.delete("/projects/:id/donations", asyncHandler(async (req, res) => {
   const projectId = req.params.id;
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));

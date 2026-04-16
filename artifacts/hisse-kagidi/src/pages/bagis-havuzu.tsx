@@ -31,7 +31,10 @@ import {
   updatePoolDonationField,
   deleteAllPoolDonations,
   fetchDonationSiblings,
+  previewBulkDeleteFiltered,
+  bulkDeleteFiltered,
 } from "@/lib/api";
+import type { BulkDeletePreviewResult } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { StatsPanel } from "./bagis-havuzu/StatsPanel";
@@ -46,6 +49,7 @@ import { AutomationRulesPanel } from "./bagis-havuzu/AutomationRulesPanel";
 import { BulkNoteDialog } from "./bagis-havuzu/BulkNoteDialog";
 import { CinsStatsBar } from "./bagis-havuzu/CinsStatsBar";
 import { HavuzAiClassification, type HavuzAiResult } from "./bagis-havuzu/HavuzAiClassification";
+import { BulkDeleteFilteredDialog } from "./bagis-havuzu/BulkDeleteFilteredDialog";
 import { ALL_TABLE_COLUMNS, PAGE_SIZE, type TableColumnKey } from "./bagis-havuzu/types";
 import type { CustomTag, PoolDonation } from "@/lib/types";
 import { trUpperCase } from "@/lib/utils";
@@ -147,6 +151,10 @@ export default function BagisHavuzuPage() {
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [bulkDeleteFilteredOpen, setBulkDeleteFilteredOpen] = useState(false);
+  const [bulkDeleteFilteredPreview, setBulkDeleteFilteredPreview] = useState<BulkDeletePreviewResult | null>(null);
+  const [bulkDeleteFilteredLoading, setBulkDeleteFilteredLoading] = useState(false);
+  const [bulkDeleteFilteredDeleting, setBulkDeleteFilteredDeleting] = useState(false);
   const [transferTarget, setTransferTarget] = useState("");
   const [transferring, setTransferring] = useState(false);
   const [newListName, setNewListName] = useState("");
@@ -632,6 +640,38 @@ export default function BagisHavuzuPage() {
     }
   }, [projectId, toast, invalidatePool]);
 
+  const handleOpenBulkDeleteFiltered = useCallback(async () => {
+    setBulkDeleteFilteredOpen(true);
+    setBulkDeleteFilteredPreview(null);
+    setBulkDeleteFilteredLoading(true);
+    try {
+      const result = await previewBulkDeleteFiltered(projectId, statsFilters);
+      setBulkDeleteFilteredPreview(result);
+    } catch (err) {
+      toast({ title: "Ön kontrol başarısız", description: err instanceof Error ? err.message : "Hata", variant: "destructive" });
+      setBulkDeleteFilteredOpen(false);
+    } finally {
+      setBulkDeleteFilteredLoading(false);
+    }
+  }, [projectId, statsFilters, toast]);
+
+  const handleBulkDeleteFiltered = useCallback(async () => {
+    setBulkDeleteFilteredDeleting(true);
+    try {
+      const result = await bulkDeleteFiltered(projectId, statsFilters);
+      toast({ title: `${result.affected} bağış kalıcı olarak silindi` });
+      setSelectedIds(new Set());
+      setSelectAllPages(false);
+      invalidatePool();
+      setBulkDeleteFilteredOpen(false);
+      setBulkDeleteFilteredPreview(null);
+    } catch (err) {
+      toast({ title: "Silme başarısız", description: err instanceof Error ? err.message : "Hata", variant: "destructive" });
+    } finally {
+      setBulkDeleteFilteredDeleting(false);
+    }
+  }, [projectId, statsFilters, toast, invalidatePool]);
+
   const handleColumnSort = useCallback((colKey: string) => {
     setSortBy(prev => {
       if (prev === colKey) {
@@ -967,6 +1007,19 @@ export default function BagisHavuzuPage() {
             </Button>
           )}
 
+          {total > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+              onClick={handleOpenBulkDeleteFiltered}
+              title={activeFilterCount > 0 ? "Filtredeki bağışları kalıcı olarak sil" : "Tüm havuzu kalıcı olarak sil"}
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              {activeFilterCount > 0 ? "Filtredeki Bağışları Sil" : "Havuzu Kalıcı Sil"}
+            </Button>
+          )}
+
           <Button
             variant={aiRunning ? "default" : "outline"}
             size="sm"
@@ -1279,6 +1332,15 @@ export default function BagisHavuzuPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <BulkDeleteFilteredDialog
+          open={bulkDeleteFilteredOpen}
+          onOpenChange={setBulkDeleteFilteredOpen}
+          preview={bulkDeleteFilteredPreview}
+          loading={bulkDeleteFilteredLoading}
+          deleting={bulkDeleteFilteredDeleting}
+          onConfirm={handleBulkDeleteFiltered}
+        />
       </div>
     </div>
   );

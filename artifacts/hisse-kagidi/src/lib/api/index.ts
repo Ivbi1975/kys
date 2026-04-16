@@ -125,8 +125,10 @@ export {
   updatePoolDonationField,
   deleteAllPoolDonations,
   fetchDonationSiblings,
+  previewBulkDeleteFiltered,
+  bulkDeleteFiltered,
 } from "./bagis-havuzu";
-export type { PoolDonationsResponse, PoolFilters, VekaletConflict, DonorSiblings } from "./bagis-havuzu";
+export type { PoolDonationsResponse, PoolFilters, VekaletConflict, DonorSiblings, BulkDeletePreviewResult } from "./bagis-havuzu";
 
 export {
   fetchAutomationRules,

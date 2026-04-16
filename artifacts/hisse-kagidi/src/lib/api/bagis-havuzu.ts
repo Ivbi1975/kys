@@ -246,3 +246,29 @@ export async function fetchDonationSiblings(
     body: JSON.stringify({ donationIds }),
   });
 }
+
+export interface BulkDeletePreviewResult {
+  total: number;
+  inKesimListesi: number;
+  kesimListeleri: { id: string; name: string; count: number }[];
+}
+
+export async function previewBulkDeleteFiltered(
+  projectId: string,
+  filters: Record<string, unknown>,
+): Promise<BulkDeletePreviewResult> {
+  return apiFetch<BulkDeletePreviewResult>(`/projects/${projectId}/donations/bulk-delete-preview`, {
+    method: "POST",
+    body: JSON.stringify(filters),
+  });
+}
+
+export async function bulkDeleteFiltered(
+  projectId: string,
+  filters: Record<string, unknown>,
+): Promise<{ success: boolean; affected: number }> {
+  return apiFetch<{ success: boolean; affected: number }>(`/projects/${projectId}/donations/bulk-delete`, {
+    method: "POST",
+    body: JSON.stringify({ ...filters, force: true }),
+  });
+}
