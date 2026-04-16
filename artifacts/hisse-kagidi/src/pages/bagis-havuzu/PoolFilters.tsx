@@ -363,156 +363,195 @@ export function PoolFilters({
   return (
     <div className="mb-3 p-3 border rounded-lg bg-muted/30 space-y-3">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
-        <Select value={statusFilter || "all"} onValueChange={v => setStatusFilter(v === "all" ? "" : v)}>
-          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Durum" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tümü</SelectItem>
-            <SelectItem value="active">Aktif</SelectItem>
-            <SelectItem value="excluded">Sepette</SelectItem>
-          </SelectContent>
-        </Select>
+        <div>
+          <span className="block text-xs text-muted-foreground mb-0.5">Durum</span>
+          <Select value={statusFilter || "all"} onValueChange={v => setStatusFilter(v === "all" ? "" : v)}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Durum" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tümü</SelectItem>
+              <SelectItem value="active">Aktif</SelectItem>
+              <SelectItem value="excluded">Sepette</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-        <Select value={kesimAlaniFilter || "all"} onValueChange={v => setKesimAlaniFilter(v === "all" ? "" : v)}>
-          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Kesim Listesi" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tümü</SelectItem>
-            {kesimAlanlari.map(ka => (
-              <SelectItem key={ka.id} value={ka.id}>{ka.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div>
+          <span className="block text-xs text-muted-foreground mb-0.5">Kesim Listesi</span>
+          <Select value={kesimAlaniFilter || "all"} onValueChange={v => setKesimAlaniFilter(v === "all" ? "" : v)}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Kesim Listesi" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tümü</SelectItem>
+              {kesimAlanlari.map(ka => (
+                <SelectItem key={ka.id} value={ka.id}>{ka.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         {stats && (stats.typeDistribution.length > 0 || donationTypeFilter.length > 0) && (
-          <MultiSelectDropdown
-            label="Cinsi"
-            options={stats.typeDistribution.map(t => ({ value: t.type, count: t.count }))}
-            selected={donationTypeFilter}
-            onChange={setDonationTypeFilter}
-            excluded={excludeFields.has("donationType")}
-            onToggleExclude={() => toggleExcludeField("donationType")}
-          />
+          <div>
+            <span className="block text-xs text-muted-foreground mb-0.5">Cinsi</span>
+            <MultiSelectDropdown
+              label="Cinsi"
+              options={stats.typeDistribution.map(t => ({ value: t.type, count: t.count }))}
+              selected={donationTypeFilter}
+              onChange={setDonationTypeFilter}
+              excluded={excludeFields.has("donationType")}
+              onToggleExclude={() => toggleExcludeField("donationType")}
+            />
+          </div>
         )}
 
         {stats && (stats.birimDistribution.length > 0 || birimFilter.length > 0) && (
-          <MultiSelectDropdown
-            label="Birim"
-            options={stats.birimDistribution.map(b => ({ value: b.birim, count: b.count }))}
-            selected={birimFilter}
-            onChange={setBirimFilter}
-            excluded={excludeFields.has("birim")}
-            onToggleExclude={() => toggleExcludeField("birim")}
-          />
+          <div>
+            <span className="block text-xs text-muted-foreground mb-0.5">Birim</span>
+            <MultiSelectDropdown
+              label="Birim"
+              options={stats.birimDistribution.map(b => ({ value: b.birim, count: b.count }))}
+              selected={birimFilter}
+              onChange={setBirimFilter}
+              excluded={excludeFields.has("birim")}
+              onToggleExclude={() => toggleExcludeField("birim")}
+            />
+          </div>
         )}
 
         {stats && (stats.temsilciDistribution.length > 0 || temsilciFilter.length > 0) && (
-          <MultiSelectDropdown
-            label="Temsilci"
-            options={stats.temsilciDistribution.map(t => ({ value: t.temsilci, count: t.count }))}
-            selected={temsilciFilter}
-            onChange={setTemsilciFilter}
-            excluded={excludeFields.has("temsilci")}
-            onToggleExclude={() => toggleExcludeField("temsilci")}
-          />
+          <div>
+            <span className="block text-xs text-muted-foreground mb-0.5">Temsilci</span>
+            <MultiSelectDropdown
+              label="Temsilci"
+              options={stats.temsilciDistribution.map(t => ({ value: t.temsilci, count: t.count }))}
+              selected={temsilciFilter}
+              onChange={setTemsilciFilter}
+              excluded={excludeFields.has("temsilci")}
+              onToggleExclude={() => toggleExcludeField("temsilci")}
+            />
+          </div>
         )}
 
         {stats && ((stats.ozellikDistribution && stats.ozellikDistribution.length > 0) || ozellikFilter.length > 0) && (
-          <MultiSelectDropdown
-            label="Özellik"
-            options={(stats.ozellikDistribution || []).map(o => ({ value: o.ozellik, count: o.count }))}
-            selected={ozellikFilter}
-            onChange={setOzellikFilter}
-            excluded={excludeFields.has("ozellik")}
-            onToggleExclude={() => toggleExcludeField("ozellik")}
-          />
+          <div>
+            <span className="block text-xs text-muted-foreground mb-0.5">Özellik</span>
+            <MultiSelectDropdown
+              label="Özellik"
+              options={(stats.ozellikDistribution || []).map(o => ({ value: o.ozellik, count: o.count }))}
+              selected={ozellikFilter}
+              onChange={setOzellikFilter}
+              excluded={excludeFields.has("ozellik")}
+              onToggleExclude={() => toggleExcludeField("ozellik")}
+            />
+          </div>
         )}
 
         {stats && ((stats.fiyatDistribution && stats.fiyatDistribution.length > 0) || fiyatFilter.length > 0) && (
-          <MultiSelectDropdown
-            label="Fiyat"
-            options={(stats.fiyatDistribution || []).map(f => ({ value: f.fiyat, count: f.count }))}
-            selected={fiyatFilter}
-            onChange={setFiyatFilter}
-            excluded={excludeFields.has("fiyat")}
-            onToggleExclude={() => toggleExcludeField("fiyat")}
-          />
+          <div>
+            <span className="block text-xs text-muted-foreground mb-0.5">Fiyat</span>
+            <MultiSelectDropdown
+              label="Fiyat"
+              options={(stats.fiyatDistribution || []).map(f => ({ value: f.fiyat, count: f.count }))}
+              selected={fiyatFilter}
+              onChange={setFiyatFilter}
+              excluded={excludeFields.has("fiyat")}
+              onToggleExclude={() => toggleExcludeField("fiyat")}
+            />
+          </div>
         )}
 
         {stats && ((stats.yerTalebiDistribution && stats.yerTalebiDistribution.length > 0) || yerTalebiFilter.length > 0) && (
-          <MultiSelectDropdown
-            label="Yer Talebi"
-            options={(stats.yerTalebiDistribution || []).map(y => ({ value: y.yerTalebi, count: y.count }))}
-            selected={yerTalebiFilter}
-            onChange={setYerTalebiFilter}
-            excluded={excludeFields.has("yerTalebi")}
-            onToggleExclude={() => toggleExcludeField("yerTalebi")}
-          />
+          <div>
+            <span className="block text-xs text-muted-foreground mb-0.5">Yer Talebi</span>
+            <MultiSelectDropdown
+              label="Yer Talebi"
+              options={(stats.yerTalebiDistribution || []).map(y => ({ value: y.yerTalebi, count: y.count }))}
+              selected={yerTalebiFilter}
+              onChange={setYerTalebiFilter}
+              excluded={excludeFields.has("yerTalebi")}
+              onToggleExclude={() => toggleExcludeField("yerTalebi")}
+            />
+          </div>
         )}
 
         {stats && ((stats.gunTalebiDistribution && stats.gunTalebiDistribution.length > 0) || gunTalebiFilter.length > 0) && (
-          <MultiSelectDropdown
-            label="Gün Talebi"
-            options={(stats.gunTalebiDistribution || []).map(g => ({ value: g.gunTalebi, count: g.count }))}
-            selected={gunTalebiFilter}
-            onChange={setGunTalebiFilter}
-            excluded={excludeFields.has("gunTalebi")}
-            onToggleExclude={() => toggleExcludeField("gunTalebi")}
-          />
+          <div>
+            <span className="block text-xs text-muted-foreground mb-0.5">Gün Talebi</span>
+            <MultiSelectDropdown
+              label="Gün Talebi"
+              options={(stats.gunTalebiDistribution || []).map(g => ({ value: g.gunTalebi, count: g.count }))}
+              selected={gunTalebiFilter}
+              onChange={setGunTalebiFilter}
+              excluded={excludeFields.has("gunTalebi")}
+              onToggleExclude={() => toggleExcludeField("gunTalebi")}
+            />
+          </div>
         )}
 
         {stats && ((stats.ilkHayvanDistribution && stats.ilkHayvanDistribution.length > 0) || ilkHayvanFilter.length > 0) && (
-          <MultiSelectDropdown
-            label="İlk Hayvan"
-            options={(stats.ilkHayvanDistribution || []).map(i => ({ value: i.ilkHayvan, count: i.count }))}
-            selected={ilkHayvanFilter}
-            onChange={setIlkHayvanFilter}
-            excluded={excludeFields.has("ilkHayvan")}
-            onToggleExclude={() => toggleExcludeField("ilkHayvan")}
-          />
+          <div>
+            <span className="block text-xs text-muted-foreground mb-0.5">İlk Hayvan</span>
+            <MultiSelectDropdown
+              label="İlk Hayvan"
+              options={(stats.ilkHayvanDistribution || []).map(i => ({ value: i.ilkHayvan, count: i.count }))}
+              selected={ilkHayvanFilter}
+              onChange={setIlkHayvanFilter}
+              excluded={excludeFields.has("ilkHayvan")}
+              onToggleExclude={() => toggleExcludeField("ilkHayvan")}
+            />
+          </div>
         )}
 
         {stats && ((stats.safiDistribution && stats.safiDistribution.length > 0) || safiFilter.length > 0) && (
-          <MultiSelectDropdown
-            label="Şafi"
-            options={(stats.safiDistribution || []).map(s => ({ value: s.safi, count: s.count }))}
-            selected={safiFilter}
-            onChange={setSafiFilter}
-            excluded={excludeFields.has("safi")}
-            onToggleExclude={() => toggleExcludeField("safi")}
-          />
+          <div>
+            <span className="block text-xs text-muted-foreground mb-0.5">Şafi</span>
+            <MultiSelectDropdown
+              label="Şafi"
+              options={(stats.safiDistribution || []).map(s => ({ value: s.safi, count: s.count }))}
+              selected={safiFilter}
+              onChange={setSafiFilter}
+              excluded={excludeFields.has("safi")}
+              onToggleExclude={() => toggleExcludeField("safi")}
+            />
+          </div>
         )}
 
         {globalTags.length > 0 && (
-          <MultiSelectDropdown
-            label="Etiket"
-            options={globalTags.map(t => ({
-              value: t.id,
-              count: tagCountMap.get(t.id) ?? undefined,
-              label: t.name,
-              color: t.color,
-            }))}
-            selected={tagFilter}
-            onChange={setTagFilter}
-            excluded={excludeFields.has("tags")}
-            onToggleExclude={() => toggleExcludeField("tags")}
-          />
+          <div>
+            <span className="block text-xs text-muted-foreground mb-0.5">Etiket</span>
+            <MultiSelectDropdown
+              label="Etiket"
+              options={globalTags.map(t => ({
+                value: t.id,
+                count: tagCountMap.get(t.id) ?? undefined,
+                label: t.name,
+                color: t.color,
+              }))}
+              selected={tagFilter}
+              onChange={setTagFilter}
+              excluded={excludeFields.has("tags")}
+              onToggleExclude={() => toggleExcludeField("tags")}
+            />
+          </div>
         )}
 
-        <div className="flex gap-0.5">
-          <Input
-            placeholder="AI Etiketi..."
-            value={aiCategoryFilter}
-            onChange={e => setAiCategoryFilter(e.target.value)}
-            className={`h-8 text-xs flex-1 ${aiCategoryFilter && excludeFields.has("aiCategory") ? "border-destructive/50 ring-1 ring-destructive/20" : ""}`}
-          />
-          {aiCategoryFilter && (
-            <button
-              onClick={() => toggleExcludeField("aiCategory")}
-              title={excludeFields.has("aiCategory") ? "Dahil et moduna geç" : "Hariç tut moduna geç"}
-              className={`h-8 w-7 flex items-center justify-center rounded-md border text-xs transition-colors ${excludeFields.has("aiCategory") ? "bg-destructive/10 border-destructive/30 text-destructive hover:bg-destructive/20" : "bg-muted/30 border-input text-muted-foreground hover:bg-muted/50 hover:text-foreground"}`}
-            >
-              <Ban className="w-3.5 h-3.5" />
-            </button>
-          )}
+        <div>
+          <span className="block text-xs text-muted-foreground mb-0.5">AI Etiketi</span>
+          <div className="flex gap-0.5">
+            <Input
+              placeholder="AI Etiketi..."
+              value={aiCategoryFilter}
+              onChange={e => setAiCategoryFilter(e.target.value)}
+              className={`h-8 text-xs flex-1 ${aiCategoryFilter && excludeFields.has("aiCategory") ? "border-destructive/50 ring-1 ring-destructive/20" : ""}`}
+            />
+            {aiCategoryFilter && (
+              <button
+                onClick={() => toggleExcludeField("aiCategory")}
+                title={excludeFields.has("aiCategory") ? "Dahil et moduna geç" : "Hariç tut moduna geç"}
+                className={`h-8 w-7 flex items-center justify-center rounded-md border text-xs transition-colors ${excludeFields.has("aiCategory") ? "bg-destructive/10 border-destructive/30 text-destructive hover:bg-destructive/20" : "bg-muted/30 border-input text-muted-foreground hover:bg-muted/50 hover:text-foreground"}`}
+              >
+                <Ban className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

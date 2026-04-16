@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useMemo } from "react";
+import { useRef, useCallback, useState, useMemo, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -261,6 +261,7 @@ export function VirtualizedDonationTable({
   sortBy, sortDir, onColumnSort, onFlagDonation, onUnflagDonation, onInlineEdit,
 }: VirtualizedDonationTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const headerInnerRef = useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingField, setEditingField] = useState<TableColumnKey | null>(null);
 
@@ -274,6 +275,18 @@ export function VirtualizedDonationTable({
   const cols = useMemo(() => ALL_TABLE_COLUMNS.filter(c => visibleColumns.has(c.key)), [visibleColumns]);
   const editableCols = useMemo(() => cols.filter(c => EDITABLE_COLUMNS.has(c.key)), [cols]);
   const tableWidth = useMemo(() => getTableWidth(cols), [cols]);
+
+  const handleBodyScroll = useCallback(() => {
+    if (headerInnerRef.current && parentRef.current) {
+      headerInnerRef.current.style.transform = `translateX(-${parentRef.current.scrollLeft}px)`;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (headerInnerRef.current && parentRef.current) {
+      headerInnerRef.current.style.transform = `translateX(-${parentRef.current.scrollLeft}px)`;
+    }
+  }, []);
 
   const handleHeaderClick = useCallback((colKey: TableColumnKey) => {
     const sortKey = SORT_KEY_MAP[colKey];
@@ -339,12 +352,13 @@ export function VirtualizedDonationTable({
 
   return (
     <div className="border rounded-lg overflow-hidden">
-      <div className="overflow-auto" ref={parentRef} style={{ maxHeight: "calc(100vh - 380px)" }}>
-        <div style={{ minWidth: tableWidth }}>
+      {/* Fixed header — outside the scroll container so it stays visible while scrolling vertically */}
+      <div className="overflow-hidden bg-background border-b shadow-sm relative z-10">
+        <div ref={headerInnerRef} style={{ minWidth: tableWidth }}>
           <table className="w-full text-sm" style={{ tableLayout: "fixed", minWidth: tableWidth }}>
             <ColGroup cols={cols} />
-            <thead className="bg-background sticky top-0 z-10 shadow-sm">
-              <tr className="border-b">
+            <thead>
+              <tr>
                 <th className="p-2 text-center">
                   <button onClick={toggleSelectAll} className="text-muted-foreground hover:text-foreground">
                     {selectedIds.size === items.length && items.length > 0
@@ -371,7 +385,17 @@ export function VirtualizedDonationTable({
               </tr>
             </thead>
           </table>
+        </div>
+      </div>
 
+      {/* Scrollable body */}
+      <div
+        className="overflow-auto"
+        ref={parentRef}
+        style={{ maxHeight: "calc(100vh - 380px)" }}
+        onScroll={handleBodyScroll}
+      >
+        <div style={{ minWidth: tableWidth }}>
           {items.length === 0 && !isLoading && (
             <div className="p-8 text-center text-muted-foreground text-sm">
               {activeFilterCount > 0 ? "Filtreye uygun bağış bulunamadı." : "Bu projede henüz bağış yok."}
