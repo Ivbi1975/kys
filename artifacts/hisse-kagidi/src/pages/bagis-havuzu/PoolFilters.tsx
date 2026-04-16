@@ -594,64 +594,53 @@ export function PoolFilters({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Hisse Sayısı Aralığı</label>
-          <div className="flex gap-1 items-center">
-            <Input
-              type="number"
-              min={1}
-              placeholder="Min"
-              value={shareCountMin}
-              onChange={e => setShareCountMin(e.target.value)}
-              className="h-8 text-xs flex-1"
-            />
-            <span className="text-xs text-muted-foreground">–</span>
-            <Input
-              type="number"
-              min={1}
-              placeholder="Max"
-              value={shareCountMax}
-              onChange={e => setShareCountMax(e.target.value)}
-              className="h-8 text-xs flex-1"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-muted-foreground">Tarih Aralığı</label>
-            <Select value={dateField || "updatedAt"} onValueChange={v => setDateField(v)}>
-              <SelectTrigger className="h-6 text-[10px] w-auto min-w-[120px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="updatedAt">Güncelleme Tarihi</SelectItem>
-                <SelectItem value="transfer">Aktarım Tarihi</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex gap-1 items-center">
-            <Input
-              type="date"
-              value={dateFrom}
-              onChange={e => setDateFrom(e.target.value)}
-              className="h-8 text-xs flex-1"
-            />
-            <span className="text-xs text-muted-foreground">–</span>
-            <Input
-              type="date"
-              value={dateTo}
-              onChange={e => setDateTo(e.target.value)}
-              className="h-8 text-xs flex-1"
-            />
-          </div>
-        </div>
+      <div className="flex flex-wrap gap-2 items-center">
+        <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">Hisse:</span>
+        <Input
+          type="number"
+          min={1}
+          placeholder="Min"
+          value={shareCountMin}
+          onChange={e => setShareCountMin(e.target.value)}
+          className="h-7 text-xs w-16"
+        />
+        <span className="text-xs text-muted-foreground">–</span>
+        <Input
+          type="number"
+          min={1}
+          placeholder="Max"
+          value={shareCountMax}
+          onChange={e => setShareCountMax(e.target.value)}
+          className="h-7 text-xs w-16"
+        />
+        <Select value={dateField || "updatedAt"} onValueChange={v => setDateField(v)}>
+          <SelectTrigger className="h-7 text-[10px] w-auto min-w-[110px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="updatedAt">Güncelleme Tarihi</SelectItem>
+            <SelectItem value="transfer">Aktarım Tarihi</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input
+          type="date"
+          value={dateFrom}
+          onChange={e => setDateFrom(e.target.value)}
+          className="h-7 text-xs w-32"
+        />
+        <span className="text-xs text-muted-foreground">–</span>
+        <Input
+          type="date"
+          value={dateTo}
+          onChange={e => setDateTo(e.target.value)}
+          className="h-7 text-xs w-32"
+        />
       </div>
 
-      <NotesMultiFilter value={notesFilter} onChange={setNotesFilter} />
-
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-muted-foreground">Sıralama (3 katman)</label>
-        <div className="flex gap-3 flex-wrap">
+      <div className="flex flex-wrap gap-2 items-start">
+        <div className="flex-1 min-w-[200px]">
+          <NotesMultiFilter value={notesFilter} onChange={setNotesFilter} />
+        </div>
+        <div className="flex gap-2 items-center flex-wrap flex-1 min-w-[320px]">
+          <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">Sıralama:</span>
           <CompactSortLevel
             label="1."
             value={sortBy}

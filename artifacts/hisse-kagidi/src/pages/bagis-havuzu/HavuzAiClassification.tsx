@@ -57,6 +57,7 @@ interface HavuzAiClassificationProps {
   aiProgress: { done: number; total: number };
   showAiPanel: boolean;
   setShowAiPanel: (v: boolean) => void;
+  hideToggle?: boolean;
   rangeMode: "all" | "selected";
   setRangeMode: (v: "all" | "selected") => void;
   batchSize: number;
@@ -77,7 +78,7 @@ interface HavuzAiClassificationProps {
 
 export function HavuzAiClassification({
   items, selectedCount, aiRunning, aiStopped, aiResults, aiProgress,
-  showAiPanel, setShowAiPanel, rangeMode, setRangeMode,
+  showAiPanel, setShowAiPanel, hideToggle, rangeMode, setRangeMode,
   batchSize, setBatchSize, startAiClassification, stopAiClassification,
   skipClassified, setSkipClassified,
   showAiReport, setShowAiReport, aiReportCollapsed, setAiReportCollapsed,
@@ -92,15 +93,17 @@ export function HavuzAiClassification({
   return (
     <>
       <Card className="p-3 space-y-3">
-        <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowAiPanel(!showAiPanel)}>
-          <h2 className="text-sm font-semibold flex items-center gap-2">
-            <Brain className="w-4 h-4 text-primary" />
-            AI Sınıflandırma
-            {resultsCount > 0 && <Badge variant="secondary" className="text-xs">{resultsCount} sonuç</Badge>}
-            {warningsCount > 0 && <Badge variant="destructive" className="text-xs">{warningsCount} uyarı</Badge>}
-          </h2>
-          <Button variant="ghost" size="sm">{showAiPanel ? "Gizle" : "Göster"}</Button>
-        </div>
+        {!hideToggle && (
+          <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowAiPanel(!showAiPanel)}>
+            <h2 className="text-sm font-semibold flex items-center gap-2">
+              <Brain className="w-4 h-4 text-primary" />
+              AI Sınıflandırma
+              {resultsCount > 0 && <Badge variant="secondary" className="text-xs">{resultsCount} sonuç</Badge>}
+              {warningsCount > 0 && <Badge variant="destructive" className="text-xs">{warningsCount} uyarı</Badge>}
+            </h2>
+            <Button variant="ghost" size="sm">{showAiPanel ? "Gizle" : "Göster"}</Button>
+          </div>
+        )}
 
         {showAiPanel && (
           <div className="space-y-3 pt-1">

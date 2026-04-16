@@ -392,7 +392,7 @@ export function VirtualizedDonationTable({
       <div
         className="overflow-auto"
         ref={parentRef}
-        style={{ maxHeight: "calc(100vh - 380px)" }}
+        style={{ maxHeight: "calc(100vh - 180px)" }}
         onScroll={handleBodyScroll}
       >
         <div style={{ minWidth: tableWidth }}>

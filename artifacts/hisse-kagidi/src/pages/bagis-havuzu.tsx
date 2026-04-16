@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   ArrowLeft, Upload, Search, X, Filter, Package,
-  BarChart3, Loader2, AlertTriangle, Settings2, Zap, Trash2, ListPlus, FileSpreadsheet,
+  BarChart3, Loader2, AlertTriangle, Settings2, Zap, Trash2, ListPlus, FileSpreadsheet, Brain,
 } from "lucide-react";
 import {
   fetchPoolDonations, fetchPoolStats,
@@ -138,6 +139,7 @@ export default function BagisHavuzuPage() {
 
   const [showRules, setShowRules] = useState(false);
   const [bulkCreateListeOpen, setBulkCreateListeOpen] = useState(false);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
@@ -892,35 +894,6 @@ export default function BagisHavuzuPage() {
 
         {showStats && stats && <StatsPanel stats={stats} />}
 
-        <div className="mb-3 space-y-3">
-          <HavuzAiClassification
-            items={items}
-            selectedCount={effectiveSelectedIds.size}
-            aiRunning={aiRunning}
-            aiStopped={aiStopped}
-            aiResults={aiResults}
-            aiProgress={aiProgress}
-            showAiPanel={showAiPanel}
-            setShowAiPanel={setShowAiPanel}
-            rangeMode={aiRangeMode}
-            setRangeMode={setAiRangeMode}
-            batchSize={aiBatchSize}
-            setBatchSize={setAiBatchSize}
-            startAiClassification={handleStartAiClassification}
-            stopAiClassification={handleStopAiClassification}
-            skipClassified={aiSkipClassified}
-            setSkipClassified={setAiSkipClassified}
-            showAiReport={showAiReport}
-            setShowAiReport={setShowAiReport}
-            aiReportCollapsed={aiReportCollapsed}
-            setAiReportCollapsed={setAiReportCollapsed}
-            aiReportStats={aiReportStats}
-            aiCategoryFilter={aiCategoryFilter || null}
-            setAiCategoryFilter={(v) => { setAiCategoryFilter(v || ""); setPage(0); }}
-            total={total}
-          />
-        </div>
-
         {showRules && (
           <div className="mb-3">
             <AutomationRulesPanel
@@ -965,6 +938,23 @@ export default function BagisHavuzuPage() {
             </Button>
           )}
 
+          <Button
+            variant={aiRunning ? "default" : "outline"}
+            size="sm"
+            onClick={() => setAiDialogOpen(true)}
+          >
+            <Brain className="w-4 h-4 mr-1" />
+            AI Sınıfla
+            {aiRunning && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs animate-pulse">
+                {aiProgress.done}/{aiProgress.total}
+              </Badge>
+            )}
+            {!aiRunning && aiResults.size > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{aiResults.size}</Badge>
+            )}
+          </Button>
+
           <div className="relative" ref={columnPickerRef}>
             <Button variant="outline" size="sm" onClick={() => setShowColumnPicker(!showColumnPicker)}>
               <Settings2 className="w-4 h-4 mr-1" />Sütunlar
@@ -1000,6 +990,53 @@ export default function BagisHavuzuPage() {
 
           {isFetching && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
         </div>
+
+        {aiCategoryFilter && (
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs text-muted-foreground">AI Kategori:</span>
+            <Badge variant="default" className="text-xs cursor-pointer" onClick={() => { setAiCategoryFilter(""); setPage(0); }}>
+              {aiCategoryFilter.replace(/_/g, " ")} <X className="w-3 h-3 ml-1" />
+            </Badge>
+          </div>
+        )}
+
+        <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Brain className="w-5 h-5 text-primary" />
+                AI Sınıflandırma
+              </DialogTitle>
+            </DialogHeader>
+            <HavuzAiClassification
+              items={items}
+              selectedCount={effectiveSelectedIds.size}
+              aiRunning={aiRunning}
+              aiStopped={aiStopped}
+              aiResults={aiResults}
+              aiProgress={aiProgress}
+              showAiPanel={true}
+              setShowAiPanel={() => {}}
+              hideToggle={true}
+              rangeMode={aiRangeMode}
+              setRangeMode={setAiRangeMode}
+              batchSize={aiBatchSize}
+              setBatchSize={setAiBatchSize}
+              startAiClassification={handleStartAiClassification}
+              stopAiClassification={handleStopAiClassification}
+              skipClassified={aiSkipClassified}
+              setSkipClassified={setAiSkipClassified}
+              showAiReport={showAiReport}
+              setShowAiReport={setShowAiReport}
+              aiReportCollapsed={aiReportCollapsed}
+              setAiReportCollapsed={setAiReportCollapsed}
+              aiReportStats={aiReportStats}
+              aiCategoryFilter={aiCategoryFilter || null}
+              setAiCategoryFilter={(v) => { setAiCategoryFilter(v || ""); setPage(0); }}
+              total={total}
+            />
+          </DialogContent>
+        </Dialog>
 
         <CinsStatsBar
           stats={stats}
