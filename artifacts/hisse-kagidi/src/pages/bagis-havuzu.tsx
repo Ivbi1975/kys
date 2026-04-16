@@ -854,7 +854,7 @@ export default function BagisHavuzuPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-4">
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex flex-wrap items-center gap-2 mb-4">
           <Button variant="ghost" size="sm" onClick={() => setLocation(`/proje/${projectId}`)}>
             <ArrowLeft className="w-4 h-4 mr-1" />Geri
           </Button>
@@ -865,7 +865,7 @@ export default function BagisHavuzuPage() {
             </h1>
             <p className="text-sm text-muted-foreground">{projectName}</p>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <Button variant="outline" size="sm" onClick={() => setShowStats(!showStats)}>
               <BarChart3 className="w-4 h-4 mr-1" />İstatistik
             </Button>
