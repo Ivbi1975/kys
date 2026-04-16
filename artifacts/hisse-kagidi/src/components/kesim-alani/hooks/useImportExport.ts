@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { produce } from "immer";
 import type { KesimAlani, Donation } from "@/lib/types";
-import { downloadCsvExport, downloadExcelExport, apiCreateDonation } from "@/lib/api";
+import { downloadCsvExport, downloadExcelExport, apiCreateDonation, checkVekaletConflicts } from "@/lib/api";
 
 export type ColumnMapping = "name" | "description" | "donationType" | "shareCount" | "vekalet" | "notes" | "phone" | "birim" | "temsilci" | "skip";
 
@@ -186,7 +186,37 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
     setBulkStep("mapping");
   }
 
-  function applyBulkImport() {
+  async function applyBulkImportChecked() {
+    if (!kesim || previewData.length === 0) return;
+    const startRow = hasHeaderRow ? 1 : 0;
+    const vekaletColIdx = columnMappings.indexOf("vekalet");
+    if (vekaletColIdx >= 0 && kesim.projectId) {
+      const vekaletValues: string[] = [];
+      for (let r = startRow; r < previewData.length; r++) {
+        const val = String(previewData[r][vekaletColIdx] ?? "").trim();
+        if (val) vekaletValues.push(val);
+      }
+      if (vekaletValues.length > 0) {
+        try {
+          const { conflicts } = await checkVekaletConflicts(kesim.projectId, vekaletValues);
+          if (conflicts.length > 0) {
+            const conflictingVekalets = new Set(conflicts.map(c => c.vekalet));
+            applyBulkImport(conflictingVekalets);
+            toast({
+              title: `${conflicts.length} bağış vekalet çakışması nedeniyle atlandı`,
+              description: "Aynı vekalet numarasına sahip mevcut kayıtlar korundu.",
+            });
+            return;
+          }
+        } catch {
+          // vekalet check failed, continue without filtering
+        }
+      }
+    }
+    applyBulkImport();
+  }
+
+  function applyBulkImport(excludeVekalets?: Set<string>) {
     if (!kesim || previewData.length === 0) return;
     const startRow = hasHeaderRow ? 1 : 0;
     const shareCountColIdx = columnMappings.indexOf("shareCount");
@@ -283,6 +313,7 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
       donation.notes = notesParts.join(" | ");
 
       if (donation.name) {
+        if (excludeVekalets && donation.vekalet && excludeVekalets.has(donation.vekalet)) continue;
         newDonations.push(donation as Donation);
       }
     }
@@ -576,6 +607,7 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
     handlePasteData,
     processRawData,
     applyBulkImport,
+    applyBulkImportChecked,
     addReviewRowsToBasket,
     transferReviewRowsToKesimAlani,
     resetBulkDialog,

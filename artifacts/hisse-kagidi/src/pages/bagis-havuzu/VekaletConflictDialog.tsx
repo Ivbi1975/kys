@@ -152,7 +152,7 @@ export function VekaletConflictDialog({
             onClick={onProceed}
             className="bg-amber-600 hover:bg-amber-700"
           >
-            Yine de Ekle
+            Çakışanları Atlayarak Devam Et
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

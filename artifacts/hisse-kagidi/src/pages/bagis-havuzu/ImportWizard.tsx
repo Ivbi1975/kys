@@ -153,10 +153,15 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
 
       setImportProgress("Vekalet kontrolleri yapılıyor...");
       const vekaletValues = donations.map(d => d.vekalet).filter(Boolean);
+      let donationsToImport = donations;
+      let skippedCount = 0;
       if (vekaletValues.length > 0) {
         try {
           const { conflicts } = await checkVekaletConflicts(projectId, vekaletValues);
           if (conflicts.length > 0) {
+            const conflictingVekalets = new Set(conflicts.map(c => c.vekalet));
+            const filteredDonations = donations.filter(d => !d.vekalet || !conflictingVekalets.has(d.vekalet));
+            skippedCount = donations.length - filteredDonations.length;
             const rows = categorizeConflicts(conflicts, donations);
             const proceed = await new Promise<boolean>((resolve) => {
               conflictResolveRef.current = resolve;
@@ -168,6 +173,7 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
               setImportProgress("");
               return;
             }
+            donationsToImport = filteredDonations;
           }
         } catch (vekaletErr) {
           console.error("Vekalet check error:", vekaletErr);
@@ -182,13 +188,22 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
         }
       }
 
-      setImportProgress(`${donations.length} bağış yükleniyor...`);
-      const result = await bulkImportDonations(projectId, donations, (inserted, total, chunkIdx, totalChunks) => {
+      if (donationsToImport.length === 0) {
+        toast({ title: "Aktarılacak bağış kalmadı", description: `${skippedCount} bağış vekalet çakışması nedeniyle atlandı.`, variant: "destructive" });
+        setImporting(false);
+        setImportProgress("");
+        resetImport();
+        return;
+      }
+
+      setImportProgress(`${donationsToImport.length} bağış yükleniyor...`);
+      const result = await bulkImportDonations(projectId, donationsToImport, (inserted, total, chunkIdx, totalChunks) => {
         if (totalChunks > 1) {
           setImportProgress(`Yükleniyor: ${inserted}/${total} (parça ${chunkIdx}/${totalChunks})`);
         }
       });
-      toast({ title: `${result.inserted} bağış başarıyla eklendi` });
+      const skippedMsg = skippedCount > 0 ? ` (${skippedCount} vekalet çakışması nedeniyle atlandı)` : "";
+      toast({ title: `${result.inserted} bağış başarıyla eklendi${skippedMsg}` });
       resetImport();
       onSuccess();
     } catch (err) {

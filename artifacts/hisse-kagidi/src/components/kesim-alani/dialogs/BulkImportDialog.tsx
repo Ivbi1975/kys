@@ -8,7 +8,7 @@ import { useKesimAlaniContext } from "../KesimAlaniContext";
 
 export function BulkImportDialog() {
   const {
-    addReviewRowsToBasket, applyBulkImport, bulkDialogOpen, bulkMode, bulkReviewExpanded, bulkReviewRows,
+    addReviewRowsToBasket, applyBulkImportChecked, bulkDialogOpen, bulkMode, bulkReviewExpanded, bulkReviewRows,
     bulkReviewTransferTarget, bulkReviewTransferring, setBulkReviewTransferTarget,
     bulkStep, COLUMN_OPTIONS, columnMappings, displayPreviewRows, fileInputRef,
     handleFileUpload, handlePasteData, hasHeaderRow, headerRow, pasteText,
@@ -164,7 +164,7 @@ export function BulkImportDialog() {
 
               <div className="flex gap-2 pt-4 flex-shrink-0">
                 <Button variant="outline" onClick={() => setBulkStep("mapping")} className="flex-1">Geri</Button>
-                <Button onClick={applyBulkImport} className="flex-1">
+                <Button onClick={applyBulkImportChecked} className="flex-1">
                   {excludedCount > 0 ? `${excludedCount} Satırı Hariç Tut ve Devam Et` : "Tümünü Dahil Et ve Devam Et"}
                 </Button>
               </div>
@@ -226,7 +226,7 @@ export function BulkImportDialog() {
             </div>
             <div className="flex gap-2 pt-4 flex-shrink-0">
               <Button variant="outline" onClick={() => setBulkStep("input")} className="flex-1">Geri</Button>
-              <Button onClick={applyBulkImport} className="flex-1">{displayPreviewRows.length} Bağışçı Ekle</Button>
+              <Button onClick={applyBulkImportChecked} className="flex-1">{displayPreviewRows.length} Bağışçı Ekle</Button>
             </div>
           </div>
         )}

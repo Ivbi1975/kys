@@ -2,12 +2,13 @@ import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { lazy, Suspense, useEffect, Component } from "react";
+import { lazy, Suspense, useEffect, useState, Component } from "react";
 import type { ReactNode } from "react";
 const NotFound = lazy(() => import("@/pages/not-found"));
 import { useTheme } from "@/lib/useTheme";
 import PasswordGate from "@/components/PasswordGate";
 import ReloadPrompt from "@/components/ReloadPrompt";
+import { SidebarNav } from "@/components/SidebarNav";
 
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -83,26 +84,54 @@ function PageFallback() {
 
 const queryClient = new QueryClient();
 
-function ProtectedRouter() {
+function ProtectedRouterInner() {
   usePrefetchAdjacentRoutes();
+  const [location] = useLocation();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem("sidebar-collapsed") === "1"; } catch { return false; }
+  });
+
+  const hideSidebar = location.startsWith("/print/") || location.startsWith("/rapor/") || location.startsWith("/not-duzenleme/");
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem("sidebar-collapsed", next ? "1" : "0"); } catch {}
+      return next;
+    });
+  };
+
+  return (
+    <div className="flex h-screen w-screen overflow-hidden">
+      {!hideSidebar && (
+        <SidebarNav collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+      )}
+      <div className="flex-1 overflow-auto">
+        <ErrorBoundary>
+          <Suspense fallback={<PageFallback />}>
+            <Switch>
+              <Route path="/" component={Home} />
+              <Route path="/kesim/:id" component={KesimAlaniPage} />
+              <Route path="/print/:id" component={PrintPage} />
+              <Route path="/rapor/:id" component={KesimRaporPage} />
+              <Route path="/not-duzenleme/:id" component={NotDuzenlemePage} />
+              <Route path="/ai-prompt-ayarlari" component={AiPromptAyarlariPage} />
+              <Route path="/proje/:id" component={ProjeDetayPage} />
+              <Route path="/bagis-havuzu/:id" component={BagisHavuzuPage} />
+              <Route path="/sorunlu-bagislar/:id" component={SorunluBagislarPage} />
+              <Route component={NotFound} />
+            </Switch>
+          </Suspense>
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+}
+
+function ProtectedRouter() {
   return (
     <PasswordGate>
-      <ErrorBoundary>
-        <Suspense fallback={<PageFallback />}>
-          <Switch>
-            <Route path="/" component={Home} />
-            <Route path="/kesim/:id" component={KesimAlaniPage} />
-            <Route path="/print/:id" component={PrintPage} />
-            <Route path="/rapor/:id" component={KesimRaporPage} />
-            <Route path="/not-duzenleme/:id" component={NotDuzenlemePage} />
-            <Route path="/ai-prompt-ayarlari" component={AiPromptAyarlariPage} />
-            <Route path="/proje/:id" component={ProjeDetayPage} />
-            <Route path="/bagis-havuzu/:id" component={BagisHavuzuPage} />
-            <Route path="/sorunlu-bagislar/:id" component={SorunluBagislarPage} />
-            <Route component={NotFound} />
-          </Switch>
-        </Suspense>
-      </ErrorBoundary>
+      <ProtectedRouterInner />
     </PasswordGate>
   );
 }

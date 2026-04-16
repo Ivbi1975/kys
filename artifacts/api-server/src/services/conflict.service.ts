@@ -60,7 +60,7 @@ export async function detectConflicts(projectId?: string) {
 
   const conflictKeysResult = await db.execute(sql`
     WITH active_ka AS (
-      SELECT id FROM kesim_alanlari WHERE deleted_at IS NULL ${projectClauseRaw}
+      SELECT id FROM kesim_alanlari WHERE deleted_at IS NULL AND name != '__havuz__' ${projectClauseRaw}
     ),
     active_donations AS (
       SELECT
@@ -104,7 +104,7 @@ export async function detectConflicts(projectId?: string) {
            d.vekalet, d.notes, d.phone, d.excluded, d.kesim_alani_id,
            ka.name AS ka_name
     FROM donations d
-    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id AND ka.deleted_at IS NULL ${projectClauseKA}
+    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id AND ka.deleted_at IS NULL AND ka.name != '__havuz__' ${projectClauseKA}
     WHERE d.deleted_at IS NULL
       AND (
         (${nameKeys.length > 0 ? sql`LOWER(TRIM(d.name)) IN (${sql.join(nameKeys.map(k => sql`${k}`), sql`, `)})` : sql`FALSE`})
@@ -177,7 +177,7 @@ export async function detectConflicts(projectId?: string) {
       JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
       WHERE d.deleted_at IS NULL
         AND d.kesim_alani_id IN (${sql.join(ungroupedConflictKAIds.map(id => sql`${id}`), sql`, `)})
-      ORDER BY d.created_at DESC
+      ORDER BY d.sort_order ASC
     `);
     for (const row of kaSiblingsResult.rows as ConflictDonationRow[]) {
       if (!donationsByKA[row.kesim_alani_id]) donationsByKA[row.kesim_alani_id] = [];
