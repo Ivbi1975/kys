@@ -821,7 +821,7 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
 
       if (result.length > 0) {
         const caseParts = result.map((r, idx) =>
-          sql`WHEN id = ${r.id} THEN ${nextSort + idx}`
+          sql`WHEN id = ${r.id} THEN ${sql.raw(String(nextSort + idx))}`
         );
         const ids = result.map(r => r.id);
         await tx.execute(sql`
