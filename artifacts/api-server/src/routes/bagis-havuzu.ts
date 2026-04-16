@@ -821,12 +821,12 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
 
       if (result.length > 0) {
         const caseParts = result.map((r, idx) =>
-          sql`WHEN id = ${r.id}::uuid THEN ${nextSort + idx}`
+          sql`WHEN id = ${r.id} THEN ${nextSort + idx}`
         );
         const ids = result.map(r => r.id);
         await tx.execute(sql`
           UPDATE donations SET sort_order = CASE ${sql.join(caseParts, sql` `)} END
-          WHERE id IN (${sql.join(ids.map(id => sql`${id}::uuid`), sql`, `)})
+          WHERE id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})
         `);
         nextSort += result.length;
       }
