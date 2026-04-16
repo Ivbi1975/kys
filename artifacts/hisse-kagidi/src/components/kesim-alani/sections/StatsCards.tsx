@@ -1,8 +1,71 @@
 import React, { useState } from "react";
-import { AlertTriangle, ChevronDown } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useKesimAlaniContext } from "../KesimAlaniContext";
 import type { VekaletConflict } from "../hooks/useVekaletCheck";
+import type { Donation } from "@/lib/types";
+
+function useCollapsible(storageKey: string, defaultOpen = false) {
+  const [open, setOpen] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored !== null) return stored === "true";
+    } catch {}
+    return defaultOpen;
+  });
+
+  const toggle = () => {
+    setOpen(prev => {
+      const next = !prev;
+      try { localStorage.setItem(storageKey, String(next)); } catch {}
+      return next;
+    });
+  };
+
+  return { open, toggle };
+}
+
+function CollapsibleCardHeader({
+  title,
+  open,
+  onToggle,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center justify-between mb-2 group"
+    >
+      <h4 className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+        {title}
+      </h4>
+      {open ? (
+        <ChevronUp className="w-3 h-3 text-muted-foreground group-hover:text-foreground transition-colors" />
+      ) : (
+        <ChevronDown className="w-3 h-3 text-muted-foreground group-hover:text-foreground transition-colors" />
+      )}
+    </button>
+  );
+}
+
+function StatBarRow({ label, count, total }: { label: string; count: number; total: number }) {
+  const pct = total > 0 ? (count / total) * 100 : 0;
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="w-28 text-right text-muted-foreground truncate shrink-0" title={label}>{label}:</span>
+      <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
+        <div
+          className="h-full bg-primary/70 rounded-full transition-all"
+          style={{ width: `${Math.max(pct, 2)}%` }}
+        />
+      </div>
+      <span className="w-8 text-right font-medium shrink-0">{count}</span>
+    </div>
+  );
+}
 
 function VekaletWarning({
   allEntries,
@@ -64,6 +127,21 @@ function VekaletWarning({
   );
 }
 
+type DonationStringKey = {
+  [K in keyof Donation]: Donation[K] extends string | undefined ? K : never;
+}[keyof Donation];
+
+function countByField(donations: Donation[], field: DonationStringKey): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const d of donations) {
+    const val = (d[field] as string | undefined)?.trim();
+    if (val) {
+      map.set(val, (map.get(val) || 0) + 1);
+    }
+  }
+  return map;
+}
+
 export function StatsCards() {
   const {
     kesim, totalShares, requiredAnimals, remainingSlots,
@@ -73,7 +151,44 @@ export function StatsCards() {
     vekaletCheck, siblingKesimAlanlari,
   } = useKesimAlaniContext();
 
+  const grupKomp = useCollapsible("statsCards.grupKomposisyon", false);
+  const bagisStats = useCollapsible("statsCards.bagisIstatistikleri", false);
+
   if (!kesim) return null;
+
+  const activeDonations = kesim.donations.filter(d => !d.excluded);
+
+  const donationTypeMap = countByField(activeDonations, "donationType");
+  const birimMap = countByField(activeDonations, "birim");
+  const temsilciMap = countByField(activeDonations, "temsilci");
+  const ozellikMap = countByField(activeDonations, "ozellik");
+  const ilkHayvanMap = countByField(activeDonations, "ilkHayvan");
+  const yerTalebiMap = countByField(activeDonations, "yerTalebi");
+  const gunTalebiMap = countByField(activeDonations, "gunTalebi");
+  const safiMap = countByField(activeDonations, "safi");
+
+  const hasBagisStats = activeDonations.length > 0 && (
+    donationTypeMap.size > 0 || birimMap.size > 0 || temsilciMap.size > 0 ||
+    ozellikMap.size > 0 || ilkHayvanMap.size > 0 || yerTalebiMap.size > 0 ||
+    gunTalebiMap.size > 0 || safiMap.size > 0
+  );
+
+  function renderStatSection(title: string, map: Map<string, number>) {
+    if (map.size === 0) return null;
+    const total = Array.from(map.values()).reduce((s, c) => s + c, 0);
+    return (
+      <div className="mb-2">
+        <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">{title}</div>
+        <div className="space-y-1">
+          {Array.from(map.entries())
+            .sort((a, b) => b[1] - a[1])
+            .map(([label, count]) => (
+              <StatBarRow key={label} label={label} count={count} total={total} />
+            ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -204,17 +319,45 @@ export function StatsCards() {
 
           {kesim.animalGroups.length > 0 && (
             <Card className="p-3">
-              <h4 className="text-xs font-semibold text-muted-foreground mb-2">Grup Kompozisyonları</h4>
-              <div className="space-y-1">
-                {Array.from(groupCompositions.entries())
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([label, count]) => (
-                    <div key={label} className="flex items-center justify-between text-xs px-1 py-0.5 rounded hover:bg-muted">
-                      <span className="font-mono text-muted-foreground">{label}</span>
-                      <span className="font-medium">{count} grup</span>
-                    </div>
-                  ))}
-              </div>
+              <CollapsibleCardHeader
+                title="Grup Kompozisyonları"
+                open={grupKomp.open}
+                onToggle={grupKomp.toggle}
+              />
+              {grupKomp.open && (
+                <div className="space-y-1">
+                  {Array.from(groupCompositions.entries())
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([label, count]) => (
+                      <div key={label} className="flex items-center justify-between text-xs px-1 py-0.5 rounded hover:bg-muted">
+                        <span className="font-mono text-muted-foreground">{label}</span>
+                        <span className="font-medium">{count} grup</span>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </Card>
+          )}
+
+          {hasBagisStats && (
+            <Card className="p-3">
+              <CollapsibleCardHeader
+                title="Bağış İstatistikleri"
+                open={bagisStats.open}
+                onToggle={bagisStats.toggle}
+              />
+              {bagisStats.open && (
+                <div>
+                  {renderStatSection("Bağış Tipi", donationTypeMap)}
+                  {renderStatSection("Birim", birimMap)}
+                  {renderStatSection("Temsilci", temsilciMap)}
+                  {renderStatSection("Özellik", ozellikMap)}
+                  {renderStatSection("İlk Hayvan", ilkHayvanMap)}
+                  {renderStatSection("Yer Talebi", yerTalebiMap)}
+                  {renderStatSection("Gün Talebi", gunTalebiMap)}
+                  {renderStatSection("Safi", safiMap)}
+                </div>
+              )}
             </Card>
           )}
         </div>
