@@ -23,6 +23,7 @@ export {
   fetchDeletedKesimAlanlari,
   fetchKesimAlani,
   createKesimAlani,
+  bulkCreateKesimAlanlari,
   apiUpdateKesimAlani,
   apiUpdateBulkAnimalGroups,
   apiCreateDonation,

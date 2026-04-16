@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
+import crypto from "crypto";
 import { refreshProjectStats } from "../projects";
 import { asyncHandler } from "../../middleware/error-handler";
 import { ERROR_MESSAGES } from "../../lib/constants";
@@ -120,6 +121,43 @@ router.get("/kesim-alanlari/:id", asyncHandler(async (req, res) => {
     return;
   }
   res.json(result.data);
+}));
+
+const bulkCreateSchema = z.object({
+  names: z.array(z.string().min(1)).min(1).max(200),
+  projectId: z.string().optional().nullable(),
+});
+
+router.post("/kesim-alanlari/bulk", asyncHandler(async (req, res) => {
+  const parsed = bulkCreateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
+    return;
+  }
+  const { names, projectId } = parsed.data;
+  const created: unknown[] = [];
+  const failed: { name: string; error: string }[] = [];
+
+  for (const name of names) {
+    const trimmed = name.trim();
+    if (!trimmed) continue;
+    try {
+      const result = await createKesimAlani({
+        id: crypto.randomUUID(),
+        name: trimmed,
+        projectId: projectId ?? null,
+        donations: [],
+        animalGroups: [],
+      });
+      created.push(result.data);
+    } catch (err) {
+      failed.push({ name: trimmed, error: err instanceof Error ? err.message : "Bilinmeyen hata" });
+    }
+  }
+
+  res.status(201).json({ created: created.length, failed });
+  refreshProjectStats();
+  auditLog({ action: "bulk_create", entityType: "kesim_alani", entityId: "bulk", newValue: { names, createdCount: created.length, projectId }, req });
 }));
 
 router.post("/kesim-alanlari", asyncHandler(async (req, res) => {

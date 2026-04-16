@@ -86,6 +86,19 @@ export async function fetchKesimAlaniMeta(id: string): Promise<KesimAlaniMeta | 
   }
 }
 
+export interface BulkCreateKesimAlanlariResult {
+  created: number;
+  failed: { name: string; error: string }[];
+}
+
+export async function bulkCreateKesimAlanlari(names: string[], projectId?: string | null): Promise<BulkCreateKesimAlanlariResult> {
+  return apiFetch<BulkCreateKesimAlanlariResult>("/kesim-alanlari/bulk", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ names, projectId: projectId ?? null }),
+  });
+}
+
 export interface PaginatedResult<T> {
   items: T[];
   nextCursor: string | null;

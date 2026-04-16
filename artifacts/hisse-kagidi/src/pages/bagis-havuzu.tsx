@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   ArrowLeft, Upload, Search, X, Filter, Package,
-  BarChart3, Loader2, AlertTriangle, Settings2, Zap, Trash2,
+  BarChart3, Loader2, AlertTriangle, Settings2, Zap, Trash2, ListPlus,
 } from "lucide-react";
 import {
   fetchPoolDonations, fetchPoolStats,
@@ -37,6 +37,7 @@ import { VirtualizedDonationTable } from "./bagis-havuzu/VirtualizedDonationTabl
 import { PoolFilters } from "./bagis-havuzu/PoolFilters";
 import { PoolBulkActions } from "./bagis-havuzu/PoolBulkActions";
 import { TransferDialog } from "./bagis-havuzu/TransferDialog";
+import { BulkCreateListeDialog } from "./bagis-havuzu/BulkCreateListeDialog";
 import { ImportWizard } from "./bagis-havuzu/ImportWizard";
 import { BulkTagDialog } from "./bagis-havuzu/BulkTagDialog";
 import { AutomationRulesPanel } from "./bagis-havuzu/AutomationRulesPanel";
@@ -114,6 +115,7 @@ export default function BagisHavuzuPage() {
   });
 
   const [showRules, setShowRules] = useState(false);
+  const [bulkCreateListeOpen, setBulkCreateListeOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
@@ -818,6 +820,9 @@ export default function BagisHavuzuPage() {
             <Button variant={showRules ? "default" : "outline"} size="sm" onClick={() => setShowRules(!showRules)}>
               <Zap className="w-4 h-4 mr-1" />Kurallar
             </Button>
+            <Button variant="outline" size="sm" onClick={() => setBulkCreateListeOpen(true)}>
+              <ListPlus className="w-4 h-4 mr-1" />Toplu Liste Oluştur
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               <Upload className="w-4 h-4 mr-1" />Toplu Yükle
             </Button>
@@ -1100,6 +1105,13 @@ export default function BagisHavuzuPage() {
           onTransfer={handleTransfer}
           kesimAlanlari={kesimAlanlari}
           projectId={projectId}
+        />
+
+        <BulkCreateListeDialog
+          open={bulkCreateListeOpen}
+          onOpenChange={setBulkCreateListeOpen}
+          projectId={projectId}
+          onSuccess={invalidatePool}
         />
 
         <ImportWizard
