@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { produce } from "immer";
 import type { KesimAlani, Donation } from "@/lib/types";
 import { downloadCsvExport, downloadExcelExport, apiCreateDonation, checkVekaletConflicts } from "@/lib/api";
+import { trUpperCase } from "@/lib/utils";
 
 export type ColumnMapping = "name" | "description" | "donationType" | "shareCount" | "vekalet" | "notes" | "phone" | "birim" | "temsilci" | "skip";
 
@@ -483,13 +484,13 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
     const donorData = kesim.donations.map((d, i) => ({
       "Sıra": i + 1,
       "Kesim Listesi ID": kesim.kesimListeId || "",
-      "Adına Kesilen": d.name,
-      "Vekaleti Veren": d.description,
-      "Cinsi": d.donationType,
+      "Adına Kesilen": trUpperCase(d.name),
+      "Vekaleti Veren": trUpperCase(d.description),
+      "Cinsi": trUpperCase(d.donationType),
       "Hisse": d.shareCount,
       "Vekalet": d.vekalet,
-      "Notlar": d.notes,
-      "Durum": d.excluded ? "Hariç" : "Dahil",
+      "Notlar": trUpperCase(d.notes),
+      "Durum": trUpperCase(d.excluded ? "Hariç" : "Dahil"),
     }));
     const wsDonors = XLSX.utils.json_to_sheet(donorData);
     wsDonors["!cols"] = [
@@ -507,10 +508,10 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
             "Hayvan No": group.animalNo,
             "Sıra": i + 1,
             "Vekalet": d.vekalet,
-            "Vekaleti Veren": d.description,
-            "Adına Kesilen": d.name,
-            "Cinsi": d.donationType,
-            "Notlar": d.notes,
+            "Vekaleti Veren": trUpperCase(d.description),
+            "Adına Kesilen": trUpperCase(d.name),
+            "Cinsi": trUpperCase(d.donationType),
+            "Notlar": trUpperCase(d.notes),
           });
         }
       }

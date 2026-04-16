@@ -13,6 +13,11 @@ function escapeCsvField(val: string): string {
   return val;
 }
 
+function trUpperCase(text: string | null | undefined): string {
+  if (!text) return "";
+  return text.toLocaleUpperCase("tr-TR");
+}
+
 const CSV_HEADERS = [
   "Kesim Alanı",
   "Bağışçı Adı",
@@ -292,10 +297,10 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
           hayvanNo: donationIdx === 0 ? animalNo : "",
           sira: donationIdx + 1,
           vekalet: row.vekalet || "",
-          vekaleti_veren: row.description || "",
-          adina_kesilen: row.name || "",
-          cinsi: row.donation_type || "",
-          notlar: fullNotes,
+          vekaleti_veren: trUpperCase(row.description),
+          adina_kesilen: trUpperCase(row.name),
+          cinsi: trUpperCase(row.donation_type),
+          notlar: trUpperCase(fullNotes),
         });
 
         dataRow.height = 20;

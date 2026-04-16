@@ -8,3 +8,8 @@ export function cn(...inputs: ClassValue[]) {
 export function turkishNormalize(text: string): string {
   return text.toLocaleLowerCase("tr");
 }
+
+export function trUpperCase(text: string | null | undefined): string {
+  if (!text) return "";
+  return text.toLocaleUpperCase("tr-TR");
+}

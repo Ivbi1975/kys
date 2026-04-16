@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   ArrowLeft, Upload, Search, X, Filter, Package,
-  BarChart3, Loader2, AlertTriangle, Settings2, Zap, Trash2, ListPlus,
+  BarChart3, Loader2, AlertTriangle, Settings2, Zap, Trash2, ListPlus, FileSpreadsheet,
 } from "lucide-react";
 import {
   fetchPoolDonations, fetchPoolStats,
@@ -46,9 +46,31 @@ import { CinsStatsBar } from "./bagis-havuzu/CinsStatsBar";
 import { HavuzAiClassification, type HavuzAiResult } from "./bagis-havuzu/HavuzAiClassification";
 import { ALL_TABLE_COLUMNS, PAGE_SIZE, type TableColumnKey } from "./bagis-havuzu/types";
 import type { CustomTag, PoolDonation } from "@/lib/types";
+import { trUpperCase } from "@/lib/utils";
 import { loadBasketFromStorage, saveBasketToStorage } from "@/components/kesim-alani/hooks/types";
 import type { BasketItem } from "@/components/kesim-alani/hooks/types";
 import type { TransferredItem } from "@/lib/api/bagis-havuzu";
+
+const TEXT_COLUMNS_SET = new Set<TableColumnKey>([
+  "name", "description", "donationType", "birim", "temsilci",
+  "ozellik", "fiyat", "yerTalebi", "gunTalebi", "ilkHayvan", "safi", "notes",
+]);
+
+function getDonationCellValue(d: PoolDonation, key: TableColumnKey): string | number {
+  switch (key) {
+    case "shareCount": return d.shareCount ?? 1;
+    case "vekalet": return d.vekalet || "";
+    case "phone": return d.phone || "";
+    case "kesimAlani": return trUpperCase(d.kesimAlaniName);
+    case "durum": return trUpperCase(d.excluded ? "Hariç" : "Dahil");
+    case "aiEtiket": return trUpperCase((d.aiCategories || []).join(", "));
+    default: {
+      const raw = (d as unknown as Record<string, unknown>)[key];
+      const str = raw != null ? String(raw) : "";
+      return TEXT_COLUMNS_SET.has(key) ? trUpperCase(str) : str;
+    }
+  }
+}
 
 function parseUrlMulti(val: string | null): string[] {
   if (!val) return [];
@@ -755,6 +777,33 @@ export default function BagisHavuzuPage() {
     setAiStopped(true);
   }, []);
 
+  const handleExportExcel = useCallback(async () => {
+    if (items.length === 0) return;
+    const XLSX = await import("xlsx-js-style");
+    const wb = XLSX.utils.book_new();
+
+    const exportCols = ALL_TABLE_COLUMNS.filter(c => visibleColumns.has(c.key));
+    const headers = exportCols.map(c => c.label);
+    const rows = items.map(d => exportCols.map(c => getDonationCellValue(d, c.key)));
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws["!cols"] = exportCols.map(c => ({ wch: c.key === "notes" ? 30 : c.key === "name" || c.key === "description" ? 22 : 14 }));
+
+    const headerStyle = {
+      font: { bold: true, color: { rgb: "FFFFFF" } },
+      fill: { fgColor: { rgb: "1E3A5F" } },
+      alignment: { horizontal: "center" },
+    };
+    for (let ci = 0; ci < headers.length; ci++) {
+      const ref = XLSX.utils.encode_cell({ r: 0, c: ci });
+      if (ws[ref]) ws[ref].s = headerStyle;
+    }
+
+    XLSX.utils.book_append_sheet(wb, ws, "Bağış Havuzu");
+    const date = new Date().toISOString().split("T")[0];
+    XLSX.writeFile(wb, `bagis_havuzu_${projectId}_${date}.xlsx`);
+  }, [items, visibleColumns, projectId]);
+
   const aiReportStats = useMemo(() => {
     const results = Array.from(aiResults.values());
     const withWarnings = results.filter(r => r.warnings && r.warnings.trim() !== "");
@@ -825,6 +874,9 @@ export default function BagisHavuzuPage() {
             </Button>
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               <Upload className="w-4 h-4 mr-1" />Toplu Yükle
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportExcel} disabled={items.length === 0} title="Görünen bağışları Excel olarak indir">
+              <FileSpreadsheet className="w-4 h-4 mr-1" />Excel
             </Button>
             <Button
               variant="outline"
