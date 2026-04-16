@@ -44,6 +44,15 @@ export interface PoolStats {
   birim_count: number;
   temsilci_count: number;
   type_count: number;
+  empty_type_count: number;
+  empty_birim_count: number;
+  empty_temsilci_count: number;
+  empty_ozellik_count: number;
+  empty_fiyat_count: number;
+  empty_yer_talebi_count: number;
+  empty_gun_talebi_count: number;
+  empty_ilk_hayvan_count: number;
+  empty_safi_count: number;
   birimDistribution: { birim: string; count: number; shares: number }[];
   temsilciDistribution: { temsilci: string; count: number; shares: number }[];
   typeDistribution: { type: string; count: number; shares: number }[];

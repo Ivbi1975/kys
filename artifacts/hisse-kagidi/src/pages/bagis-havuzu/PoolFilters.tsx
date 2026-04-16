@@ -107,7 +107,7 @@ function MultiSelectDropdown({
     const optSet = new Set(options.map(o => o.value));
     const missing: typeof options = selected
       .filter(s => !optSet.has(s))
-      .map(s => ({ value: s, count: 0, label: undefined, color: undefined }));
+      .map(s => ({ value: s, count: 0, label: s === "__empty__" ? "(Boş)" : undefined, color: undefined }));
     return [...options, ...missing];
   }, [options, selected]);
 
@@ -360,6 +360,13 @@ export function PoolFilters({
     }
   }
 
+  const kesimAlaniCountMap = new Map<string, number>();
+  if (stats?.kesimAlaniDistribution) {
+    for (const k of stats.kesimAlaniDistribution) {
+      kesimAlaniCountMap.set(k.id, k.count);
+    }
+  }
+
   return (
     <div className="mb-3 p-3 border rounded-lg bg-muted/30 space-y-3">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
@@ -381,19 +388,27 @@ export function PoolFilters({
             <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Kesim Listesi" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Tümü</SelectItem>
-              {kesimAlanlari.map(ka => (
-                <SelectItem key={ka.id} value={ka.id}>{ka.name}</SelectItem>
-              ))}
+              {kesimAlanlari.map(ka => {
+                const cnt = kesimAlaniCountMap.get(ka.id);
+                return (
+                  <SelectItem key={ka.id} value={ka.id}>
+                    {ka.name}{cnt !== undefined ? ` (${cnt})` : ""}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>
 
-        {stats && (stats.typeDistribution.length > 0 || donationTypeFilter.length > 0) && (
+        {stats && (stats.typeDistribution.length > 0 || (stats.empty_type_count ?? 0) > 0 || donationTypeFilter.length > 0) && (
           <div>
             <span className="block text-xs text-muted-foreground mb-0.5">Cinsi</span>
             <MultiSelectDropdown
               label="Cinsi"
-              options={stats.typeDistribution.map(t => ({ value: t.type, count: t.count }))}
+              options={[
+                ...stats.typeDistribution.map(t => ({ value: t.type, count: t.count })),
+                ...((stats.empty_type_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_type_count, label: "(Boş)" }] : []),
+              ]}
               selected={donationTypeFilter}
               onChange={setDonationTypeFilter}
               excluded={excludeFields.has("donationType")}
@@ -402,12 +417,15 @@ export function PoolFilters({
           </div>
         )}
 
-        {stats && (stats.birimDistribution.length > 0 || birimFilter.length > 0) && (
+        {stats && (stats.birimDistribution.length > 0 || (stats.empty_birim_count ?? 0) > 0 || birimFilter.length > 0) && (
           <div>
             <span className="block text-xs text-muted-foreground mb-0.5">Birim</span>
             <MultiSelectDropdown
               label="Birim"
-              options={stats.birimDistribution.map(b => ({ value: b.birim, count: b.count }))}
+              options={[
+                ...stats.birimDistribution.map(b => ({ value: b.birim, count: b.count })),
+                ...((stats.empty_birim_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_birim_count, label: "(Boş)" }] : []),
+              ]}
               selected={birimFilter}
               onChange={setBirimFilter}
               excluded={excludeFields.has("birim")}
@@ -416,12 +434,15 @@ export function PoolFilters({
           </div>
         )}
 
-        {stats && (stats.temsilciDistribution.length > 0 || temsilciFilter.length > 0) && (
+        {stats && (stats.temsilciDistribution.length > 0 || (stats.empty_temsilci_count ?? 0) > 0 || temsilciFilter.length > 0) && (
           <div>
             <span className="block text-xs text-muted-foreground mb-0.5">Temsilci</span>
             <MultiSelectDropdown
               label="Temsilci"
-              options={stats.temsilciDistribution.map(t => ({ value: t.temsilci, count: t.count }))}
+              options={[
+                ...stats.temsilciDistribution.map(t => ({ value: t.temsilci, count: t.count })),
+                ...((stats.empty_temsilci_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_temsilci_count, label: "(Boş)" }] : []),
+              ]}
               selected={temsilciFilter}
               onChange={setTemsilciFilter}
               excluded={excludeFields.has("temsilci")}
@@ -430,12 +451,15 @@ export function PoolFilters({
           </div>
         )}
 
-        {stats && ((stats.ozellikDistribution && stats.ozellikDistribution.length > 0) || ozellikFilter.length > 0) && (
+        {stats && ((stats.ozellikDistribution && stats.ozellikDistribution.length > 0) || (stats.empty_ozellik_count ?? 0) > 0 || ozellikFilter.length > 0) && (
           <div>
             <span className="block text-xs text-muted-foreground mb-0.5">Özellik</span>
             <MultiSelectDropdown
               label="Özellik"
-              options={(stats.ozellikDistribution || []).map(o => ({ value: o.ozellik, count: o.count }))}
+              options={[
+                ...(stats.ozellikDistribution || []).map(o => ({ value: o.ozellik, count: o.count })),
+                ...((stats.empty_ozellik_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_ozellik_count, label: "(Boş)" }] : []),
+              ]}
               selected={ozellikFilter}
               onChange={setOzellikFilter}
               excluded={excludeFields.has("ozellik")}
@@ -444,12 +468,15 @@ export function PoolFilters({
           </div>
         )}
 
-        {stats && ((stats.fiyatDistribution && stats.fiyatDistribution.length > 0) || fiyatFilter.length > 0) && (
+        {stats && ((stats.fiyatDistribution && stats.fiyatDistribution.length > 0) || (stats.empty_fiyat_count ?? 0) > 0 || fiyatFilter.length > 0) && (
           <div>
             <span className="block text-xs text-muted-foreground mb-0.5">Fiyat</span>
             <MultiSelectDropdown
               label="Fiyat"
-              options={(stats.fiyatDistribution || []).map(f => ({ value: f.fiyat, count: f.count }))}
+              options={[
+                ...(stats.fiyatDistribution || []).map(f => ({ value: f.fiyat, count: f.count })),
+                ...((stats.empty_fiyat_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_fiyat_count, label: "(Boş)" }] : []),
+              ]}
               selected={fiyatFilter}
               onChange={setFiyatFilter}
               excluded={excludeFields.has("fiyat")}
@@ -458,12 +485,15 @@ export function PoolFilters({
           </div>
         )}
 
-        {stats && ((stats.yerTalebiDistribution && stats.yerTalebiDistribution.length > 0) || yerTalebiFilter.length > 0) && (
+        {stats && ((stats.yerTalebiDistribution && stats.yerTalebiDistribution.length > 0) || (stats.empty_yer_talebi_count ?? 0) > 0 || yerTalebiFilter.length > 0) && (
           <div>
             <span className="block text-xs text-muted-foreground mb-0.5">Yer Talebi</span>
             <MultiSelectDropdown
               label="Yer Talebi"
-              options={(stats.yerTalebiDistribution || []).map(y => ({ value: y.yerTalebi, count: y.count }))}
+              options={[
+                ...(stats.yerTalebiDistribution || []).map(y => ({ value: y.yerTalebi, count: y.count })),
+                ...((stats.empty_yer_talebi_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_yer_talebi_count, label: "(Boş)" }] : []),
+              ]}
               selected={yerTalebiFilter}
               onChange={setYerTalebiFilter}
               excluded={excludeFields.has("yerTalebi")}
@@ -472,12 +502,15 @@ export function PoolFilters({
           </div>
         )}
 
-        {stats && ((stats.gunTalebiDistribution && stats.gunTalebiDistribution.length > 0) || gunTalebiFilter.length > 0) && (
+        {stats && ((stats.gunTalebiDistribution && stats.gunTalebiDistribution.length > 0) || (stats.empty_gun_talebi_count ?? 0) > 0 || gunTalebiFilter.length > 0) && (
           <div>
             <span className="block text-xs text-muted-foreground mb-0.5">Gün Talebi</span>
             <MultiSelectDropdown
               label="Gün Talebi"
-              options={(stats.gunTalebiDistribution || []).map(g => ({ value: g.gunTalebi, count: g.count }))}
+              options={[
+                ...(stats.gunTalebiDistribution || []).map(g => ({ value: g.gunTalebi, count: g.count })),
+                ...((stats.empty_gun_talebi_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_gun_talebi_count, label: "(Boş)" }] : []),
+              ]}
               selected={gunTalebiFilter}
               onChange={setGunTalebiFilter}
               excluded={excludeFields.has("gunTalebi")}
@@ -486,12 +519,15 @@ export function PoolFilters({
           </div>
         )}
 
-        {stats && ((stats.ilkHayvanDistribution && stats.ilkHayvanDistribution.length > 0) || ilkHayvanFilter.length > 0) && (
+        {stats && ((stats.ilkHayvanDistribution && stats.ilkHayvanDistribution.length > 0) || (stats.empty_ilk_hayvan_count ?? 0) > 0 || ilkHayvanFilter.length > 0) && (
           <div>
             <span className="block text-xs text-muted-foreground mb-0.5">İlk Hayvan</span>
             <MultiSelectDropdown
               label="İlk Hayvan"
-              options={(stats.ilkHayvanDistribution || []).map(i => ({ value: i.ilkHayvan, count: i.count }))}
+              options={[
+                ...(stats.ilkHayvanDistribution || []).map(i => ({ value: i.ilkHayvan, count: i.count })),
+                ...((stats.empty_ilk_hayvan_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_ilk_hayvan_count, label: "(Boş)" }] : []),
+              ]}
               selected={ilkHayvanFilter}
               onChange={setIlkHayvanFilter}
               excluded={excludeFields.has("ilkHayvan")}
@@ -500,12 +536,15 @@ export function PoolFilters({
           </div>
         )}
 
-        {stats && ((stats.safiDistribution && stats.safiDistribution.length > 0) || safiFilter.length > 0) && (
+        {stats && ((stats.safiDistribution && stats.safiDistribution.length > 0) || (stats.empty_safi_count ?? 0) > 0 || safiFilter.length > 0) && (
           <div>
             <span className="block text-xs text-muted-foreground mb-0.5">Şafi</span>
             <MultiSelectDropdown
               label="Şafi"
-              options={(stats.safiDistribution || []).map(s => ({ value: s.safi, count: s.count }))}
+              options={[
+                ...(stats.safiDistribution || []).map(s => ({ value: s.safi, count: s.count })),
+                ...((stats.empty_safi_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_safi_count, label: "(Boş)" }] : []),
+              ]}
               selected={safiFilter}
               onChange={setSafiFilter}
               excluded={excludeFields.has("safi")}

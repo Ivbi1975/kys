@@ -46,15 +46,28 @@ function buildStatsFilterSQL(projectId: string, query: Record<string, unknown>) 
 
   function addMulti(col: string, values: string[], fieldName: string) {
     if (values.length === 0) return;
+    const hasEmpty = values.includes("__empty__");
+    const nonEmpty = values.filter(v => v !== "__empty__");
     if (excludeSet.has(fieldName)) {
-      if (values.length === 1) {
-        parts.push(sql`(${sql.raw(`d.${col}`)} IS NULL OR ${sql.raw(`d.${col}`)} = '' OR ${sql.raw(`d.${col}`)} != ${values[0]})`);
+      if (hasEmpty && nonEmpty.length > 0) {
+        parts.push(sql`(${sql.raw(`d.${col}`)} IS NOT NULL AND ${sql.raw(`d.${col}`)} != '' AND ${sql.raw(`d.${col}`)} NOT IN (${sql.join(nonEmpty.map(v => sql`${v}`), sql`, `)}))`);
+      } else if (hasEmpty) {
+        parts.push(sql`(${sql.raw(`d.${col}`)} IS NOT NULL AND ${sql.raw(`d.${col}`)} != '')`);
+      } else if (nonEmpty.length === 1) {
+        parts.push(sql`(${sql.raw(`d.${col}`)} IS NULL OR ${sql.raw(`d.${col}`)} = '' OR ${sql.raw(`d.${col}`)} != ${nonEmpty[0]})`);
       } else {
-        parts.push(sql`(${sql.raw(`d.${col}`)} IS NULL OR ${sql.raw(`d.${col}`)} = '' OR ${sql.raw(`d.${col}`)} NOT IN (${sql.join(values.map(v => sql`${v}`), sql`, `)}))`);
+        parts.push(sql`(${sql.raw(`d.${col}`)} IS NULL OR ${sql.raw(`d.${col}`)} = '' OR ${sql.raw(`d.${col}`)} NOT IN (${sql.join(nonEmpty.map(v => sql`${v}`), sql`, `)}))`);
       }
     } else {
-      if (values.length === 1) parts.push(sql`${sql.raw(`d.${col}`)} = ${values[0]}`);
-      else parts.push(sql`${sql.raw(`d.${col}`)} IN (${sql.join(values.map(v => sql`${v}`), sql`, `)})`);
+      if (hasEmpty && nonEmpty.length > 0) {
+        parts.push(sql`(${sql.raw(`d.${col}`)} IS NULL OR ${sql.raw(`d.${col}`)} = '' OR ${sql.raw(`d.${col}`)} IN (${sql.join(nonEmpty.map(v => sql`${v}`), sql`, `)}))`);
+      } else if (hasEmpty) {
+        parts.push(sql`(${sql.raw(`d.${col}`)} IS NULL OR ${sql.raw(`d.${col}`)} = '')`);
+      } else if (nonEmpty.length === 1) {
+        parts.push(sql`${sql.raw(`d.${col}`)} = ${nonEmpty[0]}`);
+      } else {
+        parts.push(sql`${sql.raw(`d.${col}`)} IN (${sql.join(nonEmpty.map(v => sql`${v}`), sql`, `)})`);
+      }
     }
   }
 
@@ -212,17 +225,25 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
 
   function addMultiFilter(col: ReturnType<typeof eq> extends infer T ? Parameters<typeof eq>[0] : never, values: string[], fieldName: string) {
     if (values.length === 0) return;
+    const hasEmpty = values.includes("__empty__");
+    const nonEmpty = values.filter(v => v !== "__empty__");
     if (excludeSet.has(fieldName)) {
-      conditions.push(
-        or(
-          sql`${col} IS NULL`,
-          eq(col, ""),
-          values.length === 1 ? ne(col, values[0]) : notInArray(col, values),
-        )!
-      );
+      if (hasEmpty && nonEmpty.length > 0) {
+        conditions.push(and(sql`${col} IS NOT NULL`, ne(col, ""), nonEmpty.length === 1 ? ne(col, nonEmpty[0]) : notInArray(col, nonEmpty))!);
+      } else if (hasEmpty) {
+        conditions.push(and(sql`${col} IS NOT NULL`, ne(col, ""))!);
+      } else {
+        conditions.push(or(sql`${col} IS NULL`, eq(col, ""), nonEmpty.length === 1 ? ne(col, nonEmpty[0]) : notInArray(col, nonEmpty))!);
+      }
     } else {
-      if (values.length === 1) conditions.push(eq(col, values[0]));
-      else conditions.push(inArray(col, values));
+      if (hasEmpty && nonEmpty.length > 0) {
+        conditions.push(or(sql`${col} IS NULL`, eq(col, ""), nonEmpty.length === 1 ? eq(col, nonEmpty[0]) : inArray(col, nonEmpty))!);
+      } else if (hasEmpty) {
+        conditions.push(or(sql`${col} IS NULL`, eq(col, ""))!);
+      } else {
+        if (nonEmpty.length === 1) conditions.push(eq(col, nonEmpty[0]));
+        else conditions.push(inArray(col, nonEmpty));
+      }
     }
   }
 
@@ -437,7 +458,16 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
       COALESCE(SUM(d.share_count), 0)::int AS total_shares,
       COUNT(DISTINCT d.birim) FILTER (WHERE d.birim != '')::int AS birim_count,
       COUNT(DISTINCT d.temsilci) FILTER (WHERE d.temsilci != '')::int AS temsilci_count,
-      COUNT(DISTINCT d.donation_type) FILTER (WHERE d.donation_type != '')::int AS type_count
+      COUNT(DISTINCT d.donation_type) FILTER (WHERE d.donation_type != '')::int AS type_count,
+      COUNT(d.id) FILTER (WHERE d.donation_type IS NULL OR d.donation_type = '')::int AS empty_type_count,
+      COUNT(d.id) FILTER (WHERE d.birim IS NULL OR d.birim = '')::int AS empty_birim_count,
+      COUNT(d.id) FILTER (WHERE d.temsilci IS NULL OR d.temsilci = '')::int AS empty_temsilci_count,
+      COUNT(d.id) FILTER (WHERE d.ozellik IS NULL OR d.ozellik = '')::int AS empty_ozellik_count,
+      COUNT(d.id) FILTER (WHERE d.fiyat IS NULL OR d.fiyat = '')::int AS empty_fiyat_count,
+      COUNT(d.id) FILTER (WHERE d.yer_talebi IS NULL OR d.yer_talebi = '')::int AS empty_yer_talebi_count,
+      COUNT(d.id) FILTER (WHERE d.gun_talebi IS NULL OR d.gun_talebi = '')::int AS empty_gun_talebi_count,
+      COUNT(d.id) FILTER (WHERE d.ilk_hayvan IS NULL OR d.ilk_hayvan = '')::int AS empty_ilk_hayvan_count,
+      COUNT(d.id) FILTER (WHERE d.safi IS NULL OR d.safi = '')::int AS empty_safi_count
     FROM donations d
     JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
     WHERE ${filterWhere}
