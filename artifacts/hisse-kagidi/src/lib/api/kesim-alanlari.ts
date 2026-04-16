@@ -2,8 +2,9 @@ import type { KesimAlani, Donation } from "../types";
 import { apiFetch } from "./core";
 import { buildSignedPhotoUrl } from "./signed-url";
 
-export async function fetchKesimAlanlari(): Promise<KesimAlani[]> {
-  return apiFetch<KesimAlani[]>("/kesim-alanlari");
+export async function fetchKesimAlanlari(projectId?: string | null): Promise<KesimAlani[]> {
+  const url = projectId ? `/kesim-alanlari?projectId=${encodeURIComponent(projectId)}` : "/kesim-alanlari";
+  return apiFetch<KesimAlani[]>(url);
 }
 
 export async function fetchDeletedKesimAlanlari(): Promise<KesimAlani[]> {

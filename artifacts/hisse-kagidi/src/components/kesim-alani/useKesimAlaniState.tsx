@@ -334,10 +334,10 @@ export function useKesimAlaniState() {
             const stored = loadBasketFromStorage(fallback.projectId);
             basket.setBasketItems(stored);
             fetchPhotoCountsAdmin(fallback.id).then(notifications.setPhotoCounts).catch(() => {});
+            fetchTags().then(tags => ui.setGlobalTags(tags)).catch(() => {});
           } else {
             setLocation("/");
           }
-          try { ui.setGlobalTags(await fetchTags()); } catch {}
           return;
         }
 
@@ -419,22 +419,28 @@ export function useKesimAlaniState() {
 
         const stored = loadBasketFromStorage(meta.projectId);
         basket.setBasketItems(stored);
-        fetchPhotoCountsAdmin(meta.id).then(notifications.setPhotoCounts).catch(() => {});
 
-        if (meta.projectId) {
-          try {
-            const [allKA, projects] = await Promise.all([fetchKesimAlanlari(), fetchProjects()]);
-            if (requestId !== loadRequestIdRef.current) return;
-            const siblings = allKA
-              .filter((ka) => ka.projectId === meta.projectId && ka.id !== meta.id && !ka.deletedAt)
-              .map((ka) => ({ id: ka.id, name: ka.name }));
-            setSiblingKesimAlanlari(siblings);
-            const proj = projects.find((p) => p.id === meta.projectId);
-            if (proj) setProjectName(proj.name);
-          } catch {}
-        }
+        void (async () => {
+          fetchPhotoCountsAdmin(meta.id).then(notifications.setPhotoCounts).catch(() => {});
 
-        try { ui.setGlobalTags(await fetchTags()); } catch {}
+          if (meta.projectId) {
+            try {
+              const [projectKAs, projects] = await Promise.all([
+                fetchKesimAlanlari(meta.projectId),
+                fetchProjects(),
+              ]);
+              if (requestId !== loadRequestIdRef.current) return;
+              const siblings = projectKAs
+                .filter((ka) => ka.id !== meta.id && !ka.deletedAt)
+                .map((ka) => ({ id: ka.id, name: ka.name }));
+              setSiblingKesimAlanlari(siblings);
+              const proj = projects.find((p) => p.id === meta.projectId);
+              if (proj) setProjectName(proj.name);
+            } catch {}
+          }
+
+          try { ui.setGlobalTags(await fetchTags()); } catch {}
+        })();
       } catch (err) {
         if (requestId !== loadRequestIdRef.current) return;
         console.error("[loadData] Failed to load kesim alanı data", err);

@@ -78,7 +78,8 @@ const router: IRouter = Router();
 
 router.get("/kesim-alanlari", asyncHandler(async (req, res) => {
   const includeDeleted = req.query.includeDeleted === "true";
-  const result = await listKesimAlanlari(includeDeleted);
+  const projectId = typeof req.query.projectId === "string" ? req.query.projectId : null;
+  const result = await listKesimAlanlari(includeDeleted, projectId);
   res.json(result.data);
 }));
 

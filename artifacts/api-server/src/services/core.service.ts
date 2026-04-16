@@ -20,20 +20,34 @@ import {
   type AnimalGroupPayload,
 } from "./kesim-alani.service";
 
-export async function listKesimAlanlari(includeDeleted: boolean) {
-  const { cached, cacheKey } = getCachedKAList(includeDeleted);
-  if (cached) return serviceOk({ data: cached });
+export async function listKesimAlanlari(includeDeleted: boolean, projectId?: string | null) {
+  if (!projectId) {
+    const { cached, cacheKey } = getCachedKAList(includeDeleted);
+    if (cached) return serviceOk({ data: cached });
+
+    const hidePool = ne(kesimAlanlariTable.name, "__havuz__");
+    const whereClause = includeDeleted ? hidePool : and(isNull(kesimAlanlariTable.deletedAt), hidePool);
+
+    const rows = await db.select().from(kesimAlanlariTable)
+      .where(whereClause)
+      .orderBy(kesimAlanlariTable.createdAt);
+
+    const results = await getFullKesimAlaniList(rows);
+    setCachedKAList(cacheKey, results);
+    return serviceOk({ data: results });
+  }
 
   const hidePool = ne(kesimAlanlariTable.name, "__havuz__");
-  const whereClause = includeDeleted ? hidePool : and(isNull(kesimAlanlariTable.deletedAt), hidePool);
+  const projectFilter = eq(kesimAlanlariTable.projectId, projectId);
+  const whereClause = includeDeleted
+    ? and(hidePool, projectFilter)
+    : and(isNull(kesimAlanlariTable.deletedAt), hidePool, projectFilter);
 
-  let rows;
-  rows = await db.select().from(kesimAlanlariTable)
+  const rows = await db.select().from(kesimAlanlariTable)
     .where(whereClause)
     .orderBy(kesimAlanlariTable.createdAt);
 
   const results = await getFullKesimAlaniList(rows);
-  setCachedKAList(cacheKey, results);
   return serviceOk({ data: results });
 }
 
