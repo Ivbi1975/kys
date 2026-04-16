@@ -3,6 +3,7 @@ import { ArrowRightLeft, Undo2, Trash2, X, Tag, StickyNote } from "lucide-react"
 
 interface PoolBulkActionsProps {
   selectedCount: number;
+  siblingCount?: number;
   onTransferOpen: () => void;
   onBulkAction: (action: "exclude" | "include" | "delete") => void;
   onTagOpen: () => void;
@@ -10,12 +11,21 @@ interface PoolBulkActionsProps {
   onClearSelection: () => void;
 }
 
-export function PoolBulkActions({ selectedCount, onTransferOpen, onBulkAction, onTagOpen, onNoteOpen, onClearSelection }: PoolBulkActionsProps) {
+export function PoolBulkActions({ selectedCount, siblingCount = 0, onTransferOpen, onBulkAction, onTagOpen, onNoteOpen, onClearSelection }: PoolBulkActionsProps) {
   if (selectedCount === 0) return null;
+
+  const potentialTotal = selectedCount + siblingCount;
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-background border shadow-lg rounded-lg px-4 py-3 flex items-center gap-3 z-50">
-      <span className="text-sm font-medium">{selectedCount} bağış seçili</span>
+      <div className="text-sm font-medium">
+        <span>{selectedCount} bağış seçili</span>
+        {siblingCount > 0 && (
+          <span className="text-muted-foreground ml-1">
+            (+{siblingCount} ek = {potentialTotal} toplam)
+          </span>
+        )}
+      </div>
       <div className="flex gap-1.5">
         <Button size="sm" variant="outline" onClick={onTagOpen}>
           <Tag className="w-4 h-4 mr-1" />Etiketle
@@ -24,7 +34,11 @@ export function PoolBulkActions({ selectedCount, onTransferOpen, onBulkAction, o
           <StickyNote className="w-4 h-4 mr-1" />Not Ekle
         </Button>
         <Button size="sm" variant="outline" onClick={onTransferOpen}>
-          <ArrowRightLeft className="w-4 h-4 mr-1" />Kesim Listesine Aktar
+          <ArrowRightLeft className="w-4 h-4 mr-1" />
+          Kesim Listesine Aktar
+          {siblingCount > 0 && (
+            <span className="ml-1 text-xs text-muted-foreground">({potentialTotal})</span>
+          )}
         </Button>
         <Button size="sm" variant="outline" onClick={() => onBulkAction("exclude")}>
           <X className="w-4 h-4 mr-1" />Sepetten Çıkar

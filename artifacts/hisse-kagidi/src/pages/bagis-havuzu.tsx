@@ -30,6 +30,7 @@ import {
   flagDonation, unflagDonation,
   updatePoolDonationField,
   deleteAllPoolDonations,
+  fetchDonationSiblings,
 } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -162,9 +163,11 @@ export default function BagisHavuzuPage() {
   const [aiReportCollapsed, setAiReportCollapsed] = useState(false);
   const [aiErrorBatches, setAiErrorBatches] = useState(0);
   const [aiTotalBatches, setAiTotalBatches] = useState(0);
+  const [siblingCount, setSiblingCount] = useState(0);
   const activeJobIdsRef = useRef<string[]>([]);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const columnPickerRef = useRef<HTMLDivElement>(null);
+  const siblingTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => {
@@ -182,6 +185,28 @@ export default function BagisHavuzuPage() {
   useEffect(() => {
     return () => { stopPolling(); };
   }, [stopPolling]);
+
+  useEffect(() => {
+    const ids = selectAllPages && allFilteredIds.length > 0
+      ? allFilteredIds
+      : [...selectedIds];
+    if (ids.length === 0) {
+      setSiblingCount(0);
+      return;
+    }
+    clearTimeout(siblingTimerRef.current);
+    siblingTimerRef.current = setTimeout(async () => {
+      try {
+        const result = await fetchDonationSiblings(projectId, ids);
+        const total = result.siblings.reduce((sum, s) => sum + s.extraCount, 0);
+        setSiblingCount(total);
+      } catch {
+        setSiblingCount(0);
+      }
+    }, 600);
+    return () => clearTimeout(siblingTimerRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds, selectAllPages, allFilteredIds, projectId]);
 
   useEffect(() => {
     const stored = localStorage.getItem(`bagis-havuzu-columns-${projectId}`);
@@ -508,8 +533,11 @@ export default function BagisHavuzuPage() {
     }
   }, [queryClient, toast]);
 
-  const handleTransfer = useCallback(async () => {
-    const ids = [...effectiveSelectedIds];
+  const handleTransfer = useCallback(async (extraIds: string[] = []) => {
+    const baseIds = [...effectiveSelectedIds];
+    const ids = extraIds.length > 0
+      ? [...new Set([...baseIds, ...extraIds])]
+      : baseIds;
     if (ids.length === 0) return;
     setTransferring(true);
     try {
@@ -1175,6 +1203,7 @@ export default function BagisHavuzuPage() {
 
         <PoolBulkActions
           selectedCount={effectiveSelectedIds.size}
+          siblingCount={siblingCount}
           onTransferOpen={() => setTransferOpen(true)}
           onBulkAction={handleBulkAction}
           onTagOpen={() => setTagDialogOpen(true)}
@@ -1186,6 +1215,7 @@ export default function BagisHavuzuPage() {
           open={transferOpen}
           onOpenChange={setTransferOpen}
           selectedCount={effectiveSelectedIds.size}
+          selectedIds={[...effectiveSelectedIds]}
           transferTarget={transferTarget}
           setTransferTarget={setTransferTarget}
           newListName={newListName}

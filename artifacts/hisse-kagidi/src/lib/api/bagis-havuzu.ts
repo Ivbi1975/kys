@@ -230,3 +230,19 @@ export async function deleteAllPoolDonations(projectId: string): Promise<{ succe
     method: "DELETE",
   });
 }
+
+export interface DonorSiblings {
+  donorName: string;
+  extraCount: number;
+  extraIds: string[];
+}
+
+export async function fetchDonationSiblings(
+  projectId: string,
+  donationIds: string[],
+): Promise<{ siblings: DonorSiblings[] }> {
+  return apiFetch<{ siblings: DonorSiblings[] }>(`/projects/${projectId}/donations/siblings`, {
+    method: "POST",
+    body: JSON.stringify({ donationIds }),
+  });
+}

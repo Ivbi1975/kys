@@ -794,6 +794,74 @@ router.post("/projects/:id/donations/bulk-import", asyncHandler(async (req, res)
   res.status(201).json({ success: true, inserted });
 }));
 
+const siblingsSchema = z.object({
+  donationIds: z.array(z.string()).min(1).max(50000),
+});
+
+router.post("/projects/:id/donations/siblings", asyncHandler(async (req, res) => {
+  const projectId = req.params.id;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const parsed = siblingsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
+    return;
+  }
+
+  const { donationIds } = parsed.data;
+
+  // Only look within the pool kesim alanı (__havuz__) — never across placed kesim listeleri
+  const poolKARows = await db.select({ id: kesimAlanlariTable.id })
+    .from(kesimAlanlariTable)
+    .where(and(
+      eq(kesimAlanlariTable.projectId, projectId),
+      eq(kesimAlanlariTable.name, "__havuz__"),
+      isNull(kesimAlanlariTable.deletedAt),
+    ));
+
+  if (poolKARows.length === 0) { res.json({ siblings: [] }); return; }
+  const poolKAIds = poolKARows.map(k => k.id);
+
+  // Verify selected donations belong to pool KAs
+  const selectedDonations = await db.select({ id: donationsTable.id, name: donationsTable.name })
+    .from(donationsTable)
+    .where(and(
+      inArray(donationsTable.id, donationIds),
+      inArray(donationsTable.kesimAlaniId, poolKAIds),
+      isNull(donationsTable.deletedAt),
+    ));
+
+  const donorNames = [...new Set(selectedDonations.map(d => d.name).filter(Boolean))] as string[];
+
+  if (donorNames.length === 0) { res.json({ siblings: [] }); return; }
+
+  // Find other pool donations with same donor names not in the selection
+  const siblingRows = await db.select({ id: donationsTable.id, name: donationsTable.name })
+    .from(donationsTable)
+    .where(and(
+      inArray(donationsTable.kesimAlaniId, poolKAIds),
+      isNull(donationsTable.deletedAt),
+      inArray(donationsTable.name, donorNames),
+      notInArray(donationsTable.id, donationIds),
+    ));
+
+  const grouped = new Map<string, string[]>();
+  for (const s of siblingRows) {
+    if (!s.name) continue;
+    if (!grouped.has(s.name)) grouped.set(s.name, []);
+    grouped.get(s.name)!.push(s.id);
+  }
+
+  const siblings = Array.from(grouped.entries()).map(([donorName, extraIds]) => ({
+    donorName,
+    extraCount: extraIds.length,
+    extraIds,
+  }));
+
+  res.json({ siblings });
+}));
+
 const transferSchema = z.object({
   donationIds: z.array(z.string()).min(1).max(50000),
   targetKesimAlaniId: z.string().min(1),
