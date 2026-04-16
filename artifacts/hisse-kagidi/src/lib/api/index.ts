@@ -5,6 +5,7 @@ export {
   fetchHomeData,
   invalidateHomeDataCache,
   fetchProjects,
+  fetchProject,
   createProject,
   updateProject,
   deleteProject,

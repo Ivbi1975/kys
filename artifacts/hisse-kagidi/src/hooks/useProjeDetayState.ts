@@ -7,7 +7,7 @@ import type { KesimAlani, Project } from "@/lib/types";
 import {
   fetchKesimAlanlari,
   createKesimAlani,
-  fetchProjects,
+  fetchProject,
   updateProject,
   deleteProject,
   archiveProject,
@@ -57,14 +57,13 @@ export function useProjeDetayState() {
   const loadDataFn = useCallback(async () => {
     setRawLoading(true);
     try {
-      const [projectsRes, kaRes] = await Promise.all([
-        fetchProjects(),
-        fetchKesimAlanlari(),
+      const [proj, kaRes] = await Promise.all([
+        fetchProject(projectId),
+        fetchKesimAlanlari(projectId),
       ]);
-      const proj = projectsRes.find(p => p.id === projectId) || null;
       setProject(proj);
       setAllKesimAlanlari(kaRes);
-      setKesimAlanlari(kaRes.filter(k => k.projectId === projectId));
+      setKesimAlanlari(kaRes);
       if (proj) {
         setEditProjectName(proj.name);
       }

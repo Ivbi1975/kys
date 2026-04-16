@@ -36,6 +36,14 @@ export async function fetchProjects(): Promise<Project[]> {
   return apiFetch<Project[]>("/projects");
 }
 
+export async function fetchProject(id: string): Promise<Project | null> {
+  try {
+    return await apiFetch<Project>(`/projects/${id}`);
+  } catch {
+    return null;
+  }
+}
+
 export async function createProject(name: string): Promise<Project> {
   return apiFetch<Project>("/projects", {
     method: "POST",

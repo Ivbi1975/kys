@@ -365,6 +365,21 @@ router.post("/projects/:id/unarchive", asyncHandler(async (req, res) => {
   auditLog({ action: "unarchive", entityType: "project", entityId: id, entityName: project.name, req });
 }));
 
+router.get("/projects/:id", asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const rows = await db.execute(sql`
+    ${projectsWithStatsQuery}
+    WHERE p.id = ${id} AND p.deleted_at IS NULL AND p.archived_at IS NULL
+  `);
+
+  if (rows.rows.length === 0) {
+    res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND });
+    return;
+  }
+
+  res.json(mapProjectRow(rows.rows[0] as ProjectRow));
+}));
+
 const DASHBOARD_CACHE_TTL = 30_000;
 
 router.get("/projects/:id/dashboard", asyncHandler(async (req, res) => {
