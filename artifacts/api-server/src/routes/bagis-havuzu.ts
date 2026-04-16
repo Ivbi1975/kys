@@ -440,7 +440,35 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     flagReason: d.flagReason,
   }));
 
-  res.json({ items, total, kesimAlanlari: kaRows, allFilteredIds });
+  const donorMissedCounts: Record<string, number> = {};
+  const hasActiveFilters = conditions.length > 2;
+  const pageNames = hasActiveFilters ? [...new Set(rows.map(r => r.name).filter(Boolean))] : [];
+  if (pageNames.length > 0) {
+    const [totalByName, filteredByName] = await Promise.all([
+      db.select({ name: donationsTable.name, cnt: sql<number>`count(*)::int` })
+        .from(donationsTable)
+        .where(and(
+          inArray(donationsTable.kesimAlaniId, kaIds),
+          isNull(donationsTable.deletedAt),
+          inArray(donationsTable.name, pageNames),
+        ))
+        .groupBy(donationsTable.name),
+      db.select({ name: donationsTable.name, cnt: sql<number>`count(*)::int` })
+        .from(donationsTable)
+        .where(and(whereClause, inArray(donationsTable.name, pageNames)))
+        .groupBy(donationsTable.name),
+    ]);
+    const totalMap = new Map(totalByName.map(r => [r.name, r.cnt]));
+    const filteredMap = new Map(filteredByName.map(r => [r.name, r.cnt]));
+    for (const name of pageNames) {
+      const total = totalMap.get(name) ?? 0;
+      const filtered = filteredMap.get(name) ?? 0;
+      const missed = total - filtered;
+      if (missed > 0) donorMissedCounts[name] = missed;
+    }
+  }
+
+  res.json({ items, total, kesimAlanlari: kaRows, allFilteredIds, donorMissedCounts });
 }));
 
 router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {

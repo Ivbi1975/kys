@@ -49,6 +49,7 @@ interface VirtualizedDonationTableProps {
   onFlagDonation?: (id: string, reason: string) => void;
   onUnflagDonation?: (id: string) => void;
   onInlineEdit?: (donationId: string, field: string, value: string) => void;
+  donorMissedCounts?: Record<string, number>;
 }
 
 const ROW_HEIGHT = 36;
@@ -124,7 +125,7 @@ function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
   }
 }
 
-function renderDisplayValue(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean) {
+function renderDisplayValue(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean, missedCount?: number) {
   switch (key) {
     case "vekalet":
       return (
@@ -140,6 +141,14 @@ function renderDisplayValue(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
               <AlertTriangle className="w-3 h-3 inline" />
             </span>
           )}
+          {missedCount && missedCount > 0 ? (
+            <span
+              className="ml-1 inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[10px] font-semibold px-1.5 py-0 leading-tight border border-blue-200 dark:border-blue-700 cursor-default"
+              title={`Bu bağışçının ${missedCount} adet daha bağışı bu filtreye girmedi`}
+            >
+              +{missedCount}
+            </span>
+          ) : null}
         </>
       );
     case "name": return <span className="font-medium">{d.name || "—"}</span>;
@@ -258,7 +267,7 @@ function InlineEditInput({
 
 export function VirtualizedDonationTable({
   items, isLoading, activeFilterCount, selectedIds, toggleSelect, toggleSelectAll, multiLocationVekalets, visibleColumns,
-  sortBy, sortDir, onColumnSort, onFlagDonation, onUnflagDonation, onInlineEdit,
+  sortBy, sortDir, onColumnSort, onFlagDonation, onUnflagDonation, onInlineEdit, donorMissedCounts,
 }: VirtualizedDonationTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const headerInnerRef = useRef<HTMLDivElement>(null);
@@ -409,6 +418,9 @@ export function VirtualizedDonationTable({
                 const isSelected = selectedIds.has(d.id);
                 const isMultiLoc = multiLocationVekalets.has((d.vekalet || "").trim());
                 const isRowEditing = editingId === d.id;
+                const missedCount = (activeFilterCount > 0 && d.name && donorMissedCounts)
+                  ? (donorMissedCounts[d.name] ?? 0)
+                  : 0;
                 return (
                   <div
                     key={d.id}
@@ -454,7 +466,7 @@ export function VirtualizedDonationTable({
                                   className={`p-2 text-xs overflow-hidden text-ellipsis whitespace-nowrap cursor-text hover:bg-muted/50 ${col.key === "vekalet" ? "font-mono" : ""}`}
                                   onClick={() => startEditing(d.id, col.key)}
                                 >
-                                  {renderDisplayValue(d, col.key, isMultiLoc)}
+                                  {renderDisplayValue(d, col.key, isMultiLoc, col.key === "vekalet" ? missedCount : undefined)}
                                 </td>
                               );
                             }

@@ -325,6 +325,7 @@ export default function BagisHavuzuPage() {
   const total = data?.total || 0;
   const allFilteredIds = data?.allFilteredIds || [];
   const kesimAlanlari = (data?.kesimAlanlari || []).filter(ka => ka.name !== "__havuz__");
+  const donorMissedCounts = data?.donorMissedCounts || {};
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const multiLocationVekalets = useMemo(() => {
@@ -1157,6 +1158,7 @@ export default function BagisHavuzuPage() {
           onFlagDonation={handleFlagDonation}
           onUnflagDonation={handleUnflagDonation}
           onInlineEdit={handleInlineEdit}
+          donorMissedCounts={donorMissedCounts}
         />
 
         {totalPages > 1 && (

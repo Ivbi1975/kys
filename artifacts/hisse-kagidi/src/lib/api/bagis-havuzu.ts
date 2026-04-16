@@ -6,6 +6,7 @@ export interface PoolDonationsResponse {
   total: number;
   kesimAlanlari: { id: string; name: string }[];
   allFilteredIds: string[];
+  donorMissedCounts?: Record<string, number>;
 }
 
 export interface PoolFilters {
