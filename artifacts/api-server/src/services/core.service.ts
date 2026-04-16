@@ -1,5 +1,5 @@
 import { db } from "@workspace/db";
-import { kesimAlanlariTable, projectsTable, donationsTable, donationTagsTable } from "@workspace/db/schema";
+import { kesimAlanlariTable, projectsTable, donationsTable, donationTagsTable, animalGroupDonationsTable } from "@workspace/db/schema";
 import { eq, isNull, isNotNull, inArray, and, ne } from "drizzle-orm";
 import crypto from "crypto";
 import { serviceError, serviceOk, type ServiceResult } from "./result";
@@ -227,13 +227,54 @@ export async function deleteKesimAlani(id: string, permanent: boolean): Promise<
   const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
   if (!existing) return serviceError("not_found", 404);
 
-  if (permanent) {
-    await db.delete(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
-  } else {
-    await db.update(kesimAlanlariTable)
-      .set({ deletedAt: new Date() })
-      .where(eq(kesimAlanlariTable.id, id));
-  }
+  await db.transaction(async (tx) => {
+    if (existing.projectId) {
+      let [pool] = await tx.select({ id: kesimAlanlariTable.id })
+        .from(kesimAlanlariTable)
+        .where(and(
+          eq(kesimAlanlariTable.projectId, existing.projectId),
+          eq(kesimAlanlariTable.name, "__havuz__"),
+          isNull(kesimAlanlariTable.deletedAt),
+        ));
+
+      if (!pool) {
+        const poolId = crypto.randomBytes(16).toString("hex");
+        await tx.insert(kesimAlanlariTable).values({
+          id: poolId,
+          name: "__havuz__",
+          projectId: existing.projectId,
+          trackingToken: crypto.randomBytes(16).toString("hex"),
+          createdAt: new Date(),
+        });
+        pool = { id: poolId };
+      }
+
+      const donations = await tx.select({ id: donationsTable.id })
+        .from(donationsTable)
+        .where(eq(donationsTable.kesimAlaniId, id));
+
+      if (donations.length > 0) {
+        const donationIds = donations.map(d => d.id);
+        const BATCH = 500;
+        for (let i = 0; i < donationIds.length; i += BATCH) {
+          const batch = donationIds.slice(i, i + BATCH);
+          await tx.delete(animalGroupDonationsTable)
+            .where(inArray(animalGroupDonationsTable.donationId, batch));
+          await tx.update(donationsTable)
+            .set({ kesimAlaniId: pool.id })
+            .where(inArray(donationsTable.id, batch));
+        }
+      }
+    }
+
+    if (permanent) {
+      await tx.delete(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
+    } else {
+      await tx.update(kesimAlanlariTable)
+        .set({ deletedAt: new Date() })
+        .where(eq(kesimAlanlariTable.id, id));
+    }
+  });
 
   invalidateKACache();
   return serviceOk({ success: true as const });
