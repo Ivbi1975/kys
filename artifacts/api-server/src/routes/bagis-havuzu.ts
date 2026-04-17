@@ -1244,6 +1244,7 @@ router.get("/projects/:id/donations/assigned-vekalets", asyncHandler(async (req,
 
 const vekaletCheckSchema = z.object({
   vekalets: z.array(z.string().trim().min(1)).min(1).max(100000),
+  scope: z.enum(["pool", "kesim", "all"]).default("all"),
 });
 
 router.post("/projects/:id/donations/vekalet-check", asyncHandler(async (req, res) => {
@@ -1257,12 +1258,17 @@ router.post("/projects/:id/donations/vekalet-check", asyncHandler(async (req, re
     return;
   }
 
-  const vekalets = parsed.data.vekalets;
+  const { vekalets, scope } = parsed.data;
 
   const CHUNK = 500;
   const allConflicts: Array<{ vekalet: string; id: string; name: string; description: string; kesimAlaniId: string; kesimAlaniName: string }> = [];
   for (let i = 0; i < vekalets.length; i += CHUNK) {
     const chunk = vekalets.slice(i, i + CHUNK);
+    const scopeCondition = scope === "pool"
+      ? eq(kesimAlanlariTable.name, "__havuz__")
+      : scope === "kesim"
+        ? ne(kesimAlanlariTable.name, "__havuz__")
+        : undefined;
     const existing = await db.select({
       vekalet: donationsTable.vekalet,
       id: donationsTable.id,
@@ -1276,6 +1282,7 @@ router.post("/projects/:id/donations/vekalet-check", asyncHandler(async (req, re
         isNull(donationsTable.deletedAt),
         isNull(kesimAlanlariTable.deletedAt),
         inArray(donationsTable.vekalet, chunk),
+        scopeCondition,
       ));
     allConflicts.push(...existing.map(e => ({
       ...e,

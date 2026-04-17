@@ -37,7 +37,7 @@ export function AddDonorDialog() {
         return;
       }
       try {
-        const { conflicts } = await checkVekaletConflicts(kesim.projectId, [val]);
+        const { conflicts } = await checkVekaletConflicts(kesim.projectId, [val], "kesim");
         if (conflicts.length > 0) {
           const where = conflicts[0].kesimAlaniName || "başka bir liste";
           setVekaletError(`Bu vekalet numarası "${where}" listesinde zaten kayıtlı.`);

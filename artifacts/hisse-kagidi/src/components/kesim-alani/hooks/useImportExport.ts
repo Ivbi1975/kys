@@ -215,7 +215,7 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
 
     if (uniqueVekaletValues.length > 0 && kesim.projectId) {
       try {
-        const { conflicts } = await checkVekaletConflicts(kesim.projectId, uniqueVekaletValues);
+        const { conflicts } = await checkVekaletConflicts(kesim.projectId, uniqueVekaletValues, "kesim");
         for (const c of conflicts) dbExcludeVekalets.add(c.vekalet);
       } catch {
         // vekalet check failed, continue without filtering

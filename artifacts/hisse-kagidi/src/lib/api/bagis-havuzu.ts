@@ -220,13 +220,17 @@ export async function fetchPoolAssignedVekalets(projectId: string): Promise<{ ve
   return apiFetch<{ vekalets: string[] }>(`/projects/${projectId}/donations/assigned-vekalets`);
 }
 
-export async function checkVekaletConflicts(projectId: string, vekalets: string[]): Promise<{ conflicts: VekaletConflict[] }> {
+export async function checkVekaletConflicts(
+  projectId: string,
+  vekalets: string[],
+  scope: "pool" | "kesim" | "all" = "all",
+): Promise<{ conflicts: VekaletConflict[] }> {
   const CHUNK = 5000;
   if (vekalets.length <= CHUNK) {
     return apiFetch<{ conflicts: VekaletConflict[] }>(
       `/projects/${projectId}/donations/vekalet-check`, {
         method: "POST",
-        body: JSON.stringify({ vekalets }),
+        body: JSON.stringify({ vekalets, scope }),
       }
     );
   }
@@ -236,7 +240,7 @@ export async function checkVekaletConflicts(projectId: string, vekalets: string[
     const { conflicts } = await apiFetch<{ conflicts: VekaletConflict[] }>(
       `/projects/${projectId}/donations/vekalet-check`, {
         method: "POST",
-        body: JSON.stringify({ vekalets: chunk }),
+        body: JSON.stringify({ vekalets: chunk, scope }),
       }
     );
     allConflicts.push(...conflicts);

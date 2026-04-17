@@ -168,7 +168,7 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
       let skippedCount = rawDonations.length - donations.length;
 
       if (vekaletValues.length > 0) {
-        const { conflicts } = await checkVekaletConflicts(projectId, vekaletValues);
+        const { conflicts } = await checkVekaletConflicts(projectId, vekaletValues, "pool");
         if (conflicts.length > 0) {
           const conflictingVekalets = new Set(conflicts.map(c => c.vekalet));
           const filteredDonations = donations.filter(d => !d.vekalet || !conflictingVekalets.has(d.vekalet));
