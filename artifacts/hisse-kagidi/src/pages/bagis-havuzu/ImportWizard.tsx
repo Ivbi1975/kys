@@ -134,6 +134,8 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
     return String(err);
   }
 
+  const [pendingImport, setPendingImport] = useState<{ donations: ReturnType<typeof buildDonationsFromRows>; skippedCount: number } | null>(null);
+
   const handleImport = useCallback(async () => {
     if (displayPreviewRows.length === 0) {
       toast({ title: "Yüklenecek veri bulunamadı", variant: "destructive" });
@@ -142,54 +144,56 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
     setImporting(true);
     setImportProgress("Veriler hazırlanıyor...");
     try {
-      const donations = buildDonationsFromRows(displayPreviewRows);
+      const rawDonations = buildDonationsFromRows(displayPreviewRows);
 
-      if (donations.length === 0) {
+      if (rawDonations.length === 0) {
         toast({ title: "İsim sütunu eşleştirilmemiş veya boş", variant: "destructive" });
         setImporting(false);
         setImportProgress("");
         return;
       }
 
+      // Dosya içi vekalet tekrarını temizle (aynı no varsa ilk kayıt alınır)
+      const seenVekalets = new Set<string>();
+      const donations = rawDonations.filter(d => {
+        if (!d.vekalet) return true;
+        if (seenVekalets.has(d.vekalet)) return false;
+        seenVekalets.add(d.vekalet);
+        return true;
+      });
+
       setImportProgress("Vekalet kontrolleri yapılıyor...");
       const vekaletValues = donations.map(d => d.vekalet).filter(Boolean);
       let donationsToImport = donations;
-      let skippedCount = 0;
+      let skippedCount = rawDonations.length - donations.length;
+
       if (vekaletValues.length > 0) {
-        try {
-          const { conflicts } = await checkVekaletConflicts(projectId, vekaletValues);
-          if (conflicts.length > 0) {
-            const conflictingVekalets = new Set(conflicts.map(c => c.vekalet));
-            const filteredDonations = donations.filter(d => !d.vekalet || !conflictingVekalets.has(d.vekalet));
-            skippedCount = donations.length - filteredDonations.length;
-            const rows = categorizeConflicts(conflicts, donations);
-            const proceed = await new Promise<boolean>((resolve) => {
-              conflictResolveRef.current = resolve;
-              setConflictRows(rows);
-              setConflictDialogOpen(true);
-            });
-            if (!proceed) {
-              setImporting(false);
-              setImportProgress("");
-              return;
-            }
-            donationsToImport = filteredDonations;
-          }
-        } catch (vekaletErr) {
-          console.error("Vekalet check error:", vekaletErr);
-          const proceed = window.confirm(
-            "Vekalet kontrolü sırasında bir hata oluştu. Kontrol atlanarak devam edilsin mi?"
-          );
+        const { conflicts } = await checkVekaletConflicts(projectId, vekaletValues);
+        if (conflicts.length > 0) {
+          const conflictingVekalets = new Set(conflicts.map(c => c.vekalet));
+          const filteredDonations = donations.filter(d => !d.vekalet || !conflictingVekalets.has(d.vekalet));
+          skippedCount += donations.length - filteredDonations.length;
+          const rows = categorizeConflicts(conflicts, donations);
+          donationsToImport = filteredDonations;
+
+          // Çakışma varsa: dialog göster, kullanıcı iptal edebilir veya devam edebilir (sadece filtrelenmiş liste)
+          const proceed = await new Promise<boolean>((resolve) => {
+            conflictResolveRef.current = resolve;
+            setConflictRows(rows);
+            setPendingImport({ donations: filteredDonations, skippedCount });
+            setConflictDialogOpen(true);
+          });
           if (!proceed) {
             setImporting(false);
             setImportProgress("");
+            setPendingImport(null);
             return;
           }
         }
       }
 
       if (donationsToImport.length === 0) {
-        toast({ title: "Aktarılacak bağış kalmadı", description: `${skippedCount} bağış vekalet çakışması nedeniyle atlandı.`, variant: "destructive" });
+        toast({ title: "Aktarılacak bağış kalmadı", description: `${skippedCount} bağış zaten kayıtlı olduğu için atlandı.`, variant: "destructive" });
         setImporting(false);
         setImportProgress("");
         resetImport();
@@ -202,7 +206,7 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
           setImportProgress(`Yükleniyor: ${inserted}/${total} (parça ${chunkIdx}/${totalChunks})`);
         }
       });
-      const skippedMsg = skippedCount > 0 ? ` (${skippedCount} vekalet çakışması nedeniyle atlandı)` : "";
+      const skippedMsg = skippedCount > 0 ? ` (${skippedCount} tekrarlı vekalet atlandı)` : "";
       toast({ title: `${result.inserted} bağış başarıyla eklendi${skippedMsg}` });
       resetImport();
       onSuccess();
@@ -219,6 +223,7 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
   function handleConflictResolve(proceed: boolean) {
     setConflictDialogOpen(false);
     setConflictRows([]);
+    setPendingImport(null);
     conflictResolveRef.current?.(proceed);
     conflictResolveRef.current = null;
   }
@@ -244,6 +249,7 @@ export function ImportWizard({ open, onOpenChange, projectId, onSuccess }: Impor
     <VekaletConflictDialog
       open={conflictDialogOpen}
       conflicts={conflictRows}
+      willImportCount={pendingImport?.donations.length ?? 0}
       onProceed={() => handleConflictResolve(true)}
       onCancel={() => handleConflictResolve(false)}
     />

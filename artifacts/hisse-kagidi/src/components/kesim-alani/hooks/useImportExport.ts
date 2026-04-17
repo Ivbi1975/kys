@@ -191,29 +191,53 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
     if (!kesim || previewData.length === 0) return;
     const startRow = hasHeaderRow ? 1 : 0;
     const vekaletColIdx = columnMappings.indexOf("vekalet");
-    if (vekaletColIdx >= 0 && kesim.projectId) {
-      const vekaletValues: string[] = [];
+
+    // Benzersiz vekalet numaralarını topla (dosya içi tekrarlar dahil)
+    const rawVekaletValues: string[] = [];
+    if (vekaletColIdx >= 0) {
       for (let r = startRow; r < previewData.length; r++) {
         const val = String(previewData[r][vekaletColIdx] ?? "").trim();
-        if (val) vekaletValues.push(val);
-      }
-      if (vekaletValues.length > 0) {
-        try {
-          const { conflicts } = await checkVekaletConflicts(kesim.projectId, vekaletValues);
-          if (conflicts.length > 0) {
-            const conflictingVekalets = new Set(conflicts.map(c => c.vekalet));
-            applyBulkImport(conflictingVekalets);
-            toast({
-              title: `${conflicts.length} bağış vekalet çakışması nedeniyle atlandı`,
-              description: "Aynı vekalet numarasına sahip mevcut kayıtlar korundu.",
-            });
-            return;
-          }
-        } catch {
-          // vekalet check failed, continue without filtering
-        }
+        if (val) rawVekaletValues.push(val);
       }
     }
+
+    // Dosya içi tekrar sayısını bul
+    const seenInFile = new Set<string>();
+    let inFileDuplicateCount = 0;
+    for (const v of rawVekaletValues) {
+      if (seenInFile.has(v)) inFileDuplicateCount++;
+      else seenInFile.add(v);
+    }
+    const uniqueVekaletValues = [...seenInFile];
+
+    // Veritabanı çakışma kontrolü (global — tüm projeler dahil)
+    const dbExcludeVekalets = new Set<string>();
+
+    if (uniqueVekaletValues.length > 0 && kesim.projectId) {
+      try {
+        const { conflicts } = await checkVekaletConflicts(kesim.projectId, uniqueVekaletValues);
+        for (const c of conflicts) dbExcludeVekalets.add(c.vekalet);
+      } catch {
+        // vekalet check failed, continue without filtering
+      }
+    }
+
+    const totalSkipped = dbExcludeVekalets.size + inFileDuplicateCount;
+    if (totalSkipped > 0) {
+      const parts: string[] = [];
+      if (dbExcludeVekalets.size > 0) parts.push(`${dbExcludeVekalets.size} zaten kayıtlı`);
+      if (inFileDuplicateCount > 0) parts.push(`${inFileDuplicateCount} dosya içi tekrar`);
+      const nums = [...dbExcludeVekalets].slice(0, 5).join(", ");
+      const more = dbExcludeVekalets.size > 5 ? ` ve ${dbExcludeVekalets.size - 5} daha...` : "";
+      toast({
+        title: `${totalSkipped} vekalet numarası atlandı (${parts.join(", ")})`,
+        description: dbExcludeVekalets.size > 0 ? `Zaten kayıtlı no'lar: ${nums}${more}` : undefined,
+        variant: "destructive",
+      });
+      applyBulkImport(dbExcludeVekalets);
+      return;
+    }
+
     applyBulkImport();
   }
 
@@ -273,6 +297,7 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
     ]);
 
     const newDonations: Donation[] = [];
+    const seenImportVekalets = new Set<string>();
     for (let r = startRow; r < previewData.length; r++) {
       if (excludedIdxs.has(r)) continue;
       const row = previewData[r];
@@ -315,6 +340,9 @@ export function useImportExport({ kesim, save, toast, siblingKesimAlanlari, addS
 
       if (donation.name) {
         if (excludeVekalets && donation.vekalet && excludeVekalets.has(donation.vekalet)) continue;
+        // Aynı import içinde aynı vekalet no tekrar gelirse atla (ilk kayıt alınır)
+        if (donation.vekalet && seenImportVekalets.has(donation.vekalet)) continue;
+        if (donation.vekalet) seenImportVekalets.add(donation.vekalet);
         newDonations.push(donation as Donation);
       }
     }

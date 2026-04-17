@@ -1221,19 +1221,6 @@ router.post("/projects/:id/donations/vekalet-check", asyncHandler(async (req, re
 
   const vekalets = parsed.data.vekalets;
 
-  const kaRows = await db.select({ id: kesimAlanlariTable.id, name: kesimAlanlariTable.name })
-    .from(kesimAlanlariTable)
-    .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
-
-  if (kaRows.length === 0) {
-    res.json({ conflicts: [] });
-    return;
-  }
-
-  const kaIds = kaRows.map(k => k.id);
-  const kaNameMap: Record<string, string> = {};
-  for (const k of kaRows) kaNameMap[k.id] = k.name;
-
   const CHUNK = 500;
   const allConflicts: Array<{ vekalet: string; id: string; name: string; description: string; kesimAlaniId: string; kesimAlaniName: string }> = [];
   for (let i = 0; i < vekalets.length; i += CHUNK) {
@@ -1244,16 +1231,19 @@ router.post("/projects/:id/donations/vekalet-check", asyncHandler(async (req, re
       name: donationsTable.name,
       description: donationsTable.description,
       kesimAlaniId: donationsTable.kesimAlaniId,
-    }).from(donationsTable).where(and(
-      inArray(donationsTable.kesimAlaniId, kaIds),
-      isNull(donationsTable.deletedAt),
-      inArray(donationsTable.vekalet, chunk),
-    ));
+      kesimAlaniName: kesimAlanlariTable.name,
+    }).from(donationsTable)
+      .innerJoin(kesimAlanlariTable, eq(donationsTable.kesimAlaniId, kesimAlanlariTable.id))
+      .where(and(
+        isNull(donationsTable.deletedAt),
+        isNull(kesimAlanlariTable.deletedAt),
+        inArray(donationsTable.vekalet, chunk),
+      ));
     allConflicts.push(...existing.map(e => ({
       ...e,
       vekalet: e.vekalet || "",
       description: e.description || "",
-      kesimAlaniName: kaNameMap[e.kesimAlaniId] || "",
+      kesimAlaniName: e.kesimAlaniName === "__havuz__" ? "Bağış Havuzu" : (e.kesimAlaniName || ""),
     })));
   }
 
