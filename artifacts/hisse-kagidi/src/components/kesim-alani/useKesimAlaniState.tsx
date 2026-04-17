@@ -19,7 +19,6 @@ import { useDonations } from "./hooks/useDonations";
 import { useAnimalGroups } from "./hooks/useAnimalGroups";
 import { useGroupingEngine } from "./hooks/useGroupingEngine";
 import { useBasket } from "./hooks/useBasket";
-import { useVekaletCheck } from "./hooks/useVekaletCheck";
 import { useTeams } from "./hooks/useTeams";
 import { useTrash } from "./hooks/useTrash";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -282,7 +281,6 @@ export function useKesimAlaniState() {
 
   addSelectedToBasketRef.current = basket.addSelectedToBasket;
 
-  const vekaletCheck = useVekaletCheck(kesim);
   const teams = useTeams({ kesim, setKesim, toast, setFilterTeam });
   const trash = useTrash({ kesim, setKesim, toast, history });
 
@@ -677,7 +675,6 @@ export function useKesimAlaniState() {
     ...animalGroupsHook,
     ...groupingEngine,
     ...basket,
-    vekaletCheck,
     ...teams,
     ...trash,
     ...saveManagerRest,
