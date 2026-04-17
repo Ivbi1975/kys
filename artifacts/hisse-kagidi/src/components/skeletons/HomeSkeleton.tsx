@@ -1,13 +1,11 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
-import { Scissors } from "lucide-react";
-
 export function HomeSkeleton() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto p-6">
         <div className="flex items-center gap-3 mb-6 sm:mb-8">
-          <Scissors className="w-6 h-6 sm:w-8 sm:h-8 text-primary shrink-0" />
+          <img src="/kurban-logo.png" alt="Kurban Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl shrink-0 object-cover" />
           <div className="flex-1 min-w-0">
             <Skeleton className="h-8 w-64 mb-2" />
             <Skeleton className="h-4 w-80" />
