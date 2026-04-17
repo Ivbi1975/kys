@@ -5,6 +5,7 @@ import {
   fetchHomeData,
   invalidateHomeDataCache,
   fetchKesimAlanlari,
+  fetchKesimAlani,
   createKesimAlani,
   apiPermanentDeleteKesimAlani,
   apiRestoreKesimAlani,
@@ -569,6 +570,38 @@ export function useHomeState() {
   }, []);
 
 
+  const [deletedKADetails, setDeletedKADetails] = useState<Record<string, KesimAlani>>({});
+  const [deletedKALoadingIds, setDeletedKALoadingIds] = useState<Set<string>>(new Set());
+
+  const handleFetchDeletedKADetail = useCallback(async (id: string) => {
+    if (deletedKADetails[id] || deletedKALoadingIds.has(id)) return;
+    setDeletedKALoadingIds(prev => new Set(prev).add(id));
+    try {
+      const data = await fetchKesimAlani(id);
+      if (data) {
+        setDeletedKADetails(prev => ({ ...prev, [id]: data }));
+      } else {
+        toast({
+          title: "Detay yüklenemedi",
+          description: "Veri alınamadı.",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Detay yüklenemedi",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletedKALoadingIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }, [deletedKADetails, deletedKALoadingIds, toast]);
+
   const handleIntegrityCheck = useCallback(async () => {
     setIntegrityChecking(true);
     try {
@@ -722,6 +755,9 @@ export function useHomeState() {
     handleOpenTrackingPage: kesimActions.handleOpenTrackingPage,
     handleIntegrityCheck,
     handleIntegrityRepair,
+    deletedKADetails,
+    deletedKALoadingIds,
+    handleFetchDeletedKADetail,
   };
 }
 

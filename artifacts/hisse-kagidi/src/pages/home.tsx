@@ -244,6 +244,9 @@ export default function Home() {
           onRestore={state.handleRestore}
           onPermanentDelete={state.requestPermanentDelete}
           onPermanentDeleteProject={state.requestPermanentDeleteProject}
+          deletedKADetails={state.deletedKADetails}
+          deletedKALoadingIds={state.deletedKALoadingIds}
+          onFetchDetail={state.handleFetchDeletedKADetail}
         />
       </div>
 
