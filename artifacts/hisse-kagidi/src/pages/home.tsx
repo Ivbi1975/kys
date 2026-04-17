@@ -41,7 +41,7 @@ export default function Home() {
         )}
 
         <div className="flex items-center gap-3 mb-6 sm:mb-8">
-          <img src="/kurban-logo.png" alt="Kurban Logo" className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl shrink-0 object-cover" />
+          <img src="/kurban-logo.png" alt="Kurban Logo" className="w-16 h-16 rounded-xl shrink-0 object-cover" />
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
               Kurban Hisse Kağıdı
