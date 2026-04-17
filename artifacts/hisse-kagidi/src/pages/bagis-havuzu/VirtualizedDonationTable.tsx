@@ -51,6 +51,7 @@ interface VirtualizedDonationTableProps {
   onInlineEdit?: (donationId: string, field: string, value: string) => void;
   donorMissedCounts?: Record<string, number>;
   kesimAlaniColorMap?: Record<string, string>;
+  assignedVekalets?: Set<string>;
 }
 
 const ROW_HEIGHT = 36;
@@ -269,6 +270,7 @@ function InlineEditInput({
 export function VirtualizedDonationTable({
   items, isLoading, activeFilterCount, selectedIds, toggleSelect, toggleSelectAll, multiLocationVekalets, visibleColumns,
   sortBy, sortDir, onColumnSort, onFlagDonation, onUnflagDonation, onInlineEdit, donorMissedCounts, kesimAlaniColorMap,
+  assignedVekalets,
 }: VirtualizedDonationTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const headerInnerRef = useRef<HTMLDivElement>(null);
@@ -419,6 +421,7 @@ export function VirtualizedDonationTable({
                 const isSelected = selectedIds.has(d.id);
                 const isMultiLoc = multiLocationVekalets.has((d.vekalet || "").trim());
                 const isRowEditing = editingId === d.id;
+                const isAssigned = !!d.vekalet && !!assignedVekalets?.has(d.vekalet.trim());
                 const missedCount = (activeFilterCount > 0 && d.name && donorMissedCounts)
                   ? (donorMissedCounts[d.name] ?? 0)
                   : 0;
@@ -438,8 +441,8 @@ export function VirtualizedDonationTable({
                       <ColGroup cols={cols} />
                       <tbody>
                         <tr
-                          className={`border-b hover:bg-muted/30 transition-colors ${d.isFlagged ? "bg-amber-50/50 dark:bg-amber-950/20" : isSelected ? "bg-primary/5" : ""}`}
-                          style={!d.isFlagged && !isSelected && kesimAlaniColorMap?.[d.kesimAlaniId] ? { backgroundColor: kesimAlaniColorMap[d.kesimAlaniId] } : undefined}
+                          className={`border-b hover:bg-muted/30 transition-colors ${d.isFlagged ? "bg-amber-50/50 dark:bg-amber-950/20" : isAssigned ? "bg-green-100/70 dark:bg-green-950/40" : isSelected ? "bg-primary/5" : ""}`}
+                          style={!d.isFlagged && !isAssigned && !isSelected && kesimAlaniColorMap?.[d.kesimAlaniId] ? { backgroundColor: kesimAlaniColorMap[d.kesimAlaniId] } : undefined}
                         >
                           <td className="p-2 text-center">
                             <button onClick={() => toggleSelect(d.id)} className="text-muted-foreground hover:text-foreground">

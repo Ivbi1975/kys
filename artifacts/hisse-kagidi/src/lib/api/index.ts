@@ -122,6 +122,7 @@ export {
   bulkTagDonations,
   bulkNoteDonations,
   checkVekaletConflicts,
+  fetchPoolAssignedVekalets,
   updatePoolDonationField,
   deleteAllPoolDonations,
   fetchDonationSiblings,

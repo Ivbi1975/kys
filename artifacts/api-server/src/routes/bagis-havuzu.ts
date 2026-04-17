@@ -1204,6 +1204,37 @@ router.delete("/projects/:id/donations", asyncHandler(async (req, res) => {
   res.json({ success: true, affected: result.length });
 }));
 
+router.get("/projects/:id/donations/assigned-vekalets", asyncHandler(async (req, res) => {
+  const projectId = req.params.id;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const result = await db.execute(sql`
+    SELECT DISTINCT d1.vekalet
+    FROM donations d1
+    JOIN kesim_alanlari ka1 ON d1.kesim_alani_id = ka1.id
+    WHERE ka1.project_id = ${projectId}
+      AND ka1.name = '__havuz__'
+      AND ka1.deleted_at IS NULL
+      AND d1.deleted_at IS NULL
+      AND d1.vekalet IS NOT NULL
+      AND d1.vekalet != ''
+      AND EXISTS (
+        SELECT 1
+        FROM donations d2
+        JOIN kesim_alanlari ka2 ON d2.kesim_alani_id = ka2.id
+        WHERE ka2.project_id = ${projectId}
+          AND ka2.name != '__havuz__'
+          AND ka2.deleted_at IS NULL
+          AND d2.deleted_at IS NULL
+          AND d2.vekalet = d1.vekalet
+      )
+  `);
+
+  const vekalets = result.rows.map((r: Record<string, unknown>) => r.vekalet as string);
+  res.json({ vekalets });
+}));
+
 const vekaletCheckSchema = z.object({
   vekalets: z.array(z.string().trim().min(1)).min(1).max(100000),
 });

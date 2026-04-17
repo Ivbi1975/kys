@@ -34,6 +34,7 @@ import {
   previewBulkDeleteFiltered,
   bulkDeleteFiltered,
   downloadExcelExport,
+  fetchPoolAssignedVekalets,
 } from "@/lib/api";
 import type { BulkDeletePreviewResult } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -332,6 +333,17 @@ export default function BagisHavuzuPage() {
     queryFn: fetchProjects,
   });
 
+  const { data: assignedVekaletsData } = useQuery({
+    queryKey: ["pool-assigned-vekalets", projectId],
+    queryFn: () => fetchPoolAssignedVekalets(projectId),
+    enabled: !!projectId,
+    staleTime: 30_000,
+  });
+  const assignedVekalets = useMemo(
+    () => new Set<string>(assignedVekaletsData?.vekalets ?? []),
+    [assignedVekaletsData],
+  );
+
   const projectName = projects?.find(p => p.id === projectId)?.name || "";
   const items = data?.items || [];
   const total = data?.total || 0;
@@ -425,6 +437,7 @@ export default function BagisHavuzuPage() {
   const invalidatePool = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["pool-donations"] });
     queryClient.invalidateQueries({ queryKey: ["pool-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["pool-assigned-vekalets"] });
   }, [queryClient]);
 
   const handleFlagDonation = useCallback(async (id: string, reason: string) => {
@@ -1297,6 +1310,7 @@ export default function BagisHavuzuPage() {
           onInlineEdit={handleInlineEdit}
           donorMissedCounts={donorMissedCounts}
           kesimAlaniColorMap={kesimAlaniColorMap}
+          assignedVekalets={assignedVekalets}
         />
 
         {totalPages > 1 && (

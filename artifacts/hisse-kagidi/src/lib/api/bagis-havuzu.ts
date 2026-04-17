@@ -216,6 +216,10 @@ export async function updatePoolDonationField(
   });
 }
 
+export async function fetchPoolAssignedVekalets(projectId: string): Promise<{ vekalets: string[] }> {
+  return apiFetch<{ vekalets: string[] }>(`/projects/${projectId}/donations/assigned-vekalets`);
+}
+
 export async function checkVekaletConflicts(projectId: string, vekalets: string[]): Promise<{ conflicts: VekaletConflict[] }> {
   const CHUNK = 5000;
   if (vekalets.length <= CHUNK) {
