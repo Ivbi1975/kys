@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "9PlqXPN-gKXi_gdgfaez6"
+uri = "file://test_report.md"
+type = "text"
+title = "Uçtan Uca Test Raporu"
