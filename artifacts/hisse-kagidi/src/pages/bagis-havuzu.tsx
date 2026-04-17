@@ -196,28 +196,6 @@ export default function BagisHavuzuPage() {
   }, [stopPolling]);
 
   useEffect(() => {
-    const ids = selectAllPages && allFilteredIds.length > 0
-      ? allFilteredIds
-      : [...selectedIds];
-    if (ids.length === 0) {
-      setSiblingCount(0);
-      return;
-    }
-    clearTimeout(siblingTimerRef.current);
-    siblingTimerRef.current = setTimeout(async () => {
-      try {
-        const result = await fetchDonationSiblings(projectId, ids);
-        const total = result.siblings.reduce((sum, s) => sum + s.extraCount, 0);
-        setSiblingCount(total);
-      } catch {
-        setSiblingCount(0);
-      }
-    }, 600);
-    return () => clearTimeout(siblingTimerRef.current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIds, selectAllPages, allFilteredIds, projectId]);
-
-  useEffect(() => {
     const stored = localStorage.getItem(`bagis-havuzu-columns-${projectId}`);
     if (stored) {
       try { setVisibleColumns(new Set(JSON.parse(stored) as TableColumnKey[])); } catch { /* ignore */ }
@@ -387,6 +365,28 @@ export default function BagisHavuzuPage() {
     }
     return selectedIds;
   }, [selectAllPages, allFilteredIds, selectedIds]);
+
+  useEffect(() => {
+    const ids = selectAllPages && allFilteredIds.length > 0
+      ? allFilteredIds
+      : [...selectedIds];
+    if (ids.length === 0) {
+      setSiblingCount(0);
+      return;
+    }
+    clearTimeout(siblingTimerRef.current);
+    siblingTimerRef.current = setTimeout(async () => {
+      try {
+        const result = await fetchDonationSiblings(projectId, ids);
+        const total = result.siblings.reduce((sum, s) => sum + s.extraCount, 0);
+        setSiblingCount(total);
+      } catch {
+        setSiblingCount(0);
+      }
+    }, 600);
+    return () => clearTimeout(siblingTimerRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds, selectAllPages, allFilteredIds, projectId]);
 
   const toggleColumn = useCallback((key: TableColumnKey) => {
     setVisibleColumns(prev => {
