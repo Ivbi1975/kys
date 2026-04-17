@@ -12,7 +12,6 @@ import bagisHavuzuRouter from "./bagis-havuzu";
 import authRouter from "./auth";
 import auditLogsRouter from "./audit-logs";
 import homeDataRouter from "./home-data";
-import adminResetRouter from "./admin-reset";
 
 const router: IRouter = Router();
 
@@ -29,6 +28,5 @@ router.use(aiNotesRouter);
 router.use(exportRouter);
 router.use(integrityRouter);
 router.use(auditLogsRouter);
-router.use(adminResetRouter);
 
 export default router;
