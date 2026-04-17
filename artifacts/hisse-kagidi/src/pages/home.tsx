@@ -23,7 +23,6 @@ import { SettingsDialog } from "@/components/home/SettingsDialog";
 import { AuditLogViewer } from "@/components/home/AuditLogViewer";
 import { HomeDialogs } from "@/components/home/HomeDialogs";
 import { ArchiveSection } from "@/components/home/ArchiveSection";
-import { TrashSection } from "@/components/home/TrashSection";
 
 export default function Home() {
   const state = useHomeState();
@@ -233,20 +232,6 @@ export default function Home() {
           archiveOpen={state.archiveOpen}
           setArchiveOpen={state.setArchiveOpen}
           onUnarchiveProject={state.handleUnarchiveProject}
-        />
-
-        <TrashSection
-          deletedKesimAlanlari={state.deletedKesimAlanlari}
-          deletedProjects={state.deletedProjects}
-          trashOpen={state.trashOpen}
-          setTrashOpen={state.setTrashOpen}
-          onRestoreProject={state.handleRestoreProject}
-          onRestore={state.handleRestore}
-          onPermanentDelete={state.requestPermanentDelete}
-          onPermanentDeleteProject={state.requestPermanentDeleteProject}
-          deletedKADetails={state.deletedKADetails}
-          deletedKALoadingIds={state.deletedKALoadingIds}
-          onFetchDetail={state.handleFetchDeletedKADetail}
         />
       </div>
 

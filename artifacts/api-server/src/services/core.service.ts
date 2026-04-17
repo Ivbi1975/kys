@@ -3,11 +3,13 @@ import { kesimAlanlariTable, projectsTable, donationsTable, donationTagsTable, a
 import { eq, isNull, isNotNull, inArray, and, ne } from "drizzle-orm";
 import crypto from "crypto";
 import { serviceError, serviceOk, type ServiceResult } from "./result";
+import { cacheGet, cacheSet } from "../lib/cache";
 import {
   getFullKesimAlani,
   getFullKesimAlaniList,
   getCachedKAList,
   setCachedKAList,
+  KA_LIST_TTL,
   invalidateKACache,
   getKesimAlaniMeta,
   saveDonations,
@@ -37,6 +39,19 @@ export async function listKesimAlanlari(includeDeleted: boolean, projectId?: str
     return serviceOk({ data: results });
   }
 
+  const projCacheKey = `${KA_LIST_CACHE_KEY}:proj:${includeDeleted ? "all" : "active"}:${projectId}`;
+  const projCached = cacheGet<unknown[]>(projCacheKey);
+  if (projCached) return serviceOk({ data: projCached });
+
+  const { cached: fullCached } = getCachedKAList(includeDeleted);
+  if (fullCached) {
+    const filtered = (fullCached as Array<{ projectId?: string | null }>).filter(
+      k => k.projectId === projectId,
+    );
+    cacheSet(projCacheKey, filtered, KA_LIST_TTL);
+    return serviceOk({ data: filtered });
+  }
+
   const hidePool = ne(kesimAlanlariTable.name, "__havuz__");
   const projectFilter = eq(kesimAlanlariTable.projectId, projectId);
   const whereClause = includeDeleted
@@ -48,6 +63,7 @@ export async function listKesimAlanlari(includeDeleted: boolean, projectId?: str
     .orderBy(kesimAlanlariTable.createdAt);
 
   const results = await getFullKesimAlaniList(rows);
+  cacheSet(projCacheKey, results, KA_LIST_TTL);
   return serviceOk({ data: results });
 }
 

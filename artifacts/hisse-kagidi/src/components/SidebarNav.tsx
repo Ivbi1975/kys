@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { ChevronDown, ChevronRight, FolderOpen, Scissors, Inbox, PanelLeftClose, PanelLeftOpen, Home } from "lucide-react";
+import { ChevronDown, ChevronRight, FolderOpen, Scissors, Inbox, PanelLeftClose, PanelLeftOpen, Home, Trash2 } from "lucide-react";
 import { fetchHomeData } from "@/lib/api/projects";
 import type { HomeData } from "@/lib/api/projects";
 import { cn } from "@/lib/utils";
@@ -172,6 +172,15 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
             onClick={() => go(`/bagis-havuzu/${project.id}`)}
           />
         ))}
+
+        {/* Çöp Kutusu */}
+        <NavItem
+          collapsed={collapsed}
+          icon={<Trash2 className="h-3.5 w-3.5 flex-shrink-0" />}
+          label="Çöp Kutusu"
+          active={location === "/cop-kutusu"}
+          onClick={() => go("/cop-kutusu")}
+        />
       </nav>
     </aside>
   );

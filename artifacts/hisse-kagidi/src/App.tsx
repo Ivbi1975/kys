@@ -46,6 +46,7 @@ class ErrorBoundary extends Component<
 }
 
 const Home = lazy(() => import("@/pages/home"));
+const CopKutusuPage = lazy(() => import("@/pages/cop-kutusu"));
 const KesimAlaniPage = lazy(() => import("@/pages/kesim-alani"));
 const PrintPage = lazy(() => import("@/pages/print"));
 const NotDuzenlemePage = lazy(() => import("@/pages/not-duzenleme"));
@@ -88,7 +89,10 @@ function ProtectedRouterInner() {
   usePrefetchAdjacentRoutes();
   const [location] = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    try { return localStorage.getItem("sidebar-collapsed") === "1"; } catch { return false; }
+    try {
+      const stored = localStorage.getItem("sidebar-collapsed");
+      return stored === null ? true : stored === "1";
+    } catch { return true; }
   });
 
   const hideSidebar = location.startsWith("/print/") || location.startsWith("/rapor/") || location.startsWith("/not-duzenleme/");
@@ -119,6 +123,7 @@ function ProtectedRouterInner() {
               <Route path="/proje/:id" component={ProjeDetayPage} />
               <Route path="/bagis-havuzu/:id" component={BagisHavuzuPage} />
               <Route path="/sorunlu-bagislar/:id" component={SorunluBagislarPage} />
+              <Route path="/cop-kutusu" component={CopKutusuPage} />
               <Route component={NotFound} />
             </Switch>
           </Suspense>
