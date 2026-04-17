@@ -33,6 +33,7 @@ import {
   fetchDonationSiblings,
   previewBulkDeleteFiltered,
   bulkDeleteFiltered,
+  downloadExcelExport,
 } from "@/lib/api";
 import type { BulkDeletePreviewResult } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -863,6 +864,32 @@ export default function BagisHavuzuPage() {
     setAiStopped(true);
   }, []);
 
+  const [projectExportLoading, setProjectExportLoading] = useState(false);
+
+  const handleExportProjectExcel = useCallback(async () => {
+    if (!projectId) return;
+    setProjectExportLoading(true);
+    try {
+      const blob = await downloadExcelExport({ projectId });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const date = new Date().toISOString().split("T")[0];
+      a.download = `proje_bagiscilar_${projectId}_${date}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Excel indirildi", description: "Proje bağışçıları başarıyla dışa aktarıldı" });
+    } catch (err) {
+      toast({
+        title: "Excel export hatası",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    } finally {
+      setProjectExportLoading(false);
+    }
+  }, [projectId, toast]);
+
   const handleExportExcel = useCallback(async () => {
     if (items.length === 0) return;
     const XLSX = await import("xlsx-js-style");
@@ -963,6 +990,20 @@ export default function BagisHavuzuPage() {
             </Button>
             <Button variant="outline" size="sm" onClick={handleExportExcel} disabled={items.length === 0} title="Görünen bağışları Excel olarak indir">
               <FileSpreadsheet className="w-4 h-4 mr-1" />Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportProjectExcel}
+              disabled={projectExportLoading || !projectId}
+              title="Tüm proje bağışçılarını sunucudan Excel olarak indir"
+            >
+              {projectExportLoading ? (
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="w-4 h-4 mr-1" />
+              )}
+              Tüm Proje Excel
             </Button>
             <Button
               variant="outline"

@@ -1,16 +1,30 @@
 import type { KesimAlani } from "../types";
 import { apiFetch, getApiKey, API_BASE } from "./core";
 
-export async function fetchExportCount(kaId?: string): Promise<{ total: number }> {
-  const qs = kaId ? `?kaId=${encodeURIComponent(kaId)}` : "";
+export interface ExportScope {
+  kaId?: string;
+  projectId?: string;
+}
+
+function buildScopeQuery(scope?: ExportScope): string {
+  if (!scope) return "";
+  if (scope.kaId) return `?kaId=${encodeURIComponent(scope.kaId)}`;
+  if (scope.projectId) return `?projectId=${encodeURIComponent(scope.projectId)}`;
+  return "";
+}
+
+export async function fetchExportCount(scope?: ExportScope | string): Promise<{ total: number }> {
+  const normalized: ExportScope | undefined = typeof scope === "string" ? { kaId: scope } : scope;
+  const qs = buildScopeQuery(normalized);
   return apiFetch<{ total: number }>(`/export/count${qs}`);
 }
 
 export async function downloadCsvExport(
-  kaId?: string,
+  scope: ExportScope | string | undefined,
   onProgress?: (received: number, total: number) => void,
 ): Promise<Blob> {
-  const qs = kaId ? `?kaId=${encodeURIComponent(kaId)}` : "";
+  const normalized: ExportScope | undefined = typeof scope === "string" ? { kaId: scope } : scope;
+  const qs = buildScopeQuery(normalized);
   const apiKey = getApiKey();
   const fetchHeaders: Record<string, string> = {};
   if (apiKey) {
@@ -48,16 +62,19 @@ export async function downloadCsvExport(
 }
 
 export async function downloadExcelExport(
-  kaId: string,
+  scope: ExportScope | string,
   onProgress?: (phase: string) => void,
 ): Promise<Blob> {
+  const normalized: ExportScope = typeof scope === "string" ? { kaId: scope } : scope;
+  const qs = buildScopeQuery(normalized);
+  if (!qs) throw new Error("Excel export için kaId veya projectId gerekli");
   const apiKey = getApiKey();
   const fetchHeaders: Record<string, string> = {};
   if (apiKey) {
     fetchHeaders["X-API-Key"] = apiKey;
   }
   onProgress?.("Sunucudan Excel oluşturuluyor...");
-  const res = await fetch(`${API_BASE}/export/excel?kaId=${encodeURIComponent(kaId)}`, {
+  const res = await fetch(`${API_BASE}/export/excel${qs}`, {
     headers: fetchHeaders,
   });
   if (!res.ok) {

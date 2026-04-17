@@ -37,19 +37,27 @@ const CSV_HEADERS = [
 
 router.get("/export/csv", asyncHandler(async (req, res) => {
   const kaId = req.query.kaId as string | undefined;
+  const projectId = req.query.projectId as string | undefined;
+
+  const scopeClause = kaId
+    ? `ka.id = $1 AND ka.deleted_at IS NULL`
+    : projectId
+      ? `ka.project_id = $1 AND ka.deleted_at IS NULL`
+      : `ka.deleted_at IS NULL`;
+  const scopeParams: string[] = kaId ? [kaId] : projectId ? [projectId] : [];
 
   const client = await pool.connect();
   try {
-    const countQuery = kaId
-      ? `SELECT count(*)::int AS total FROM donations d JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id WHERE d.deleted_at IS NULL AND ka.id = $1`
-      : `SELECT count(*)::int AS total FROM donations d JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id WHERE d.deleted_at IS NULL AND ka.deleted_at IS NULL`;
-    const countParams = kaId ? [kaId] : [];
-    const countResult = await client.query(countQuery, countParams);
+    const countQuery = `SELECT count(*)::int AS total FROM donations d JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id WHERE d.deleted_at IS NULL AND ${scopeClause}`;
+    const countResult = await client.query(countQuery, scopeParams);
     const totalRows = countResult.rows[0]?.total ?? 0;
 
+    const today = new Date().toISOString().split("T")[0];
     const filename = kaId
-      ? `bagisci_listesi_${kaId}_${new Date().toISOString().split("T")[0]}.csv`
-      : `tum_bagiscilar_${new Date().toISOString().split("T")[0]}.csv`;
+      ? `bagisci_listesi_${kaId}_${today}.csv`
+      : projectId
+        ? `proje_bagiscilar_${projectId}_${today}.csv`
+        : `tum_bagiscilar_${today}.csv`;
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -61,8 +69,7 @@ router.get("/export/csv", asyncHandler(async (req, res) => {
     res.write(bom + CSV_HEADERS.map(escapeCsvField).join(",") + "\n");
 
     const cursorName = "export_cursor_" + Date.now();
-    const cursorQuery = kaId
-      ? `DECLARE ${cursorName} CURSOR FOR
+    const cursorQuery = `DECLARE ${cursorName} CURSOR FOR
          SELECT
            ka.name AS ka_name,
            d.name, d.description, d.donation_type, d.share_count,
@@ -74,25 +81,11 @@ router.get("/export/csv", asyncHandler(async (req, res) => {
          LEFT JOIN animal_group_donations agd ON agd.donation_id = d.id
          LEFT JOIN animal_groups ag ON ag.id = agd.group_id
          LEFT JOIN teams t ON t.id = ag.team_id
-         WHERE d.deleted_at IS NULL AND ka.id = $1
-         ORDER BY ka.name, d.sort_order`
-      : `DECLARE ${cursorName} CURSOR FOR
-         SELECT
-           ka.name AS ka_name,
-           d.name, d.description, d.donation_type, d.share_count,
-           d.vekalet, d.notes, d.phone, d.excluded,
-           ag.animal_no, ag.color_tag, ag.kesildi, ag.kesildi_at,
-           t.name AS team_name
-         FROM donations d
-         JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-         LEFT JOIN animal_group_donations agd ON agd.donation_id = d.id
-         LEFT JOIN animal_groups ag ON ag.id = agd.group_id
-         LEFT JOIN teams t ON t.id = ag.team_id
-         WHERE d.deleted_at IS NULL AND ka.deleted_at IS NULL
+         WHERE d.deleted_at IS NULL AND ${scopeClause}
          ORDER BY ka.name, d.sort_order`;
 
     await client.query("BEGIN");
-    await client.query(cursorQuery, kaId ? [kaId] : []);
+    await client.query(cursorQuery, scopeParams);
 
     let rowsSent = 0;
     let hasMore = true;
@@ -208,15 +201,106 @@ function buildNotesValue(row: { notes: string | null; ai_categories: string[] | 
   return aiLabel ? (notesVal ? `${notesVal} [${aiLabel}]` : `[${aiLabel}]`) : notesVal;
 }
 
+type DbClient = { query: (text: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> };
+
+async function buildProjectFlatExcel(client: DbClient, projectId: string): Promise<{ buffer: Buffer; filename: string; totalRows: number }> {
+  const projectResult = await client.query(
+    `SELECT name FROM projects WHERE id = $1 AND deleted_at IS NULL`,
+    [projectId],
+  );
+  if (projectResult.rows.length === 0) {
+    throw Object.assign(new Error("Proje bulunamadı"), { statusCode: 404 });
+  }
+  const projectName = projectResult.rows[0].name as string;
+
+  const dataResult = await client.query(
+    `SELECT
+       ka.name AS ka_name,
+       d.name, d.description, d.donation_type, d.share_count,
+       d.vekalet, d.notes, d.phone, d.excluded,
+       ag.animal_no, ag.color_tag, ag.kesildi, ag.kesildi_at,
+       t.name AS team_name
+     FROM donations d
+     JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+     LEFT JOIN animal_group_donations agd ON agd.donation_id = d.id
+     LEFT JOIN animal_groups ag ON ag.id = agd.group_id
+     LEFT JOIN teams t ON t.id = ag.team_id
+     WHERE d.deleted_at IS NULL AND ka.deleted_at IS NULL AND ka.project_id = $1
+     ORDER BY ka.name, d.sort_order`,
+    [projectId],
+  );
+
+  const workbook = new ExcelJS.Workbook();
+  const ws = workbook.addWorksheet("Bağışçılar");
+  ws.columns = CSV_HEADERS.map((h) => ({ header: h, width: Math.max(14, h.length + 2) }));
+
+  const headerRow = ws.getRow(1);
+  headerRow.eachCell((cell) => {
+    cell.fill = EXCEL_HEADER_FILL;
+    cell.font = EXCEL_HEADER_FONT;
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+    cell.border = CELL_BORDER;
+  });
+  headerRow.height = 22;
+
+  for (const row of dataResult.rows) {
+    ws.addRow([
+      row.ka_name || "",
+      row.name || "",
+      row.description || "",
+      row.donation_type || "",
+      row.share_count ?? 1,
+      row.vekalet || "",
+      row.notes || "",
+      row.phone || "",
+      row.excluded ? "Evet" : "Hayır",
+      row.animal_no != null ? Number(row.animal_no) : "",
+      row.color_tag || "",
+      row.kesildi ? "Evet" : "Hayır",
+      row.kesildi_at ? new Date(row.kesildi_at as string | number | Date).toLocaleDateString("tr-TR") : "",
+      row.team_name || "",
+    ]);
+  }
+
+  const safeName = projectName.replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ _-]/g, "").replace(/\s+/g, "_");
+  const today = new Date().toISOString().split("T")[0];
+  const filename = `${safeName || "proje"}_bagiscilar_${today}.xlsx`;
+  const buf = await workbook.xlsx.writeBuffer();
+  return { buffer: Buffer.from(buf), filename, totalRows: dataResult.rows.length };
+}
+
 router.get("/export/excel", asyncHandler(async (req, res) => {
   const kaId = req.query.kaId as string | undefined;
-  if (!kaId) {
-    res.status(400).json({ error: "kaId parametresi gerekli" });
+  const projectId = req.query.projectId as string | undefined;
+
+  if (!kaId && !projectId) {
+    res.status(400).json({ error: "kaId veya projectId parametresi gerekli" });
     return;
   }
 
   const client = await pool.connect();
   try {
+    if (!kaId && projectId) {
+      try {
+        const { buffer, filename, totalRows } = await buildProjectFlatExcel(client, projectId);
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
+        res.setHeader("X-Total-Rows", String(totalRows));
+        res.setHeader("Access-Control-Expose-Headers", "X-Total-Rows");
+        res.setHeader("Content-Length", String(buffer.byteLength));
+        res.end(buffer);
+      } catch (err: unknown) {
+        const status = (err as { statusCode?: number }).statusCode;
+        if (status === 404) {
+          res.status(404).json({ error: (err as Error).message });
+          return;
+        }
+        throw err;
+      }
+      return;
+    }
+
+    // kaId path: kesim kağıdı format
     const kaResult = await client.query(
       `SELECT name, kesim_liste_id FROM kesim_alanlari WHERE id = $1 AND deleted_at IS NULL`,
       [kaId],
@@ -424,12 +508,19 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
 
 router.get("/export/count", asyncHandler(async (req, res) => {
   const kaId = req.query.kaId as string | undefined;
+  const projectId = req.query.projectId as string | undefined;
   const client = await pool.connect();
   try {
-    const query = kaId
-      ? `SELECT count(*)::int AS total FROM donations WHERE deleted_at IS NULL AND kesim_alani_id = $1`
-      : `SELECT count(*)::int AS total FROM donations d JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id WHERE d.deleted_at IS NULL AND ka.deleted_at IS NULL`;
-    const params = kaId ? [kaId] : [];
+    const scopeClause = kaId
+      ? `ka.id = $1 AND ka.deleted_at IS NULL`
+      : projectId
+        ? `ka.project_id = $1 AND ka.deleted_at IS NULL`
+        : `ka.deleted_at IS NULL`;
+    const params: string[] = kaId ? [kaId] : projectId ? [projectId] : [];
+    const query = `SELECT count(*)::int AS total
+      FROM donations d
+      JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+      WHERE d.deleted_at IS NULL AND ${scopeClause}`;
     const result = await client.query(query, params);
     res.json({ total: result.rows[0]?.total ?? 0 });
   } finally {
