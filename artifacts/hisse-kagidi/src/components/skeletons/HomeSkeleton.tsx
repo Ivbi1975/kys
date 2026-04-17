@@ -5,7 +5,7 @@ export function HomeSkeleton() {
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto p-6">
         <div className="flex items-center gap-3 mb-6 sm:mb-8">
-          <img src="/kurban-logo.png" alt="Kurban Logo" className="w-16 h-16 rounded-xl shrink-0 object-contain bg-black" />
+          <img src="/kurban-logo.png" alt="Kurban Logo" className="w-16 h-16 shrink-0 object-contain" />
           <div className="flex-1 min-w-0">
             <Skeleton className="h-8 w-64 mb-2" />
             <Skeleton className="h-4 w-80" />
