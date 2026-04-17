@@ -19,6 +19,13 @@ import { invalidateKACache } from "../services/kesim-alani.service";
 
 const router: IRouter = Router();
 
+function normalizeNotes(val: string | null | undefined): string {
+  if (val === null || val === undefined) return "";
+  const trimmed = val.trim();
+  if (/^null$/i.test(trimmed)) return "";
+  return trimmed;
+}
+
 function parseMultiValue(val: unknown): string[] {
   if (typeof val !== "string" || !val.trim()) return [];
   return val.split(",").map(v => v.trim()).filter(Boolean);
@@ -437,7 +444,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     donationType: d.donationType,
     shareCount: d.shareCount,
     vekalet: d.vekalet,
-    notes: d.notes,
+    notes: normalizeNotes(d.notes),
     phone: d.phone || "",
     birim: d.birim || "",
     temsilci: d.temsilci || "",
@@ -788,7 +795,7 @@ router.post("/projects/:id/donations/bulk-import", asyncHandler(async (req, res)
         donationType: d.donationType,
         shareCount: d.shareCount,
         vekalet: d.vekalet,
-        notes: d.notes,
+        notes: normalizeNotes(d.notes),
         phone: d.phone,
         birim: d.birim,
         temsilci: d.temsilci,
@@ -1014,7 +1021,7 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
         donationType: r.donationType ?? "",
         shareCount: r.shareCount ?? 1,
         vekalet: r.vekalet ?? "",
-        notes: r.notes ?? "",
+        notes: normalizeNotes(r.notes),
       })));
     }
   }
@@ -1446,6 +1453,9 @@ router.patch("/projects/:projectId/donations/:id", asyncHandler(async (req, res)
     dbValue = num;
   } else {
     dbValue = String(dbValue);
+    if (parsed.data.field === "notes") {
+      dbValue = normalizeNotes(dbValue);
+    }
   }
 
   await db.update(donationsTable)
@@ -1569,7 +1579,7 @@ router.get("/projects/:id/flagged-donations", asyncHandler(async (req, res) => {
     donationType: d.donationType,
     shareCount: d.shareCount,
     vekalet: d.vekalet,
-    notes: d.notes,
+    notes: normalizeNotes(d.notes),
     phone: d.phone || "",
     excluded: d.excluded,
     isFlagged: d.isFlagged,
