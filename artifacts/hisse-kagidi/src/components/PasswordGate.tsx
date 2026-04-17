@@ -123,6 +123,7 @@ export default function PasswordGate({ children }: { children: React.ReactNode }
                 onChange={(e) => setPassword1(e.target.value)}
                 className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition"
                 placeholder="1. şifreyi girin"
+                autoComplete="current-password"
                 autoFocus
               />
               <button
@@ -147,6 +148,7 @@ export default function PasswordGate({ children }: { children: React.ReactNode }
                 onChange={(e) => setPassword2(e.target.value)}
                 className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition"
                 placeholder="2. şifreyi girin"
+                autoComplete="current-password"
               />
               <button
                 type="button"
