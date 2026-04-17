@@ -217,12 +217,27 @@ export async function updatePoolDonationField(
 }
 
 export async function checkVekaletConflicts(projectId: string, vekalets: string[]): Promise<{ conflicts: VekaletConflict[] }> {
-  return apiFetch<{ conflicts: VekaletConflict[] }>(
-    `/projects/${projectId}/donations/vekalet-check`, {
-      method: "POST",
-      body: JSON.stringify({ vekalets }),
-    }
-  );
+  const CHUNK = 5000;
+  if (vekalets.length <= CHUNK) {
+    return apiFetch<{ conflicts: VekaletConflict[] }>(
+      `/projects/${projectId}/donations/vekalet-check`, {
+        method: "POST",
+        body: JSON.stringify({ vekalets }),
+      }
+    );
+  }
+  const allConflicts: VekaletConflict[] = [];
+  for (let i = 0; i < vekalets.length; i += CHUNK) {
+    const chunk = vekalets.slice(i, i + CHUNK);
+    const { conflicts } = await apiFetch<{ conflicts: VekaletConflict[] }>(
+      `/projects/${projectId}/donations/vekalet-check`, {
+        method: "POST",
+        body: JSON.stringify({ vekalets: chunk }),
+      }
+    );
+    allConflicts.push(...conflicts);
+  }
+  return { conflicts: allConflicts };
 }
 
 export async function deleteAllPoolDonations(projectId: string): Promise<{ success: boolean; affected: number }> {

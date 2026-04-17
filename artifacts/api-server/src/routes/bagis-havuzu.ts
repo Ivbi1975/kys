@@ -1205,7 +1205,7 @@ router.delete("/projects/:id/donations", asyncHandler(async (req, res) => {
 }));
 
 const vekaletCheckSchema = z.object({
-  vekalets: z.array(z.string().trim().min(1)).min(1).max(10000),
+  vekalets: z.array(z.string().trim().min(1)).min(1).max(100000),
 });
 
 router.post("/projects/:id/donations/vekalet-check", asyncHandler(async (req, res) => {
