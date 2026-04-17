@@ -48,25 +48,17 @@ export default function ProjeDetayPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => state.setLocation("/")}
-          >
-            <ArrowLeft className="w-4 h-4 mr-1" />
-            Geri
-          </Button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <FolderOpen className="w-6 h-6 text-primary" />
-              {state.project.name}
-            </h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              {state.kesimAlanlari.length} kesim alanı
-            </p>
-          </div>
-          <div className="flex items-center gap-1">
+        <div className="mb-6">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => state.setLocation("/")}
+            >
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              Geri
+            </Button>
+            <div className="flex items-center gap-1 flex-wrap justify-end">
             <Button
               variant="outline"
               size="sm"
@@ -135,6 +127,16 @@ export default function ProjeDetayPage() {
               Ara
             </Button>
             <ThemeToggle />
+          </div>
+          </div>
+          <div className="mt-3">
+            <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+              <FolderOpen className="w-5 h-5 text-primary flex-shrink-0" />
+              <span className="truncate">{state.project.name}</span>
+            </h1>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              {state.kesimAlanlari.length} kesim alanı
+            </p>
           </div>
         </div>
 
