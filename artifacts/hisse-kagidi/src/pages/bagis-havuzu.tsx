@@ -1350,6 +1350,7 @@ export default function BagisHavuzuPage() {
           onTransfer={handleTransfer}
           kesimAlanlari={kesimAlanlari}
           projectId={projectId}
+          skipSiblings={true}
         />
 
         <BulkCreateListeDialog

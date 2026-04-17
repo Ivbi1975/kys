@@ -22,12 +22,14 @@ interface TransferDialogProps {
   onTransfer: (extraIds: string[]) => void;
   kesimAlanlari: { id: string; name: string }[];
   projectId: string;
+  skipSiblings?: boolean;
 }
 
 export function TransferDialog({
   open, onOpenChange, selectedCount, selectedIds, transferTarget, setTransferTarget,
   newListName, setNewListName, creatingNewList, setCreatingNewList,
   transferring, onTransfer, kesimAlanlari: propKesimAlanlari, projectId,
+  skipSiblings = false,
 }: TransferDialogProps) {
   const [freshKA, setFreshKA] = useState<{ id: string; name: string }[]>([]);
   const [step, setStep] = useState<"select" | "confirm">("select");
@@ -54,6 +56,10 @@ export function TransferDialog({
 
   const handleActarClick = useCallback(async () => {
     if (selectedIds.length === 0) return;
+    if (skipSiblings) {
+      onTransfer([]);
+      return;
+    }
     setCheckingSiblings(true);
     try {
       const result = await fetchDonationSiblings(projectId, selectedIds);
@@ -68,7 +74,7 @@ export function TransferDialog({
     } finally {
       setCheckingSiblings(false);
     }
-  }, [selectedIds, projectId, onTransfer]);
+  }, [selectedIds, projectId, onTransfer, skipSiblings]);
 
   const handleConfirmWithExtra = useCallback(() => {
     const extraIds = siblings.flatMap(s => s.extraIds);
