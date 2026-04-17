@@ -9,6 +9,7 @@ import {
   getFullKesimAlaniList,
   getCachedKAList,
   setCachedKAList,
+  KA_LIST_CACHE_KEY,
   KA_LIST_TTL,
   invalidateKACache,
   getKesimAlaniMeta,
