@@ -918,20 +918,46 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
     return;
   }
 
-  const projectKAIds = await db.select({ id: kesimAlanlariTable.id })
+  const projectKAIds = await db.select({ id: kesimAlanlariTable.id, name: kesimAlanlariTable.name })
     .from(kesimAlanlariTable)
     .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
   const validKAIds = new Set(projectKAIds.map(k => k.id));
+  const poolKAId = projectKAIds.find(k => k.name === "__havuz__")?.id;
   // Source KAs exclude the target so donations already there are never "re-moved" to themselves
   const sourceKAIds = [...validKAIds].filter(id => id !== targetKesimAlaniId);
 
   let movedCount = 0;
   let alreadyInTarget = 0;
-  let idsToMove: string[] = donationIds;
+  let copiedNewIds: string[] = [];
 
   await db.transaction(async (tx) => {
-    // Check inside the transaction for accuracy (avoids TOCTOU race with automation rules or concurrent requests)
     const CHUNK = 5000;
+
+    // ── Separate pool vs non-pool source donations ──────────────────────────
+    let poolSourceIds: string[] = [];
+    let nonPoolSourceIds: string[] = [];
+
+    if (poolKAId) {
+      const DETECT_CHUNK = 1000;
+      const poolSet = new Set<string>();
+      for (let i = 0; i < donationIds.length; i += DETECT_CHUNK) {
+        const chunk = donationIds.slice(i, i + DETECT_CHUNK);
+        const poolRows = await tx.select({ id: donationsTable.id })
+          .from(donationsTable)
+          .where(and(
+            inArray(donationsTable.id, chunk),
+            eq(donationsTable.kesimAlaniId, poolKAId),
+            isNull(donationsTable.deletedAt),
+          ));
+        for (const r of poolRows) poolSet.add(r.id);
+      }
+      poolSourceIds = donationIds.filter(id => poolSet.has(id));
+      nonPoolSourceIds = donationIds.filter(id => !poolSet.has(id));
+    } else {
+      nonPoolSourceIds = donationIds;
+    }
+
+    // ── Check already in target (by same donation ID for non-pool, by vekalet for pool) ──
     const existingIds = new Set<string>();
     for (let i = 0; i < donationIds.length; i += CHUNK) {
       const chunk = donationIds.slice(i, i + CHUNK);
@@ -946,12 +972,7 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
     }
     alreadyInTarget = existingIds.size;
 
-    if (skipExisting && alreadyInTarget > 0) {
-      idsToMove = donationIds.filter(id => !existingIds.has(id));
-    }
-
-    if (idsToMove.length === 0 || sourceKAIds.length === 0) return;
-
+    // ── Get max sort for target ──────────────────────────────────────────────
     const maxSortResult = await tx.execute(sql`
       SELECT COALESCE(MAX(sort_order), -1)::int AS max_sort
       FROM donations
@@ -959,30 +980,112 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
     `);
     let nextSort = ((maxSortResult.rows[0] as { max_sort: number })?.max_sort ?? -1) + 1;
 
-    const MOVE_CHUNK = 500;
-    for (let i = 0; i < idsToMove.length; i += MOVE_CHUNK) {
-      const chunk = idsToMove.slice(i, i + MOVE_CHUNK);
-      const result = await tx.update(donationsTable)
-        .set({ kesimAlaniId: targetKesimAlaniId, updatedAt: new Date() })
-        .where(and(
-          inArray(donationsTable.id, chunk),
-          inArray(donationsTable.kesimAlaniId, sourceKAIds),
-          isNull(donationsTable.deletedAt),
-        ))
-        .returning({ id: donationsTable.id });
-
-      if (result.length > 0) {
-        const caseParts = result.map((r, idx) =>
-          sql`WHEN id = ${r.id} THEN ${sql.raw(String(nextSort + idx))}`
-        );
-        const ids = result.map(r => r.id);
-        await tx.execute(sql`
-          UPDATE donations SET sort_order = CASE ${sql.join(caseParts, sql` `)} END
-          WHERE id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})
-        `);
-        nextSort += result.length;
+    // ── POOL donations: COPY (keep original, insert new in target) ───────────
+    if (poolSourceIds.length > 0) {
+      // Find vekalets already in any non-pool kesim listesi (prevent double-booking)
+      const alreadyAssigned = new Set<string>();
+      const VEKALET_CHUNK = 1000;
+      const allPoolDonations: Array<{ id: string; vekalet: string | null }> = [];
+      for (let i = 0; i < poolSourceIds.length; i += VEKALET_CHUNK) {
+        const chunk = poolSourceIds.slice(i, i + VEKALET_CHUNK);
+        const rows = await tx.select({ id: donationsTable.id, vekalet: donationsTable.vekalet })
+          .from(donationsTable)
+          .where(and(inArray(donationsTable.id, chunk), isNull(donationsTable.deletedAt)));
+        allPoolDonations.push(...rows);
       }
-      movedCount += result.length;
+      const vekaletToPoolId = new Map<string, string>();
+      for (const d of allPoolDonations) {
+        if (d.vekalet) vekaletToPoolId.set(d.vekalet, d.id);
+      }
+
+      if (vekaletToPoolId.size > 0) {
+        const vekalets = [...vekaletToPoolId.keys()];
+        for (let i = 0; i < vekalets.length; i += VEKALET_CHUNK) {
+          const chunk = vekalets.slice(i, i + VEKALET_CHUNK);
+          const existing = await tx.select({ vekalet: donationsTable.vekalet })
+            .from(donationsTable)
+            .innerJoin(kesimAlanlariTable, eq(donationsTable.kesimAlaniId, kesimAlanlariTable.id))
+            .where(and(
+              ne(kesimAlanlariTable.name, "__havuz__"),
+              isNull(donationsTable.deletedAt),
+              isNull(kesimAlanlariTable.deletedAt),
+              inArray(donationsTable.vekalet, chunk),
+            ));
+          for (const r of existing) if (r.vekalet) alreadyAssigned.add(r.vekalet);
+        }
+      }
+
+      // Filter: only copy donations whose vekalet is not yet in any kesim listesi
+      const toCopy = allPoolDonations.filter(d =>
+        !alreadyAssigned.has(d.vekalet ?? "") &&
+        !(skipExisting && existingIds.has(d.id))
+      );
+
+      alreadyInTarget += alreadyAssigned.size;
+
+      const COPY_CHUNK = 200;
+      for (let i = 0; i < toCopy.length; i += COPY_CHUNK) {
+        const chunk = toCopy.slice(i, i + COPY_CHUNK);
+        const sourceRows = await tx.select()
+          .from(donationsTable)
+          .where(and(
+            inArray(donationsTable.id, chunk.map(c => c.id)),
+            isNull(donationsTable.deletedAt),
+          ));
+
+        for (const src of sourceRows) {
+          const newId = crypto.randomUUID();
+          await tx.execute(sql`
+            INSERT INTO donations (
+              id, kesim_alani_id, name, description, donation_type, share_count,
+              vekalet, notes, phone, excluded, sort_order, is_flagged, flag_reason,
+              birim, temsilci, ozellik, fiyat, yer_talebi, gun_talebi, ilk_hayvan, safi, updated_at
+            ) VALUES (
+              ${newId}, ${targetKesimAlaniId}, ${src.name}, ${src.description}, ${src.donationType}, ${src.shareCount},
+              ${src.vekalet}, ${normalizeNotes(src.notes)}, ${src.phone}, ${src.excluded}, ${nextSort}, ${src.isFlagged}, ${src.flagReason},
+              ${src.birim}, ${src.temsilci}, ${src.ozellik}, ${src.fiyat}, ${src.yerTalebi}, ${src.gunTalebi}, ${src.ilkHayvan}, ${src.safi}, NOW()
+            )
+          `);
+          copiedNewIds.push(newId);
+          nextSort++;
+          movedCount++;
+        }
+      }
+    }
+
+    // ── NON-POOL donations: MOVE (existing behavior) ─────────────────────────
+    if (nonPoolSourceIds.length > 0) {
+      let idsToMove = skipExisting
+        ? nonPoolSourceIds.filter(id => !existingIds.has(id))
+        : nonPoolSourceIds;
+
+      if (idsToMove.length > 0 && sourceKAIds.length > 0) {
+        const MOVE_CHUNK = 500;
+        for (let i = 0; i < idsToMove.length; i += MOVE_CHUNK) {
+          const chunk = idsToMove.slice(i, i + MOVE_CHUNK);
+          const result = await tx.update(donationsTable)
+            .set({ kesimAlaniId: targetKesimAlaniId, updatedAt: new Date() })
+            .where(and(
+              inArray(donationsTable.id, chunk),
+              inArray(donationsTable.kesimAlaniId, sourceKAIds),
+              isNull(donationsTable.deletedAt),
+            ))
+            .returning({ id: donationsTable.id });
+
+          if (result.length > 0) {
+            const caseParts = result.map((r, idx) =>
+              sql`WHEN id = ${r.id} THEN ${sql.raw(String(nextSort + idx))}`
+            );
+            const ids = result.map(r => r.id);
+            await tx.execute(sql`
+              UPDATE donations SET sort_order = CASE ${sql.join(caseParts, sql` `)} END
+              WHERE id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})
+            `);
+            nextSort += result.length;
+          }
+          movedCount += result.length;
+        }
+      }
     }
   });
 
@@ -993,14 +1096,17 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
     return;
   }
 
+  const allNewIds = copiedNewIds;
   let transferredItems: Array<{
     id: string; name: string; description: string; donationType: string;
     shareCount: number; vekalet: string; notes: string;
   }> = [];
   if (movedCount > 0) {
     const FETCH_CHUNK = 500;
-    for (let i = 0; i < idsToMove.length; i += FETCH_CHUNK) {
-      const chunk = idsToMove.slice(i, i + FETCH_CHUNK);
+    // For pool copies, fetch by new IDs; for moves, fetch by original IDs (now in target)
+    const idsToFetch = allNewIds.length > 0 ? allNewIds : donationIds;
+    for (let i = 0; i < idsToFetch.length; i += FETCH_CHUNK) {
+      const chunk = idsToFetch.slice(i, i + FETCH_CHUNK);
       const rows = await db.select({
         id: donationsTable.id,
         name: donationsTable.name,
