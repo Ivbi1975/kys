@@ -52,10 +52,16 @@ export async function listKesimAlanlari(includeDeleted: boolean, projectId?: str
 }
 
 export async function listDeletedKesimAlanlari() {
-  const rows = await db.select().from(kesimAlanlariTable)
+  const rows = await db.select({
+    id: kesimAlanlariTable.id,
+    name: kesimAlanlariTable.name,
+    createdAt: kesimAlanlariTable.createdAt,
+    deletedAt: kesimAlanlariTable.deletedAt,
+    projectId: kesimAlanlariTable.projectId,
+  })
+    .from(kesimAlanlariTable)
     .where(isNotNull(kesimAlanlariTable.deletedAt))
     .orderBy(kesimAlanlariTable.createdAt);
-  const fullList = await getFullKesimAlaniList(rows);
 
   const projectIds = [...new Set(rows.map(r => r.projectId).filter(Boolean))] as string[];
   let projectNameMap: Record<string, string> = {};
@@ -66,13 +72,16 @@ export async function listDeletedKesimAlanlari() {
     projectNameMap = Object.fromEntries(projects.map(p => [p.id, p.name]));
   }
 
-  const enriched = fullList.map((item: Record<string, unknown>, idx: number) => {
-    const row = rows[idx];
-    return {
-      ...item,
-      projectName: row.projectId ? (projectNameMap[row.projectId] || null) : null,
-    };
-  });
+  const enriched = rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    createdAt: row.createdAt,
+    deletedAt: row.deletedAt,
+    projectId: row.projectId,
+    projectName: row.projectId ? (projectNameMap[row.projectId] || null) : null,
+    donations: [],
+    animalGroups: [],
+  }));
 
   return serviceOk({ data: enriched });
 }
