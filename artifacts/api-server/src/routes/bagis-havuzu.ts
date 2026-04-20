@@ -1006,6 +1006,7 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
             .from(donationsTable)
             .innerJoin(kesimAlanlariTable, eq(donationsTable.kesimAlaniId, kesimAlanlariTable.id))
             .where(and(
+              eq(kesimAlanlariTable.projectId, projectId),
               ne(kesimAlanlariTable.name, "__havuz__"),
               isNull(donationsTable.deletedAt),
               isNull(kesimAlanlariTable.deletedAt),

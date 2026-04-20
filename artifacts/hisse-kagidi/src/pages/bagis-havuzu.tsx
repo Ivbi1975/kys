@@ -105,7 +105,7 @@ export default function BagisHavuzuPage() {
   const [donationTypeFilter, setDonationTypeFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("type")));
   const [birimFilter, setBirimFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("birim")));
   const [temsilciFilter, setTemsilciFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("temsilci")));
-  const [kesimAlaniFilter, setKesimAlaniFilter] = useState(() => urlParams.get("ka") || "");
+  const [kesimAlaniFilter, setKesimAlaniFilter] = useState(() => urlParams.get("ka") || "none");
   const [aiCategoryFilter, setAiCategoryFilter] = useState(() => urlParams.get("ai") || "");
   const [ozellikFilter, setOzellikFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("ozellik")));
   const [fiyatFilter, setFiyatFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("fiyat")));
