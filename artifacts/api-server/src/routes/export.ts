@@ -401,14 +401,12 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
       // Left: logo area (blank cell base, image overlaid by addImage below)
       const logoCell = titleRow.getCell(1);
       logoCell.value = "";
-      logoCell.border = CELL_BORDER;
       if (LOGO_COLS > 1) ws.mergeCells(titleRowIdx, 1, titleRowIdx, LOGO_COLS);
       // Right: kesim name, right-aligned dark blue bold — matches PDF top-right
       const nameCell = titleRow.getCell(LOGO_COLS + 1);
       nameCell.value = kaDisplayName;
       nameCell.font = { name: "Calibri", bold: true, size: 14, color: { argb: "FF1E3A5F" } };
       nameCell.alignment = { horizontal: "right", vertical: "middle" };
-      nameCell.border = CELL_BORDER;
       if (NUM_COLS > LOGO_COLS + 1) ws.mergeCells(titleRowIdx, LOGO_COLS + 1, titleRowIdx, NUM_COLS);
       currentRow++;
 
