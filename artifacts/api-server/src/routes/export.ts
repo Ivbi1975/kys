@@ -157,8 +157,7 @@ const EXCEL_EVEN_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgCol
 const EXCEL_FOOTER_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8EDF5" } };
 const THIN_BORDER: Partial<ExcelJS.Border> = { style: "thin", color: { argb: "FF9CA3AF" } };
 const CELL_BORDER: Partial<ExcelJS.Borders> = { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER };
-const MEDIUM_BORDER: Partial<ExcelJS.Border> = { style: "medium" };
-const HAYVAN_BORDER: Partial<ExcelJS.Borders> = { top: MEDIUM_BORDER, bottom: MEDIUM_BORDER, left: MEDIUM_BORDER, right: MEDIUM_BORDER };
+const HAYVAN_BORDER: Partial<ExcelJS.Borders> = { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER };
 
 const SLOTS_PER_GROUP = 7;
 
