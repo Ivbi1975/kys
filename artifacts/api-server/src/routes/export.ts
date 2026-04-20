@@ -163,13 +163,12 @@ const HAYVAN_BORDER: Partial<ExcelJS.Borders> = { top: MEDIUM_BORDER, bottom: ME
 const SLOTS_PER_GROUP = 7;
 
 const EXCEL_COLUMNS: { key: string; header: string; width: number }[] = [
-  { key: "kesimListeId", header: "Kesim Listesi ID", width: 18 },
   { key: "hayvanNo", header: "HAYVAN", width: 14 },
   { key: "sira", header: "SIRA", width: 8 },
   { key: "vekalet", header: "VEKALET", width: 16 },
-  { key: "vekaleti_veren", header: "VEKALETİ VEREN", width: 28 },
-  { key: "adina_kesilen", header: "ADINA KESİLEN", width: 28 },
-  { key: "cinsi", header: "CİNSİ", width: 14 },
+  { key: "vekaleti_veren", header: "VEKALETİ VEREN", width: 30 },
+  { key: "adina_kesilen", header: "ADINA KESİLEN", width: 34 },
+  { key: "cinsi", header: "CİNSİ", width: 16 },
   { key: "notlar", header: "NOTLAR", width: 22 },
 ];
 
@@ -302,7 +301,7 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
 
     // kaId path: kesim kağıdı format
     const kaResult = await client.query(
-      `SELECT name, kesim_liste_id FROM kesim_alanlari WHERE id = $1 AND deleted_at IS NULL`,
+      `SELECT name, display_name FROM kesim_alanlari WHERE id = $1 AND deleted_at IS NULL`,
       [kaId],
     );
     if (kaResult.rows.length === 0) {
@@ -310,7 +309,7 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
       return;
     }
     const kaName = kaResult.rows[0].name as string;
-    const kesimListeId = (kaResult.rows[0].kesim_liste_id || "") as string;
+    const kaDisplayName = ((kaResult.rows[0].display_name as string | null) || kaName);
 
     const donationsResult = await client.query(
       `SELECT
@@ -373,24 +372,30 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
 
     ws.columns = EXCEL_COLUMNS.map(c => ({ key: c.key, width: c.width }));
 
-    const today = new Date().toLocaleDateString("tr-TR");
     let currentRow = 1;
 
     for (let groupIdx = 0; groupIdx < groups.length; groupIdx++) {
       const group = groups[groupIdx];
-      const pageNum = groupIdx + 1;
 
+      // Title row: left area blank (logo placeholder), right area = kesim name — matches PDF header layout
       const titleRow = ws.getRow(currentRow);
-      titleRow.height = 28;
-      const titleCell = titleRow.getCell(1);
-      titleCell.value = `${kaName} — ${today}`;
-      titleCell.font = { bold: true, size: 14, color: { argb: "FFFFFFFF" } };
-      titleCell.fill = EXCEL_TITLE_FILL;
-      titleCell.alignment = { horizontal: "center", vertical: "middle" };
-      titleCell.border = CELL_BORDER;
-      ws.mergeCells(currentRow, 1, currentRow, NUM_COLS);
+      titleRow.height = 32;
+      const LOGO_COLS = 3;
+      // Left: logo placeholder area (blank, no fill — white like PDF)
+      const logoCell = titleRow.getCell(1);
+      logoCell.value = "";
+      logoCell.border = CELL_BORDER;
+      if (LOGO_COLS > 1) ws.mergeCells(currentRow, 1, currentRow, LOGO_COLS);
+      // Right: kesim name, right-aligned dark blue bold — matches PDF top-right
+      const nameCell = titleRow.getCell(LOGO_COLS + 1);
+      nameCell.value = kaDisplayName;
+      nameCell.font = { bold: true, size: 14, color: { argb: "FF1E3A5F" } };
+      nameCell.alignment = { horizontal: "right", vertical: "middle" };
+      nameCell.border = CELL_BORDER;
+      if (NUM_COLS > LOGO_COLS + 1) ws.mergeCells(currentRow, LOGO_COLS + 1, currentRow, NUM_COLS);
       currentRow++;
 
+      // Column header row — dark navy, white bold, matching PDF column headers
       const headerRow = ws.getRow(currentRow);
       headerRow.height = 22;
       EXCEL_COLUMNS.forEach((col, colIdx) => {
@@ -408,11 +413,11 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
       for (let slotIdx = 0; slotIdx < SLOTS_PER_GROUP; slotIdx++) {
         const slot = group.slots[slotIdx] ?? null;
         const dataRow = ws.getRow(currentRow);
-        dataRow.height = 26;
+        dataRow.height = 28;
         const isEven = slotIdx % 2 === 1;
 
+        // col1=hayvan, col2=sira, col3=vekalet, col4=vekaleti_veren, col5=adina_kesilen, col6=cinsi, col7=notlar
         const colValues: (string | number)[] = [
-          kesimListeId,
           slotIdx === 0 ? group.animalNo : "",
           slotIdx + 1,
           slot?.vekalet ?? "",
@@ -429,21 +434,25 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
           cell.alignment = { vertical: "middle" };
 
           const colNum = colIdx + 1;
-          if (colNum === 2) {
+          if (colNum === 1) {
+            // HAYVAN column — styled by merge below; skip non-first rows
             if (slotIdx === 0) {
               cell.fill = EXCEL_HAYVAN_FILL;
               cell.font = EXCEL_HAYVAN_FONT;
               cell.alignment = { horizontal: "center", vertical: "middle" };
               cell.border = HAYVAN_BORDER;
             }
-          } else if (colNum === 3) {
+          } else if (colNum === 2) {
+            // SIRA — centered bold
             cell.alignment = { horizontal: "center", vertical: "middle" };
             cell.font = { bold: true };
             if (isEven) cell.fill = EXCEL_EVEN_FILL;
-          } else if (colNum === 6) {
+          } else if (colNum === 5) {
+            // ADINA KESİLEN — bold
             cell.font = { bold: true };
             if (isEven) cell.fill = EXCEL_EVEN_FILL;
-          } else if (colNum === 7) {
+          } else if (colNum === 6) {
+            // CİNSİ — centered
             cell.alignment = { horizontal: "center", vertical: "middle" };
             if (isEven) cell.fill = EXCEL_EVEN_FILL;
           } else {
@@ -454,28 +463,24 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
         currentRow++;
       }
 
-      ws.mergeCells(dataStartRow, 2, dataStartRow + SLOTS_PER_GROUP - 1, 2);
-      const hayvanMergedCell = ws.getRow(dataStartRow).getCell(2);
+      // Merge HAYVAN column vertically across all 7 slots — col 1
+      ws.mergeCells(dataStartRow, 1, dataStartRow + SLOTS_PER_GROUP - 1, 1);
+      const hayvanMergedCell = ws.getRow(dataStartRow).getCell(1);
       hayvanMergedCell.value = group.animalNo;
       hayvanMergedCell.fill = EXCEL_HAYVAN_FILL;
       hayvanMergedCell.font = EXCEL_HAYVAN_FONT;
       hayvanMergedCell.alignment = { horizontal: "center", vertical: "middle" };
       hayvanMergedCell.border = HAYVAN_BORDER;
 
+      // Footer row — kesim name only, left-aligned, small italic — matches PDF footer
       const footerRow = ws.getRow(currentRow);
       footerRow.height = 18;
-      const footerLeft = footerRow.getCell(1);
-      footerLeft.value = kaName;
-      footerLeft.font = { italic: true, size: 9, color: { argb: "FF374151" } };
-      footerLeft.fill = EXCEL_FOOTER_FILL;
-      footerLeft.border = CELL_BORDER;
-      ws.mergeCells(currentRow, 1, currentRow, NUM_COLS - 1);
-      const footerRight = footerRow.getCell(NUM_COLS);
-      footerRight.value = `Sayfa ${pageNum} / ${totalGroups}`;
-      footerRight.font = { italic: true, size: 9, color: { argb: "FF374151" } };
-      footerRight.fill = EXCEL_FOOTER_FILL;
-      footerRight.alignment = { horizontal: "right", vertical: "middle" };
-      footerRight.border = CELL_BORDER;
+      const footerCell = footerRow.getCell(1);
+      footerCell.value = kaDisplayName;
+      footerCell.font = { italic: true, size: 9, color: { argb: "FF374151" } };
+      footerCell.fill = EXCEL_FOOTER_FILL;
+      footerCell.border = CELL_BORDER;
+      ws.mergeCells(currentRow, 1, currentRow, NUM_COLS);
       currentRow++;
 
       if (groupIdx < groups.length - 1) {
