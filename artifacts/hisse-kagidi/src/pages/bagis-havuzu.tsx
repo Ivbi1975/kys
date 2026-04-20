@@ -267,7 +267,7 @@ export default function BagisHavuzuPage() {
   }, []);
 
   const activeFilterCount = [
-    debouncedSearch, statusFilter, kesimAlaniFilter, aiCategoryFilter, notesFilter, shareCountMin, shareCountMax, dateFrom, dateTo,
+    debouncedSearch, statusFilter, kesimAlaniFilter !== "none" ? kesimAlaniFilter : null, aiCategoryFilter, notesFilter, shareCountMin, shareCountMax, dateFrom, dateTo,
   ].filter(Boolean).length
   + [donationTypeFilter, birimFilter, temsilciFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter].filter(a => a.length > 0).length;
 
