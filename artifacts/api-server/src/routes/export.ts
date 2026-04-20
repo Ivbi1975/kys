@@ -149,9 +149,9 @@ router.get("/export/csv", asyncHandler(async (req, res) => {
 }));
 
 const EXCEL_HEADER_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
-const EXCEL_HEADER_FONT: Partial<ExcelJS.Font> = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+const EXCEL_HEADER_FONT: Partial<ExcelJS.Font> = { name: "Calibri", bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
 const EXCEL_HAYVAN_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDBEAFE" } };
-const EXCEL_HAYVAN_FONT: Partial<ExcelJS.Font> = { bold: true, color: { argb: "FF1E3A5F" }, size: 28 };
+const EXCEL_HAYVAN_FONT: Partial<ExcelJS.Font> = { name: "Calibri", bold: true, color: { argb: "FF1E3A5F" }, size: 28 };
 const EXCEL_TITLE_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
 const EXCEL_EVEN_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
 const EXCEL_FOOTER_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8EDF5" } };
@@ -406,7 +406,7 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
       // Right: kesim name, right-aligned dark blue bold — matches PDF top-right
       const nameCell = titleRow.getCell(LOGO_COLS + 1);
       nameCell.value = kaDisplayName;
-      nameCell.font = { bold: true, size: 14, color: { argb: "FF1E3A5F" } };
+      nameCell.font = { name: "Calibri", bold: true, size: 14, color: { argb: "FF1E3A5F" } };
       nameCell.alignment = { horizontal: "right", vertical: "middle" };
       nameCell.border = CELL_BORDER;
       if (NUM_COLS > LOGO_COLS + 1) ws.mergeCells(titleRowIdx, LOGO_COLS + 1, titleRowIdx, NUM_COLS);
@@ -457,11 +457,13 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
           const cell = dataRow.getCell(colIdx + 1);
           cell.value = val;
           cell.border = CELL_BORDER;
+          // Default: Calibri 10pt, left-aligned, middle vertical
+          cell.font = { name: "Calibri", size: 10 };
           cell.alignment = { vertical: "middle" };
 
           const colNum = colIdx + 1;
           if (colNum === 1) {
-            // HAYVAN column — styled by merge below; skip non-first rows
+            // HAYVAN — fully styled by the merge block below
             if (slotIdx === 0) {
               cell.fill = EXCEL_HAYVAN_FILL;
               cell.font = EXCEL_HAYVAN_FONT;
@@ -469,19 +471,31 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
               cell.border = HAYVAN_BORDER;
             }
           } else if (colNum === 2) {
-            // SIRA — centered bold
+            // SIRA — bold, centered
+            cell.font = { name: "Calibri", size: 10, bold: true };
             cell.alignment = { horizontal: "center", vertical: "middle" };
-            cell.font = { bold: true };
+            if (isEven) cell.fill = EXCEL_EVEN_FILL;
+          } else if (colNum === 3) {
+            // VEKALET — smaller, slightly gray, left-indented
+            cell.font = { name: "Calibri", size: 9, color: { argb: "FF6B7280" } };
+            cell.alignment = { vertical: "middle", indent: 1 };
+            if (isEven) cell.fill = EXCEL_EVEN_FILL;
+          } else if (colNum === 4) {
+            // VEKALETİ VEREN — normal, left-indented
+            cell.alignment = { vertical: "middle", indent: 1 };
             if (isEven) cell.fill = EXCEL_EVEN_FILL;
           } else if (colNum === 5) {
-            // ADINA KESİLEN — bold
-            cell.font = { bold: true };
+            // ADINA KESİLEN — bold, left-indented
+            cell.font = { name: "Calibri", size: 10, bold: true };
+            cell.alignment = { vertical: "middle", indent: 1 };
             if (isEven) cell.fill = EXCEL_EVEN_FILL;
           } else if (colNum === 6) {
-            // CİNSİ — centered
+            // CİNSİ — centered, normal
             cell.alignment = { horizontal: "center", vertical: "middle" };
             if (isEven) cell.fill = EXCEL_EVEN_FILL;
           } else {
+            // NOTLAR — left-indented
+            cell.alignment = { vertical: "middle", indent: 1 };
             if (isEven) cell.fill = EXCEL_EVEN_FILL;
           }
         });
@@ -503,7 +517,7 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
       footerRow.height = 14;
       const footerCell = footerRow.getCell(1);
       footerCell.value = kaDisplayName;
-      footerCell.font = { italic: true, size: 9, color: { argb: "FF374151" } };
+      footerCell.font = { name: "Calibri", italic: true, size: 9, color: { argb: "FF374151" } };
       footerCell.fill = EXCEL_FOOTER_FILL;
       footerCell.border = CELL_BORDER;
       ws.mergeCells(currentRow, 1, currentRow, NUM_COLS);
