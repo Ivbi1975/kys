@@ -171,7 +171,7 @@ export default function Home() {
 
         {state.kesimAlanlari.length === 0 && state.projects.length === 0 ? (
           <Card className="p-12 text-center">
-            <img src="/kurban-logo.png" alt="logo" className="w-14 h-14 mx-auto mb-4 opacity-50" />
+            <img src="/kurban-logo.png" alt="logo" className="w-28 h-14 mx-auto mb-4 opacity-50 object-contain" />
             <h3 className="text-lg font-semibold text-foreground mb-2">
               Henüz proje veya kesim alanı yok
             </h3>
