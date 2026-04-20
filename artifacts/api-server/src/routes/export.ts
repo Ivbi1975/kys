@@ -163,13 +163,13 @@ const HAYVAN_BORDER: Partial<ExcelJS.Borders> = { top: MEDIUM_BORDER, bottom: ME
 const SLOTS_PER_GROUP = 7;
 
 const EXCEL_COLUMNS: { key: string; header: string; width: number }[] = [
-  { key: "hayvanNo", header: "HAYVAN", width: 14 },
-  { key: "sira", header: "SIRA", width: 8 },
-  { key: "vekalet", header: "VEKALET", width: 16 },
-  { key: "vekaleti_veren", header: "VEKALETİ VEREN", width: 30 },
-  { key: "adina_kesilen", header: "ADINA KESİLEN", width: 34 },
-  { key: "cinsi", header: "CİNSİ", width: 16 },
-  { key: "notlar", header: "NOTLAR", width: 22 },
+  { key: "hayvanNo",       header: "HAYVAN",         width: 12 },
+  { key: "sira",           header: "SIRA",            width:  8 },
+  { key: "vekalet",        header: "VEKALET",         width: 11 },
+  { key: "vekaleti_veren", header: "VEKALETİ VEREN", width: 33 },
+  { key: "adina_kesilen",  header: "ADINA KESİLEN",  width: 49 },
+  { key: "cinsi",          header: "CİNSİ",           width: 15 },
+  { key: "notlar",         header: "NOTLAR",          width: 12 },
 ];
 
 const NUM_COLS = EXCEL_COLUMNS.length;
@@ -396,7 +396,7 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
       // Title row: left area = logo, right area = kesim name — matches PDF header layout
       const titleRowIdx = currentRow;
       const titleRow = ws.getRow(titleRowIdx);
-      titleRow.height = 36;
+      titleRow.height = 45;
       const LOGO_COLS = 3;
       // Left: logo area (blank cell base, image overlaid by addImage below)
       const logoCell = titleRow.getCell(1);
@@ -423,7 +423,7 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
 
       // Column header row — dark navy, white bold, matching PDF column headers
       const headerRow = ws.getRow(currentRow);
-      headerRow.height = 22;
+      headerRow.height = 27;
       EXCEL_COLUMNS.forEach((col, colIdx) => {
         const cell = headerRow.getCell(colIdx + 1);
         cell.value = col.header;
@@ -439,7 +439,7 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
       for (let slotIdx = 0; slotIdx < SLOTS_PER_GROUP; slotIdx++) {
         const slot = group.slots[slotIdx] ?? null;
         const dataRow = ws.getRow(currentRow);
-        dataRow.height = 28;
+        dataRow.height = 60;
         const isEven = slotIdx % 2 === 1;
 
         // col1=hayvan, col2=sira, col3=vekalet, col4=vekaleti_veren, col5=adina_kesilen, col6=cinsi, col7=notlar
@@ -500,7 +500,7 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
 
       // Footer row — kesim name only, left-aligned, small italic — matches PDF footer
       const footerRow = ws.getRow(currentRow);
-      footerRow.height = 18;
+      footerRow.height = 14;
       const footerCell = footerRow.getCell(1);
       footerCell.value = kaDisplayName;
       footerCell.font = { italic: true, size: 9, color: { argb: "FF374151" } };
