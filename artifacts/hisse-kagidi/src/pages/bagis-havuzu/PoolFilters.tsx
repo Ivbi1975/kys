@@ -407,7 +407,8 @@ export function PoolFilters({
             <MultiSelectDropdown
               label="Cinsi"
               options={[
-                ...stats.typeDistribution.map(t => ({ value: t.type, count: t.count })),
+                ...[...stats.typeDistribution.map(t => ({ value: t.type, count: t.count }))]
+                  .sort((a, b) => a.value.localeCompare(b.value, "tr")),
                 ...((stats.empty_type_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_type_count, label: "(Boş)" }] : []),
               ]}
               selected={donationTypeFilter}
@@ -424,7 +425,8 @@ export function PoolFilters({
             <MultiSelectDropdown
               label="Birim"
               options={[
-                ...stats.birimDistribution.map(b => ({ value: b.birim, count: b.count })),
+                ...[...stats.birimDistribution.map(b => ({ value: b.birim, count: b.count }))]
+                  .sort((a, b) => a.value.localeCompare(b.value, "tr")),
                 ...((stats.empty_birim_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_birim_count, label: "(Boş)" }] : []),
               ]}
               selected={birimFilter}
@@ -441,7 +443,8 @@ export function PoolFilters({
             <MultiSelectDropdown
               label="Temsilci"
               options={[
-                ...stats.temsilciDistribution.map(t => ({ value: t.temsilci, count: t.count })),
+                ...[...stats.temsilciDistribution.map(t => ({ value: t.temsilci, count: t.count }))]
+                  .sort((a, b) => a.value.localeCompare(b.value, "tr")),
                 ...((stats.empty_temsilci_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_temsilci_count, label: "(Boş)" }] : []),
               ]}
               selected={temsilciFilter}
@@ -458,7 +461,8 @@ export function PoolFilters({
             <MultiSelectDropdown
               label="Özellik"
               options={[
-                ...(stats.ozellikDistribution || []).map(o => ({ value: o.ozellik, count: o.count })),
+                ...[...(stats.ozellikDistribution || []).map(o => ({ value: o.ozellik, count: o.count }))]
+                  .sort((a, b) => a.value.localeCompare(b.value, "tr")),
                 ...((stats.empty_ozellik_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_ozellik_count, label: "(Boş)" }] : []),
               ]}
               selected={ozellikFilter}
@@ -475,7 +479,8 @@ export function PoolFilters({
             <MultiSelectDropdown
               label="Fiyat"
               options={[
-                ...(stats.fiyatDistribution || []).map(f => ({ value: f.fiyat, count: f.count })),
+                ...[...(stats.fiyatDistribution || []).map(f => ({ value: f.fiyat, count: f.count }))]
+                  .sort((a, b) => parseFloat(a.value) - parseFloat(b.value)),
                 ...((stats.empty_fiyat_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_fiyat_count, label: "(Boş)" }] : []),
               ]}
               selected={fiyatFilter}
@@ -492,7 +497,8 @@ export function PoolFilters({
             <MultiSelectDropdown
               label="Yer Talebi"
               options={[
-                ...(stats.yerTalebiDistribution || []).map(y => ({ value: y.yerTalebi, count: y.count })),
+                ...[...(stats.yerTalebiDistribution || []).map(y => ({ value: y.yerTalebi, count: y.count }))]
+                  .sort((a, b) => a.value.localeCompare(b.value, "tr")),
                 ...((stats.empty_yer_talebi_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_yer_talebi_count, label: "(Boş)" }] : []),
               ]}
               selected={yerTalebiFilter}
@@ -509,7 +515,8 @@ export function PoolFilters({
             <MultiSelectDropdown
               label="Gün Talebi"
               options={[
-                ...(stats.gunTalebiDistribution || []).map(g => ({ value: g.gunTalebi, count: g.count })),
+                ...[...(stats.gunTalebiDistribution || []).map(g => ({ value: g.gunTalebi, count: g.count }))]
+                  .sort((a, b) => parseFloat(a.value) - parseFloat(b.value)),
                 ...((stats.empty_gun_talebi_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_gun_talebi_count, label: "(Boş)" }] : []),
               ]}
               selected={gunTalebiFilter}
@@ -526,7 +533,8 @@ export function PoolFilters({
             <MultiSelectDropdown
               label="İlk Hayvan"
               options={[
-                ...(stats.ilkHayvanDistribution || []).map(i => ({ value: i.ilkHayvan, count: i.count })),
+                ...[...(stats.ilkHayvanDistribution || []).map(i => ({ value: i.ilkHayvan, count: i.count }))]
+                  .sort((a, b) => a.value.localeCompare(b.value, "tr")),
                 ...((stats.empty_ilk_hayvan_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_ilk_hayvan_count, label: "(Boş)" }] : []),
               ]}
               selected={ilkHayvanFilter}
@@ -543,7 +551,8 @@ export function PoolFilters({
             <MultiSelectDropdown
               label="Şafi"
               options={[
-                ...(stats.safiDistribution || []).map(s => ({ value: s.safi, count: s.count })),
+                ...[...(stats.safiDistribution || []).map(s => ({ value: s.safi, count: s.count }))]
+                  .sort((a, b) => a.value.localeCompare(b.value, "tr")),
                 ...((stats.empty_safi_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_safi_count, label: "(Boş)" }] : []),
               ]}
               selected={safiFilter}

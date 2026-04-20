@@ -49,7 +49,6 @@ import { ImportWizard } from "./bagis-havuzu/ImportWizard";
 import { BulkTagDialog } from "./bagis-havuzu/BulkTagDialog";
 import { AutomationRulesPanel } from "./bagis-havuzu/AutomationRulesPanel";
 import { BulkNoteDialog } from "./bagis-havuzu/BulkNoteDialog";
-import { CinsStatsBar } from "./bagis-havuzu/CinsStatsBar";
 import { HavuzAiClassification, type HavuzAiResult } from "./bagis-havuzu/HavuzAiClassification";
 import { BulkDeleteFilteredDialog } from "./bagis-havuzu/BulkDeleteFilteredDialog";
 import { ALL_TABLE_COLUMNS, PAGE_SIZE, type TableColumnKey } from "./bagis-havuzu/types";
@@ -1188,18 +1187,6 @@ export default function BagisHavuzuPage() {
             />
           </DialogContent>
         </Dialog>
-
-        <CinsStatsBar
-          stats={stats}
-          items={items}
-          donationTypeFilter={donationTypeFilter}
-          onToggleType={(type) => {
-            setDonationTypeFilter(prev =>
-              prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-            );
-            setPage(0);
-          }}
-        />
 
         {showFilters && (
           <PoolFilters
