@@ -566,6 +566,7 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
     JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
     WHERE ka.project_id = ${projectId}
       AND ka.deleted_at IS NULL AND d.deleted_at IS NULL
+      AND ka.name != '__havuz__'
       AND d.excluded = false AND d.vekalet IS NOT NULL AND d.vekalet != ''
     GROUP BY d.vekalet
     HAVING COUNT(DISTINCT d.kesim_alani_id) > 1
@@ -578,6 +579,7 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
     JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
     WHERE ka.project_id = ${projectId}
       AND ka.deleted_at IS NULL AND d.deleted_at IS NULL
+      AND ka.name != '__havuz__'
       AND d.excluded = false AND d.name IS NOT NULL AND d.name != ''
     GROUP BY d.name
     HAVING COUNT(DISTINCT d.kesim_alani_id) > 1
