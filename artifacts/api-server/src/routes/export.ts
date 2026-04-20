@@ -311,6 +311,9 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
     const kaName = kaResult.rows[0].name as string;
     const kaDisplayName = ((kaResult.rows[0].display_name as string | null) || kaName);
 
+    const logoResult = await client.query(`SELECT value FROM app_settings WHERE key = 'logo'`);
+    const logoDataUrl = (logoResult.rows[0]?.value as string | null) || null;
+
     const donationsResult = await client.query(
       `SELECT
          ag.animal_no,
@@ -354,6 +357,19 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
     const workbook = new ExcelJS.Workbook();
     const ws = workbook.addWorksheet("Kesim Kağıdı");
 
+    // Register logo image once if available
+    let logoImageId: number | null = null;
+    if (logoDataUrl) {
+      const logoMatch = logoDataUrl.match(/^data:image\/(png|jpeg|jpg|gif|webp);base64,(.+)$/i);
+      if (logoMatch) {
+        const rawExt = logoMatch[1].toLowerCase();
+        const ext = (rawExt === "jpg" ? "jpeg" : rawExt) as "png" | "jpeg" | "gif";
+        try {
+          logoImageId = workbook.addImage({ base64: logoMatch[2], extension: ext });
+        } catch { logoImageId = null; }
+      }
+    }
+
     ws.pageSetup = {
       paperSize: 9,
       orientation: "landscape",
@@ -377,23 +393,33 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
     for (let groupIdx = 0; groupIdx < groups.length; groupIdx++) {
       const group = groups[groupIdx];
 
-      // Title row: left area blank (logo placeholder), right area = kesim name — matches PDF header layout
-      const titleRow = ws.getRow(currentRow);
-      titleRow.height = 32;
+      // Title row: left area = logo, right area = kesim name — matches PDF header layout
+      const titleRowIdx = currentRow;
+      const titleRow = ws.getRow(titleRowIdx);
+      titleRow.height = 36;
       const LOGO_COLS = 3;
-      // Left: logo placeholder area (blank, no fill — white like PDF)
+      // Left: logo area (blank cell base, image overlaid by addImage below)
       const logoCell = titleRow.getCell(1);
       logoCell.value = "";
       logoCell.border = CELL_BORDER;
-      if (LOGO_COLS > 1) ws.mergeCells(currentRow, 1, currentRow, LOGO_COLS);
+      if (LOGO_COLS > 1) ws.mergeCells(titleRowIdx, 1, titleRowIdx, LOGO_COLS);
       // Right: kesim name, right-aligned dark blue bold — matches PDF top-right
       const nameCell = titleRow.getCell(LOGO_COLS + 1);
       nameCell.value = kaDisplayName;
       nameCell.font = { bold: true, size: 14, color: { argb: "FF1E3A5F" } };
       nameCell.alignment = { horizontal: "right", vertical: "middle" };
       nameCell.border = CELL_BORDER;
-      if (NUM_COLS > LOGO_COLS + 1) ws.mergeCells(currentRow, LOGO_COLS + 1, currentRow, NUM_COLS);
+      if (NUM_COLS > LOGO_COLS + 1) ws.mergeCells(titleRowIdx, LOGO_COLS + 1, titleRowIdx, NUM_COLS);
       currentRow++;
+
+      // Embed logo image in the left section of the title row
+      if (logoImageId !== null) {
+        ws.addImage(logoImageId, {
+          tl: { col: 0, row: titleRowIdx - 1 },
+          br: { col: LOGO_COLS, row: titleRowIdx },
+          editAs: "oneCell",
+        });
+      }
 
       // Column header row — dark navy, white bold, matching PDF column headers
       const headerRow = ws.getRow(currentRow);
