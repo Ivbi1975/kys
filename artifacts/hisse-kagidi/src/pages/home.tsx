@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Scissors, Search, LogOut } from "lucide-react";
+import { Search, LogOut } from "lucide-react";
 import { HomeSkeleton } from "@/components/skeletons/HomeSkeleton";
 import QrCodeModal from "@/components/QrCodeModal";
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
@@ -204,7 +204,7 @@ export default function Home() {
               <div className="mb-6">
                 {state.projects.length > 0 && (
                   <div className="flex items-center gap-2 mb-3">
-                    <Scissors className="w-4 h-4 text-muted-foreground" />
+                    <img src="/kurban-logo.png" alt="" className="w-4 h-4 object-contain opacity-60" />
                     <h3 className="text-sm font-semibold text-muted-foreground">Projesiz Kesim Alanları</h3>
                   </div>
                 )}

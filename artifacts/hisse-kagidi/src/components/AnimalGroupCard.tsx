@@ -16,7 +16,6 @@ import {
   Lock,
   Unlock,
   Trash2,
-  Scissors,
   ArrowLeftRight,
   ShoppingBag,
   CheckSquare,
@@ -488,7 +487,7 @@ const GroupOverflowMenu = memo(function GroupOverflowMenu({
             onClick={() => { onSplit(groupIdx); setOpen(false); }}
             disabled={group.locked || filledCount <= 1}
           >
-            <Scissors className="w-3.5 h-3.5" />
+            <img src="/kurban-logo.png" alt="" className="w-3.5 h-3.5 object-contain" />
             Grubu Böl
           </button>
           <button

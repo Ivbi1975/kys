@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { ChevronDown, ChevronRight, FolderOpen, Scissors, Inbox, PanelLeftClose, PanelLeftOpen, Home, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, FolderOpen, Inbox, PanelLeftClose, PanelLeftOpen, Home, Trash2 } from "lucide-react";
 import { fetchHomeData } from "@/lib/api/projects";
 import type { HomeData } from "@/lib/api/projects";
 import { cn } from "@/lib/utils";
@@ -126,7 +126,7 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
                     <NavItem
                       key={ka.id}
                       collapsed={false}
-                      icon={<Scissors className="h-3 w-3 flex-shrink-0" />}
+                      icon={<img src="/kurban-logo.png" alt="" className="h-3 w-3 flex-shrink-0 object-contain" />}
                       label={ka.name}
                       active={activeKesimId === ka.id}
                       onClick={() => go(`/kesim/${ka.id}`)}
@@ -152,7 +152,7 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
               <NavItem
                 key={ka.id}
                 collapsed={collapsed}
-                icon={<Scissors className="h-3.5 w-3.5 flex-shrink-0" />}
+                icon={<img src="/kurban-logo.png" alt="" className="h-3.5 w-3.5 flex-shrink-0 object-contain" />}
                 label={ka.name}
                 active={activeKesimId === ka.id}
                 onClick={() => go(`/kesim/${ka.id}`)}

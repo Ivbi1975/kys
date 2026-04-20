@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Plus, Trash2, ChevronRight, Scissors, Calendar,
+  Plus, Trash2, ChevronRight, Calendar,
   Link2, ExternalLink, QrCode, GitBranch, CornerDownRight,
 } from "lucide-react";
 import type { KesimAlani } from "@/lib/types";
@@ -113,7 +113,7 @@ function KesimAlaniCard({
                 onSplit(k);
               }}
             >
-              <Scissors className="w-4 h-4 text-amber-600" />
+              <img src="/kurban-logo.png" alt="" className="w-4 h-4 object-contain" />
             </Button>
           )}
           <Button
@@ -258,7 +258,7 @@ export function KesimAlaniList({
   if (kesimAlanlari.length === 0) {
     return (
       <Card className="p-12 text-center">
-        <Scissors className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+        <img src="/kurban-logo.png" alt="logo" className="w-28 h-14 mx-auto mb-4 opacity-50 object-contain" />
         <h2 className="text-lg font-semibold text-foreground mb-2">Henüz kesim alanı yok</h2>
         <p className="text-muted-foreground mb-4">Bu projeye yeni bir kesim alanı ekleyin.</p>
         <Button onClick={onCreateDialog}>

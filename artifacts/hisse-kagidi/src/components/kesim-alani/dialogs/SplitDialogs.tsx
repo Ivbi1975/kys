@@ -1,7 +1,6 @@
 import type { KesimAlani } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Scissors } from "lucide-react";
 
 interface SplitDialogsProps {
   kesim: KesimAlani;
@@ -24,7 +23,7 @@ export function SplitDialogs({
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Scissors className="w-5 h-5 text-primary" />
+              <img src="/kurban-logo.png" alt="" className="w-5 h-5 object-contain" />
               Hisse Bölme
             </DialogTitle>
           </DialogHeader>
@@ -62,7 +61,7 @@ export function SplitDialogs({
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Scissors className="w-5 h-5 text-primary" />
+              <img src="/kurban-logo.png" alt="" className="w-5 h-5 object-contain" />
               Grubu Böl
             </DialogTitle>
           </DialogHeader>
@@ -98,7 +97,7 @@ export function SplitDialogs({
                 <div className="flex justify-end gap-2 pt-2">
                   <Button variant="outline" onClick={() => setSplitGroupDialog(null)}>İptal</Button>
                   <Button onClick={executeSplitGroup}>
-                    <Scissors className="w-3 h-3 mr-1" />
+                    <img src="/kurban-logo.png" alt="" className="w-3 h-3 mr-1 object-contain" />
                     {splitGroupDialog.splitAt}/{filled.length - splitGroupDialog.splitAt} Olarak Böl
                   </Button>
                 </div>

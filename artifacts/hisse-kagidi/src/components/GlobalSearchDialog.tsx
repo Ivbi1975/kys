@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, MapPin, Loader2, Users, Scissors } from "lucide-react";
+import { Search, MapPin, Loader2, Users } from "lucide-react";
 import { globalSearch } from "@/lib/api";
 import type { GlobalSearchResult } from "@/lib/api";
 
@@ -177,7 +177,7 @@ export default function GlobalSearchDialog({ open, onOpenChange, projectId }: Gl
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mt-1.5">
                         <span className="inline-flex items-center gap-1 text-primary">
-                          <Scissors className="w-3 h-3" />
+                          <img src="/kurban-logo.png" alt="" className="w-3 h-3 object-contain" />
                           {r.kesimAlaniName}
                         </span>
                         {r.projectName && (
