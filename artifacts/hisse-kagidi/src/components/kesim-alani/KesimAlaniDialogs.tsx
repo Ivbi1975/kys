@@ -32,7 +32,7 @@ export function KesimAlaniDialogs(props: KesimAlaniStateReturn) {
     splitGroupDialog, setSplitGroupDialog, executeSplitGroup,
     smartPlacePopover, setSmartPlacePopover, smartPlaceDonor, getAvailableGroupsForDonor,
     personBulkDeleteConfirm, setPersonBulkDeleteConfirm, deleteDonation, bulkDeleteByDesc, bulkExcludeByDesc,
-    trashOpen, setTrashOpen, trashItems, trashLoading, trashPermanentConfirm, setTrashPermanentConfirm, restoreDonation, permanentDeleteDonation,
+    trashOpen, setTrashOpen, trashItems, trashLoading, trashPermanentConfirm, setTrashPermanentConfirm, restoreDonation, permanentDeleteDonation, bulkPermanentDeleteDonations,
     trackingNotesOpen, setTrackingNotesOpen, trackingNotes, setTrackingNotes, trackingNotesLoading,
     notificationLogsOpen, setNotificationLogsOpen, notificationLogs, notificationLogsLoading,
     notificationTemplateOpen, setNotificationTemplateOpen, notificationTemplate, setNotificationTemplate, notificationTemplateSaving, setNotificationTemplateSaving,
@@ -220,6 +220,7 @@ export function KesimAlaniDialogs(props: KesimAlaniStateReturn) {
             setTrashPermanentConfirm={setTrashPermanentConfirm}
             restoreDonation={restoreDonation}
             permanentDeleteDonation={permanentDeleteDonation}
+            bulkPermanentDeleteDonations={bulkPermanentDeleteDonations}
           />
         </LazyLoadBoundary>
       )}

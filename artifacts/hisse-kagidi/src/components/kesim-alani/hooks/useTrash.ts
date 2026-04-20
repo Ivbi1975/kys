@@ -72,6 +72,29 @@ export function useTrash({ kesim, setKesim, toast, history }: UseTrashDeps) {
     [kesim, toast]
   );
 
+  const bulkPermanentDeleteDonations = useCallback(
+    async (donationIds: string[]) => {
+      if (!kesim || donationIds.length === 0) return;
+      try {
+        await Promise.all(
+          donationIds.map((id) => apiPermanentDeleteDonation(kesim.id, id))
+        );
+        setTrashItems((prev) => prev.filter((d) => !donationIds.includes(d.id)));
+        toast({
+          title: "Kalıcı olarak silindi",
+          description: `${donationIds.length} bağışçı kalıcı olarak silindi.`,
+        });
+      } catch (err) {
+        toast({
+          title: "Kalıcı silme hatası",
+          description: err instanceof Error ? err.message : "Bilinmeyen hata",
+          variant: "destructive",
+        });
+      }
+    },
+    [kesim, toast]
+  );
+
   return {
     trashOpen,
     setTrashOpen,
@@ -84,5 +107,6 @@ export function useTrash({ kesim, setKesim, toast, history }: UseTrashDeps) {
     openTrash,
     restoreDonation,
     permanentDeleteDonation,
+    bulkPermanentDeleteDonations,
   };
 }
