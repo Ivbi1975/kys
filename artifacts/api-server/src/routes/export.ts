@@ -380,7 +380,7 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
         left: 0.5,
         right: 0.5,
         top: 0.6,
-        bottom: 0.6,
+        bottom: 1.0,
         header: 0.3,
         footer: 0.3,
       },
