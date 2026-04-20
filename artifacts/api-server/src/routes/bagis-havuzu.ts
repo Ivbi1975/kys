@@ -1387,6 +1387,7 @@ router.post("/projects/:id/donations/vekalet-check", asyncHandler(async (req, re
       .where(and(
         isNull(donationsTable.deletedAt),
         isNull(kesimAlanlariTable.deletedAt),
+        eq(kesimAlanlariTable.projectId, projectId),
         inArray(donationsTable.vekalet, chunk),
         scopeCondition,
       ));

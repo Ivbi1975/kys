@@ -221,14 +221,9 @@ router.delete("/projects/:id", asyncHandler(async (req, res) => {
         await tx.delete(trackingNotesTable).where(inArray(trackingNotesTable.kesimAlaniId, kaIds));
         await tx.delete(notificationLogsTable).where(inArray(notificationLogsTable.kesimAlaniId, kaIds));
 
-        const donationRows = await tx.select({ id: donationsTable.id })
-          .from(donationsTable)
-          .where(inArray(donationsTable.kesimAlaniId, kaIds));
-        const donationIds = donationRows.map(d => d.id);
-        if (donationIds.length > 0) {
-          await tx.delete(donationTagsTable).where(inArray(donationTagsTable.donationId, donationIds));
-        }
-
+        await tx.delete(donationTagsTable).where(
+          sql`${donationTagsTable.donationId} IN (SELECT id FROM donations WHERE kesim_alani_id IN (SELECT id FROM kesim_alanlari WHERE project_id = ${id}))`
+        );
         await tx.delete(donationsTable).where(inArray(donationsTable.kesimAlaniId, kaIds));
         await tx.delete(teamsTable).where(inArray(teamsTable.kesimAlaniId, kaIds));
         await tx.delete(kesimAlanlariTable).where(inArray(kesimAlanlariTable.id, kaIds));
@@ -244,7 +239,13 @@ router.delete("/projects/:id", asyncHandler(async (req, res) => {
     await refreshProjectStatsImmediate();
     res.json({ success: true });
   } else {
-    await db.update(projectsTable).set({ deletedAt: new Date() }).where(eq(projectsTable.id, id));
+    const now = new Date();
+    await db.update(projectsTable).set({ deletedAt: now }).where(eq(projectsTable.id, id));
+    await db.update(kesimAlanlariTable)
+      .set({ deletedAt: now })
+      .where(and(eq(kesimAlanlariTable.projectId, id), isNull(kesimAlanlariTable.deletedAt)));
+    invalidateKACache();
+    cacheInvalidatePrefix("kesim-alanlari");
     await refreshProjectStatsImmediate();
     res.json({ success: true });
   }
@@ -263,6 +264,11 @@ router.post("/projects/:id/restore", asyncHandler(async (req, res) => {
   if (!existing) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
 
   await db.update(projectsTable).set({ deletedAt: null }).where(eq(projectsTable.id, id));
+  await db.update(kesimAlanlariTable)
+    .set({ deletedAt: null })
+    .where(eq(kesimAlanlariTable.projectId, id));
+  invalidateKACache();
+  cacheInvalidatePrefix("kesim-alanlari");
   await refreshProjectStatsImmediate();
   const [restored] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
   res.json({ ...restored, stats: emptyStats });
