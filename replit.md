@@ -1,215 +1,95 @@
-# Workspace
+# Overview
 
-## Overview
+This pnpm workspace monorepo, built with TypeScript, provides a comprehensive solution for managing Kurban Bayramı share certificates. The project aims to streamline the process of organizing donations, assigning them to animal groups, and tracking their status.
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+Key capabilities include:
+- Efficient management of cutting areas and donor information, with flexible import options.
+- Intelligent grouping of donors into animal shares (groups of 7).
+- Robust tracking and reporting features, including public tracking links and detailed reports.
+- Advanced conflict resolution and automation tools for donation management.
+- Scalable architecture designed to handle large volumes of data and users.
 
-## Stack
+The business vision is to become the leading platform for Kurban Bayramı organization, offering an intuitive, reliable, and feature-rich experience for charities and individuals alike.
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
-- **API Auth**: API key middleware (`X-API-Key` header, env var `API_KEY`); timing-safe comparisons via `crypto.timingSafeEqual`; photo endpoints use HMAC-signed session tokens (`ptoken` + `exp` query params) instead of raw API key in URLs; `X-Request-ID` UUID header on all requests (validated format); pino logger redacts `x-api-key` header
-- **Rate limiting**: Global 200 req/min + tracking-specific 30 req/min (`/api/tracking` prefix)
-- **Error handling**: Central `asyncHandler` wrapper + `errorHandler` middleware (`src/middleware/error-handler.ts`); route handlers should use `asyncHandler` instead of local try-catch; generic "Sunucu hatası" in production (no stack traces); request ID included in error responses
+# User Preferences
 
-## Structure
+I prefer concise and accurate information.
+I like a clear separation of concerns in the codebase.
+I prefer detailed explanations for complex logic.
+I want iterative development with frequent, small updates.
+Ask before making major architectural changes.
+Do not make changes to the `lib/api-spec` directory directly; changes should be made to the OpenAPI spec, and then codegen should be run.
+Do not make changes to generated files in `lib/api-client-react/src/generated/` or `lib/api-zod/src/generated/`.
+Ensure all database migrations are explicitly reviewed before applying to production.
+For frontend development, prioritize user experience and performance.
+For backend development, prioritize security, scalability, and maintainability.
 
-```text
-artifacts-monorepo/
-├── artifacts/              # Deployable applications
-│   ├── api-server/         # Express API server
-│   └── hisse-kagidi/       # Kurban Hisse Kağıdı - React + Vite web app
-├── lib/                    # Shared libraries
-│   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts (single workspace package)
-│   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
-├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
-├── tsconfig.json           # Root TS project references
-└── package.json            # Root package with hoisted devDeps
-```
+# System Architecture
 
-## Artifacts
+The project is structured as a pnpm workspace monorepo, separating deployable applications (`artifacts`) from shared libraries (`lib`) and utility scripts (`scripts`).
 
-### Kurban Hisse Kağıdı (`artifacts/hisse-kagidi`)
+## UI/UX Decisions
 
-Frontend-only React + Vite app for managing Kurban Bayramı share certificates. Features:
-- Create cutting areas (kesim alanları)
-- Add donors via manual entry, Excel upload (.xlsx/.xls/.csv), or copy-paste with column mapping
-- High-share review step: rows with >50 total shares per description group are flagged; user can exclude, add to basket, or transfer directly to another cutting list
-- Donation flagging: manual flag/unflag with reason text, yellow triangle indicators in DonorRow overflow menu, pool table, and AnimalGroupCard vekalet cells
-- Sorunlu Bağışlar page: centralized view of all problem donations (manual flags, AI warnings, vekalet conflicts) with search, type/location filters, and unflag actions
-- Multi-select checkboxes for bulk deletion and bulk editing of donors
-- Same-name auto-count: if a name appears N times, effectiveShare=N is used
-- Smart auto-grouping: distributes donors into groups of 7 (one animal per group) using bin-packing
-- Drag-and-drop between animal groups
-- Sort by any column
-- Undo/Redo system with history panel (Ctrl+Z/Ctrl+Y, up to 80 steps with Turkish descriptions)
-- Animal group color tags (green/orange/red) with filtering
-- Animal group locking (prevents accidental changes)
-- Animal group notes
-- Dark theme support with three modes: Açık (light), Koyu (dark), Sistem (system auto-detect) — settable via header toggle or Settings > Tema
-- Excel export for donor lists (client-side, lightweight) and kesim kağıdı format (server-side streaming via ExcelJS for 4700+ animal support, with cell merges + column widths + styling)
-- Excel export on print page matching visible column layout with HAYVAN cell merges (server-side download)
-- PDF export on print page (opens browser print dialog for Save as PDF)
-- Statistics dashboard — kesim detail: active donors, excluded count, total shares, required animals, empty slots, occupancy % (doluluk)
-- Statistics dashboard — home page: each card shows bağışçı/hisse/hayvan/grup/doluluk; summary row for all areas when 2+ exist
-- Share distribution panel (bar chart showing count of 1-7 share donors)
-- Group composition panel (shows share combinations per group like "3+2+1+1")
-- Ungrouped donor tracking (clickable orange counter filters donor list to show only unassigned donors)
-- Kesim listesi parçalama (split): split large lists into smaller sub-lists, distributing donors across new child lists. Parent lists show "Parçalandı" badge with amber border, children show "Alt Liste" badge with hierarchical indent. Modal form supports dynamic row add/remove with even-distribution helper and total validation.
-- JSON backup/restore for all data
-- Print A4 landscape pages matching Excel "Kesim Kağıdı" format with columns: HAYVAN (merged vertically), SIRA, VEKALET, VEKALETİ VEREN, ADINA KESİLEN, CİNSİ, NOTLAR
-- Flexible workspace layout: multi-column grid (1/2/3 columns), column hide/show popover, compact mode, fullscreen mode (ESC to exit), collapse all/expand all, column drag-and-drop reorder, resizable split pane between donor list and animal groups — all preferences saved to localStorage via `useWorkspacePreferences` hook
-- Mobile responsive: tab-based navigation (Bağışçı Listesi / Hayvan Grupları) on mobile instead of split pane, compact header with save button, responsive stat cards (2-col grid on mobile), toolbar buttons adapt to screen size
-- Donor list hide/show toggle (panel collapses, groups reflow to full width) — desktop only
-- Group split (scissors icon, divides filled donors into two renumbered groups)
-- Group merge (checkbox selection + toolbar, handles 7-share overflow into new groups)
-- Manual swap mode (ArrowLeftRight icon, preview dialog before executing)
-- Auto conflict resolver ("Otomatik Çöz" button, optimally consolidates same-vekalet donors by choosing the target group with most existing matches to minimize swaps)
-- Cross-kesim-alanı basket (kese): basket items persist in localStorage per project, visible when navigating between KAs; items from other KAs shown with blue badges; transfer donors to another KA in same project via "Başka KA'ya taşı" dropdown; group-level "Tümünü Sepete Ekle" button in group header (shopping bag icon); "Bağışçı Listesine Ekle" button for foreign basket items — adds donors to current KA's donor list with confirmation dialog, auto-removes from source KA, logs all transfers to DB
-- Donation transfer log: `donation_transfers` DB table tracks all cross-KA donor movements (from/to KA names, donor info, timestamps, removal status); viewable on project detail page via "Aktarımlar Logu" button
-- Custom tag system: global tag definitions (name + color) managed in Settings, assignable to donors via popover, displayed as colored badges, included in backup/restore, orphaned tags cleaned on deletion
-- Advanced filtering: filter donor list by cinsi (dropdown), hisse range (min/max), status (active/excluded), tags (multi-select) — combinable filters with active count badge and clear button
-- Shared utility modules: `src/lib/formatting.ts` (formatDate, formatDateTime, formatTime, formatKesildiTime, formatNoteTime, timeSince), `src/lib/constants.ts` (TAG_COLORS, COLOR_MAP, FIELD_LABELS, DonorFieldKey), `src/hooks/useTrackingActions.ts` (handleCopyTrackingLink, handleOpenTrackingPage, resolveToken, buildTrackingUrl), `src/components/ThemeToggle.tsx` (shared theme toggle button)
-- Data persisted in PostgreSQL via API server (migrated from localStorage)
-- One-time automatic localStorage → PostgreSQL migration on first load
-- Soft delete for kesim alanları (trash/restore functionality with permanent delete option)
-- Soft delete for donations (Bağış Çöp Kutusu): all deletion paths (single delete, bulk select delete, bulkDeleteByDesc, findDelete) use soft-delete API; deleted donations viewable in "Çöp Kutusu" dialog on kesim-alani page with restore and permanent-delete options; `deletedAt` column on donations table
-- Kesim tracking public link system: generates a unique token per kesim alanı; public page at `/takip/:token` (no password required) shows animal groups with kesildi toggle checkboxes, progress bar, auto-refresh every 30s; "Takip Linki" button in kesim-alani header copies the tracking URL to clipboard; kesildi stats shown in both kesim-alani and proje-detay pages
-- Toast notifications for all user actions (success/error feedback)
-- AlertDialog for destructive operations (modern UI instead of browser confirm())
-- Save button in header with last save timestamp (HH:MM:SS), auto-save on changes + manual save button
-- Save status indicator in workspace header (saving/saved/error states)
-- Creation date display on kesim alanı cards with relative time
-- crypto.randomUUID() for all ID generation (collision-safe)
-- Database indexes on foreign keys and unique constraints on join tables
-- API base path uses import.meta.env.BASE_URL for proper artifact routing
-- File size validation for logo uploads (max 5MB)
-- Offline mode for tracking page: Service Worker via vite-plugin-pwa caches assets; IndexedDB stores tracking data and queues offline changes (kesildi toggles, notes); auto-sync when back online; offline banner with pending change counter; NetworkFirst caching strategy for API requests
+The frontend application, "Kurban Hisse Kağıdı," is a React + Vite app with a focus on usability and responsiveness.
+- **Theme Support**: Includes light, dark, and system-aware themes.
+- **Workspace Layout**: Flexible, multi-column grid layout with customizable visibility, order, and resizing, with preferences persisted locally.
+- **Mobile Responsiveness**: Adapts to mobile devices with tab-based navigation and compact elements.
+- **Interaction Patterns**: Utilizes toast notifications for feedback, AlertDialogs for destructive actions, and an undo/redo system for data manipulation.
 
-Data model (Donation):
-- `id`, `name` (adına kesilen), `description` (vekaleti veren), `donationType` (cinsi), `shareCount`, `vekalet` (vekalet no), `notes` (notlar), `phone`, `birim`, `temsilci`, `ozellik` (özellik), `fiyat`, `yerTalebi` (yer talebi), `gunTalebi` (gün talebi), `ilkHayvan` (ilk hayvan), `safi` (şafi), `excluded?`, `tags?`
+## Technical Implementations
 
-Data model (AnimalGroup):
-- `id`, `animalNo`, `donations[]`, `colorTag?` (green/orange/red), `locked?`, `notes?`, `kesildi?` (boolean, tracks slaughter status)
+- **Monorepo**: pnpm workspaces for managing multiple packages.
+- **Language**: TypeScript 5.9 for type safety across the entire project.
+- **API Framework**: Express 5 for building the RESTful API.
+- **Database & ORM**: PostgreSQL with Drizzle ORM for data persistence.
+- **Validation**: Zod for robust schema validation, including `drizzle-zod` for database schema validation.
+- **API Codegen**: Orval generates API clients and Zod schemas from an OpenAPI spec.
+- **Build System**: esbuild for efficient CJS bundling.
+- **Authentication**: API key middleware (`X-API-Key`) and HMAC-signed session tokens for photo endpoints.
+- **Rate Limiting**: Implemented globally and for specific tracking endpoints.
+- **Error Handling**: Centralized `asyncHandler` and `errorHandler` middleware for consistent error responses, redacting sensitive information in production.
+- **Data Models**: Key entities include `Donation` (with attributes like name, share count, status, tags), `AnimalGroup` (containing donations, status, and tracking info), `KesimAlani` (cutting areas), and `Project`.
+- **Offline Mode**: The tracking page supports offline functionality using Service Worker and IndexedDB for caching and syncing changes.
+- **Audit Logging**: Comprehensive audit trail for critical actions, with automated purging.
+- **Automation Rules**: User-defined rules with conditions and actions for managing donations.
 
-Key files:
-- `src/lib/types.ts` - TypeScript types (Donation, AnimalGroup, KesimAlani, ColorTag, CustomTag, Project, ProjectStats)
-- `src/lib/api/` - API client modules split by domain: `core.ts` (apiFetch, getApiKey), `projects.ts`, `kesim-alanlari.ts`, `tracking.ts`, `ai-notes.ts`, `settings.ts`, `misc.ts`; barrel `index.ts` re-exports all
-- `src/lib/storage.ts` - Print preferences (localStorage, UI-only settings)
-- `src/lib/grouping.ts` - Mod 7 smart grouping algorithm (pre-splits into full 7-share animals, then pairs/triples remainders)
-- `src/lib/useHistory.ts` - Snapshot-based undo/redo hook (80 steps, structuredClone)
-- `src/lib/useTheme.ts` - Theme hook supporting light/dark/system modes with system preference detection
-- `src/lib/useWorkspacePreferences.ts` - Workspace layout preferences hook (columnCount, hiddenColumns, compactMode, columnOrder, splitRatio) with localStorage persistence
-- `src/pages/home.tsx` - Home page with project cards (collapsible), kesim alanı list grouped by project, project CRUD, move kesim alanı between projects, settings (logo, backup, theme selector, tag management)
-- `src/pages/kesim-alani.tsx` - Main editing page entry point (imports hook + content + dialogs components)
-- `src/components/kesim-alani/useKesimAlaniState.tsx` - Orchestrator hook (~900 lines) wiring domain hooks together, holding UI state, computing memos
-- `src/components/kesim-alani/hooks/` - Domain hooks directory:
-  - `types.ts` - Shared types (BasketItem, SortField, SaveFn, KesimDeps, generateId, basket storage helpers)
-  - `useSaveManager.ts` - Save/debounce/API calls, error description builder
-  - `useDonations.ts` - Donor CRUD, selection, inline editing, bulk edit, find-delete, sort
-  - `useAnimalGroups.ts` - Group CRUD, collapse/select, split/merge, lock, column drag, group find-delete
-  - `useGroupingEngine.ts` - Auto-grouping, conflicts, swap mode, auto-resolve
-  - `useBasket.ts` - Basket + cross-KA transfer
-  - `useTeams.ts` - Team CRUD + assign
-  - `useTrash.ts` - Trash operations (soft delete restore, permanent delete)
-  - `useKeyboardShortcuts.ts` - Keyboard event handler (Ctrl+Z/Y/S/F/G, F11, ?)
-  - `useUndoRedo.ts` - Undo/redo with history panel
-  - `useDragAndDrop.ts` - Drag-and-drop between groups
-  - `useImportExport.ts` - Bulk import, Excel export
-  - `useKesimAlaniFilters.ts` - Donor list filtering and search index
-- `src/components/kesim-alani/KesimAlaniContent.tsx` - Thin orchestrator (~140 lines) wrapping sub-components via KesimAlaniContext
-- `src/components/kesim-alani/KesimAlaniContext.tsx` - React Context provider eliminating 250+ prop drilling
-- `src/components/kesim-alani/sections/KesimAlaniHeader.tsx` - Breadcrumb, action buttons, save status, undo/redo, export
-- `src/components/kesim-alani/sections/StatsCards.tsx` - Stats grid, share distribution, group compositions
-- `src/components/kesim-alani/sections/DonorListPanel.tsx` - Left panel: search, filters, bulk import, virtual donor table
-- `src/components/kesim-alani/sections/GroupListPanel.tsx` - Right panel: group toolbar, minimap, conflict display, virtualized group cards
-- `src/components/kesim-alani/KesimAlaniDialogs.tsx` - Thin dialog orchestrator (~300 lines), delegates to sub-components in `dialogs/` directory: `SwapDialogs`, `SplitDialogs`, `SmartPlaceDialog`, `TeamDialog`, `BasketPanel`, `DonorListReport`, `JumpDialog`
-- `src/pages/print/` - Print page split into: `PrintPage.tsx` (state+toolbar), `templates.tsx` (5 template renderers), `excelExport.ts`, `printHelpers.ts`; barrel `index.ts`
-- `src/pages/kesim-takip.tsx` - Public kesim tracking page (no auth), shows animal groups with kesildi toggle, offline mode with IndexedDB + Service Worker
-- `src/pages/kesim-rapor.tsx` - Kesim report page (`/rapor/:id`), print-optimized PDF with stats, timeline, team breakdown, notes; accessible from kesim-alani "Rapor" button
-- `src/lib/offlineStore.ts` - IndexedDB wrapper for offline tracking data cache and change queue
-- `src/lib/useOfflineSync.ts` - React hook for offline-aware data loading, change queuing, and sync
-- `src/pages/bagis-havuzu.tsx` - Bağış Havuzu (donation pool) page (`/bagis-havuzu/:id`), central view of all donations across all kesim areas in a project; features multi-select filtering (birim, temsilci, cinsi, özellik, fiyat, yer talebi, gün talebi, ilk hayvan, şafi), URL filter persistence via replaceState, filters open by default, bold donation count, search, Excel bulk import with column mapping (5000 per chunk), transfer to kesim areas with duplicate detection (skipExisting), select-all across pages, multi-level column sorting (click headers), bulk operations (exclude/include/delete), AI classification with stop button, statistics panel with distribution breakdowns + transferredToLists/inGroups stats, multi-location vekalet/name conflict warnings
-- `src/pages/bagis-havuzu/PoolFilters.tsx` - Multi-select dropdown filters with checkbox lists, inline search for long option lists, badge display of selections, negative filter (exclude) toggle per field, share count min/max range filter, date range filter (updatedAt), tag count indicators, 3-level compact sorting
-- `src/pages/bagis-havuzu/BulkNoteDialog.tsx` - Bulk note dialog for adding/replacing notes on selected donations (append or replace mode)
-- `src/pages/bagis-havuzu/VirtualizedDonationTable.tsx` - Virtualized donation table with clickable sortable column headers (ArrowUp/Down/UpDown icons), configurable visible columns
-- `src/pages/bagis-havuzu/TransferDialog.tsx` - Transfer dialog with fresh KA list fetch on open, create-new-list option
-- `src/pages/bagis-havuzu/PoolBulkActions.tsx` - Floating bulk actions bar (Listeye Aktar, Devre Dışı Bırak, Aktif Yap, Sil)
-- `src/pages/bagis-havuzu/StatsPanel.tsx` - Statistics panel with total/active/excluded/shares/transferredToLists/inGroups cards and distribution breakdowns
-- `src/pages/bagis-havuzu/AutomationRulesPanel.tsx` - Automation rules panel: rule list with create/edit/delete/toggle, condition builder (field+operator+value), action selector (transfer to KA, add tag, flag, exclude), "Kuralları Çalıştır" button with execution results dialog
-- `src/lib/api/bagis-havuzu.ts` - API client for Bağış Havuzu endpoints (fetchPoolDonations, fetchPoolStats, bulkImportDonations, transferDonationsToKA, bulkActionDonations, checkVekaletConflicts)
-- `src/lib/api/automation-rules.ts` - API client for automation rules CRUD and execution
+## Feature Specifications
 
-## TypeScript & Composite Projects
+### Kurban Hisse Kağıdı (Frontend)
+- **Donor Management**: Manual entry, Excel/CSV import with column mapping, multi-select bulk operations (delete, edit, transfer).
+- **Grouping Logic**: Smart auto-grouping algorithm (bin-packing) to form animal groups of 7 shares, with drag-and-drop support.
+- **Conflict Resolution**: Automated and manual tools for resolving donation conflicts.
+- **Donation Tracking**: Manual flagging, "Sorunlu Bağışlar" page for centralized conflict viewing, public tracking links.
+- **Reporting & Export**: Client-side Excel export, server-side streaming Excel export for large datasets, PDF export for print.
+- **Statistics Dashboard**: Provides real-time insights into kesim details, share distribution, and group composition.
+- **Undo/Redo System**: Snapshot-based history for user actions.
+- **Cross-Kesim-Alanı Basket**: Allows transferring donors between different cutting areas within a project.
+- **Custom Tag System**: User-defined tags for categorizing donations.
+- **Advanced Filtering**: Comprehensive filtering options for donor lists.
+- **Soft Deletion**: Implemented for kesim alanları and donations with trash/restore functionality.
+- **Bagis Havuzu (Donation Pool)**: Centralized management of all donations within a project, featuring advanced filtering, bulk operations, AI classification, and automation rules.
 
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references. This means:
+### API Server (Backend)
+- **Routes**: Comprehensive API endpoints for managing projects, kesim alanları, donations, animal groups, tags, settings, backup/restore, and AI services.
+- **Services**: Business logic organized into dedicated services (e.g., `kesim-alani.service.ts`, `conflict.service.ts`, `rule-engine.service.ts`).
+- **Performance Optimizations**: In-memory caching, compact response formats, Brotli/gzip compression, streaming Excel exports.
+- **AI Integration**: OpenAI integration for AI-based classification of donation notes.
+- **Automation Rules Engine**: Evaluates user-defined rules based on donation attributes and executes specified actions.
 
-- **Always typecheck from the root** — run `pnpm run typecheck` (which runs `tsc --build --emitDeclarationOnly`). This builds the full dependency graph so that cross-package imports resolve correctly. Running `tsc` inside a single package will fail if its dependencies haven't been built yet.
-- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite...etc, not `tsc`.
-- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array. `tsc --build` uses this to determine build order and skip up-to-date packages.
+# External Dependencies
 
-## Root Scripts
-
-- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages that define it
-- `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
-
-## Packages
-
-### `artifacts/api-server` (`@workspace/api-server`)
-
-Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
-
-- Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts compression, logging, helmet (security headers with CSP), rate limiting (200 req/min per IP), CORS, JSON/urlencoded parsing, routes at `/api`; trust proxy enabled for correct IP resolution
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` (`GET /api/healthz`); `src/routes/projects.ts` (project CRUD with aggregated stats, soft delete/restore); `src/routes/kesim-alanlari/` (domain-split route directory: `core.ts`, `donations.ts`, `groups.ts`, `photos.ts`, `teams.ts`, `tracking.ts`, `notifications.ts`, `transfers.ts`, `conflicts.ts`, `search.ts`; barrel `index.ts`; 57 routes total); `src/routes/tags.ts` (custom tag CRUD, zod-validated); `src/routes/settings.ts` (logo management, zod-validated); `src/routes/backup.ts` (export/import with transactions, zod-validated); `src/routes/ai-notes.ts` (AI classification with OpenAI integration); `src/routes/bagis-havuzu.ts` (project-level donation pool: list/stats/bulk-import/transfer/bulk-action/vekalet-check/automation-rules-CRUD/automation-rules-execute with project-scoped authorization)
-- Services: `src/services/kesim-alani.service.ts` (shared CRUD, grouping, stats, per-item cache with 10s TTL); `src/services/conflict.service.ts`, `src/services/tracking.service.ts`, `src/services/search.service.ts`, `src/services/transfer.service.ts` (domain-specific business logic); `src/services/audit-log.service.ts` (fire-and-forget audit logging with source detection, cursor-based listing, 180-day auto-purge scheduler); `src/services/rule-engine.service.ts` (automation rule condition evaluator and action executor: supports field matching for all donation fields, tags, AI categories with operators equals/contains/range/in/empty; actions: transfer to KA, add tag, flag, exclude; rules execute in priority order, first match wins)
-- Performance: In-memory cache for KA list (15s TTL) and individual KA items (10s TTL) with prefix-based invalidation; Dashboard endpoint uses SQL GROUP BY aggregation; Compact response format (`?compact=1`) reduces payload ~50% by sending donation IDs instead of full objects in animal groups; Brotli/gzip response compression; ExcelJS streaming workbook writer for large exports
-- Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
-
-### `lib/db` (`@workspace/db`)
-
-Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
-
-- `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — table definitions with Drizzle-Zod insert schemas: `projectsTable`, `kesimAlanlariTable` (with `projectId` FK to projects, `trackingToken` for public tracking links), `donationsTable` (with `deletedAt` for soft-delete, `aiCategories` text JSON array, `aiWarnings` text for AI classification persistence), `animalGroupsTable` (with `kesildi` boolean for slaughter tracking), `animalGroupDonationsTable`, `customTagsTable`, `donationTagsTable`, `donationTransfersTable` (cross-KA transfer audit log), `appSettingsTable`, `auditLogsTable` (comprehensive audit log: action, entityType, entityId, entityName, oldValue/newValue as JSONB, sourceType, sourceIdentifier, ipAddress, createdAt; auto-purge after 180 days), `automationRulesTable` (id, projectId, name, conditions JSONB, action JSONB, priority, isActive, createdAt, updatedAt; for user-defined automation rules on donation pool)
-- `drizzle/` — generated migration files
-- `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
-
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
-
-### `lib/api-spec` (`@workspace/api-spec`)
-
-Owns the OpenAPI 3.1 spec (`openapi.yaml`) and the Orval config (`orval.config.ts`). Running codegen produces output into two sibling packages:
-
-1. `lib/api-client-react/src/generated/` — React Query hooks + fetch client
-2. `lib/api-zod/src/generated/` — Zod schemas
-
-Run codegen: `pnpm --filter @workspace/api-spec run codegen`
-
-### `lib/api-zod` (`@workspace/api-zod`)
-
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
-
-### `lib/api-client-react` (`@workspace/api-client-react`)
-
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
-
-### `scripts` (`@workspace/scripts`)
-
-Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+- **Node.js**: Runtime environment (version 24).
+- **pnpm**: Package manager.
+- **TypeScript**: Programming language.
+- **Express**: Web application framework.
+- **PostgreSQL**: Relational database.
+- **Drizzle ORM**: TypeScript ORM for PostgreSQL.
+- **Zod**: Schema declaration and validation library.
+- **Orval**: OpenAPI code generator.
+- **esbuild**: JavaScript bundler.
+- **pino**: Logger.
+- **React**: Frontend JavaScript library.
+- **Vite**: Frontend build tool.
+- **ExcelJS**: Library for reading, writing, and styling Excel files.
+- **OpenAI**: AI services for classification.
+- **vite-plugin-pwa**: Vite plugin for PWA features (Service Worker, IndexedDB).

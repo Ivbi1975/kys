@@ -151,6 +151,11 @@ export function useGroupingEngine({
 
       if (useIncremental) {
         finalGroups = await runIncrementalGrouping(kesim.donations, kesim.animalGroups, changedIds, lockedIndices);
+        // Remove empty non-locked groups left behind after incremental regrouping
+        finalGroups = finalGroups.filter(
+          (g) => g.locked || g.donations.some((d) => d.name.trim() || d.description.trim())
+        );
+        finalGroups.forEach((g, i) => { g.animalNo = i + 1; });
       } else {
         const donationsToGroup = kesim.donations.filter((d) => !lockedDonationIds.has(d.id));
         const newGroups = await runGrouping(donationsToGroup, (progress) => {

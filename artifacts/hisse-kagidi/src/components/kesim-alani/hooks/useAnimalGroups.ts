@@ -705,10 +705,11 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
           g.donations = g.donations.filter((d) => !matchIds.has(d.id));
         }
       });
-      setKesim(updated);
-      history.push(
+      save(
         updated,
-        `Gruplardan toplu silindi: ${matches.length} bağışçı (${findDeleteColumnLabel[groupFindDeleteColumn]}: "${groupFindDeleteValue}")`
+        `Gruplardan toplu silindi: ${matches.length} bağışçı (${findDeleteColumnLabel[groupFindDeleteColumn]}: "${groupFindDeleteValue}")`,
+        true,
+        "groups"
       );
       setGroupFindDeleteOpen(false);
       setGroupFindDeleteValue("");
