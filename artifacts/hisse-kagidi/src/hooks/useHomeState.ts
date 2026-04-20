@@ -209,7 +209,7 @@ export function useHomeState() {
     setEditingTagId(null);
   }, [editingTagId, editTagName, editTagColor, toast]);
 
-  const handleCreate = useCallback(async () => {
+  const handleCreate = useCallback(async (displayName?: string) => {
     if (!newName.trim()) return;
     const newKesim: KesimAlani & { projectId?: string | null } = {
       id: crypto.randomUUID(),
@@ -218,6 +218,7 @@ export function useHomeState() {
       animalGroups: [],
       createdAt: new Date().toISOString(),
       projectId: createProjectId,
+      displayName: displayName?.trim() || null,
     };
     try {
       await createKesimAlani(newKesim);

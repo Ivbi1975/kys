@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -231,11 +232,16 @@ function CreateKesimAlaniDialog({
   setNewName: (name: string) => void;
   createProjectId: string | null;
   setCreateProjectId: (id: string | null) => void;
-  handleCreate: () => void;
+  handleCreate: (displayName?: string) => void;
   projects: Project[];
 }) {
+  const [displayName, setDisplayName] = useState("");
+  const doCreate = () => {
+    handleCreate(displayName || undefined);
+    setDisplayName("");
+  };
   return (
-    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setCreateProjectId(null); }}>
+    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setCreateProjectId(null); setDisplayName(""); } }}>
       <DialogTrigger asChild>
         <Button size="default">
           <Plus className="w-4 h-4 mr-2" />
@@ -251,7 +257,7 @@ function CreateKesimAlaniDialog({
             placeholder="Kesim alanı adı (örn: Ankara Merkez)"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            onKeyDown={(e) => e.key === "Enter" && doCreate()}
             autoFocus
           />
           {projects.length > 0 && (
@@ -270,7 +276,13 @@ function CreateKesimAlaniDialog({
               </Select>
             </div>
           )}
-          <Button onClick={handleCreate} className="w-full" disabled={!newName.trim()}>
+          <Input
+            placeholder="Çıktıda Görünecek İsim (isteğe bağlı)"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && doCreate()}
+          />
+          <Button onClick={doCreate} className="w-full" disabled={!newName.trim()}>
             Oluştur
           </Button>
         </div>

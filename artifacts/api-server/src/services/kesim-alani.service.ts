@@ -143,6 +143,7 @@ export function assembleKesimAlani(
   return {
     id: ka.id,
     name: ka.name,
+    displayName: ka.displayName || null,
     createdAt: ka.createdAt,
     deletedAt: ka.deletedAt || null,
     projectId: ka.projectId || null,
@@ -303,7 +304,7 @@ export async function getFullKesimAlani(id: string) {
 
   const result = await db.execute(sql`
     SELECT
-      ka.id AS ka_id, ka.name, ka.created_at, ka.deleted_at,
+      ka.id AS ka_id, ka.name, ka.display_name, ka.created_at, ka.deleted_at,
       ka.project_id, ka.tracking_token, ka.tracking_token_expires_at, ka.kesim_liste_id,
       ka.yetkili, ka.parent_kesim_alani_id, ka.split_status,
       COALESCE((
@@ -355,7 +356,7 @@ export async function getFullKesimAlani(id: string) {
   type SingleRawGroup = { id: string; animal_no: number; color_tag: string; locked: boolean; notes: string; kesildi: boolean; kesildi_at: string | null; team_id: string | null; sort_order: number; donation_links: { donationId: string; sortOrder: number }[] };
   type SingleRawTeam = { id: string; name: string; color: string };
   type SingleRawRow = {
-    ka_id: string; name: string; created_at: string; deleted_at: string | null;
+    ka_id: string; name: string; display_name: string | null; created_at: string; deleted_at: string | null;
     project_id: string | null; tracking_token: string | null; tracking_token_expires_at: string | null; kesim_liste_id: string | null;
     yetkili: string | null; parent_kesim_alani_id: string | null; split_status: string | null;
     donations: SingleRawDonation[];
@@ -367,6 +368,7 @@ export async function getFullKesimAlani(id: string) {
   const ka: KesimAlaniRow = {
     id: rawRow.ka_id,
     name: rawRow.name,
+    displayName: rawRow.display_name,
     createdAt: new Date(rawRow.created_at),
     deletedAt: rawRow.deleted_at ? new Date(rawRow.deleted_at) : null,
     updatedAt: new Date(),

@@ -32,6 +32,7 @@ export const kesimAlanlariTable = pgTable("kesim_alanlari", {
   trackingTokenExpiresAt: timestamp("tracking_token_expires_at", { withTimezone: true }),
   kesimListeId: text("kesim_liste_id"),
   yetkili: text("yetkili"),
+  displayName: text("display_name"),
   parentKesimAlaniId: text("parent_kesim_alani_id"),
   splitStatus: text("split_status"),
 }, (table) => [

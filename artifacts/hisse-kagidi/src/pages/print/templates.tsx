@@ -59,7 +59,7 @@ function PageFooter({ kesim, trackingUrl, showQrCode }: { kesim: KesimAlani; pag
   return (
     <>
       <div className="page-footer">
-        <span>{kesim.name}</span>
+        <span>{kesim.displayName || kesim.name}</span>
       </div>
       {showQrCode && trackingUrl && (
         <div className="print-qr-code">
@@ -78,7 +78,7 @@ export function StandardTemplate(props: TemplateProps) {
         <div key={group.id} className="print-page">
           <div className="page-header-row">
             {logo && <img src={logo} alt="Logo" className="page-logo-img" />}
-            <div className="page-header-title">{kesim.name}</div>
+            <div className="page-header-title">{kesim.displayName || kesim.name}</div>
           </div>
           <div className="page-content">
             {renderAnimalTable({ group, ...rest })}
@@ -98,7 +98,7 @@ export function PortraitTemplate(props: TemplateProps) {
         <div key={group.id} className="print-page print-page-portrait">
           <div className="page-header-row">
             {logo && <img src={logo} alt="Logo" className="page-logo-img" />}
-            <div className="page-header-title">{kesim.name}</div>
+            <div className="page-header-title">{kesim.displayName || kesim.name}</div>
           </div>
           <div className="page-content">
             {renderAnimalTable({ group, ...rest })}
@@ -124,7 +124,7 @@ export function CompactTemplate(props: TemplateProps) {
         <div key={pageIdx} className="print-page print-page-compact">
           <div className="page-header-row">
             {logo && <img src={logo} alt="Logo" className="page-logo-img" style={{ maxHeight: "10mm" }} />}
-            <div className="page-header-title" style={{ fontSize: "14px" }}>{kesim.name}</div>
+            <div className="page-header-title" style={{ fontSize: "14px" }}>{kesim.displayName || kesim.name}</div>
           </div>
           <div className="page-content">
             <table className="compact-list-table">
@@ -196,7 +196,7 @@ export function NameListTemplate(props: TemplateProps) {
         <div key={pageIdx} className="print-page print-page-portrait">
           <div className="page-header-row">
             {logo && <img src={logo} alt="Logo" className="page-logo-img" style={{ maxHeight: "10mm" }} />}
-            <div className="page-header-title" style={{ fontSize: "14px" }}>{kesim.name} - Bağışçı Listesi</div>
+            <div className="page-header-title" style={{ fontSize: "14px" }}>{kesim.displayName || kesim.name} - Bağışçı Listesi</div>
           </div>
           <div className="page-content">
             <table className="namelist-table">
@@ -266,7 +266,7 @@ export function SummaryTemplate(props: TemplateProps) {
         <div key={pageIdx} className="print-page print-page-compact">
           <div className="page-header-row">
             {logo && <img src={logo} alt="Logo" className="page-logo-img" style={{ maxHeight: "12mm" }} />}
-            <div className="page-header-title" style={{ fontSize: "16px" }}>{kesim.name} - Özet Rapor</div>
+            <div className="page-header-title" style={{ fontSize: "16px" }}>{kesim.displayName || kesim.name} - Özet Rapor</div>
           </div>
           <div className="page-content">
             {pageIdx === 0 && (

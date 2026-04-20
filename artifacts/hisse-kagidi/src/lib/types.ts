@@ -102,6 +102,7 @@ export interface KesimAlani {
   trackingToken?: string | null;
   kesimListeId?: string | null;
   yetkili?: string | null;
+  displayName?: string | null;
   teams?: Team[];
   parentKesimAlaniId?: string | null;
   splitStatus?: string | null;

@@ -90,6 +90,23 @@ export function KesimAlaniHeader() {
                 }}
               />
             </div>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground">Çıktı İsmi:</span>
+              <Input
+                className="h-6 text-xs w-32 px-1.5"
+                placeholder="Çıktıda Görünecek İsim"
+                aria-label="Çıktıda Görünecek İsim"
+                value={kesim.displayName || ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const updated = { ...kesim, displayName: val || null };
+                  save(updated, undefined, false);
+                }}
+                onBlur={() => {
+                  save(kesim, undefined, true);
+                }}
+              />
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">

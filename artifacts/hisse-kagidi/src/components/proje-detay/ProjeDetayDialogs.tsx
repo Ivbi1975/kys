@@ -104,15 +104,17 @@ function CreateKesimAlaniDialog({
   setDialogOpen: (open: boolean) => void;
   newKesimAdi: string;
   setNewKesimAdi: (name: string) => void;
-  handleCreateKesimAlani: (yetkili?: string) => void;
+  handleCreateKesimAlani: (yetkili?: string, displayName?: string) => void;
 }) {
   const [yetkili, setYetkili] = React.useState("");
+  const [displayName, setDisplayName] = React.useState("");
   const handleCreate = () => {
-    handleCreateKesimAlani(yetkili || undefined);
+    handleCreateKesimAlani(yetkili || undefined, displayName || undefined);
     setYetkili("");
+    setDisplayName("");
   };
   return (
-    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setYetkili(""); }}>
+    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setYetkili(""); setDisplayName(""); } }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Yeni Kesim Alanı</DialogTitle>
@@ -129,6 +131,12 @@ function CreateKesimAlaniDialog({
             placeholder="Yetkili (isteğe bağlı)"
             value={yetkili}
             onChange={(e) => setYetkili(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+          />
+          <Input
+            placeholder="Çıktıda Görünecek İsim (isteğe bağlı)"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCreate()}
           />
           <Button onClick={handleCreate} className="w-full" disabled={!newKesimAdi.trim()}>
