@@ -1,0 +1,63 @@
+Bu pnpm monorepo projesindeki mevcut hataları düzelt.
+
+Öncelik sırası:
+
+1. TypeScript derleme hatalarını düzelt.
+   - artifacts/api-server/src/routes/export.ts içinde ExcelJS ws.addImage kullanımında tl/br tipi ExcelJS Anchor tipiyle uyumsuz. Mevcut ExcelJS sürümüne uygun olacak şekilde düzelt.
+   - artifacts/api-server/src/routes/kesim-alanlari/core.ts içinde auditLog action olarak "bulk_create" kullanılıyor ama artifacts/api-server/src/services/audit-log.service.ts içindeki AuditAction tipinde yok. Ya AuditAction union tipine uygun action ekle ya da mevcut action tiplerinden doğru olanı kullan.
+   - artifacts/hisse-kagidi/src/components/kesim-alani/sections/StatsCards.tsx içinde countByField fonksiyonunda DonationStringKey tipi undefined içerebildiği için d[field] index erişimi TypeScript hatası veriyor. Tipi güvenli hale getir.
+
+2. Test ve build komutlarını çalıştır.
+   - pnpm run typecheck
+   - pnpm run test
+   - pnpm run build
+   Çıkan tüm gerçek kod hatalarını düzelt. Ortam kaynaklı olmayan hataları bırakma.
+
+3. OpenAPI uyumsuzluğunu incele.
+   - lib/api-spec/openapi.yaml şu anda neredeyse sadece /healthz içeriyor.
+   - API server’da projects, kesim alanları, donations, groups, tags, settings, backup, export, tracking, ai-notes, audit-logs, home-data gibi birçok route var.
+   - OpenAPI spec gerçek API yüzeyini temsil etmiyor. Generated client/zod kullanılıyorsa bu ciddi uyumsuzluk yaratır.
+   - Doğrudan generated dosyaları değiştirme. Gerekirse OpenAPI spec’i güncelle ve codegen çalıştır.
+
+4. Güvenlik tasarımını iyileştir.
+   - artifacts/api-server/src/routes/auth.ts login başarılı olunca gerçek API_KEY değerini frontend’e dönüyor.
+   - artifacts/hisse-kagidi/src/components/PasswordGate.tsx bu API key’i sessionStorage’a yazıyor.
+   - Bu model güvenli değil. Gerçek API_KEY istemciye verilmemeli.
+   - Kısa süreli session token / signed token / httpOnly cookie gibi daha güvenli bir yapı öner ve uygula.
+   - Mevcut auth middleware ve frontend apiFetch kullanımını buna göre güncelle.
+   - Geriye dönük uyumluluk gerekiyorsa dikkatli migration yap.
+
+5. Veritabanı schema/migration risklerini kontrol et.
+   - donations.share_count için DB seviyesinde sınır yok. İş kuralı 1-7 ise CHECK constraint ekle.
+   - animal_groups içinde aynı kesim_alani_id altında animal_no benzersiz olmalıysa unique constraint ekle.
+   - animal_group_donations tablosu group_id ve donation_id ilişkilerinin aynı kesim_alani_id içinde olduğunu DB seviyesinde garanti etmiyor. Bunu uygulama servislerinde ve mümkünse DB constraint/trigger ile güvenceye al.
+   - custom_tags global duruyor. Eğer etiketler proje bazlı olmalıysa project_id ekleme migration’ını planla.
+   - lib/db/drizzle/meta içinde migration snapshot dosyaları journal ile tutarlı mı kontrol et. Eksik snapshot/schema drift varsa Drizzle workflow’una göre düzelt.
+   - Migration dosyalarını production’a uygun, geriye dönük güvenli ve açık şekilde hazırla.
+
+6. Backup/import risklerini düzelt.
+   - artifacts/api-server/src/routes/backup.ts içinde replace mode tüm ana verileri siliyor. Bu işlem admin key ile korunuyor ama çok yıkıcı.
+   - Dry-run, açık onay, proje bazlı import veya import öncesi otomatik backup/snapshot gibi güvenlik önlemleri ekle.
+   - Math.random() ile ID üretimi var. Bunları crypto.randomUUID() ile değiştir.
+   - Import sırasında shareCount, tag, donation/group ilişkileri ve referential integrity daha sıkı doğrulansın.
+
+7. Türkçe karakter/encoding sorunlarını düzelt.
+   - Dosyalarda "Ä°", "ÅŸ", "Ã§" gibi bozuk karakterler görünüyor.
+   - UI metinleri ve dokümantasyondaki Türkçe karakterleri UTF-8 olarak düzelt.
+   - Özellikle replit.md, frontend component textleri, API error mesajları ve toast/error mesajlarını kontrol et.
+
+8. Büyük frontend dosyalarını bakım açısından değerlendir.
+   - artifacts/hisse-kagidi/src/pages/bagis-havuzu.tsx
+   - artifacts/hisse-kagidi/src/components/kesim-alani/dialogs/BasketPanel.tsx
+   - artifacts/hisse-kagidi/src/components/AnimalGroupCard.tsx
+   Bu dosyalar çok büyük. Davranışı bozmadan hook/component ayrımı yapılabilecek yerleri ayır. Ancak önce typecheck/test/build hatalarını düzelt.
+
+Kurallar:
+- Generated dosyaları doğrudan değiştirme:
+  - lib/api-client-react/src/generated/
+  - lib/api-zod/src/generated/
+- lib/api-spec doğrudan elle düzenlenecekse ardından codegen çalıştır.
+- Veritabanı migration’larını açık, küçük ve geri alınabilir mantıkla yaz.
+- Mevcut davranışı bozma.
+- Her düzeltmeden sonra typecheck/test/build çalıştır ve sonucu raporla.
+- Sonunda hangi dosyalar değişti, hangi hatalar çözüldü, hangi riskler kaldı özetle.
