@@ -21,11 +21,11 @@ export function DonorListPanel() {
   const {
     kesim, activeFilterCount, addDonorToBasket, basketItemIds, commitEdit,
     debouncedSearchQuery, deleteDonation, handleFlagDonation, handleUnflagDonation, descCountMap, donorListVisible,
-    editDraft, editingCell, effectiveShareMap, filterUngrouped, filteredDonations,
+    editDraft, editingCell, effectiveShareMap, filteredDonations,
     globalTags, groupedDonorIds, handleDonorCellKeyDown, handleSort,
     openTrash, removeFromBasket, removedFromGroupIds, searchInputRef,
     selectedIds, setDebouncedSearchQuery, setDonorListReportOpen,
-    setDonorListVisible, setEditDraft, setFilterUngrouped, setPersonEditDesc,
+    setDonorListVisible, setEditDraft, setPersonEditDesc,
     setSelectedIds, setShowAdvancedFilter, setShowRemovedFilter, setSmartPlacePopover,
     setSplitShareDialog, setTagPopoverDonorId, showAdvancedFilter, showRemovedFilter,
     sortDir, sortField, startEditing, tagPopoverDonorId, toggleDonationTag,
@@ -73,11 +73,6 @@ export function DonorListPanel() {
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           <h2 className="text-lg font-semibold whitespace-nowrap">Bağışçı Listesi</h2>
-          {filterUngrouped && (
-            <button onClick={() => setFilterUngrouped(false)} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors">
-              Gruplanmamış<span className="text-[10px]">✕</span>
-            </button>
-          )}
           {removedFromGroupIds.size > 0 && (
             <button
               onClick={() => { setShowRemovedFilter(!showRemovedFilter); if (!donorListVisible) setDonorListVisible(true); }}
@@ -119,7 +114,7 @@ export function DonorListPanel() {
           <div className="p-8 text-center text-muted-foreground text-sm">
             {filteredDonations.length > 0 && visibleDonations.length === 0
               ? "Tüm eşleşen bağışçılar sepette. Sepetten çıkarıldıklarında burada görünecekler."
-              : searchQuery.trim() ? `"${searchQuery}" için sonuç bulunamadı` : filterUngrouped ? "Tüm bağışçılar gruplara atanmış" : 'Henüz bağışçı eklenmedi. "Toplu Ekle" ile Excel yükleyin veya yapıştırın.'}
+              : searchQuery.trim() ? `"${searchQuery}" için sonuç bulunamadı` : 'Tüm bağışçılar gruplara atanmış veya henüz eklenmedi.'}
           </div>
         ) : (
           <TableVirtuoso

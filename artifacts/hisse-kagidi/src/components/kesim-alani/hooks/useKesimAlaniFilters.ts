@@ -16,7 +16,6 @@ export function useKesimAlaniFilters({ donations, groupedDonorIds, removedFromGr
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [personSearchQuery, setPersonSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-  const [filterUngrouped, setFilterUngrouped] = useState(false);
   const [showOnlyIncomplete, setShowOnlyIncomplete] = useState(false);
   const [highlightIncomplete, setHighlightIncomplete] = useState(true);
   const [filterCinsi, setFilterCinsi] = useState<string>("all");
@@ -131,9 +130,7 @@ export function useKesimAlaniFilters({ donations, groupedDonorIds, removedFromGr
   const filteredDonations = useMemo(() => {
     const preFiltered = showRemovedFilter
       ? donations.filter(d => removedFromGroupIds.has(d.id))
-      : filterUngrouped
-      ? donations.filter(d => !d.excluded && !groupedDonorIds.has(d.id))
-      : donations;
+      : donations.filter(d => !d.excluded && !groupedDonorIds.has(d.id));
 
     const advFiltered = preFiltered.filter(d => {
       if (filterStatus === "active" && d.excluded) return false;
@@ -159,7 +156,7 @@ export function useKesimAlaniFilters({ donations, groupedDonorIds, removedFromGr
     const matchedIds = searchIndex.search(debouncedSearchQuery);
     if (!matchedIds) return advFiltered;
     return advFiltered.filter(d => matchedIds.has(d.id));
-  }, [donations, showRemovedFilter, removedFromGroupIds, filterUngrouped, groupedDonorIds, filterStatus, filterCinsi, filterHisseMin, filterHisseMax, filterTags, filterAiCategories, filterAiWarnings, debouncedSearchQuery, searchIndex]);
+  }, [donations, showRemovedFilter, removedFromGroupIds, groupedDonorIds, filterStatus, filterCinsi, filterHisseMin, filterHisseMax, filterTags, filterAiCategories, filterAiWarnings, debouncedSearchQuery, searchIndex]);
 
   const uniqueDonationTypes = useMemo(() =>
     Array.from(new Set(
@@ -184,8 +181,6 @@ export function useKesimAlaniFilters({ donations, groupedDonorIds, removedFromGr
     setPersonSearchQuery,
     debouncedSearchQuery,
     setDebouncedSearchQuery,
-    filterUngrouped,
-    setFilterUngrouped,
     showOnlyIncomplete,
     setShowOnlyIncomplete,
     highlightIncomplete,

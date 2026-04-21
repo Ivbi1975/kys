@@ -100,8 +100,7 @@ export function StatsCards() {
   const {
     kesim, totalShares, requiredAnimals, remainingSlots,
     shareDistribution, photoCounts,
-    ungroupedDonors, ungroupedShareCount, filterUngrouped,
-    setFilterUngrouped, donorListVisible, setDonorListVisible,
+    ungroupedDonors, ungroupedShareCount, donorListVisible, setDonorListVisible,
   } = useKesimAlaniContext();
 
   const bagisStats = useCollapsible("statsCards.bagisIstatistikleri", false);
@@ -215,11 +214,8 @@ export function StatsCards() {
         )}
         {ungroupedDonors.length > 0 && (
           <Card
-            className={`p-3 text-center cursor-pointer transition-colors ${filterUngrouped ? "ring-2 ring-orange-500 bg-orange-50 dark:bg-orange-950" : "hover:bg-muted"}`}
-            onClick={() => {
-              setFilterUngrouped(!filterUngrouped);
-              if (!donorListVisible) setDonorListVisible(true);
-            }}
+            className="p-3 text-center cursor-pointer transition-colors hover:bg-muted"
+            onClick={() => { if (!donorListVisible) setDonorListVisible(true); }}
           >
             <div className="text-2xl font-bold text-orange-600">{ungroupedDonors.length}</div>
             <div className="text-xs text-muted-foreground">{ungroupedShareCount} hisse gruplanmamış</div>

@@ -6,7 +6,7 @@ export type KesimAlaniContextValue = ReturnType<typeof useKesimAlaniState>;
 export type FilterContextValue = Pick<KesimAlaniContextValue,
   "sortField" | "setSortField" | "sortDir" | "setSortDir" |
   "personSearchQuery" | "setPersonSearchQuery" | "debouncedSearchQuery" | "setDebouncedSearchQuery" |
-  "filterUngrouped" | "setFilterUngrouped" | "showOnlyIncomplete" | "setShowOnlyIncomplete" |
+  "showOnlyIncomplete" | "setShowOnlyIncomplete" |
   "highlightIncomplete" | "setHighlightIncomplete" |
   "filterCinsi" | "setFilterCinsi" | "filterHisseMin" | "setFilterHisseMin" | "filterHisseMax" | "setFilterHisseMax" |
   "filterTags" | "setFilterTags" | "filterAiCategories" | "setFilterAiCategories" | "filterAiWarnings" | "setFilterAiWarnings" |
@@ -96,7 +96,6 @@ export function KesimAlaniProvider({
     sortDir: value.sortDir, setSortDir: value.setSortDir,
     personSearchQuery: value.personSearchQuery, setPersonSearchQuery: value.setPersonSearchQuery,
     debouncedSearchQuery: value.debouncedSearchQuery, setDebouncedSearchQuery: value.setDebouncedSearchQuery,
-    filterUngrouped: value.filterUngrouped, setFilterUngrouped: value.setFilterUngrouped,
     showOnlyIncomplete: value.showOnlyIncomplete, setShowOnlyIncomplete: value.setShowOnlyIncomplete,
     highlightIncomplete: value.highlightIncomplete, setHighlightIncomplete: value.setHighlightIncomplete,
     filterCinsi: value.filterCinsi, setFilterCinsi: value.setFilterCinsi,
@@ -120,7 +119,7 @@ export function KesimAlaniProvider({
   }), [
     value.sortField, value.setSortField, value.sortDir, value.setSortDir,
     value.personSearchQuery, value.setPersonSearchQuery, value.debouncedSearchQuery, value.setDebouncedSearchQuery,
-    value.filterUngrouped, value.setFilterUngrouped, value.showOnlyIncomplete, value.setShowOnlyIncomplete,
+    value.showOnlyIncomplete, value.setShowOnlyIncomplete,
     value.highlightIncomplete, value.setHighlightIncomplete,
     value.filterCinsi, value.setFilterCinsi, value.filterHisseMin, value.setFilterHisseMin,
     value.filterHisseMax, value.setFilterHisseMax,
