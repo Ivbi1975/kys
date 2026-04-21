@@ -99,12 +99,11 @@ function countByField(donations: Donation[], field: DonationStringKey): Map<stri
 export function StatsCards() {
   const {
     kesim, totalShares, requiredAnimals, remainingSlots,
-    shareDistribution, groupCompositions, photoCounts,
+    shareDistribution, photoCounts,
     ungroupedDonors, ungroupedShareCount, filterUngrouped,
     setFilterUngrouped, donorListVisible, setDonorListVisible,
   } = useKesimAlaniContext();
 
-  const grupKomp = useCollapsible("statsCards.grupKomposisyon", false);
   const bagisStats = useCollapsible("statsCards.bagisIstatistikleri", false);
 
   if (!kesim) return null;
@@ -254,28 +253,6 @@ export function StatsCards() {
                   );
                 })}
               </div>
-            </Card>
-          )}
-
-          {kesim.animalGroups.length > 0 && (
-            <Card className="p-3">
-              <CollapsibleCardHeader
-                title="Grup Kompozisyonları"
-                open={grupKomp.open}
-                onToggle={grupKomp.toggle}
-              />
-              {grupKomp.open && (
-                <div className="space-y-1">
-                  {Array.from(groupCompositions.entries())
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([label, count]) => (
-                      <div key={label} className="flex items-center justify-between text-xs px-1 py-0.5 rounded hover:bg-muted">
-                        <span className="font-mono text-muted-foreground">{label}</span>
-                        <span className="font-medium">{count} grup</span>
-                      </div>
-                    ))}
-                </div>
-              )}
             </Card>
           )}
 

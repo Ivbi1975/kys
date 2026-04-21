@@ -184,27 +184,6 @@ export function useKesimAlaniState() {
     return dist;
   }, [donations, effectiveShareMap]);
 
-  const groupCompositions = useMemo(() => {
-    const compositions = new Map<string, number>();
-    for (const g of animalGroups) {
-      const filled = g.donations.filter((d) => d.name.trim());
-      const shareMap = new Map<string, number>();
-      for (const d of filled) {
-        const key = d.description.trim().toLocaleLowerCase("tr") || d.id;
-        shareMap.set(key, (shareMap.get(key) || 0) + 1);
-      }
-      const parts = Array.from(shareMap.values()).sort((a, b) => a - b);
-      const emptySlots = MAX_SHARES_PER_ANIMAL - filled.length;
-      const label =
-        parts.length > 0
-          ? emptySlots > 0
-            ? [...parts, `${emptySlots}boş`].join("+")
-            : parts.join("+")
-          : "Boş";
-      compositions.set(label, (compositions.get(label) || 0) + 1);
-    }
-    return compositions;
-  }, [animalGroups]);
 
   const setConflictsRef = useRef<React.Dispatch<React.SetStateAction<import("@/lib/grouping").ConflictInfo[]>>>(() => {});
 
@@ -742,7 +721,6 @@ export function useKesimAlaniState() {
     getAvailableGroupsForDonor,
     getSwapSuggestions,
     globalTags: ui.globalTags,
-    groupCompositions,
     groupRows,
     groupedDonorIds,
     groupsHeaderRef: ui.groupsHeaderRef,
