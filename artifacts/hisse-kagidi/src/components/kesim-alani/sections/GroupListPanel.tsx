@@ -1,16 +1,16 @@
-import React, { Profiler, useState, useCallback } from "react";
+import React, { Profiler, useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Virtuoso } from "react-virtuoso";
 import { AnimalGroupCard } from "@/components/AnimalGroupCard";
 import type { ConflictInfo } from "@/lib/grouping";
 import { ALL_GROUP_COLUMNS, type ColumnKey } from "@/lib/useWorkspacePreferences";
 import {
-  AlertTriangle, ArrowDown, ArrowLeftRight, ArrowUp, ChevronsDownUp, ChevronsUpDown,
+  AlertTriangle, ArrowDown, ArrowLeftRight, ArrowUp, ChevronDown,
+  ChevronsDownUp, ChevronsUpDown,
   Eye, EyeOff, Filter, GripVertical, LayoutGrid, Lock, MapIcon, Maximize2,
   Merge, Minimize2, MoveRight, PanelLeftClose, PanelLeftOpen, Plus,
   Search, Settings2, ShoppingBag, Trash2, Unlock, Wand2, X,
@@ -31,9 +31,9 @@ export function GroupListPanel() {
     currentGroupMatches, deleteAnimalGroup, donorListVisible, handleFlagDonation, handleUnflagDonation,
     dragItem, dragOverGroup, dragOverItem, effectiveColumnCount, enhancedRemoveFromGroup,
     expandAll, filteredGroupItems,
-    fullscreenMode, groupCinsFilter, groupRows,
-    groupSearchMatchIdx, groupSearchQuery, groupsHeaderRef, groupsScrollTopRef,
-    groupsVirtuosoRef, handleAssignTeam, handleColumnDragEnd,
+    fullscreenMode, groupCinsFilter,
+    groupSearchMatchIdx, groupSearchQuery, groupsHeaderRef,
+    handleAssignTeam, handleColumnDragEnd,
     handleColumnDragOver, handleColumnDragStart, handleColumnDrop,
     handleDragEnd, handleDragLeave, handleDragOver, handleDragOverCard,
     handleDragStart, handleDrop, handleGroupCellTab, handleSelectAllGroupDonations,
@@ -41,7 +41,7 @@ export function GroupListPanel() {
     handleViewPhotos, highlightIncomplete, isMobile, jumpInputRef,
     mergeSelectedGroups, moveGroupDown, moveGroupUp,
     openSplitGroupDialog, photoCounts,
-    scrollContainerRef, scrollToAnimalGroup, selectedGroupDonations,
+    scrollToAnimalGroup, selectedGroupDonations,
     selectedGroupIds, setBulkGroupEditField, setBulkGroupEditOpen,
     setBulkGroupEditValue, setBulkMoveTargetGroup, setColorTagFilter, setConflicts,
     setDonorListVisible, setFullscreenMode, setGroupCinsFilter,
@@ -57,6 +57,16 @@ export function GroupListPanel() {
   } = ctx;
 
   const [groupSearchInput, setGroupSearchInput] = useState("");
+  const PAGE_SIZE = 5;
+  const [visibleGroupCount, setVisibleGroupCount] = useState(PAGE_SIZE);
+  const prevFilteredLengthRef = useRef(filteredGroupItems.length);
+
+  useEffect(() => {
+    if (prevFilteredLengthRef.current !== filteredGroupItems.length) {
+      setVisibleGroupCount(PAGE_SIZE);
+      prevFilteredLengthRef.current = filteredGroupItems.length;
+    }
+  }, [filteredGroupItems.length]);
 
   const handleGroupSearch = useCallback(() => {
     setGroupSearchQuery(groupSearchInput);
@@ -311,17 +321,29 @@ export function GroupListPanel() {
           <p className="text-muted-foreground">Bağışçı listesini doldurup "Otomatik Grupla" butonuna tıklayın</p>
         </Card>
       ) : (() => {
-        const virtuosoProps = fullscreenMode && scrollContainerRef.current
-          ? { customScrollParent: scrollContainerRef.current }
-          : { useWindowScroll: true as const };
+        const visibleItems = filteredGroupItems.slice(0, visibleGroupCount);
+        const visibleRows: { group: NonNullable<typeof kesim>["animalGroups"][0]; groupIdx: number }[][] = [];
+        for (let i = 0; i < visibleItems.length; i += effectiveColumnCount) {
+          visibleRows.push(visibleItems.slice(i, i + effectiveColumnCount));
+        }
+        const hasMore = filteredGroupItems.length > visibleGroupCount;
+        const remaining = filteredGroupItems.length - visibleGroupCount;
         return (
-          <Virtuoso
-            ref={groupsVirtuosoRef} {...virtuosoProps} data={groupRows} overscan={5}
-            defaultItemHeight={collapsedGroups.size > 0 ? 60 : 350}
-            initialScrollTop={groupsScrollTopRef.current}
-            onScroll={(e) => { const el = e?.target as HTMLElement | null; if (el && typeof el.scrollTop === "number") { groupsScrollTopRef.current = el.scrollTop; } }}
-            itemContent={(_index, row) => (<div className={`${gridClassName} pb-4`}>{row.map(renderGroupCard)}</div>)}
-          />
+          <>
+            {visibleRows.map((row, rowIdx) => (
+              <div key={rowIdx} className={`${gridClassName} pb-4`}>
+                {row.map(renderGroupCard)}
+              </div>
+            ))}
+            {hasMore && (
+              <div className="flex justify-center py-4">
+                <Button variant="outline" onClick={() => setVisibleGroupCount(c => c + PAGE_SIZE)}>
+                  <ChevronDown className="w-4 h-4 mr-2" />
+                  Diğer Gruplar ({Math.min(remaining, PAGE_SIZE)} daha göster, toplam {remaining} kaldı)
+                </Button>
+              </div>
+            )}
+          </>
         );
       })()}
     </Profiler>
