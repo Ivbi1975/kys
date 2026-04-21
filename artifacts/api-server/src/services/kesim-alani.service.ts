@@ -122,7 +122,7 @@ export function assembleKesimAlani(
     groupDonationsByGroup[link.groupId].push(link);
   }
 
-  const mappedDonations = donations.map(d => donationsById[d.id]);
+  const mappedDonations = donations.filter(d => d.name.trim()).map(d => donationsById[d.id]);
 
   const mappedGroups = groups.map(g => {
     const links = (groupDonationsByGroup[g.id] || []).sort((a, b) => a.sortOrder - b.sortOrder);

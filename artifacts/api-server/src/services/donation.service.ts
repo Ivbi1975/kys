@@ -5,7 +5,7 @@ import {
   donationTagsTable,
 } from "@workspace/db/schema";
 import { desc, gt, lt, or, count, ilike, asc } from "drizzle-orm";
-import { eq, inArray, isNull, isNotNull, and } from "drizzle-orm";
+import { eq, inArray, isNull, isNotNull, and, ne } from "drizzle-orm";
 import { MAX_QUERY_LIMIT } from "../lib/constants";
 import { serviceError, serviceOk, type ServiceResult } from "./result";
 import { requireActiveKesimAlani, getFullKesimAlani } from "./kesim-alani.service";
@@ -14,6 +14,7 @@ function buildDonationFilters(kesimAlaniId: string, query: Record<string, unknow
   const conditions = [
     eq(donationsTable.kesimAlaniId, kesimAlaniId),
     isNull(donationsTable.deletedAt),
+    ne(donationsTable.name, ""),
   ];
 
   const search = typeof query.search === "string" ? query.search.trim() : "";

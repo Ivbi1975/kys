@@ -246,7 +246,8 @@ export async function updateKesimAlaniDonationsChunked(
       }
     }
 
-    await upsertDonationsBatch(tx, id, donations, sortOrderOffset);
+    const validDonations = donations.filter(d => (d.name ?? "").trim());
+    await upsertDonationsBatch(tx, id, validDonations, sortOrderOffset);
   });
 
   const isLastChunk = chunkIndex === totalChunks - 1;
