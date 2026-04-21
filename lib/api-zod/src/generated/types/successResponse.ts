@@ -15,10 +15,9 @@ server-side Zod definitions) is tracked as ongoing work.
 
  * OpenAPI spec version: 0.1.0
  */
-import type { HealthStatusDbPool } from "./healthStatusDbPool";
+import type { SimpleSuccess } from "./simpleSuccess";
 
-export type HealthStatusDb = {
-  connected: boolean;
-  latencyMs: number;
-  pool: HealthStatusDbPool;
-};
+/**
+ * Operation succeeded
+ */
+export type SuccessResponse = SimpleSuccess;

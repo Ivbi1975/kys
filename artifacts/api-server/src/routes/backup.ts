@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import crypto from "node:crypto";
 import { db } from "@workspace/db";
 import { refreshProjectStats } from "./projects";
 import {
@@ -181,16 +182,25 @@ router.post("/backup/export", asyncHandler(async (_req, res) => {
 
 const importPayloadSchema = z.object({
   mode: z.enum(["replace", "merge"]).optional().default("replace"),
+  dryRun: z.boolean().optional().default(false),
+  confirmReplace: z.boolean().optional().default(false),
   data: backupImportSchema,
 });
 
+const SHARE_COUNT_MIN = 1;
+const SHARE_COUNT_MAX = 7;
+
 router.post("/backup/import", asyncHandler(async (req, res) => {
   let mode: "replace" | "merge" = "replace";
+  let dryRun = false;
+  let confirmReplace = false;
   let data: z.infer<typeof backupImportSchema>;
 
   const wrappedParse = importPayloadSchema.safeParse(req.body);
   if (wrappedParse.success) {
     mode = wrappedParse.data.mode;
+    dryRun = wrappedParse.data.dryRun;
+    confirmReplace = wrappedParse.data.confirmReplace;
     data = wrappedParse.data.data;
   } else {
     const directParse = backupImportSchema.safeParse(req.body);
@@ -201,7 +211,72 @@ router.post("/backup/import", asyncHandler(async (req, res) => {
     data = directParse.data;
   }
 
+  // Validate share counts up-front to surface bad data clearly
+  const validationIssues: string[] = [];
+  const seenDonationIds = new Set<string>();
+  const seenGroupIds = new Set<string>();
+  const referencedDonationIds = new Set<string>();
+  for (const ka of data.kesimAlanlari) {
+    for (const d of ka.donations || []) {
+      if (d.shareCount != null && (d.shareCount < SHARE_COUNT_MIN || d.shareCount > SHARE_COUNT_MAX)) {
+        validationIssues.push(`Bağış ${d.id || d.name}: shareCount ${d.shareCount} aralık dışı (1-7)`);
+      }
+      if (d.id) {
+        if (seenDonationIds.has(d.id)) {
+          validationIssues.push(`Yinelenen bağış ID: ${d.id}`);
+        }
+        seenDonationIds.add(d.id);
+      }
+    }
+    for (const g of ka.animalGroups || []) {
+      if (g.id) {
+        if (seenGroupIds.has(g.id)) {
+          validationIssues.push(`Yinelenen grup ID: ${g.id}`);
+        }
+        seenGroupIds.add(g.id);
+      }
+      for (const link of g.donations || []) {
+        if (link.id) referencedDonationIds.add(link.id);
+      }
+    }
+  }
+  for (const refId of referencedDonationIds) {
+    if (!seenDonationIds.has(refId)) {
+      validationIssues.push(`Grup içinde tanımlanmayan bağış ID referansı: ${refId}`);
+    }
+  }
+  if (validationIssues.length > 0) {
+    res.status(400).json({ error: "Yedek doğrulama başarısız", issues: validationIssues.slice(0, 50) });
+    return;
+  }
+
+  if (mode === "replace" && !dryRun && !confirmReplace) {
+    res.status(409).json({
+      error: "Yedek geri yükleme onayı gerekli",
+      detail: "Replace modu mevcut tüm verileri siler. Onaylamak için confirmReplace=true gönderin veya dryRun=true ile önizleme alın.",
+      hint: { confirmReplace: true, dryRun: true },
+    });
+    return;
+  }
+
   const importLog = { tags: 0, tagsSkipped: 0, kesimAlanlari: 0, kesimAlanlariSkipped: 0, donations: 0, donationsSkipped: 0, groups: 0, groupsSkipped: 0 };
+
+  if (dryRun) {
+    const summary = {
+      mode,
+      dryRun: true,
+      wouldDelete: mode === "replace",
+      counts: {
+        kesimAlanlari: data.kesimAlanlari.length,
+        donations: data.kesimAlanlari.reduce((s, k) => s + (k.donations?.length || 0), 0),
+        animalGroups: data.kesimAlanlari.reduce((s, k) => s + (k.animalGroups?.length || 0), 0),
+        globalTags: data.globalTags?.length || 0,
+        hasLogo: !!data.logo,
+      },
+    };
+    res.json({ success: true, dryRun: true, summary });
+    return;
+  }
 
   await db.transaction(async (tx) => {
     if (mode === "replace") {
@@ -231,7 +306,7 @@ router.post("/backup/import", asyncHandler(async (req, res) => {
     }
 
     for (const ka of data.kesimAlanlari) {
-      const kaId = ka.id || Math.random().toString(36).substring(2, 12);
+      const kaId = ka.id || crypto.randomUUID();
       const kaValues = {
         id: kaId,
         name: stripHtml(ka.name || "İsimsiz"),
@@ -253,7 +328,7 @@ router.post("/backup/import", asyncHandler(async (req, res) => {
       if (ka.donations && ka.donations.length > 0) {
         for (let i = 0; i < ka.donations.length; i++) {
           const d = ka.donations[i];
-          const donationId = d.id || Math.random().toString(36).substring(2, 12);
+          const donationId = d.id || crypto.randomUUID();
           const dValues: typeof donationsTable.$inferInsert = {
             id: donationId,
             kesimAlaniId: kaId,
@@ -306,7 +381,7 @@ router.post("/backup/import", asyncHandler(async (req, res) => {
       if (ka.animalGroups && ka.animalGroups.length > 0) {
         for (let i = 0; i < ka.animalGroups.length; i++) {
           const g = ka.animalGroups[i];
-          const groupId = g.id || Math.random().toString(36).substring(2, 12);
+          const groupId = g.id || crypto.randomUUID();
           const gValues = {
             id: groupId,
             kesimAlaniId: kaId,

@@ -15,10 +15,14 @@ server-side Zod definitions) is tracked as ongoing work.
 
  * OpenAPI spec version: 0.1.0
  */
-import type { HealthStatusDbPool } from "./healthStatusDbPool";
+import type { ErrorResponseDetailsItem } from "./errorResponseDetailsItem";
+import type { ErrorResponseHint } from "./errorResponseHint";
 
-export type HealthStatusDb = {
-  connected: boolean;
-  latencyMs: number;
-  pool: HealthStatusDbPool;
-};
+export interface ErrorResponse {
+  /** Human-readable error message (Turkish) */
+  error: string;
+  detail?: string;
+  details?: ErrorResponseDetailsItem[];
+  issues?: string[];
+  hint?: ErrorResponseHint;
+}

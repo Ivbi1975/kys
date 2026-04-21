@@ -15,10 +15,14 @@ server-side Zod definitions) is tracked as ongoing work.
 
  * OpenAPI spec version: 0.1.0
  */
-import type { HealthStatusDbPool } from "./healthStatusDbPool";
+import type { BackupImportRequestMode } from "./backupImportRequestMode";
+import type { JsonObject } from "./jsonObject";
 
-export type HealthStatusDb = {
-  connected: boolean;
-  latencyMs: number;
-  pool: HealthStatusDbPool;
-};
+export interface BackupImportRequest {
+  mode?: BackupImportRequestMode;
+  /** If true, validate and report counts without writing */
+  dryRun?: boolean;
+  /** Required when mode=replace and dryRun=false */
+  confirmReplace?: boolean;
+  data: JsonObject;
+}

@@ -22,7 +22,8 @@ export type AuditAction =
   | "import"
   | "export"
   | "repair"
-  | "move";
+  | "move"
+  | "bulk_create";
 
 export type AuditEntityType =
   | "donation"

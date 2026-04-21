@@ -19,16 +19,16 @@ export class ApiFetchError extends Error {
 }
 
 export function getApiKey(): string {
-  return sessionStorage.getItem("app_api_key") || "";
+  return sessionStorage.getItem("app_session_token") || "";
 }
 
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const apiKey = getApiKey();
+  const token = getApiKey();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (apiKey) {
-    headers["X-API-Key"] = apiKey;
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -41,7 +41,7 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   if (!res.ok) {
     if (res.status === 401) {
       sessionStorage.removeItem("app_unlocked");
-      sessionStorage.removeItem("app_api_key");
+      sessionStorage.removeItem("app_session_token");
       window.location.reload();
       throw new Error("Oturum süresi doldu. Yeniden giriş yapılıyor...");
     }

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { ERROR_MESSAGES } from "../lib/constants";
 import { timingSafeCompare, generatePhotoToken } from "../lib/signed-url";
+import { issueSessionToken } from "../lib/session-token";
 
 const router = Router();
 
@@ -28,7 +29,15 @@ router.post("/auth/login", (req, res) => {
     return;
   }
 
-  res.json({ success: true, apiKey });
+  const { token, expiresAt } = issueSessionToken(apiKey);
+  res.json({ success: true, token, expiresAt });
+});
+
+// Stateless logout — session tokens are signed and self-contained, so logout is
+// enforced by the client discarding the token. We acknowledge the request so
+// generated clients can call this endpoint safely.
+router.post("/auth/logout", (_req, res) => {
+  res.json({ success: true });
 });
 
 router.get("/photo-token", (req, res) => {

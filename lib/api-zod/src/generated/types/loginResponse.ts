@@ -15,10 +15,11 @@ server-side Zod definitions) is tracked as ongoing work.
 
  * OpenAPI spec version: 0.1.0
  */
-import type { HealthStatusDbPool } from "./healthStatusDbPool";
 
-export type HealthStatusDb = {
-  connected: boolean;
-  latencyMs: number;
-  pool: HealthStatusDbPool;
-};
+export interface LoginResponse {
+  success?: boolean;
+  /** Signed session token (s1.<exp>.<sig>) */
+  token: string;
+  /** Unix epoch seconds when the token expires */
+  expiresAt: number;
+}

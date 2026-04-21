@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { logger } from "../lib/logger";
 import { timingSafeCompare, verifyPhotoToken } from "../lib/signed-url";
+import { verifySessionToken, isSessionTokenShape } from "../lib/session-token";
 
 const API_KEY = process.env.API_KEY || "";
 const ADMIN_KEY = process.env.ADMIN_KEY || "";
@@ -47,9 +48,24 @@ export function apiKeyAuth(req: Request, res: Response, next: NextFunction): voi
   }
 
   const headerKey = req.headers["x-api-key"] as string | undefined;
+  const authHeader = req.headers["authorization"] as string | undefined;
+  const bearerToken = authHeader && authHeader.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length).trim()
+    : undefined;
+  const candidate = bearerToken || headerKey;
 
-  if (headerKey) {
-    if (!timingSafeCompare(headerKey, API_KEY)) {
+  if (candidate) {
+    if (isSessionTokenShape(candidate)) {
+      const result = verifySessionToken(candidate, API_KEY);
+      if (!result.valid) {
+        logger.warn({ path: req.path, ip: req.ip, reason: result.reason }, "Invalid session token");
+        res.status(401).json({ error: "Geçersiz veya süresi dolmuş oturum." });
+        return;
+      }
+      next();
+      return;
+    }
+    if (!timingSafeCompare(candidate, API_KEY)) {
       logger.warn({ path: req.path, ip: req.ip }, "Invalid API key attempt");
       res.status(401).json({ error: "Geçersiz API anahtarı." });
       return;
@@ -63,7 +79,7 @@ export function apiKeyAuth(req: Request, res: Response, next: NextFunction): voi
     return;
   }
 
-  res.status(401).json({ error: "Kimlik doğrulama gerekli. X-API-Key header eksik." });
+  res.status(401).json({ error: "Kimlik doğrulama gerekli. Oturum token veya X-API-Key header eksik." });
 }
 
 const ADMIN_ONLY_PATHS = [

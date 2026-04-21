@@ -7,12 +7,15 @@ import { ArrowUpDown, ChevronUp, ChevronLeft, ChevronRight, CornerDownLeft, Filt
 import { COLOR_MAP } from "@/lib/constants";
 import { computeEffectiveShares } from "@/lib/grouping";
 import type { BasketItem, ReturnToSourceResult, BasketSortKey, BasketSortDir } from "../hooks/types";
-
-type BasketTab = "contents" | "place" | "transfer";
-type GroupByCriterion = "cins" | "share" | "source";
-
-const ITEMS_PER_PAGE = 50;
-const TIMEOUT_WARNING_MS = 2 * 60 * 60 * 1000;
+import {
+  ITEMS_PER_PAGE,
+  TIMEOUT_WARNING_MS,
+  buildGroupedChips,
+  formatTimeInBasket as formatTimeInBasketUtil,
+  getGroupKey as getGroupKeyUtil,
+  type BasketTab,
+  type GroupByCriterion,
+} from "./BasketPanel.utils";
 
 interface BasketPanelProps {
   kesim: KesimAlani;
@@ -158,13 +161,7 @@ export function BasketPanel({
 
   const timedOutCount = timedOutIds.size;
 
-  const getGroupKey = (b: BasketItem): string => {
-    const parts: string[] = [];
-    if (groupByCriteria.has("cins")) parts.push(b.donationType || "Belirtilmemiş");
-    if (groupByCriteria.has("share")) parts.push(`${b.donorShareCount || 1} Hisse`);
-    if (groupByCriteria.has("source")) parts.push(b.sourceGroupAnimalNo ? `Hayvan ${b.sourceGroupAnimalNo}` : "Bağışçı Listesi");
-    return parts.join(" · ") || "__all__";
-  };
+  const getGroupKey = (b: BasketItem): string => getGroupKeyUtil(b, groupByCriteria);
 
   const groupedSections = useMemo(() => {
     if (groupByCriteria.size === 0) return null;
@@ -252,31 +249,7 @@ export function BasketPanel({
 
   const isTimedOut = (item: BasketItem) => timedOutIds.has(item.donationId);
 
-  const formatTimeInBasket = (addedAt?: number) => {
-    if (!addedAt) return null;
-    const elapsed = now - addedAt;
-    const minutes = Math.floor(elapsed / 60_000);
-    if (minutes < 60) return `${minutes}dk`;
-    const hours = Math.floor(minutes / 60);
-    const remainMins = minutes % 60;
-    return `${hours}s ${remainMins}dk`;
-  };
-
-  const buildGroupedChips = (items: typeof filteredLocalDonationItems) => {
-    const grouped: { key: string; label: string; items: typeof items }[] = [];
-    const seen = new Map<string, number>();
-    for (const b of items) {
-      const label = (b.description || b.name).trim();
-      const existing = seen.get(label);
-      if (existing !== undefined) {
-        grouped[existing].items.push(b);
-      } else {
-        seen.set(label, grouped.length);
-        grouped.push({ key: label, label, items: [b] });
-      }
-    }
-    return grouped;
-  };
+  const formatTimeInBasket = (addedAt?: number) => formatTimeInBasketUtil(addedAt, now);
 
   const tabs: { id: BasketTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: "contents", label: "Sepet İçeriği", icon: <ShoppingCart className="w-3.5 h-3.5" />, badge: selectedBasketIds.size > 0 ? `${selectedBasketIds.size} seçili` : undefined },

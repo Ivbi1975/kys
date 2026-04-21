@@ -66,14 +66,29 @@ function StatBarRow({ label, count, total }: { label: string; count: number; tot
   );
 }
 
-type DonationStringKey = {
-  [K in keyof Donation]: Donation[K] extends string | undefined ? K : never;
-}[keyof Donation];
+type DonationStringKey =
+  | "name"
+  | "description"
+  | "donationType"
+  | "vekalet"
+  | "notes"
+  | "phone"
+  | "birim"
+  | "temsilci"
+  | "ozellik"
+  | "fiyat"
+  | "yerTalebi"
+  | "gunTalebi"
+  | "ilkHayvan"
+  | "safi"
+  | "aiWarnings"
+  | "flagReason";
 
 function countByField(donations: Donation[], field: DonationStringKey): Map<string, number> {
   const map = new Map<string, number>();
   for (const d of donations) {
-    const val = (d[field] as string | undefined)?.trim();
+    const raw = d[field];
+    const val = typeof raw === "string" ? raw.trim() : "";
     if (val) {
       map.set(val, (map.get(val) || 0) + 1);
     }

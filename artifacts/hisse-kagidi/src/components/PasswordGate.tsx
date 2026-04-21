@@ -75,8 +75,13 @@ export default function PasswordGate({ children }: { children: React.ReactNode }
       }
 
       const data = await res.json();
+      const sessionToken = data.token;
+      if (!sessionToken) {
+        setError("Sunucu geçerli bir oturum token'ı döndürmedi.");
+        return;
+      }
       sessionStorage.setItem("app_unlocked", "true");
-      sessionStorage.setItem("app_api_key", data.apiKey);
+      sessionStorage.setItem("app_session_token", sessionToken);
       fetchPhotoToken().catch(() => {});
       setUnlocked(true);
     } catch {

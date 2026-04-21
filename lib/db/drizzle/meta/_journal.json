@@ -169,6 +169,20 @@
       "when": 1774946600000,
       "tag": "0023_kesim_alani_yetkili",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1774946700000,
+      "tag": "0024_donations_share_count_check",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1774946800000,
+      "tag": "0025_animal_groups_unique_animal_no",
+      "breakpoints": true
     }
   ]
 }

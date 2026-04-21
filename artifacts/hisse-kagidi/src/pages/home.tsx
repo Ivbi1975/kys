@@ -75,7 +75,7 @@ export default function Home() {
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   onClick={() => {
                     sessionStorage.removeItem("app_unlocked");
-                    sessionStorage.removeItem("app_api_key");
+                    sessionStorage.removeItem("app_session_token");
                     window.location.reload();
                   }}
                 >

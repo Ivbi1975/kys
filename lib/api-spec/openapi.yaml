@@ -3,64 +3,955 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: |
+    API specification for the Kurban Hisse Kağıdı (Sacrificial Donation Management) backend.
+
+    All endpoints (except `/healthz` and `/auth/login`) require authentication via either:
+    - `Authorization: Bearer <signed-session-token>` (preferred for browser clients)
+    - `X-API-Key: <key>` (legacy, for server-to-server callers and tests)
+
+    Many request/response bodies use loose JSON schemas (`type: object, additionalProperties: true`)
+    because the application code carries the canonical Zod validators in
+    `artifacts/api-server/src/routes/*`. Tightening these schemas (and deriving them from the
+    server-side Zod definitions) is tracked as ongoing work.
 servers:
   - url: /api
     description: Base API path
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
 tags:
   - name: health
-    description: Health operations
+  - name: auth
+  - name: projects
+  - name: kesim-alanlari
+  - name: donations
+  - name: animal-groups
+  - name: tags
+  - name: settings
+  - name: backup
+  - name: export
+  - name: tracking
+  - name: ai-notes
+  - name: audit-logs
+  - name: home-data
+  - name: integrity
+  - name: photos
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
+      security: []
       summary: Health check
-      description: Returns server health status including DB connectivity and pool stats
       responses:
-        "200":
-          description: Healthy
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HealthStatus"
-        "503":
-          description: Degraded — DB unreachable
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HealthStatus"
+        "200": { description: Healthy, content: { application/json: { schema: { $ref: "#/components/schemas/HealthStatus" } } } }
+        "503": { description: Degraded, content: { application/json: { schema: { $ref: "#/components/schemas/HealthStatus" } } } }
+  /cache-stats:
+    get:
+      operationId: cacheStats
+      tags: [health]
+      summary: In-process cache stats
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+  /auth/login:
+    post:
+      operationId: authLogin
+      tags: [auth]
+      security: []
+      summary: Authenticate with the application password
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/LoginRequest" } } }
+      responses:
+        "200": { description: Login successful, content: { application/json: { schema: { $ref: "#/components/schemas/LoginResponse" } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+  /auth/logout:
+    post:
+      operationId: authLogout
+      tags: [auth]
+      summary: Stateless logout acknowledgement
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /photo-token:
+    get:
+      operationId: getPhotoToken
+      tags: [auth]
+      summary: Issue a short-lived signed token for photo URLs
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PhotoToken" } } } }
+        "503": { $ref: "#/components/responses/Error" }
+  /home-data:
+    get:
+      operationId: getHomeData
+      tags: [home-data]
+      summary: Aggregated data for the home page
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+  /audit-logs:
+    get:
+      operationId: listAuditLogs
+      tags: [audit-logs]
+      parameters:
+        - { name: limit, in: query, schema: { type: integer } }
+        - { name: offset, in: query, schema: { type: integer } }
+        - { name: entityType, in: query, schema: { type: string } }
+        - { name: action, in: query, schema: { type: string } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+  /integrity/check:
+    get:
+      operationId: integrityCheck
+      tags: [integrity]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+  /integrity/repair:
+    post:
+      operationId: integrityRepair
+      tags: [integrity]
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+  /global-search:
+    get:
+      operationId: globalSearch
+      tags: [home-data]
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+    post:
+      operationId: createProject
+      tags: [projects]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /projects/deleted:
+    get:
+      operationId: listDeletedProjects
+      tags: [projects]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+  /projects/archived:
+    get:
+      operationId: listArchivedProjects
+      tags: [projects]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+  /projects/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getProject
+      tags: [projects]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+    put:
+      operationId: updateProject
+      tags: [projects]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /projects/{id}/restore:
+    post:
+      operationId: restoreProject
+      tags: [projects]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /projects/{id}/archive:
+    post:
+      operationId: archiveProject
+      tags: [projects]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /projects/{id}/unarchive:
+    post:
+      operationId: unarchiveProject
+      tags: [projects]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /projects/{id}/dashboard:
+    get:
+      operationId: getProjectDashboard
+      tags: [projects]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /projects/{id}/donations:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: listPoolDonations
+      tags: [donations]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+    delete:
+      operationId: deleteAllPoolDonations
+      tags: [donations]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /projects/{id}/donations/stats:
+    get:
+      operationId: getPoolDonationStats
+      tags: [donations]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /projects/{id}/donations/bulk-import:
+    post:
+      operationId: bulkImportDonations
+      tags: [donations]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /projects/{id}/donations/siblings:
+    post:
+      operationId: getDonationSiblings
+      tags: [donations]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /projects/{id}/donations/transfer:
+    post:
+      operationId: transferDonations
+      tags: [donations]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /projects/{id}/donations/bulk-action:
+    post:
+      operationId: bulkActionDonations
+      tags: [donations]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /projects/{id}/donations/bulk-delete-preview:
+    post:
+      operationId: bulkDeletePreview
+      tags: [donations]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /projects/{id}/donations/bulk-delete:
+    post:
+      operationId: bulkDeleteDonations
+      tags: [donations]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /projects/{id}/donations/assigned-vekalets:
+    get:
+      operationId: getAssignedVekalets
+      tags: [donations]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+  /projects/{id}/donations/vekalet-check:
+    post:
+      operationId: vekaletCheck
+      tags: [donations]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /projects/{id}/donations/bulk-tag:
+    post:
+      operationId: bulkTagDonations
+      tags: [donations]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /projects/{id}/donations/bulk-notes:
+    post:
+      operationId: bulkNoteDonations
+      tags: [donations]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /projects/{projectId}/donations/{id}:
+    patch:
+      operationId: updatePoolDonation
+      tags: [donations]
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /projects/{projectId}/donations/{id}/flag:
+    post:
+      operationId: flagDonation
+      tags: [donations]
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /projects/{projectId}/donations/{id}/unflag:
+    post:
+      operationId: unflagDonation
+      tags: [donations]
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /projects/{id}/flagged-donations:
+    get:
+      operationId: listFlaggedDonations
+      tags: [donations]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+  /projects/{id}/automation-rules:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: listAutomationRules
+      tags: [donations]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+    post:
+      operationId: createAutomationRule
+      tags: [donations]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /projects/{id}/automation-rules/{ruleId}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+      - { name: ruleId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: updateAutomationRule
+      tags: [donations]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+    delete:
+      operationId: deleteAutomationRule
+      tags: [donations]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /projects/{id}/automation-rules/execute:
+    post:
+      operationId: executeAutomationRules
+      tags: [donations]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /projects/{projectId}/transfer-log:
+    get:
+      operationId: getTransferLog
+      tags: [donations]
+      parameters: [{ name: projectId, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+  /projects/{projectId}/pending-edit-requests:
+    get:
+      operationId: getPendingEditRequests
+      tags: [donations]
+      parameters: [{ name: projectId, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+  /donation-transfers:
+    post:
+      operationId: createDonationTransfer
+      tags: [donations]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /catisma-tespiti:
+    get:
+      operationId: detectConflicts
+      tags: [donations]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /catisma-tespiti/transfer:
+    post:
+      operationId: resolveConflictTransfer
+      tags: [donations]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari:
+    get:
+      operationId: listKesimAlanlari
+      tags: [kesim-alanlari]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+    post:
+      operationId: createKesimAlani
+      tags: [kesim-alanlari]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/bulk:
+    post:
+      operationId: bulkCreateKesimAlanlari
+      tags: [kesim-alanlari]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/deleted:
+    get:
+      operationId: listDeletedKesimAlanlari
+      tags: [kesim-alanlari]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+  /kesim-alanlari/move-donations:
+    post:
+      operationId: moveDonationsBetweenKesimAlanlari
+      tags: [kesim-alanlari]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/move-animal-group:
+    post:
+      operationId: moveAnimalGroupBetweenKesimAlanlari
+      tags: [kesim-alanlari]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: getKesimAlani
+      tags: [kesim-alanlari]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+    put:
+      operationId: updateKesimAlani
+      tags: [kesim-alanlari]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+    delete:
+      operationId: deleteKesimAlani
+      tags: [kesim-alanlari]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /kesim-alanlari/{id}/meta:
+    get:
+      operationId: getKesimAlaniMeta
+      tags: [kesim-alanlari]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/{id}/move:
+    put:
+      operationId: moveKesimAlani
+      tags: [kesim-alanlari]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /kesim-alanlari/{id}/update-chunked:
+    put:
+      operationId: updateKesimAlaniChunked
+      tags: [kesim-alanlari]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/{id}/restore:
+    post:
+      operationId: restoreKesimAlani
+      tags: [kesim-alanlari]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /kesim-alanlari/{id}/split:
+    post:
+      operationId: splitKesimAlani
+      tags: [kesim-alanlari]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/{id}/dashboard:
+    get:
+      operationId: getKesimAlaniDashboard
+      tags: [kesim-alanlari]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/{id}/donations:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: listKesimAlaniDonations
+      tags: [donations]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+    post:
+      operationId: createKesimAlaniDonation
+      tags: [donations]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/{id}/donations/count:
+    get:
+      operationId: countKesimAlaniDonations
+      tags: [donations]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/{id}/donations/deleted:
+    get:
+      operationId: listDeletedKesimAlaniDonations
+      tags: [donations]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+  /kesim-alanlari/{id}/donations/{donationId}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+      - { name: donationId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: updateKesimAlaniDonation
+      tags: [donations]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+    delete:
+      operationId: deleteKesimAlaniDonation
+      tags: [donations]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /kesim-alanlari/{id}/donations/{donationId}/restore:
+    post:
+      operationId: restoreKesimAlaniDonation
+      tags: [donations]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: donationId, in: path, required: true, schema: { type: string } }
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /kesim-alanlari/{id}/groups:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: listAnimalGroups
+      tags: [animal-groups]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+  /kesim-alanlari/{id}/groups/count:
+    get:
+      operationId: countAnimalGroups
+      tags: [animal-groups]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/{id}/groups/{groupId}:
+    get:
+      operationId: getAnimalGroup
+      tags: [animal-groups]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/{id}/groups/bulk-lock:
+    post:
+      operationId: bulkLockAnimalGroups
+      tags: [animal-groups]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /kesim-alanlari/{id}/animal-groups:
+    post:
+      operationId: createAnimalGroup
+      tags: [animal-groups]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/{id}/animal-groups/bulk:
+    put:
+      operationId: bulkUpdateAnimalGroups
+      tags: [animal-groups]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/{id}/animal-groups/bulk-chunked:
+    put:
+      operationId: bulkUpdateAnimalGroupsChunked
+      tags: [animal-groups]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/{id}/animal-groups/{groupId}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+      - { name: groupId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: updateAnimalGroup
+      tags: [animal-groups]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+    delete:
+      operationId: deleteAnimalGroup
+      tags: [animal-groups]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /kesim-alanlari/{id}/teams:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: listTeams
+      tags: [kesim-alanlari]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+    post:
+      operationId: createTeam
+      tags: [kesim-alanlari]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/{id}/teams/{teamId}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+      - { name: teamId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: updateTeam
+      tags: [kesim-alanlari]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+    delete:
+      operationId: deleteTeam
+      tags: [kesim-alanlari]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /kesim-alanlari/{id}/groups/{groupId}/team:
+    put:
+      operationId: assignGroupTeam
+      tags: [animal-groups]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /kesim-alanlari/{id}/generate-tracking-token:
+    post:
+      operationId: generateTrackingToken
+      tags: [tracking]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /kesim-alanlari/{id}/revoke-tracking-token:
+    post:
+      operationId: revokeTrackingToken
+      tags: [tracking]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /kesim-alanlari/{id}/tracking-notes:
+    get:
+      operationId: listKesimTrackingNotes
+      tags: [tracking]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+  /kesim-alanlari/{id}/tracking-notes/{noteId}/status:
+    put:
+      operationId: updateTrackingNoteStatus
+      tags: [tracking]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: noteId, in: path, required: true, schema: { type: string } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /kesim-alanlari/{id}/notification-logs:
+    get:
+      operationId: listKesimNotificationLogs
+      tags: [tracking]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+  /kesim-alanlari/{id}/group/{groupId}/photos:
+    get:
+      operationId: listGroupPhotos
+      tags: [photos]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+  /kesim-alanlari/{id}/group/{groupId}/photos/{photoId}:
+    get:
+      operationId: getGroupPhoto
+      tags: [photos]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+        - { name: photoId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Image bytes, content: { "image/*": { schema: { type: string, format: binary } } } }
+  /kesim-alanlari/{id}/photos/counts:
+    get:
+      operationId: getKesimPhotoCounts
+      tags: [photos]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /photos/backfill-thumbnails:
+    post:
+      operationId: backfillThumbnails
+      tags: [photos]
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /tags:
+    get:
+      operationId: listTags
+      tags: [tags]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+    post:
+      operationId: createTag
+      tags: [tags]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /tags/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    put:
+      operationId: updateTag
+      tags: [tags]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+    delete:
+      operationId: deleteTag
+      tags: [tags]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /settings/logo:
+    get:
+      operationId: getLogo
+      tags: [settings]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+    put:
+      operationId: setLogo
+      tags: [settings]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+    delete:
+      operationId: deleteLogo
+      tags: [settings]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /settings/notification-template:
+    get:
+      operationId: getNotificationTemplate
+      tags: [settings]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+    put:
+      operationId: setNotificationTemplate
+      tags: [settings]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /backup/export:
+    post:
+      operationId: backupExport
+      tags: [backup]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /backup/import:
+    post:
+      operationId: backupImport
+      tags: [backup]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/BackupImportRequest" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /export/csv:
+    get:
+      operationId: exportCsv
+      tags: [export]
+      responses:
+        "200": { description: CSV file, content: { "text/csv": { schema: { type: string } } } }
+  /export/excel:
+    get:
+      operationId: exportExcel
+      tags: [export]
+      responses:
+        "200": { description: XLSX file, content: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { schema: { type: string, format: binary } } } }
+  /export/count:
+    get:
+      operationId: exportCount
+      tags: [export]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /tracking/{token}:
+    get:
+      operationId: getTrackingData
+      tags: [tracking]
+      security: []
+      parameters: [{ name: token, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /tracking/{token}/delta:
+    get:
+      operationId: getTrackingDelta
+      tags: [tracking]
+      security: []
+      parameters: [{ name: token, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /tracking/{token}/notification-logs:
+    get:
+      operationId: getTrackingNotificationLogs
+      tags: [tracking]
+      security: []
+      parameters: [{ name: token, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+  /tracking/{token}/notes:
+    parameters: [{ name: token, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: listTrackingNotes
+      tags: [tracking]
+      security: []
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+    post:
+      operationId: createTrackingNote
+      tags: [tracking]
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /tracking/{token}/group/{groupId}/kesildi:
+    put:
+      operationId: markGroupKesildi
+      tags: [tracking]
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /tracking/{token}/group/{groupId}/team:
+    put:
+      operationId: assignTrackingGroupTeam
+      tags: [tracking]
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /tracking/{token}/group/{groupId}/photos:
+    parameters:
+      - { name: token, in: path, required: true, schema: { type: string } }
+      - { name: groupId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: listTrackingGroupPhotos
+      tags: [tracking, photos]
+      security: []
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+    post:
+      operationId: uploadTrackingGroupPhoto
+      tags: [tracking, photos]
+      security: []
+      description: |
+        Upload a photo via multipart/form-data with a single `file` field. The exact body
+        schema is intentionally omitted from this spec because the generated zod/typescript
+        client does not model `File`/`Blob` portably; callers should construct a FormData
+        body manually.
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /tracking/{token}/group/{groupId}/photos/{photoId}:
+    parameters:
+      - { name: token, in: path, required: true, schema: { type: string } }
+      - { name: groupId, in: path, required: true, schema: { type: string } }
+      - { name: photoId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getTrackingGroupPhoto
+      tags: [tracking, photos]
+      security: []
+      responses:
+        "200": { description: Image bytes, content: { "image/*": { schema: { type: string, format: binary } } } }
+    delete:
+      operationId: deleteTrackingGroupPhoto
+      tags: [tracking, photos]
+      security: []
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /ai-notes/settings:
+    get:
+      operationId: getAiNotesSettings
+      tags: [ai-notes]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+    put:
+      operationId: updateAiNotesSettings
+      tags: [ai-notes]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /ai-notes/classify:
+    post:
+      operationId: classifyNotes
+      tags: [ai-notes]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /ai-notes/classify-async:
+    post:
+      operationId: classifyNotesAsync
+      tags: [ai-notes]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /ai-notes/jobs/{jobId}:
+    get:
+      operationId: getAiClassifyJob
+      tags: [ai-notes]
+      parameters: [{ name: jobId, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /ai-notes/jobs/{jobId}/cancel:
+    post:
+      operationId: cancelAiClassifyJob
+      tags: [ai-notes]
+      parameters: [{ name: jobId, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /ai-notes/active-job:
+    get:
+      operationId: getActiveAiJob
+      tags: [ai-notes]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /ai-notes/save-classifications:
+    put:
+      operationId: saveAiClassifications
+      tags: [ai-notes]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+  /ai-notes/bulk-update:
+    put:
+      operationId: bulkUpdateAiNotes
+      tags: [ai-notes]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: SignedSessionToken
+      description: |
+        Signed session token issued by `/auth/login`. Format: `s1.<expSeconds>.<base64urlHmac>`.
+        Sent as `Authorization: Bearer <token>`.
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        Legacy API key auth (server-to-server callers and tests). The raw API_KEY should never
+        be exposed to the browser.
+  responses:
+    Success:
+      description: Operation succeeded
+      content: { application/json: { schema: { $ref: "#/components/schemas/SimpleSuccess" } } }
+    Error:
+      description: Error response
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
   schemas:
+    JsonObject:
+      type: object
+      additionalProperties: true
+    JsonArray:
+      type: array
+      items: { $ref: "#/components/schemas/JsonObject" }
     HealthStatus:
       type: object
       properties:
-        status:
-          type: string
-          enum: [ok, degraded]
+        status: { type: string, enum: [ok, degraded] }
         db:
           type: object
           properties:
-            connected:
-              type: boolean
-            latencyMs:
-              type: integer
+            connected: { type: boolean }
+            latencyMs: { type: integer }
             pool:
               type: object
               properties:
-                total:
-                  type: integer
-                idle:
-                  type: integer
-                active:
-                  type: integer
-                waiting:
-                  type: integer
+                total: { type: integer }
+                idle: { type: integer }
+                active: { type: integer }
+                waiting: { type: integer }
               required: [total, idle, active, waiting]
           required: [connected, latencyMs, pool]
-        uptime:
-          type: integer
-      required:
-        - status
-        - db
-        - uptime
+        uptime: { type: integer }
+      required: [status, db, uptime]
+    LoginRequest:
+      type: object
+      properties:
+        password: { type: string, minLength: 1 }
+      required: [password]
+    LoginResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        token: { type: string, description: "Signed session token (s1.<exp>.<sig>)" }
+        expiresAt: { type: integer, description: "Unix epoch seconds when the token expires" }
+      required: [token, expiresAt]
+    PhotoToken:
+      type: object
+      properties:
+        token: { type: string }
+        expiresAt: { type: integer }
+      required: [token, expiresAt]
+    BackupImportRequest:
+      type: object
+      properties:
+        mode: { type: string, enum: [replace, merge] }
+        dryRun: { type: boolean, description: "If true, validate and report counts without writing" }
+        confirmReplace: { type: boolean, description: "Required when mode=replace and dryRun=false" }
+        data:
+          $ref: "#/components/schemas/JsonObject"
+      required: [data]
+    SimpleSuccess:
+      type: object
+      properties:
+        success: { type: boolean }
+      required: [success]
+    ErrorResponse:
+      type: object
+      properties:
+        error: { type: string, description: "Human-readable error message (Turkish)" }
+        detail: { type: string }
+        details: { type: array, items: { type: object, additionalProperties: true } }
+        issues: { type: array, items: { type: string } }
+        hint: { type: object, additionalProperties: true }
+      required: [error]
