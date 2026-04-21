@@ -14,6 +14,7 @@ import {
   type TeamRow,
 } from "@workspace/db/schema";
 import { eq, inArray, isNull, and, sql } from "drizzle-orm";
+import crypto from "crypto";
 import { cacheGet, cacheSet, cacheInvalidatePrefix } from "../lib/cache";
 import { logger } from "../lib/logger";
 import { BATCH_SIZE } from "../lib/constants";
@@ -124,8 +125,19 @@ export function assembleKesimAlani(
 
   const mappedDonations = donations.filter(d => d.name.trim()).map(d => donationsById[d.id]);
 
+  const MAX_SLOTS = 7;
+  const emptySlot = () => ({
+    id: `empty-${crypto.randomUUID()}`,
+    name: "", description: "", donationType: "", shareCount: 1,
+    vekalet: "", notes: "", phone: "", birim: "", temsilci: "",
+    ozellik: "", fiyat: "", yerTalebi: "", gunTalebi: "", ilkHayvan: "", safi: "",
+    excluded: false, tags: [], aiCategories: [], aiWarnings: "", isFlagged: false, flagReason: "",
+  });
+
   const mappedGroups = groups.map(g => {
     const links = (groupDonationsByGroup[g.id] || []).sort((a, b) => a.sortOrder - b.sortOrder);
+    const realDonations = links.map(l => donationsById[l.donationId]).filter(Boolean);
+    while (realDonations.length < MAX_SLOTS) realDonations.push(emptySlot() as typeof realDonations[0]);
     return {
       id: g.id,
       animalNo: g.animalNo,
@@ -136,7 +148,7 @@ export function assembleKesimAlani(
       kesildiAt: g.kesildiAt || null,
       teamId: g.teamId || null,
       updatedAt: g.updatedAt ? g.updatedAt.toISOString() : null,
-      donations: links.map(l => donationsById[l.donationId]).filter(Boolean),
+      donations: realDonations,
     };
   });
 
@@ -857,7 +869,7 @@ export async function diffUpdateGroups(tx: Tx, kesimAlaniId: string, incoming: A
 
   for (const g of incoming) {
     if (!g.donations) continue;
-    const gDonations = g.donations;
+    const gDonations = g.donations.filter(d => (d.name ?? "").trim());
     for (let j = 0; j < gDonations.length; j++) {
       const key = `${g.id}:${gDonations[j].id}`;
       incomingLinkSet.add(key);

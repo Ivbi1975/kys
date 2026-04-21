@@ -185,20 +185,32 @@ export async function createKesimAlani(data: KesimAlani & { projectId?: string |
 const DONATION_CHUNK_THRESHOLD = 3000;
 const DONATION_CHUNK_SIZE = 2000;
 
+function stripEmptyGroupDonations<T extends { animalGroups?: Array<{ donations?: Array<{ name?: string; id: string }> }> }>(data: T): T {
+  if (!data.animalGroups) return data;
+  return {
+    ...data,
+    animalGroups: data.animalGroups.map(g => ({
+      ...g,
+      donations: (g.donations ?? []).filter(d => (d.name ?? "").trim()),
+    })),
+  };
+}
+
 export async function apiUpdateKesimAlani(
   data: KesimAlani,
   onChunkProgress?: (progress: ChunkProgress) => void,
 ): Promise<KesimAlani> {
-  const donationCount = data.donations?.length ?? 0;
+  const cleanData = stripEmptyGroupDonations(data);
+  const donationCount = cleanData.donations?.length ?? 0;
 
   if (donationCount <= DONATION_CHUNK_THRESHOLD) {
-    return apiFetch<KesimAlani>(`/kesim-alanlari/${data.id}`, {
+    return apiFetch<KesimAlani>(`/kesim-alanlari/${cleanData.id}`, {
       method: "PUT",
-      body: JSON.stringify(data),
+      body: JSON.stringify(cleanData),
     });
   }
 
-  const donations = data.donations;
+  const donations = cleanData.donations;
   const totalChunks = Math.ceil(donations.length / DONATION_CHUNK_SIZE);
   const allDonationIds = donations.map(d => d.id);
   let lastResult: unknown = null;
@@ -231,8 +243,8 @@ export async function apiUpdateKesimAlani(
     onChunkProgress?.({ chunkIndex: i, totalChunks, savedCount, totalGroups: donations.length });
   }
 
-  if (data.animalGroups !== undefined) {
-    return apiUpdateBulkAnimalGroups(data.id, data.animalGroups, onChunkProgress ? (progress) => {
+  if (cleanData.animalGroups !== undefined) {
+    return apiUpdateBulkAnimalGroups(cleanData.id, cleanData.animalGroups, onChunkProgress ? (progress) => {
       onChunkProgress({ ...progress, savedCount: savedCount + progress.savedCount });
     } : undefined);
   }
@@ -241,7 +253,7 @@ export async function apiUpdateKesimAlani(
   if (finalResult?.data) {
     return finalResult.data;
   }
-  return apiFetch<KesimAlani>(`/kesim-alanlari/${data.id}`);
+  return apiFetch<KesimAlani>(`/kesim-alanlari/${cleanData.id}`);
 }
 
 const CHUNK_SIZE = 500;
@@ -258,7 +270,11 @@ export async function apiUpdateBulkAnimalGroups(
   animalGroups: KesimAlani["animalGroups"],
   onChunkProgress?: (progress: ChunkProgress) => void,
 ): Promise<KesimAlani> {
-  const groupsWithSortOrder = animalGroups.map((g, i) => ({
+  const cleanGroups = animalGroups.map(g => ({
+    ...g,
+    donations: (g.donations ?? []).filter(d => (d.name ?? "").trim()),
+  }));
+  const groupsWithSortOrder = cleanGroups.map((g, i) => ({
     ...g,
     sortOrder: i,
   }));
