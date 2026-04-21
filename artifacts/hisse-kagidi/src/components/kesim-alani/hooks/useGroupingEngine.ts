@@ -172,6 +172,7 @@ export function useGroupingEngine({
       const newDonations: Donation[] = [];
       for (const g of finalGroups) {
         for (const d of g.donations) {
+          if (!d.name.trim() && !d.description.trim()) continue; // skip empty slots
           if (!existingDonationIds.has(d.id)) {
             existingDonationIds.add(d.id);
             newDonations.push(d);
@@ -241,6 +242,7 @@ export function useGroupingEngine({
       const newDonations: Donation[] = [];
       for (const g of newGroups) {
         for (const d of g.donations) {
+          if (!d.name.trim() && !d.description.trim()) continue; // skip empty slots
           if (!existingDonationIds.has(d.id)) {
             existingDonationIds.add(d.id);
             newDonations.push(d);
