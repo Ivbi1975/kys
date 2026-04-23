@@ -168,59 +168,31 @@ const GroupDonationRow = memo(function GroupDonationRow({
         );
       case "vekalet":
         return (
-          <td key={colKey} className={cellPad} data-group-cell={`${groupIdx}-${dIdx}-vekalet`}>
+          <td key={colKey} className={cellPad}>
             <div className="flex items-center gap-0.5">
               {d.isFlagged && (
                 <span title={d.flagReason || "Sorunlu bağış"}><AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" /></span>
               )}
-              <LocalInput
-                className={inputClass}
-                value={d.vekalet || ""}
-                onCommit={(v) => handleCommit("vekalet", v)}
-                onKeyDown={handleKeyDown("vekalet")}
-                placeholder="—"
-                aria-label={`Satır ${dIdx + 1} Vekalet`}
-              />
+              <span className={`${inputH} flex items-center uppercase select-text`}>{d.vekalet || "—"}</span>
             </div>
           </td>
         );
       case "description":
         return (
-          <td key={colKey} className={cellPad} data-group-cell={`${groupIdx}-${dIdx}-description`}>
-            <LocalInput
-              className={inputClass}
-              value={d.description}
-              onCommit={(v) => handleCommit("description", v)}
-              onKeyDown={handleKeyDown("description")}
-              placeholder="—"
-              aria-label={`Satır ${dIdx + 1} Açıklama`}
-            />
+          <td key={colKey} className={cellPad}>
+            <span className={`${inputH} flex items-center uppercase select-text`}>{d.description || "—"}</span>
           </td>
         );
       case "name":
         return (
-          <td key={colKey} className={cellPad} data-group-cell={`${groupIdx}-${dIdx}-name`}>
-            <LocalInput
-              className={inputClass}
-              value={d.name}
-              onCommit={(v) => handleCommit("name", v)}
-              onKeyDown={handleKeyDown("name")}
-              placeholder="—"
-              aria-label={`Satır ${dIdx + 1} Ad Soyad`}
-            />
+          <td key={colKey} className={cellPad}>
+            <span className={`${inputH} flex items-center uppercase select-text`}>{d.name || "—"}</span>
           </td>
         );
       case "donationType":
         return (
-          <td key={colKey} className={cellPad} data-group-cell={`${groupIdx}-${dIdx}-donationType`}>
-            <LocalInput
-              className={inputClass}
-              value={d.donationType}
-              onCommit={(v) => handleCommit("donationType", v)}
-              onKeyDown={handleKeyDown("donationType")}
-              placeholder="—"
-              aria-label={`Satır ${dIdx + 1} Bağış Türü`}
-            />
+          <td key={colKey} className={cellPad}>
+            <span className={`${inputH} flex items-center uppercase select-text`}>{d.donationType || "—"}</span>
           </td>
         );
       case "notes":

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  AlertTriangle, Eye, EyeOff, Flag, MoreHorizontal, ShoppingBag, Tag, Trash2, UserCog, Wand2,
+  AlertTriangle, Eye, EyeOff, Flag, MoreHorizontal, ShoppingBag, Tag, Trash2, Wand2,
 } from "lucide-react";
 
 interface DonorRowProps {
@@ -41,24 +41,14 @@ interface DonorRowProps {
   onUnflagDonation?: (id: string) => void;
 }
 
-function EditableCell({
-  d, field, isEditing, editDraft, onSetEditDraft, onCommitEdit, onKeyDown, onStartEditing, displayValue,
-}: {
+function EditableCell({ displayValue }: {
   d: Donation; field: string; isEditing: boolean; editDraft: string;
   onSetEditDraft: (v: string) => void; onCommitEdit: () => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>, id: string, field: string) => void;
   onStartEditing: (id: string, field: string) => void; displayValue: string;
 }) {
-  if (isEditing) {
-    return (
-      <Input className="h-7 text-sm ring-2 ring-primary/40 bg-primary/5" value={editDraft}
-        onChange={(e) => onSetEditDraft(e.target.value)} onBlur={() => onCommitEdit()}
-        onKeyDown={(e) => onKeyDown(e, d.id, field)} autoFocus />
-    );
-  }
   return (
-    <span className="cursor-text block px-1 py-0.5 rounded hover:bg-muted/50 transition-colors"
-      onClick={() => onStartEditing(d.id, field)}>{displayValue || "—"}</span>
+    <span className="block px-1 py-0.5 uppercase select-text">{displayValue || "—"}</span>
   );
 }
 
@@ -240,21 +230,7 @@ function DonorRowInner({
         onKeyDown={onKeyDown} onStartEditing={onStartEditing} displayValue={d.vekalet} />
     </td>
     <td className="p-2">
-      {isEditing && editField === "description" ? (
-        <Input className="h-7 text-sm ring-2 ring-primary/40 bg-primary/5" value={editDraft}
-          onChange={(e) => onSetEditDraft(e.target.value)} onBlur={() => onCommitEdit()}
-          onKeyDown={(e) => onKeyDown(e, d.id, "description")} autoFocus />
-      ) : (
-        <div className="flex items-center gap-1">
-          <span className="cursor-text flex-1 block px-1 py-0.5 rounded hover:bg-muted/50 transition-colors"
-            onClick={() => onStartEditing(d.id, "description")}>{d.description || "—"}</span>
-          {d.description && descCount > 1 && (
-            <Button variant="ghost" size="sm" className="h-5 w-5 p-0 shrink-0"
-              title="Bu kişinin tüm kayıtlarını düzenle" aria-label="Bu kişinin tüm kayıtlarını düzenle"
-              onClick={() => onSetPersonEditDesc(d.description)}><UserCog className="w-3 h-3 text-muted-foreground" /></Button>
-          )}
-        </div>
-      )}
+      <span className="block px-1 py-0.5 uppercase select-text">{d.description || "—"}</span>
     </td>
     <td className="p-2">
       <EditableCell d={d} field="name" isEditing={isEditing && editField === "name"}
