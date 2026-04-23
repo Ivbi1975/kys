@@ -28,7 +28,6 @@ const SORT_KEY_MAP: Partial<Record<TableColumnKey, string>> = {
 };
 
 const EDITABLE_COLUMNS: Set<TableColumnKey> = new Set([
-  "vekalet", "name", "description", "donationType",
   "birim", "temsilci", "ozellik", "fiyat",
   "yerTalebi", "gunTalebi", "ilkHayvan", "safi", "notes",
   "phone", "shareCount",
@@ -101,8 +100,35 @@ function getFieldValue(d: PoolDonation, key: TableColumnKey): string {
   }
 }
 
-function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean) {
+function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean, missedCount?: number) {
   switch (key) {
+    case "vekalet":
+      return (
+        <>
+          {d.isFlagged && (
+            <span className="mr-1 text-amber-500" title={d.flagReason || "Sorunlu bağış"}>
+              <AlertTriangle className="w-3 h-3 inline" />
+            </span>
+          )}
+          <span className="uppercase">{d.vekalet || "—"}</span>
+          {isMultiLoc && (
+            <span className="ml-1 text-orange-500" title="Bu vekalet birden fazla listede mevcut">
+              <AlertTriangle className="w-3 h-3 inline" />
+            </span>
+          )}
+          {missedCount && missedCount > 0 ? (
+            <span
+              className="ml-1 inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[10px] font-semibold px-1.5 py-0 leading-tight border border-blue-200 dark:border-blue-700 cursor-default"
+              title={`Bu bağışçının ${missedCount} adet daha bağışı bu filtreye girmedi`}
+            >
+              +{missedCount}
+            </span>
+          ) : null}
+        </>
+      );
+    case "name": return <span className="font-medium uppercase">{d.name || "—"}</span>;
+    case "description": return <span className="uppercase">{d.description || "—"}</span>;
+    case "donationType": return <span className="uppercase">{d.donationType || "—"}</span>;
     case "kesimAlani": return <Badge variant="outline" className="text-xs">{d.kesimAlaniName}</Badge>;
     case "durum": {
       const { label, color } = getStatusLabel(d);
@@ -480,7 +506,7 @@ export function VirtualizedDonationTable({
 
                             return (
                               <td key={col.key} className={`p-2 text-xs overflow-hidden text-ellipsis whitespace-nowrap ${col.key === "vekalet" ? "font-mono" : ""}`}>
-                                {renderReadOnlyCell(d, col.key, isMultiLoc)}
+                                {renderReadOnlyCell(d, col.key, isMultiLoc, col.key === "vekalet" ? missedCount : undefined)}
                               </td>
                             );
                           })}
