@@ -127,6 +127,7 @@ export default function Home() {
         </div>
 
         <HomeDialogs
+          onBulkCreate={() => setBulkCreateProjectId(null)}
           importModeOpen={state.importModeOpen}
           setImportModeOpen={state.setImportModeOpen}
           pendingImportJson={state.pendingImportJson}

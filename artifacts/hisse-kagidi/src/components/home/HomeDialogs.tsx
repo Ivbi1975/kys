@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Upload, FolderPlus } from "lucide-react";
+import { Plus, Trash2, Upload, FolderPlus, Layers } from "lucide-react";
 import type { Project } from "@/lib/types";
 import type { HomeState } from "@/hooks/useHomeState";
 
@@ -40,7 +40,9 @@ type HomeDialogsProps = Pick<HomeState,
   | "permanentDeleteConfirm" | "setPermanentDeleteConfirm" | "executePermanentDelete"
   | "permanentDeleteProjectConfirm" | "setPermanentDeleteProjectConfirm" | "executePermanentDeleteProject"
   | "deleteProjectConfirm" | "setDeleteProjectConfirm" | "handleDeleteProject"
->;
+> & {
+  onBulkCreate?: () => void;
+};
 
 export function HomeDialogs(props: HomeDialogsProps) {
   return (
@@ -73,6 +75,13 @@ export function HomeDialogs(props: HomeDialogsProps) {
           handleCreate={props.handleCreate}
           projects={props.projects}
         />
+
+        {props.onBulkCreate && (
+          <Button variant="outline" size="default" onClick={props.onBulkCreate}>
+            <Layers className="w-4 h-4 mr-2" />
+            Toplu Ekle
+          </Button>
+        )}
       </div>
 
       <EditProjectDialog

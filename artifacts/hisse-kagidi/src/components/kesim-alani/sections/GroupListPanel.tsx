@@ -74,15 +74,13 @@ export function GroupListPanel() {
   }, [filteredGroupItems.length]);
 
   useEffect(() => {
-    if (!allShown) return;
-    const onScroll = () => {
-      if (!groupsListBottomRef.current) return;
-      const rect = groupsListBottomRef.current.getBoundingClientRect();
-      setAtBottom(rect.top <= window.innerHeight + 80);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
+    if (!allShown || !groupsListBottomRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setAtBottom(entry.isIntersecting),
+      { threshold: 0, rootMargin: "80px 0px" }
+    );
+    observer.observe(groupsListBottomRef.current);
+    return () => observer.disconnect();
   }, [allShown]);
 
   const handleGroupSearch = useCallback(() => {
