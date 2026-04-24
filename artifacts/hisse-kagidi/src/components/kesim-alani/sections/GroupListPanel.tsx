@@ -23,6 +23,9 @@ import { GroupBulkLockPopover } from "./GroupBulkLockPopover";
 
 export function GroupListPanel() {
   const ctx = useKesimAlaniContext();
+  const groupsListBottomRef = useRef<HTMLDivElement>(null);
+  const [atBottom, setAtBottom] = useState(false);
+
   const {
     kesim, addEmptyGroup, basketItemIds, bulkChangeGroupDonationType, bulkGroupEditField,
     bulkGroupEditOpen, bulkGroupEditValue, bulkMoveTargetGroup, bulkMoveToGroup,
@@ -59,14 +62,28 @@ export function GroupListPanel() {
   const [groupSearchInput, setGroupSearchInput] = useState("");
   const PAGE_SIZE = 5;
   const [visibleGroupCount, setVisibleGroupCount] = useState(PAGE_SIZE);
+  const [allShown, setAllShown] = useState(false);
   const prevFilteredLengthRef = useRef(filteredGroupItems.length);
 
   useEffect(() => {
     if (prevFilteredLengthRef.current !== filteredGroupItems.length) {
       setVisibleGroupCount(PAGE_SIZE);
+      setAllShown(false);
       prevFilteredLengthRef.current = filteredGroupItems.length;
     }
   }, [filteredGroupItems.length]);
+
+  useEffect(() => {
+    if (!allShown) return;
+    const onScroll = () => {
+      if (!groupsListBottomRef.current) return;
+      const rect = groupsListBottomRef.current.getBoundingClientRect();
+      setAtBottom(rect.top <= window.innerHeight + 80);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [allShown]);
 
   const handleGroupSearch = useCallback(() => {
     setGroupSearchQuery(groupSearchInput);
@@ -337,11 +354,30 @@ export function GroupListPanel() {
             ))}
             {hasMore && (
               <div className="flex justify-center gap-2 py-4">
-                <Button variant="outline" onClick={() => setVisibleGroupCount(filteredGroupItems.length)}>
+                <Button variant="outline" onClick={() => { setVisibleGroupCount(filteredGroupItems.length); setAllShown(true); }}>
                   <ChevronDown className="w-4 h-4 mr-2" />
                   Tüm Grupları Göster ({remaining} kaldı)
                 </Button>
               </div>
+            )}
+            <div ref={groupsListBottomRef} />
+            {allShown && (
+              <button
+                onClick={() => {
+                  if (atBottom) {
+                    groupsHeaderRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  } else {
+                    groupsListBottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+                  }
+                }}
+                className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-10 h-10 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all duration-200"
+                title={atBottom ? "En yukarıya git" : "En aşağıya git"}
+              >
+                {atBottom
+                  ? <ArrowUp className="w-5 h-5" />
+                  : <ArrowDown className="w-5 h-5" />
+                }
+              </button>
             )}
           </>
         );
