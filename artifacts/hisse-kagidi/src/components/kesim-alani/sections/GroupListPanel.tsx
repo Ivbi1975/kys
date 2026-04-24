@@ -336,10 +336,10 @@ export function GroupListPanel() {
               </div>
             ))}
             {hasMore && (
-              <div className="flex justify-center py-4">
-                <Button variant="outline" onClick={() => setVisibleGroupCount(c => c + PAGE_SIZE)}>
+              <div className="flex justify-center gap-2 py-4">
+                <Button variant="outline" onClick={() => setVisibleGroupCount(filteredGroupItems.length)}>
                   <ChevronDown className="w-4 h-4 mr-2" />
-                  Diğer Gruplar ({Math.min(remaining, PAGE_SIZE)} daha göster, toplam {remaining} kaldı)
+                  Tüm Grupları Göster ({remaining} kaldı)
                 </Button>
               </div>
             )}
