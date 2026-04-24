@@ -91,6 +91,18 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
           onClick={() => go("/")}
         />
 
+        {/* Bağış Havuzu per project — at the top */}
+        {activeProjects.map(project => (
+          <NavItem
+            key={`havuz-${project.id}`}
+            collapsed={collapsed}
+            icon={<Inbox className="h-3.5 w-3.5 flex-shrink-0" />}
+            label={`Havuz: ${project.name}`}
+            active={location === `/bagis-havuzu/${project.id}`}
+            onClick={() => go(`/bagis-havuzu/${project.id}`)}
+          />
+        ))}
+
         {/* Projects */}
         {activeProjects.map(project => {
           const kesimList = getKesimForProject(project.id);
@@ -160,18 +172,6 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
             ))}
           </div>
         )}
-
-        {/* Bağış Havuzu per project */}
-        {activeProjects.map(project => (
-          <NavItem
-            key={`havuz-${project.id}`}
-            collapsed={collapsed}
-            icon={<Inbox className="h-3.5 w-3.5 flex-shrink-0" />}
-            label={`Havuz: ${project.name}`}
-            active={location === `/bagis-havuzu/${project.id}`}
-            onClick={() => go(`/bagis-havuzu/${project.id}`)}
-          />
-        ))}
 
         {/* Çöp Kutusu */}
         <NavItem

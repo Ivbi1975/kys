@@ -91,7 +91,7 @@ function ProtectedRouterInner() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       const stored = localStorage.getItem("sidebar-collapsed");
-      return stored === null ? true : stored === "1";
+      return stored === null ? false : stored === "1";
     } catch { return true; }
   });
 
