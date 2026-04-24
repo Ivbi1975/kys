@@ -1,5 +1,6 @@
 import { QRCodeSVG } from "qrcode.react";
 import type { KesimAlani, AnimalGroup } from "@/lib/types";
+import { turkishTitleCase } from "@/lib/formatting";
 import type { PrintPreferences } from "@/lib/storage";
 import type { ColumnKey } from "./printHelpers";
 import { COLUMNS, getAiLabel, getCellContent } from "./printHelpers";
@@ -141,8 +142,8 @@ export function CompactTemplate(props: TemplateProps) {
               <tbody>
                 {pageGroups.map((group) => {
                   const filledDonors = group.donations.filter(d => d.name.trim());
-                  const donorNames = filledDonors.filter(d => !shouldHideContent("adina-kesilen", d.donationType)).map(d => d.name).join(", ");
-                  const vekaletNames = filledDonors.filter(d => !shouldHideContent("vekaleti-veren", d.donationType)).map(d => d.description).filter(Boolean).join(", ");
+                  const donorNames = filledDonors.filter(d => !shouldHideContent("adina-kesilen", d.donationType)).map(d => turkishTitleCase(d.name)).join(", ");
+                  const vekaletNames = filledDonors.filter(d => !shouldHideContent("vekaleti-veren", d.donationType)).map(d => turkishTitleCase(d.description)).filter(Boolean).join(", ");
                   const cinsTypes = [...new Set(filledDonors.filter(d => !shouldHideContent("cinsi", d.donationType)).map(d => d.donationType).filter(Boolean))].join(", ");
                   const groupNotes = [...new Set(filledDonors.filter(d => !shouldHideContent("notlar", d.donationType)).map(d => {
                     const note = d.notes || "";
@@ -215,9 +216,9 @@ export function NameListTemplate(props: TemplateProps) {
                   <tr key={i}>
                     <td style={{ textAlign: "center" }}>{pageIdx * rowsPerPage + i + 1}</td>
                     <td style={{ textAlign: "center", fontWeight: 700 }}>{d.animalNo}</td>
-                    <td>{d.name}</td>
-                    <td>{d.description}</td>
-                    <td style={{ textAlign: "center" }}>{d.donationType}</td>
+                    <td>{turkishTitleCase(d.name)}</td>
+                    <td>{turkishTitleCase(d.description)}</td>
+                    <td style={{ textAlign: "center" }}>{turkishTitleCase(d.donationType)}</td>
                     <td style={{ textAlign: "center" }}>{d.shareCount}</td>
                   </tr>
                 ))}
@@ -307,8 +308,8 @@ export function SummaryTemplate(props: TemplateProps) {
                 <tbody>
                   {pageGroups.map((group) => {
                     const filled = group.donations.filter(d => d.name.trim());
-                    const names = filled.filter(d => !shouldHideContent("adina-kesilen", d.donationType)).map(d => d.name).join(", ");
-                    const vekalets = filled.filter(d => !shouldHideContent("vekaleti-veren", d.donationType)).map(d => d.description).filter(Boolean).join(", ");
+                    const names = filled.filter(d => !shouldHideContent("adina-kesilen", d.donationType)).map(d => turkishTitleCase(d.name)).join(", ");
+                    const vekalets = filled.filter(d => !shouldHideContent("vekaleti-veren", d.donationType)).map(d => turkishTitleCase(d.description)).filter(Boolean).join(", ");
                     const types = [...new Set(filled.filter(d => !shouldHideContent("cinsi", d.donationType)).map(d => d.donationType).filter(Boolean))].join(", ");
                     const notes = [...new Set(filled.filter(d => !shouldHideContent("notlar", d.donationType)).map(d => {
                       const note = d.notes || "";

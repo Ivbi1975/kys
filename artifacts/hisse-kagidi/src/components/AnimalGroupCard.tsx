@@ -6,6 +6,7 @@ import { LocalInput } from "@/components/LocalInput";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag, Team } from "@/lib/types";
 import { COLOR_MAP } from "@/lib/constants";
+import { turkishTitleCase } from "@/lib/formatting";
 import type { ColumnKey } from "@/lib/useWorkspacePreferences";
 import { GroupFlagPopover } from "@/components/animal-group/GroupFlagPopover";
 import {
@@ -173,26 +174,26 @@ const GroupDonationRow = memo(function GroupDonationRow({
               {d.isFlagged && (
                 <span title={d.flagReason || "Sorunlu bağış"}><AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" /></span>
               )}
-              <span className={`${inputH} flex items-center uppercase select-text`}>{d.vekalet || "—"}</span>
+              <span className={`${inputH} flex items-center select-text`}>{turkishTitleCase(d.vekalet) || "—"}</span>
             </div>
           </td>
         );
       case "description":
         return (
           <td key={colKey} className={cellPad}>
-            <span className={`${inputH} flex items-center uppercase select-text`}>{d.description || "—"}</span>
+            <span className={`${inputH} flex items-center select-text`}>{turkishTitleCase(d.description) || "—"}</span>
           </td>
         );
       case "name":
         return (
           <td key={colKey} className={cellPad}>
-            <span className={`${inputH} flex items-center uppercase select-text`}>{d.name || "—"}</span>
+            <span className={`${inputH} flex items-center select-text`}>{turkishTitleCase(d.name) || "—"}</span>
           </td>
         );
       case "donationType":
         return (
           <td key={colKey} className={cellPad}>
-            <span className={`${inputH} flex items-center uppercase select-text`}>{d.donationType || "—"}</span>
+            <span className={`${inputH} flex items-center select-text`}>{turkishTitleCase(d.donationType) || "—"}</span>
           </td>
         );
       case "notes":

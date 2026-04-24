@@ -1,3 +1,10 @@
+export function turkishTitleCase(str: string | null | undefined): string {
+  if (!str) return str ?? "";
+  return str
+    .toLocaleLowerCase("tr-TR")
+    .replace(/(?:^|\s)\S/g, (ch) => ch.toLocaleUpperCase("tr-TR"));
+}
+
 export function formatDate(dateStr: string): string {
   try {
     const date = new Date(dateStr);

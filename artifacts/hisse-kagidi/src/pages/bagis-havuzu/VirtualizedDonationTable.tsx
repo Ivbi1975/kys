@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { AlertTriangle, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, Flag, FlagOff } from "lucide-react";
 import type { PoolDonation } from "@/lib/types";
 import { ALL_TABLE_COLUMNS, getStatusLabel, type TableColumnKey } from "./types";
+import { turkishTitleCase } from "@/lib/formatting";
 
 const SORT_KEY_MAP: Partial<Record<TableColumnKey, string>> = {
   vekalet: "vekalet",
@@ -106,7 +107,7 @@ function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
               <AlertTriangle className="w-3 h-3 inline" />
             </span>
           )}
-          <span className="uppercase">{d.vekalet || "—"}</span>
+          <span>{turkishTitleCase(d.vekalet) || "—"}</span>
           {isMultiLoc && (
             <span className="ml-1 text-orange-500" title="Bu vekalet birden fazla listede mevcut">
               <AlertTriangle className="w-3 h-3 inline" />
@@ -122,9 +123,9 @@ function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
           ) : null}
         </>
       );
-    case "name": return <span className="font-medium uppercase">{d.name || "—"}</span>;
-    case "description": return <span className="uppercase">{d.description || "—"}</span>;
-    case "donationType": return <span className="uppercase">{d.donationType || "—"}</span>;
+    case "name": return <span className="font-medium">{turkishTitleCase(d.name) || "—"}</span>;
+    case "description": return <span>{turkishTitleCase(d.description) || "—"}</span>;
+    case "donationType": return <span>{turkishTitleCase(d.donationType) || "—"}</span>;
     case "notes": return <span className="max-w-[150px] truncate block" title={d.notes}>{d.notes || "—"}</span>;
     case "phone": return <span>{d.phone || "—"}</span>;
     case "shareCount": return <span className="font-bold">{d.shareCount ?? 1}</span>;
@@ -148,7 +149,7 @@ function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
           )}
         </>
       );
-    default: return <span>{getFieldValue(d, key) || "—"}</span>;
+    default: return <span>{turkishTitleCase(getFieldValue(d, key)) || "—"}</span>;
   }
 }
 
@@ -162,7 +163,7 @@ function renderDisplayValue(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
               <AlertTriangle className="w-3 h-3 inline" />
             </span>
           )}
-          {d.vekalet || "—"}
+          {turkishTitleCase(d.vekalet) || "—"}
           {isMultiLoc && (
             <span className="ml-1 text-orange-500" title="Bu vekalet birden fazla listede mevcut">
               <AlertTriangle className="w-3 h-3 inline" />
@@ -178,11 +179,11 @@ function renderDisplayValue(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
           ) : null}
         </>
       );
-    case "name": return <span className="font-medium">{d.name || "—"}</span>;
+    case "name": return <span className="font-medium">{turkishTitleCase(d.name) || "—"}</span>;
     case "notes": return <span className="max-w-[150px] truncate block" title={d.notes}>{d.notes || "—"}</span>;
     case "phone": return d.phone || "—";
     case "shareCount": return <span className="font-bold">{d.shareCount ?? 1}</span>;
-    default: return getFieldValue(d, key) || "—";
+    default: return turkishTitleCase(getFieldValue(d, key)) || "—";
   }
 }
 

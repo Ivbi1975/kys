@@ -1,4 +1,5 @@
 import type { AnimalGroup } from "@/lib/types";
+import { turkishTitleCase } from "@/lib/formatting";
 
 export const COLUMNS = [
   { key: "hayvan", label: "HAYVAN" },
@@ -37,10 +38,10 @@ export function getAiLabel(d: AnimalGroup["donations"][0]): string {
 
 export function getCellContent(columnKey: ColumnKey, d: AnimalGroup["donations"][0]): string {
   switch (columnKey) {
-    case "vekalet": return d.vekalet || "";
-    case "vekaleti-veren": return d.description || "";
-    case "adina-kesilen": return d.name || "";
-    case "cinsi": return d.donationType || "";
+    case "vekalet": return turkishTitleCase(d.vekalet);
+    case "vekaleti-veren": return turkishTitleCase(d.description);
+    case "adina-kesilen": return turkishTitleCase(d.name);
+    case "cinsi": return turkishTitleCase(d.donationType);
     case "notlar": {
       const notes = d.notes || "";
       const ai = getAiLabel(d);
