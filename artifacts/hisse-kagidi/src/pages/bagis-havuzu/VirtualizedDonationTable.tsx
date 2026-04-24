@@ -27,11 +27,7 @@ const SORT_KEY_MAP: Partial<Record<TableColumnKey, string>> = {
   kesimAlani: "kesimAlaniId",
 };
 
-const EDITABLE_COLUMNS: Set<TableColumnKey> = new Set([
-  "birim", "temsilci", "ozellik", "fiyat",
-  "yerTalebi", "gunTalebi", "ilkHayvan", "safi", "notes",
-  "phone", "shareCount",
-]);
+const EDITABLE_COLUMNS: Set<TableColumnKey> = new Set([]);
 
 interface VirtualizedDonationTableProps {
   items: PoolDonation[];
@@ -129,6 +125,9 @@ function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
     case "name": return <span className="font-medium uppercase">{d.name || "—"}</span>;
     case "description": return <span className="uppercase">{d.description || "—"}</span>;
     case "donationType": return <span className="uppercase">{d.donationType || "—"}</span>;
+    case "notes": return <span className="max-w-[150px] truncate block" title={d.notes}>{d.notes || "—"}</span>;
+    case "phone": return <span>{d.phone || "—"}</span>;
+    case "shareCount": return <span className="font-bold">{d.shareCount ?? 1}</span>;
     case "kesimAlani": return <Badge variant="outline" className="text-xs">{d.kesimAlaniName}</Badge>;
     case "durum": {
       const { label, color } = getStatusLabel(d);
@@ -149,7 +148,7 @@ function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
           )}
         </>
       );
-    default: return "—";
+    default: return <span>{getFieldValue(d, key) || "—"}</span>;
   }
 }
 
