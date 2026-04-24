@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui/card";
-import { FolderOpen, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { FolderOpen, ChevronRight, Plus } from "lucide-react";
 import type { KesimAlani } from "@/lib/types";
 import type { Project } from "@/lib/types";
 import { getTotalShares } from "@/lib/grouping";
@@ -8,9 +9,10 @@ interface ProjectCardProps {
   project: Project;
   kesimAlanlari: KesimAlani[];
   onNavigate: (projectId: string) => void;
+  onBulkCreate?: (projectId: string) => void;
 }
 
-export function ProjectCard({ project, kesimAlanlari, onNavigate }: ProjectCardProps) {
+export function ProjectCard({ project, kesimAlanlari, onNavigate, onBulkCreate }: ProjectCardProps) {
   const projectKesimAlanlari = kesimAlanlari.filter(k => k.projectId === project.id);
 
   const projTotals = projectKesimAlanlari.reduce((acc, k) => {
@@ -42,7 +44,19 @@ export function ProjectCard({ project, kesimAlanlari, onNavigate }: ProjectCardP
           <div className="flex-1 min-w-0">
             <h2 className="font-semibold text-foreground text-lg">{project.name}</h2>
             <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-              <span>{projTotals.areas} kesim alanı</span>
+              <span className="flex items-center gap-1">
+                {projTotals.areas} kesim alanı
+                {onBulkCreate && (
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/20 hover:bg-primary/40 text-primary transition-colors"
+                    title="Toplu kesim alanı ekle"
+                    onClick={(e) => { e.stopPropagation(); onBulkCreate(project.id); }}
+                  >
+                    <Plus className="w-2.5 h-2.5" />
+                  </button>
+                )}
+              </span>
               <span>{projTotals.donors} bağışçı</span>
               <span>{projTotals.shares} hisse</span>
               <span>{projTotals.groups} grup</span>

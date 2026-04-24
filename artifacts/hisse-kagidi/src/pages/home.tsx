@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Search, LogOut } from "lucide-react";
@@ -5,6 +6,7 @@ import { HomeSkeleton } from "@/components/skeletons/HomeSkeleton";
 import QrCodeModal from "@/components/QrCodeModal";
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { BulkCreateKesimAlaniCountDialog } from "@/components/proje-detay/BulkCreateKesimAlaniCountDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +28,7 @@ import { ArchiveSection } from "@/components/home/ArchiveSection";
 
 export default function Home() {
   const state = useHomeState();
+  const [bulkCreateProjectId, setBulkCreateProjectId] = useState<string | null>(null);
 
   if (state.showSkeleton) {
     return <HomeSkeleton />;
@@ -197,6 +200,7 @@ export default function Home() {
                 project={project}
                 kesimAlanlari={state.kesimAlanlari}
                 onNavigate={(projectId) => state.setLocation(`/proje/${projectId}`)}
+                onBulkCreate={(projectId) => setBulkCreateProjectId(projectId)}
               />
             ))}
 
@@ -245,6 +249,13 @@ export default function Home() {
       <GlobalSearchDialog
         open={state.globalSearchOpen}
         onOpenChange={state.setGlobalSearchOpen}
+      />
+
+      <BulkCreateKesimAlaniCountDialog
+        open={bulkCreateProjectId !== null}
+        onOpenChange={(open) => { if (!open) setBulkCreateProjectId(null); }}
+        projectId={bulkCreateProjectId}
+        onSuccess={state.refreshData}
       />
     </div>
   );

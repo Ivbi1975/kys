@@ -110,6 +110,25 @@ export function useHomeState() {
   const [importModeOpen, setImportModeOpen] = useState(false);
   const [pendingImportJson, setPendingImportJson] = useState<string | null>(null);
 
+  const refreshData = useCallback(async () => {
+    try {
+      const homeData = await fetchHomeData();
+      setKesimAlanlari(homeData.kesimAlanlari);
+      setGlobalTags(homeData.tags);
+      setLogoPreview(homeData.logo);
+      setProjects(homeData.projects);
+      setDeletedKesimAlanlari(homeData.deletedKesimAlanlari);
+      setDeletedProjects(homeData.deletedProjects);
+      setArchivedProjects(homeData.archivedProjects);
+    } catch (err) {
+      toast({
+        title: "Veri yüklenemedi",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
   useEffect(() => {
     async function init() {
       const MIGRATION_FLAG = "hisse-kagidi-migrated-to-db";
@@ -119,24 +138,8 @@ export function useHomeState() {
           if (migrated) setMigrationDone(true);
         } catch {}
       }
-      try {
-        const homeData = await fetchHomeData();
-        setKesimAlanlari(homeData.kesimAlanlari);
-        setGlobalTags(homeData.tags);
-        setLogoPreview(homeData.logo);
-        setProjects(homeData.projects);
-        setDeletedKesimAlanlari(homeData.deletedKesimAlanlari);
-        setDeletedProjects(homeData.deletedProjects);
-        setArchivedProjects(homeData.archivedProjects);
-      } catch (err) {
-        toast({
-          title: "Veri yüklenemedi",
-          description: err instanceof Error ? err.message : "Bilinmeyen hata",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
+      await refreshData();
+      setLoading(false);
     }
     init();
   }, []);
@@ -759,6 +762,7 @@ export function useHomeState() {
     deletedKADetails,
     deletedKALoadingIds,
     handleFetchDeletedKADetail,
+    refreshData,
   };
 }
 

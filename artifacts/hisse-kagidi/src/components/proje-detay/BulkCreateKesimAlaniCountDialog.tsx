@@ -8,7 +8,7 @@ import { bulkCreateKesimAlanlari } from "@/lib/api";
 interface BulkCreateKesimAlaniCountDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  projectId: string;
+  projectId: string | null;
   onSuccess: () => void;
 }
 
