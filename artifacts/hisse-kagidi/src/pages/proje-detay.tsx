@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchPoolStats } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
@@ -17,6 +19,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { ProjeDetaySkeleton } from "@/components/skeletons/ProjeDetaySkeleton";
 import { useProjeDetayState } from "@/hooks/useProjeDetayState";
 import { ProjectSummaryCard } from "@/components/proje-detay/ProjectSummaryCard";
+import { PoolSummaryCard } from "@/components/proje-detay/PoolSummaryCard";
 import { PendingEditRequestsCard } from "@/components/proje-detay/PendingEditRequestsCard";
 import { KesimAlaniList } from "@/components/proje-detay/KesimAlaniList";
 import { SplitModal } from "@/components/proje-detay/SplitModal";
@@ -28,6 +31,14 @@ import { BulkCreateKesimAlaniCountDialog } from "@/components/proje-detay/BulkCr
 export default function ProjeDetayPage() {
   const state = useProjeDetayState();
   const [bulkCountOpen, setBulkCountOpen] = useState(false);
+
+  const projectId = state.project?.id ?? "";
+  const { data: poolStats, isLoading: poolStatsLoading } = useQuery({
+    queryKey: ["pool-stats", projectId, {}],
+    queryFn: () => fetchPoolStats(projectId),
+    enabled: !!projectId,
+    staleTime: 30_000,
+  });
 
   if (state.loading) {
     return <ProjeDetaySkeleton />;
@@ -151,6 +162,12 @@ export default function ProjeDetayPage() {
             </div>
           </div>
         </div>
+
+        <PoolSummaryCard
+          stats={poolStats}
+          loading={poolStatsLoading && !poolStats}
+          onNavigate={() => state.setLocation(`/bagis-havuzu/${state.project!.id}`)}
+        />
 
         <ProjectSummaryCard totals={state.totals} occupancy={state.occupancy} />
 
