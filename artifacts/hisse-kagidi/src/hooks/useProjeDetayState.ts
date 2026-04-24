@@ -363,6 +363,7 @@ export function useProjeDetayState() {
     loading,
     project,
     kesimAlanlari,
+    refreshData: loadDataFn,
     allKesimAlanlari,
     dialogOpen,
     setDialogOpen,

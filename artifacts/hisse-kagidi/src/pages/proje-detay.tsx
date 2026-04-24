@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
@@ -22,9 +23,11 @@ import { SplitModal } from "@/components/proje-detay/SplitModal";
 import { ConflictSection } from "@/components/proje-detay/ConflictSection";
 import { TransferLogSection } from "@/components/proje-detay/TransferLogSection";
 import { ProjeDetayDialogs } from "@/components/proje-detay/ProjeDetayDialogs";
+import { BulkCreateKesimAlaniCountDialog } from "@/components/proje-detay/BulkCreateKesimAlaniCountDialog";
 
 export default function ProjeDetayPage() {
   const state = useProjeDetayState();
+  const [bulkCountOpen, setBulkCountOpen] = useState(false);
 
   if (state.loading) {
     return <ProjeDetaySkeleton />;
@@ -134,9 +137,18 @@ export default function ProjeDetayPage() {
               <FolderOpen className="w-5 h-5 text-primary flex-shrink-0" />
               <span className="truncate">{state.project.name}</span>
             </h1>
-            <p className="text-muted-foreground text-sm mt-0.5">
-              {state.kesimAlanlari.length} kesim alanı
-            </p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-muted-foreground text-sm">
+                {state.kesimAlanlari.length} kesim alanı
+              </p>
+              <button
+                onClick={() => setBulkCountOpen(true)}
+                title="Toplu kesim alanı ekle"
+                className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -233,6 +245,13 @@ export default function ProjeDetayPage() {
       <GlobalSearchDialog
         open={state.globalSearchOpen}
         onOpenChange={state.setGlobalSearchOpen}
+      />
+
+      <BulkCreateKesimAlaniCountDialog
+        open={bulkCountOpen}
+        onOpenChange={setBulkCountOpen}
+        projectId={state.project.id}
+        onSuccess={state.refreshData}
       />
     </div>
   );
