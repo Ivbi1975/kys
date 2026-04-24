@@ -103,6 +103,7 @@ export interface KesimAlani {
   kesimListeId?: string | null;
   yetkili?: string | null;
   displayName?: string | null;
+  maxVekalet?: number | null;
   teams?: Team[];
   parentKesimAlaniId?: string | null;
   splitStatus?: string | null;

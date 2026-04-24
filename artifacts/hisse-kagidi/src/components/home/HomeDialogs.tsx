@@ -241,16 +241,19 @@ function CreateKesimAlaniDialog({
   setNewName: (name: string) => void;
   createProjectId: string | null;
   setCreateProjectId: (id: string | null) => void;
-  handleCreate: (displayName?: string) => void;
+  handleCreate: (displayName?: string, maxVekalet?: number | null) => void;
   projects: Project[];
 }) {
   const [displayName, setDisplayName] = useState("");
+  const [maxVekaletStr, setMaxVekaletStr] = useState("");
   const doCreate = () => {
-    handleCreate(displayName || undefined);
+    const maxVekalet = maxVekaletStr.trim() ? parseInt(maxVekaletStr.trim(), 10) : null;
+    handleCreate(displayName || undefined, maxVekalet);
     setDisplayName("");
+    setMaxVekaletStr("");
   };
   return (
-    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setCreateProjectId(null); setDisplayName(""); } }}>
+    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setCreateProjectId(null); setDisplayName(""); setMaxVekaletStr(""); } }}>
       <DialogTrigger asChild>
         <Button size="default">
           <Plus className="w-4 h-4 mr-2" />
@@ -289,6 +292,14 @@ function CreateKesimAlaniDialog({
             placeholder="Çıktıda Görünecek İsim (isteğe bağlı)"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && doCreate()}
+          />
+          <Input
+            type="number"
+            min={1}
+            placeholder="Maksimum Vekalet Sayısı (isteğe bağlı)"
+            value={maxVekaletStr}
+            onChange={(e) => setMaxVekaletStr(e.target.value.replace(/[^0-9]/g, ""))}
             onKeyDown={(e) => e.key === "Enter" && doCreate()}
           />
           <Button onClick={doCreate} className="w-full" disabled={!newName.trim()}>

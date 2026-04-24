@@ -49,6 +49,7 @@ const createKesimAlaniSchema = z.object({
   kesimListeId: z.string().optional().nullable(),
   yetkili: z.string().optional().nullable(),
   displayName: z.string().optional().nullable(),
+  maxVekalet: z.number().int().positive().optional().nullable(),
   projectId: z.string().optional().nullable(),
   donations: z.array(donationPayloadSchema).optional().default([]),
   animalGroups: z.array(animalGroupPayloadSchema).optional().default([]),
@@ -59,6 +60,7 @@ const updateKesimAlaniSchema = z.object({
   kesimListeId: z.string().optional().nullable(),
   yetkili: z.string().optional().nullable(),
   displayName: z.string().optional().nullable(),
+  maxVekalet: z.number().int().positive().optional().nullable(),
   donations: z.array(donationPayloadSchema).optional(),
   animalGroups: z.array(animalGroupPayloadSchema).optional(),
 });
@@ -73,6 +75,7 @@ const updateKesimAlaniChunkedSchema = z.object({
   kesimListeId: z.string().optional().nullable(),
   yetkili: z.string().optional().nullable(),
   displayName: z.string().optional().nullable(),
+  maxVekalet: z.number().int().positive().optional().nullable(),
 }).refine(data => data.chunkIndex < data.totalChunks, {
   message: "chunkIndex must be less than totalChunks",
 });
@@ -220,8 +223,8 @@ router.put("/kesim-alanlari/:id/update-chunked", asyncHandler(async (req, res) =
     res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
     return;
   }
-  const { donations, chunkIndex, totalChunks, sortOrderOffset, allDonationIds, name, kesimListeId, yetkili, displayName } = parsed.data;
-  const metaUpdates = (name !== undefined || kesimListeId !== undefined || yetkili !== undefined || displayName !== undefined) ? { name, kesimListeId, yetkili, displayName } : undefined;
+  const { donations, chunkIndex, totalChunks, sortOrderOffset, allDonationIds, name, kesimListeId, yetkili, displayName, maxVekalet } = parsed.data;
+  const metaUpdates = (name !== undefined || kesimListeId !== undefined || yetkili !== undefined || displayName !== undefined || maxVekalet !== undefined) ? { name, kesimListeId, yetkili, displayName, maxVekalet } : undefined;
   const result = await updateKesimAlaniDonationsChunked(
     req.params.id,
     donations,
