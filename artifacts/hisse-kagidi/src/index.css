@@ -279,12 +279,15 @@
   .print-page {
     box-shadow: none;
     page-break-after: always;
+    break-after: page;
     page-break-inside: avoid;
+    break-inside: avoid;
     margin: 0;
-    padding: 0 5mm;
+    padding: 3mm 8mm;
     width: 100%;
     min-height: auto;
-    max-height: auto;
+    max-height: none;
+    overflow: visible;
   }
 }
 
@@ -459,12 +462,15 @@
   .template-portrait .print-page-portrait {
     box-shadow: none;
     page-break-after: always;
+    break-after: page;
     page-break-inside: avoid;
+    break-inside: avoid;
     margin: 0;
-    padding: 0 5mm;
+    padding: 3mm 8mm;
     width: 100%;
     min-height: auto;
-    max-height: auto;
+    max-height: none;
+    overflow: visible;
   }
 }
 
@@ -479,12 +485,15 @@
   .template-compact .print-page-compact {
     box-shadow: none;
     page-break-after: always;
+    break-after: page;
     page-break-inside: avoid;
+    break-inside: avoid;
     margin: 0;
-    padding: 0 5mm;
+    padding: 3mm 8mm;
     width: 100%;
     min-height: auto;
-    max-height: auto;
+    max-height: none;
+    overflow: visible;
   }
 }
 
@@ -667,12 +676,15 @@
   .template-summary .print-page-compact {
     box-shadow: none;
     page-break-after: always;
+    break-after: page;
     page-break-inside: avoid;
+    break-inside: avoid;
     margin: 0;
-    padding: 0 5mm;
+    padding: 3mm 8mm;
     width: 100%;
     min-height: auto;
-    max-height: auto;
+    max-height: none;
+    overflow: visible;
   }
 }
 
@@ -715,12 +727,15 @@
   .template-namelist .print-page-portrait {
     box-shadow: none;
     page-break-after: always;
+    break-after: page;
     page-break-inside: avoid;
+    break-inside: avoid;
     margin: 0;
-    padding: 0 5mm;
+    padding: 3mm 8mm;
     width: 100%;
     min-height: auto;
-    max-height: auto;
+    max-height: none;
+    overflow: visible;
   }
 }
 
