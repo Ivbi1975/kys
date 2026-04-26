@@ -57,7 +57,7 @@ import type { CustomTag, PoolDonation } from "@/lib/types";
 import { trUpperCase } from "@/lib/utils";
 import { loadBasketFromStorage, saveBasketToStorage } from "@/components/kesim-alani/hooks/types";
 import type { BasketItem } from "@/components/kesim-alani/hooks/types";
-import type { TransferredItem } from "@/lib/api/bagis-havuzu";
+import type { TransferredItem, DonorSiblings } from "@/lib/api/bagis-havuzu";
 
 export default function BagisHavuzuPage() {
   const params = useParams<{ id: string }>();
@@ -144,6 +144,7 @@ export default function BagisHavuzuPage() {
   const [aiErrorBatches, setAiErrorBatches] = useState(0);
   const [aiTotalBatches, setAiTotalBatches] = useState(0);
   const [siblingCount, setSiblingCount] = useState(0);
+  const [siblingsData, setSiblingsData] = useState<DonorSiblings[]>([]);
   const activeJobIdsRef = useRef<string[]>([]);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const columnPickerRef = useRef<HTMLDivElement>(null);
@@ -354,6 +355,7 @@ export default function BagisHavuzuPage() {
       : [...selectedIds];
     if (ids.length === 0) {
       setSiblingCount(0);
+      setSiblingsData([]);
       return;
     }
     clearTimeout(siblingTimerRef.current);
@@ -362,8 +364,10 @@ export default function BagisHavuzuPage() {
         const result = await fetchDonationSiblings(projectId, ids);
         const total = result.siblings.reduce((sum, s) => sum + s.extraCount, 0);
         setSiblingCount(total);
+        setSiblingsData(result.siblings);
       } catch {
         setSiblingCount(0);
+        setSiblingsData([]);
       }
     }, 600);
     return () => clearTimeout(siblingTimerRef.current);
@@ -1286,6 +1290,8 @@ export default function BagisHavuzuPage() {
         <PoolBulkActions
           selectedCount={effectiveSelectedIds.size}
           siblingCount={siblingCount}
+          siblingsData={siblingsData}
+          selectedDonations={items.filter(d => effectiveSelectedIds.has(d.id))}
           onTransferOpen={() => setTransferOpen(true)}
           onBulkAction={handleBulkAction}
           onTagOpen={() => setTagDialogOpen(true)}
