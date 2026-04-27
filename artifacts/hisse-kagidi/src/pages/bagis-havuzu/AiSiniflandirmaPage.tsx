@@ -1,0 +1,599 @@
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useParams, useLocation } from "wouter";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Brain, ArrowLeft, Play, Square, FastForward, RotateCcw,
+  AlertTriangle, Loader2, X, Sparkles, CheckCircle2,
+  MessageSquare, FileText, Tag, Settings2, BarChart3,
+} from "lucide-react";
+import {
+  fetchPoolDonations,
+  fetchJobStatus, cancelJob,
+  classifyNotesAsyncChunked, saveAiClassifications,
+  PartialChunkError, ApiFetchError,
+} from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+import type { AiClassificationResult } from "@/lib/api";
+
+interface AiResult extends AiClassificationResult {
+  donationType?: string;
+  donorName?: string;
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+  "erken_kesim": "bg-orange-100 text-orange-800 border-orange-200",
+  "özel_kesim": "bg-amber-100 text-amber-800 border-amber-200",
+  "2.gün": "bg-yellow-100 text-yellow-800 border-yellow-200",
+  "3.gün": "bg-lime-100 text-lime-800 border-lime-200",
+  "Şafi": "bg-red-100 text-red-800 border-red-200",
+  "mevta_kurbani": "bg-slate-100 text-slate-700 border-slate-200",
+  "adak": "bg-purple-100 text-purple-800 border-purple-200",
+  "akika": "bg-pink-100 text-pink-800 border-pink-200",
+  "vacip": "bg-blue-100 text-blue-800 border-blue-200",
+  "nafile": "bg-cyan-100 text-cyan-800 border-cyan-200",
+  "sünnet": "bg-teal-100 text-teal-800 border-teal-200",
+  "ulke_talebi": "bg-indigo-100 text-indigo-800 border-indigo-200",
+  "sabah_kesimi": "bg-rose-100 text-rose-800 border-rose-200",
+  "ödeme_notu": "bg-emerald-100 text-emerald-800 border-emerald-200",
+  "iletişim_talebi": "bg-violet-100 text-violet-800 border-violet-200",
+  "et_talebi": "bg-green-100 text-green-800 border-green-200",
+  "hayvan_tercihi": "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200",
+  "ilk_hayvan": "bg-sky-100 text-sky-800 border-sky-200",
+  "acil": "bg-red-200 text-red-900 border-red-300",
+};
+
+function CategoryBadge({ cat, onClick, active }: { cat: string; onClick?: () => void; active?: boolean }) {
+  const colorClass = CATEGORY_COLORS[cat] ?? "bg-muted text-muted-foreground border-border";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium cursor-pointer select-none transition-all ${colorClass} ${active ? "ring-2 ring-primary ring-offset-1" : "hover:opacity-80"}`}
+      onClick={onClick}
+    >
+      {cat.replace(/_/g, " ")}
+    </span>
+  );
+}
+
+export default function AiSiniflandirmaPage() {
+  const params = useParams<{ id: string }>();
+  const projectId = params.id || "";
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const [batchSize, setBatchSize] = useState(25);
+  const [skipClassified, setSkipClassified] = useState(false);
+  const [aiRunning, setAiRunning] = useState(false);
+  const [aiStopped, setAiStopped] = useState(false);
+  const [aiResults, setAiResults] = useState<Map<string, AiResult>>(new Map());
+  const [aiProgress, setAiProgress] = useState({ done: 0, total: 0 });
+  const [aiErrorBatches, setAiErrorBatches] = useState(0);
+  const [aiTotalBatches, setAiTotalBatches] = useState(0);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const activeJobIdsRef = useRef<string[]>([]);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const { data: donationsData, isLoading } = useQuery({
+    queryKey: ["pool-donations-ai-page", projectId],
+    queryFn: () => fetchPoolDonations(projectId, { limit: 10000, offset: 0, sortBy: "sortOrder" }),
+    enabled: !!projectId,
+  });
+
+  const allItems = useMemo(() => donationsData?.items ?? [], [donationsData]);
+  const itemsWithNotes = useMemo(
+    () => allItems.filter(d => (d.notes || "").trim() !== ""),
+    [allItems],
+  );
+
+  const stopPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => stopPolling(), [stopPolling]);
+
+  const startPollingJobs = useCallback((jobIds: string[], batchTotal: number) => {
+    stopPolling();
+    const finishedJobs = new Set<string>();
+    const jobProgressMap = new Map<string, { done: number; total: number }>();
+    const jobErrorMap = new Map<string, number>();
+    const jobBatchMap = new Map<string, number>();
+    const allCollectedResults: { donationId: string; categories: string[]; warnings: string; requests?: string; summary?: string }[] = [];
+    let isPolling = false;
+
+    const poll = async () => {
+      if (isPolling) return;
+      isPolling = true;
+      try {
+        const activeIds = jobIds.filter(id => !finishedJobs.has(id));
+        const statuses = await Promise.all(activeIds.map(id => fetchJobStatus(id).catch(() => null)));
+
+        for (let i = 0; i < activeIds.length; i++) {
+          const status = statuses[i];
+          if (!status) continue;
+          const jid = activeIds[i];
+
+          const prev = jobProgressMap.get(jid);
+          jobProgressMap.set(jid, {
+            done: status.processedDonations,
+            total: Math.max(status.totalDonations, prev?.total ?? 0),
+          });
+          if (status.failedBatchCount !== undefined) jobErrorMap.set(jid, status.failedBatchCount);
+          if (status.totalBatches !== undefined) jobBatchMap.set(jid, status.totalBatches);
+
+          if (status.results && status.results.length > 0) {
+            setAiResults(prev => {
+              const next = new Map(prev);
+              for (const r of status.results!) {
+                const cats = Array.isArray(r.categories) ? r.categories : (r.categories ? [String(r.categories)] : []);
+                const donor = allItems.find(d => d.id === r.donationId);
+                next.set(r.donationId, {
+                  ...r,
+                  categories: cats,
+                  warnings: r.warnings || "",
+                  donationType: donor?.donationType || "",
+                  donorName: donor?.description || donor?.name || r.donationId,
+                });
+              }
+              return next;
+            });
+          }
+
+          if (status.status === "completed" || status.status === "failed" || status.status === "cancelled") {
+            finishedJobs.add(jid);
+            if (status.results && status.results.length > 0) {
+              allCollectedResults.push(...status.results.map(r => ({
+                donationId: r.donationId,
+                categories: Array.isArray(r.categories) ? r.categories : [],
+                warnings: r.warnings || "",
+                requests: r.requests || "",
+                summary: r.summary || "",
+              })));
+            }
+            if (status.status === "cancelled") setAiStopped(true);
+            if (status.status === "failed") {
+              toast({ title: "AI İşlemi Başarısız", description: status.error || "Bilinmeyen hata", variant: "destructive" });
+            }
+          }
+        }
+
+        let totalDone = 0, totalAll = 0;
+        for (const p of jobProgressMap.values()) { totalDone += p.done; totalAll += p.total; }
+        setAiProgress({ done: totalDone, total: totalAll });
+
+        let totalErrors = 0;
+        for (const e of jobErrorMap.values()) totalErrors += e;
+        setAiErrorBatches(totalErrors);
+        let totalBatch = 0;
+        for (const b of jobBatchMap.values()) totalBatch += b;
+        setAiTotalBatches(totalBatch);
+
+        if (finishedJobs.size === jobIds.length) {
+          stopPolling();
+          setAiRunning(false);
+          activeJobIdsRef.current = [];
+          if (allCollectedResults.length > 0) {
+            try {
+              const SAVE_CHUNK = 2000;
+              for (let si = 0; si < allCollectedResults.length; si += SAVE_CHUNK) {
+                await saveAiClassifications(allCollectedResults.slice(si, si + SAVE_CHUNK));
+              }
+              queryClient.invalidateQueries({ queryKey: ["pool-donations"] });
+              setSaved(true);
+            } catch {}
+          }
+        }
+      } catch {} finally { isPolling = false; }
+    };
+
+    poll();
+    pollIntervalRef.current = setInterval(poll, 3000);
+  }, [stopPolling, toast, allItems, queryClient]);
+
+  const handleStart = useCallback(async (resume = false) => {
+    let toProcess = itemsWithNotes;
+    if (resume) toProcess = toProcess.filter(d => !aiResults.has(d.id));
+    if (skipClassified) toProcess = toProcess.filter(d => !d.aiCategories || d.aiCategories.length === 0);
+
+    if (toProcess.length === 0) {
+      toast({ title: "İşlenecek bağış yok", description: "Notu olan veya sınıflandırılmamış bağış bulunamadı" });
+      return;
+    }
+
+    setAiRunning(true);
+    setAiStopped(false);
+    setAiErrorBatches(0);
+    setAiTotalBatches(0);
+    setSaved(false);
+    if (!resume) setAiResults(new Map());
+
+    const previouslyDone = resume ? aiResults.size : 0;
+    setAiProgress({ done: previouslyDone, total: previouslyDone + toProcess.length });
+
+    try {
+      const { jobIds } = await classifyNotesAsyncChunked(
+        toProcess.map(d => ({ id: d.id, name: d.description || d.name || "", donationType: d.donationType || "", vekalet: d.vekalet || "", notes: d.notes || "" }))
+      );
+      activeJobIdsRef.current = jobIds;
+      startPollingJobs(jobIds, toProcess.length);
+    } catch (err) {
+      if (err instanceof PartialChunkError && err.jobIds.length > 0) {
+        activeJobIdsRef.current = err.jobIds;
+        startPollingJobs(err.jobIds, toProcess.length);
+        toast({ title: "Kısmi başlatma", description: err.message, variant: "destructive" });
+        return;
+      }
+      setAiRunning(false);
+      const msg = err instanceof Error ? err.message : "Bilinmeyen hata";
+      const details = err instanceof ApiFetchError ? err.details : undefined;
+      const detailStr = details ? details.map((d: { path?: string[]; message?: string }) => `${(d.path || []).join(".")}: ${d.message || ""}`).join(", ") : "";
+      toast({ title: "AI Başlatılamadı", description: detailStr ? `${msg} (${detailStr})` : msg, variant: "destructive" });
+    }
+  }, [itemsWithNotes, skipClassified, aiResults, toast, startPollingJobs]);
+
+  const handleStop = useCallback(async () => {
+    const jobIds = activeJobIdsRef.current;
+    if (jobIds.length > 0) await Promise.all(jobIds.map(id => cancelJob(id).catch(() => {})));
+    setAiStopped(true);
+    setAiRunning(false);
+  }, []);
+
+  const handleSaveNow = useCallback(async () => {
+    if (aiResults.size === 0) return;
+    setSaving(true);
+    try {
+      const toSave = Array.from(aiResults.values()).map(r => ({
+        donationId: r.donationId,
+        categories: r.categories,
+        warnings: r.warnings || "",
+      }));
+      const CHUNK = 2000;
+      for (let i = 0; i < toSave.length; i += CHUNK) {
+        await saveAiClassifications(toSave.slice(i, i + CHUNK));
+      }
+      queryClient.invalidateQueries({ queryKey: ["pool-donations"] });
+      setSaved(true);
+      toast({ title: "Kaydedildi", description: `${toSave.length} bağışçı sınıflandırması güncellendi` });
+    } catch {
+      toast({ title: "Kaydetme hatası", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }, [aiResults, queryClient, toast]);
+
+  const categoryDistribution = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of aiResults.values()) {
+      for (const cat of r.categories) {
+        map.set(cat, (map.get(cat) ?? 0) + 1);
+      }
+    }
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  }, [aiResults]);
+
+  const warningResults = useMemo(
+    () => Array.from(aiResults.values()).filter(r => r.warnings && r.warnings.trim()),
+    [aiResults],
+  );
+
+  const requestResults = useMemo(
+    () => Array.from(aiResults.values()).filter(r => (r as AiResult & { requests?: string }).requests?.trim()),
+    [aiResults],
+  );
+
+  const filteredResults = useMemo(() => {
+    const all = Array.from(aiResults.values());
+    if (!categoryFilter) return all;
+    return all.filter(r => r.categories.some(c => c.toLocaleLowerCase("tr") === categoryFilter.toLocaleLowerCase("tr")));
+  }, [aiResults, categoryFilter]);
+
+  const progressPct = aiProgress.total > 0 ? Math.round((aiProgress.done / aiProgress.total) * 100) : 0;
+
+  return (
+    <div className="flex flex-col h-screen bg-background">
+      <div className="flex items-center gap-3 px-4 py-3 border-b bg-background/95 backdrop-blur sticky top-0 z-10">
+        <Button variant="ghost" size="sm" onClick={() => setLocation(`/bagis-havuzu/${projectId}`)}>
+          <ArrowLeft className="w-4 h-4 mr-1" />Geri
+        </Button>
+        <div className="flex items-center gap-2">
+          <Brain className="w-5 h-5 text-primary" />
+          <h1 className="text-base font-semibold">AI Sınıflandırma</h1>
+        </div>
+        {aiRunning && (
+          <Badge variant="secondary" className="animate-pulse text-xs">
+            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+            {aiProgress.done}/{aiProgress.total} işleniyor
+          </Badge>
+        )}
+        {!aiRunning && aiResults.size > 0 && (
+          <Badge variant="secondary" className="text-xs">{aiResults.size} sonuç</Badge>
+        )}
+        {warningResults.length > 0 && (
+          <Badge variant="destructive" className="text-xs">{warningResults.length} uyarı</Badge>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          {aiResults.size > 0 && !aiRunning && (
+            <Button size="sm" variant={saved ? "outline" : "default"} onClick={handleSaveNow} disabled={saving || saved}>
+              {saving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
+              {saved ? "Kaydedildi" : "Kaydet"}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-1 min-h-0">
+        <div className="w-72 shrink-0 border-r flex flex-col gap-4 p-4 overflow-y-auto">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground mb-3">
+              <Settings2 className="w-4 h-4" />Ayarlar
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Batch boyutu</label>
+                <Select value={String(batchSize)} onValueChange={v => setBatchSize(parseInt(v))} disabled={aiRunning}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5 bağış / istek</SelectItem>
+                    <SelectItem value="10">10 bağış / istek</SelectItem>
+                    <SelectItem value="25">25 bağış / istek</SelectItem>
+                    <SelectItem value="50">50 bağış / istek</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  id="ai-skip"
+                  type="checkbox"
+                  checked={skipClassified}
+                  onChange={e => setSkipClassified(e.target.checked)}
+                  disabled={aiRunning}
+                  className="rounded border-gray-300"
+                />
+                <label htmlFor="ai-skip" className="text-xs text-muted-foreground cursor-pointer select-none">
+                  Daha önce sınıflandırılmış olanları atla
+                </label>
+              </div>
+
+              {isLoading ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />Bağışlar yükleniyor...
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {itemsWithNotes.length} notu olan bağış işlenecek
+                  {allItems.length !== itemsWithNotes.length && (
+                    <span className="block text-[11px]">({allItems.length} bağıştan)</span>
+                  )}
+                </p>
+              )}
+
+              {!aiRunning ? (
+                aiStopped && aiResults.size > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    <Button size="sm" onClick={() => handleStart(true)} className="w-full">
+                      <FastForward className="w-4 h-4 mr-1" />Kaldığı Yerden Devam
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleStart(false)} className="w-full">
+                      <RotateCcw className="w-4 h-4 mr-1" />Yeniden Başla
+                    </Button>
+                  </div>
+                ) : (
+                  <Button size="sm" onClick={() => handleStart(false)} disabled={itemsWithNotes.length === 0 || isLoading} className="w-full">
+                    <Play className="w-4 h-4 mr-1" />Başlat ({itemsWithNotes.length} bağış)
+                  </Button>
+                )
+              ) : (
+                <Button variant="destructive" size="sm" onClick={handleStop} className="w-full">
+                  <Square className="w-4 h-4 mr-1" />Durdur
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {(aiRunning || aiProgress.total > 0) && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  {aiRunning ? "İşleniyor..." : aiStopped ? "Durduruldu" : "Tamamlandı"}
+                </span>
+                <span className="font-medium">{progressPct}%</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2">
+                <div className="bg-primary h-2 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
+              </div>
+              <div className="flex justify-between text-[11px] text-muted-foreground">
+                <span>{aiProgress.done} işlendi</span>
+                <span>{aiProgress.total} toplam</span>
+              </div>
+              {aiErrorBatches > 0 && (
+                <p className="text-[11px] text-destructive">
+                  {aiErrorBatches}/{aiTotalBatches} batch hatalı
+                </p>
+              )}
+            </div>
+          )}
+
+          {aiResults.size > 0 && (
+            <div className="space-y-3 pt-2 border-t">
+              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <BarChart3 className="w-3.5 h-3.5" />İstatistikler
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-muted/50 rounded-lg p-2.5 text-center">
+                  <div className="text-lg font-bold text-primary">{aiResults.size}</div>
+                  <div className="text-[10px] text-muted-foreground">İşlenen</div>
+                </div>
+                <div className={`rounded-lg p-2.5 text-center ${warningResults.length > 0 ? "bg-destructive/10" : "bg-muted/50"}`}>
+                  <div className={`text-lg font-bold ${warningResults.length > 0 ? "text-destructive" : "text-muted-foreground"}`}>{warningResults.length}</div>
+                  <div className="text-[10px] text-muted-foreground">Uyarı</div>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-2.5 text-center">
+                  <div className="text-lg font-bold text-blue-600">{requestResults.length}</div>
+                  <div className="text-[10px] text-muted-foreground">Özel İstek</div>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-2.5 text-center">
+                  <div className="text-lg font-bold text-muted-foreground">{categoryDistribution.length}</div>
+                  <div className="text-[10px] text-muted-foreground">Kategori</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0 overflow-y-auto p-4 space-y-4">
+          {aiResults.size === 0 && !aiRunning && (
+            <div className="flex flex-col items-center justify-center h-64 text-center gap-3">
+              <Brain className="w-12 h-12 text-muted-foreground/30" />
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Henüz sınıflandırma yapılmadı</p>
+                <p className="text-xs text-muted-foreground/70 mt-1">Soldaki ayarları kullanarak başlatın</p>
+              </div>
+            </div>
+          )}
+
+          {categoryDistribution.length > 0 && (
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold flex items-center gap-1.5">
+                  <Sparkles className={`w-4 h-4 text-primary ${aiRunning ? "animate-pulse" : ""}`} />
+                  Kategori Dağılımı
+                  {categoryFilter && (
+                    <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs" onClick={() => setCategoryFilter(null)}>
+                      <X className="w-3 h-3 mr-0.5" />Filtreyi Kaldır
+                    </Button>
+                  )}
+                </h2>
+                <span className="text-xs text-muted-foreground">{aiResults.size} sonuçtan</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {categoryDistribution.map(([cat, count]) => (
+                  <button
+                    key={cat}
+                    onClick={() => setCategoryFilter(prev => prev === cat ? null : cat)}
+                    className="flex items-center gap-1.5 group"
+                  >
+                    <CategoryBadge cat={cat} active={categoryFilter === cat} />
+                    <span className="text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">{count}</span>
+                  </button>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {filteredResults.length > 0 && (
+            <Card className="overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+                <h2 className="text-sm font-semibold flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-primary" />
+                  Sonuçlar
+                  {categoryFilter && (
+                    <Badge variant="outline" className="text-xs ml-1">{categoryFilter.replace(/_/g, " ")} filtresi</Badge>
+                  )}
+                </h2>
+                <span className="text-xs text-muted-foreground">{filteredResults.length} kayıt</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 text-xs text-muted-foreground">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-medium w-40">Bağışçı</th>
+                      <th className="text-left px-3 py-2 font-medium w-24">Cinsi</th>
+                      <th className="text-left px-3 py-2 font-medium">Kategoriler</th>
+                      <th className="text-left px-3 py-2 font-medium w-52">Özet</th>
+                      <th className="text-left px-3 py-2 font-medium w-52">Özel İstekler</th>
+                      <th className="text-left px-3 py-2 font-medium w-52">Uyarılar</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {filteredResults.map((r, idx) => {
+                      const donor = allItems.find(d => d.id === r.donationId);
+                      const hasWarning = r.warnings && r.warnings.trim();
+                      const extR = r as AiResult & { requests?: string; summary?: string };
+                      return (
+                        <tr key={r.donationId} className={`${idx % 2 === 0 ? "bg-background" : "bg-muted/20"} ${hasWarning ? "border-l-2 border-l-destructive" : ""}`}>
+                          <td className="px-3 py-2.5 font-medium text-xs truncate max-w-[160px]" title={donor?.description || donor?.name || r.donationId}>
+                            {donor?.description || donor?.name || r.donationId}
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground">{donor?.donationType || "—"}</td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex flex-wrap gap-1">
+                              {r.categories.length > 0 ? (
+                                r.categories.map(cat => (
+                                  <CategoryBadge key={cat} cat={cat} onClick={() => setCategoryFilter(prev => prev === cat ? null : cat)} />
+                                ))
+                              ) : (
+                                <span className="text-xs text-muted-foreground/50">—</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground">{extR.summary || "—"}</td>
+                          <td className="px-3 py-2.5 text-xs">
+                            {extR.requests?.trim() ? (
+                              <span className="flex items-start gap-1">
+                                <MessageSquare className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
+                                <span className="text-blue-700 dark:text-blue-400">{extR.requests}</span>
+                              </span>
+                            ) : "—"}
+                          </td>
+                          <td className="px-3 py-2.5 text-xs">
+                            {hasWarning ? (
+                              <span className="flex items-start gap-1">
+                                <AlertTriangle className="w-3.5 h-3.5 text-destructive shrink-0 mt-0.5" />
+                                <span className="text-destructive">{r.warnings}</span>
+                              </span>
+                            ) : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+
+          {warningResults.length > 0 && !categoryFilter && (
+            <Card className="border-destructive/30 overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 bg-destructive/5 border-b border-destructive/20">
+                <AlertTriangle className="w-4 h-4 text-destructive" />
+                <h2 className="text-sm font-semibold text-destructive">Uyarılı Bağışçılar ({warningResults.length})</h2>
+              </div>
+              <div className="divide-y">
+                {warningResults.map(r => {
+                  const donor = allItems.find(d => d.id === r.donationId);
+                  return (
+                    <div key={r.donationId} className="px-4 py-2.5 flex items-start gap-3">
+                      <AlertTriangle className="w-3.5 h-3.5 text-destructive shrink-0 mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-medium">{donor?.description || donor?.name || r.donationId}</div>
+                        <div className="text-xs text-destructive/80 mt-0.5">{r.warnings}</div>
+                        {r.categories.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {r.categories.map(cat => <CategoryBadge key={cat} cat={cat} />)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

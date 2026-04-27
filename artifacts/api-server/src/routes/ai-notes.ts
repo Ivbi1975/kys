@@ -11,32 +11,42 @@ import { TX_BATCH_SIZE, AiJobStatus, STALE_JOB_CUTOFF_MS, STALE_JOB_CLEANUP_INTE
 
 const router: IRouter = Router();
 
-const DEFAULT_PROMPT = `Sen bir kurban/bağış yönetim sisteminin asistanısın. Sana verilen bağışçı notlarını analiz et ve her not için aşağıdaki kategorilerde sınıflandırma yap.
+const DEFAULT_PROMPT = `Sen bir kurban/bağış yönetim sisteminin asistanısın. Sana verilen bağışçı notlarını detaylı şekilde analiz et ve her not için aşağıdaki kategorilerde sınıflandırma yap.
 
 Notları analiz ederken:
-1. Belirtilen kategorilere göre tespit et
+1. Belirtilen kategorilere göre tespit et — birden fazla kategori atanabilir
 2. Bağışçının cinsi (donationType) ile notları karşılaştır ve tutarsızlıkları bildir
-3. Önemli istekler veya uyarılar varsa belirt
-4. Büyük/küçük harf farkını görmezden gel. "vacip", "vacib", "VACİP", "VACİB" gibi yazımlar aynı anlama gelir, uyarı verme. Benzer şekilde "adak", "Adak", "ADAK" aynıdır
+3. Önemli istekler veya uyarılar varsa açıkça belirt
+4. Büyük/küçük harf farkını görmezden gel. "vacip", "vacib", "VACİP", "VACİB" aynıdır; "adak", "Adak", "ADAK" aynıdır
+5. Her not için anlamlı bir özet (summary) yaz — notta ne istendiğini kısaca özetle
+6. Özel istekler (requests) alanına yalnızca aksiyon gerektiren spesifik talepleri yaz
 
 Kategoriler:
 {{CATEGORIES}}
 
 Kategori kuralları:
-- "3.gün": Notta "üçüncü gün kesilsin", "üçüncü gün", "3.gün", "seferi olacağım üçüncü gün kesilsin" gibi ifadeler varsa bu etiketi ata.
-- "2.gün": Notta "mutlaka 2.gün kesilecek", "2.gün", "ikinci gün", "3.gün seferi olacağım" (yani 3.gün seferi = 2.gün kesilmeli) gibi ifadeler varsa bu etiketi ata.
-- "erken_kesim": Notta "seferi olacağım ilk hayvanda kesilsin", "ilk hayvan", "birinci hayvan", "ılk hayvan", "erken kesim", "erkenden kesim", "yola çıkacağım", "mümkünse erkenden kesilsin", "sabah erken saatte kesilsin", "öğleden önce kesilsin", "geç kesim", "erken saat", "seferi" gibi ifadeler varsa bu etiketi ata. Zaman hassasiyeti olan tüm istekleri kapsar.
-- "özel_kesim": Notta belirli bir saat belirtiliyorsa (ör: "saat 10'da", "14:00'te"), özel zaman talebi varsa (ör: "öğleden sonra kesilsin", "akşama doğru") bu etiketi ata.
-- "Şafi": Notta "şafi", "şafi mezhebindeyim", "şafii", "safi", "safı" gibi ifadeler varsa bu etiketi ata VE uyarı olarak "Şafi mezhebine göre kesim gerekiyor" yaz. Bu önemli bir uyarıdır.
-- "Sünnet" bağış cinsi: Notta "sünnet", "sunnet" ifadesi geçerse, categories listesine "sünnet" ekle. Sünnet/Sunnet ifadesi geçerse bu bir bağış cinsidir (donationType). Bağış cinsi olarak 'Sünnet' yazılmalı.
+- "3.gün": "üçüncü gün", "3.gün", "seferi olacağım üçüncü gün kesilsin" gibi ifadeler varsa ata.
+- "2.gün": "2.gün", "ikinci gün", "mutlaka 2.gün kesilecek" gibi ifadeler varsa ata.
+- "erken_kesim": "ilk hayvanda", "birinci hayvan", "erken kesim", "erkenden", "yola çıkacağım", "öğleden önce kesilsin", "sabah erken", "seferi" gibi zaman hassasiyeti olan ifadeler varsa ata.
+- "özel_kesim": Belirli saat belirtiliyorsa (ör: "saat 10'da", "14:00'te") veya "öğleden sonra", "akşama doğru" gibi özel zaman talebi varsa ata.
+- "Şafi": "şafi", "şafii", "şafi mezhebi", "safi" gibi ifadeler varsa ata VE warnings alanına "Şafi mezhebine göre kesim gerekiyor" yaz. Bu kritik bir uyarıdır.
+- "sünnet": "sünnet", "sunnet" ifadesi geçerse ata. Bu bir bağış cinsidir.
+- "mevta_kurbani": "merhum", "merhume", "ruhuna", "mevta", "vefat etmiş" gibi ifadeler varsa ata.
+- "ulke_talebi": Belirli bir ülkede kesilmesi isteniyorsa ata (ör: "Suriye'de kesilsin", "Afrika'da dağıtılsın").
+- "ödeme_notu": Ödeme bilgisi içeriyorsa ata — banka kartı, havale, taksit, garanti kartı, ödeme nerede yapıldığı gibi bilgiler.
+- "iletişim_talebi": "arayın", "bildirim yapın", "SMS gönderin", "haberdar edin", "fotoğraf isteği", "video isteği", "haber verin" gibi iletişim/bildirim talepleri varsa ata.
+- "et_talebi": "eti bize gelsin", "et teslim", "eti dağıtılsın", "bize getirin", "et paylaşım" gibi et teslimatı veya dağıtım talebi varsa ata.
+- "hayvan_tercihi": Belirli bir hayvan özelliği talep ediliyorsa ata (ör: "dişi olsun", "iri hayvan", "koyun", "koç", "büyükbaş olsun").
+- "ilk_hayvan": "ilk hayvan", "birinci hayvan", "seferi ilk hayvanda" gibi ifadeler varsa ata.
+- "acil": "acil", "mutlaka", "kesinlikle", "çok önemli" gibi aciliyet/öncelik belirten ifadeler veya kritik özel durum varsa ata.
 
 Her bağışçı için JSON formatında yanıt ver:
 {
   "donationId": "...",
   "categories": ["kategori1", "kategori2"],
-  "requests": "tespit edilen özel istekler",
-  "warnings": "uyarılar ve tutarsızlıklar",
-  "summary": "kısa özet"
+  "requests": "Aksiyon gerektiren spesifik talepler (yoksa boş bırak)",
+  "warnings": "Dikkat gerektiren uyarılar ve tutarsızlıklar (yoksa boş bırak)",
+  "summary": "Notun kısa ve anlaşılır özeti (1-2 cümle)"
 }
 
 Yanıtı JSON array olarak ver: [{...}, {...}]`;
@@ -55,6 +65,12 @@ const DEFAULT_CATEGORIES = [
   "özel_kesim",
   "Şafi",
   "sünnet",
+  "ödeme_notu",
+  "iletişim_talebi",
+  "et_talebi",
+  "hayvan_tercihi",
+  "ilk_hayvan",
+  "acil",
 ];
 
 async function syncAiSettingsToDb(): Promise<void> {
@@ -67,7 +83,7 @@ async function syncAiSettingsToDb(): Promise<void> {
     await db.insert(appSettingsTable)
       .values({ key: "ai_prompt", value: DEFAULT_PROMPT })
       .onConflictDoNothing();
-  } else if (!promptRow.value.includes("Kategori kuralları")) {
+  } else if (!promptRow.value.includes("Kategori kuralları") || !promptRow.value.includes("ödeme_notu")) {
     const categoryRulesSection = DEFAULT_PROMPT.substring(
       DEFAULT_PROMPT.indexOf("Kategori kuralları:")
     );

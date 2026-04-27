@@ -55,6 +55,7 @@ const ProjeDetayPage = lazy(() => import("@/pages/proje-detay"));
 const KesimTakipPage = lazy(() => import("@/pages/kesim-takip"));
 const KesimRaporPage = lazy(() => import("@/pages/kesim-rapor"));
 const BagisHavuzuPage = lazy(() => import("@/pages/bagis-havuzu"));
+const AiSiniflandirmaPage = lazy(() => import("@/pages/bagis-havuzu/AiSiniflandirmaPage"));
 const SorunluBagislarPage = lazy(() => import("@/pages/sorunlu-bagislar"));
 
 function usePrefetchAdjacentRoutes() {
@@ -121,6 +122,7 @@ function ProtectedRouterInner() {
               <Route path="/not-duzenleme/:id" component={NotDuzenlemePage} />
               <Route path="/ai-prompt-ayarlari" component={AiPromptAyarlariPage} />
               <Route path="/proje/:id" component={ProjeDetayPage} />
+              <Route path="/bagis-havuzu/:id/ai" component={AiSiniflandirmaPage} />
               <Route path="/bagis-havuzu/:id" component={BagisHavuzuPage} />
               <Route path="/sorunlu-bagislar/:id" component={SorunluBagislarPage} />
               <Route path="/cop-kutusu" component={CopKutusuPage} />

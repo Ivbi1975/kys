@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,7 +35,7 @@ import {
   downloadExcelExport,
   fetchPoolAssignedVekalets,
 } from "@/lib/api";
-import type { BulkDeletePreviewResult } from "@/lib/api";
+import type { BulkDeletePreviewResult, AiClassificationResult } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { StatsPanel } from "./bagis-havuzu/StatsPanel";
@@ -49,7 +48,6 @@ import { ImportWizard } from "./bagis-havuzu/ImportWizard";
 import { BulkTagDialog } from "./bagis-havuzu/BulkTagDialog";
 import { AutomationRulesPanel } from "./bagis-havuzu/AutomationRulesPanel";
 import { BulkNoteDialog } from "./bagis-havuzu/BulkNoteDialog";
-import { HavuzAiClassification, type HavuzAiResult } from "./bagis-havuzu/HavuzAiClassification";
 import { BulkDeleteFilteredDialog } from "./bagis-havuzu/BulkDeleteFilteredDialog";
 import { ALL_TABLE_COLUMNS, PAGE_SIZE, type TableColumnKey } from "./bagis-havuzu/types";
 import { getDonationCellValue, parseUrlMulti, serializeMulti } from "./bagis-havuzu/utils";
@@ -116,7 +114,7 @@ export default function BagisHavuzuPage() {
 
   const [showRules, setShowRules] = useState(false);
   const [bulkCreateListeOpen, setBulkCreateListeOpen] = useState(false);
-  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+
   const [importOpen, setImportOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
@@ -133,7 +131,7 @@ export default function BagisHavuzuPage() {
   const [creatingNewList, setCreatingNewList] = useState(false);
   const [aiRunning, setAiRunning] = useState(false);
   const [aiStopped, setAiStopped] = useState(false);
-  const [aiResults, setAiResults] = useState<Map<string, HavuzAiResult>>(new Map());
+  const [aiResults, setAiResults] = useState<Map<string, AiClassificationResult>>(new Map());
   const [aiProgress, setAiProgress] = useState({ done: 0, total: 0 });
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [aiBatchSize, setAiBatchSize] = useState(25);
@@ -1066,7 +1064,7 @@ export default function BagisHavuzuPage() {
           <Button
             variant={aiRunning ? "default" : "outline"}
             size="sm"
-            onClick={() => setAiDialogOpen(true)}
+            onClick={() => setLocation(`/bagis-havuzu/${projectId}/ai`)}
           >
             <Brain className="w-4 h-4 mr-1" />
             AI Sınıfla
@@ -1125,43 +1123,6 @@ export default function BagisHavuzuPage() {
           </div>
         )}
 
-        <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Brain className="w-5 h-5 text-primary" />
-                AI Sınıflandırma
-              </DialogTitle>
-            </DialogHeader>
-            <HavuzAiClassification
-              items={items}
-              selectedCount={effectiveSelectedIds.size}
-              aiRunning={aiRunning}
-              aiStopped={aiStopped}
-              aiResults={aiResults}
-              aiProgress={aiProgress}
-              showAiPanel={true}
-              setShowAiPanel={() => {}}
-              hideToggle={true}
-              rangeMode={aiRangeMode}
-              setRangeMode={setAiRangeMode}
-              batchSize={aiBatchSize}
-              setBatchSize={setAiBatchSize}
-              startAiClassification={handleStartAiClassification}
-              stopAiClassification={handleStopAiClassification}
-              skipClassified={aiSkipClassified}
-              setSkipClassified={setAiSkipClassified}
-              showAiReport={showAiReport}
-              setShowAiReport={setShowAiReport}
-              aiReportCollapsed={aiReportCollapsed}
-              setAiReportCollapsed={setAiReportCollapsed}
-              aiReportStats={aiReportStats}
-              aiCategoryFilter={aiCategoryFilter || null}
-              setAiCategoryFilter={(v) => { setAiCategoryFilter(v || ""); setPage(0); }}
-              total={total}
-            />
-          </DialogContent>
-        </Dialog>
 
         {showFilters && (
           <PoolFilters
