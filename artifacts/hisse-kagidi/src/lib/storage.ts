@@ -13,12 +13,14 @@ export interface PrintPreferences {
 export const DEFAULT_PRINT_PREFS: PrintPreferences = {
   hiddenColumns: [],
   contentHideRules: {
-    "vekaleti-veren": ["Vacip", "VACİB", "vacib", "Vacib"],
+    "vekaleti-veren": [],
   },
   template: "standard",
   columnFontSizes: {},
   showQrCode: false,
 };
+
+const LEGACY_VACIP_RULES = ["vacip", "vacib"];
 
 export const PRINT_TEMPLATES: { value: PrintTemplate; label: string; description: string }[] = [
   { value: "standard", label: "Kesim Kağıdı", description: "Her hayvan grubu ayrı A4 yatay sayfada" },
@@ -48,7 +50,11 @@ export function loadPrintPreferences(): PrintPreferences {
       if (parsed.contentHideRules && typeof parsed.contentHideRules === "object") {
         for (const [key, val] of Object.entries(parsed.contentHideRules)) {
           if (CONTENT_HIDE_ALLOWED.includes(key) && Array.isArray(val) && val.every((v) => typeof v === "string")) {
-            contentHideRules[key] = val as string[];
+            let rules = val as string[];
+            if (key === "vekaleti-veren") {
+              rules = rules.filter((r) => !LEGACY_VACIP_RULES.includes(r.toLowerCase()));
+            }
+            contentHideRules[key] = rules;
           }
         }
       }

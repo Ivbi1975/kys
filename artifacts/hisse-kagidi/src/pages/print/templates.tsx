@@ -308,7 +308,7 @@ export function SummaryTemplate(props: TemplateProps) {
                   {pageGroups.map((group) => {
                     const filled = group.donations.filter(d => d.name.trim());
                     const names = filled.filter(d => !shouldHideContent("adina-kesilen", d.donationType)).map(d => trUpper(d.name)).join(", ");
-                    const vekalets = filled.filter(d => !shouldHideContent("vekaleti-veren", d.donationType)).map(d => trUpper(d.description)).filter(Boolean).join(", ");
+                    const vekalets = filled.filter(d => !shouldHideContent("vekaleti-veren", d.donationType)).map(d => trUpper(d.description || d.name)).filter(Boolean).join(", ");
                     const types = [...new Set(filled.filter(d => !shouldHideContent("cinsi", d.donationType)).map(d => trUpper(d.donationType)).filter(Boolean))].join(", ");
                     const notes = [...new Set(filled.filter(d => !shouldHideContent("notlar", d.donationType)).map(d => {
                       const note = d.notes ? trUpper(d.notes) : "";
