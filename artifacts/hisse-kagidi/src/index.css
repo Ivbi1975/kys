@@ -224,16 +224,33 @@
     --border: 214 32% 91%;
   }
 
+  html,
   body {
     margin: 0;
     padding: 0;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
     background: white !important;
     color: #1e293b !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  .print\\:hidden {
+  #root {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .h-screen { height: auto !important; }
+  .min-h-screen { min-height: 0 !important; }
+  .w-screen { width: 100% !important; }
+  .overflow-hidden { overflow: visible !important; }
+  .overflow-auto { overflow: visible !important; }
+  .flex-1 { flex: none !important; width: 100% !important; }
+
+  .print\:hidden {
     display: none !important;
   }
 }
