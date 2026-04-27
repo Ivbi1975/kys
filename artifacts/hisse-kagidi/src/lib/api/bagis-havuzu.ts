@@ -254,10 +254,19 @@ export async function deleteAllPoolDonations(projectId: string): Promise<{ succe
   });
 }
 
+export interface SiblingDonation {
+  id: string;
+  name: string;
+  vekalet: string | null;
+  shareCount: number;
+  donationType: string | null;
+}
+
 export interface DonorSiblings {
   donorName: string;
   extraCount: number;
   extraIds: string[];
+  donations: SiblingDonation[];
 }
 
 export async function fetchDonationSiblings(

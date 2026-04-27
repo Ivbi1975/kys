@@ -864,7 +864,13 @@ router.post("/projects/:id/donations/siblings", asyncHandler(async (req, res) =>
   if (donorNames.length === 0) { res.json({ siblings: [] }); return; }
 
   // Find other pool donations with same donor names not in the selection
-  const siblingRows = await db.select({ id: donationsTable.id, name: donationsTable.name })
+  const siblingRows = await db.select({
+    id: donationsTable.id,
+    name: donationsTable.name,
+    vekalet: donationsTable.vekalet,
+    shareCount: donationsTable.shareCount,
+    donationType: donationsTable.donationType,
+  })
     .from(donationsTable)
     .where(and(
       inArray(donationsTable.kesimAlaniId, poolKAIds),
@@ -873,17 +879,25 @@ router.post("/projects/:id/donations/siblings", asyncHandler(async (req, res) =>
       notInArray(donationsTable.id, donationIds),
     ));
 
-  const grouped = new Map<string, string[]>();
+  type SiblingDonation = { id: string; name: string; vekalet: string | null; shareCount: number; donationType: string | null };
+  const grouped = new Map<string, SiblingDonation[]>();
   for (const s of siblingRows) {
     if (!s.name) continue;
     if (!grouped.has(s.name)) grouped.set(s.name, []);
-    grouped.get(s.name)!.push(s.id);
+    grouped.get(s.name)!.push({
+      id: s.id,
+      name: s.name,
+      vekalet: s.vekalet || null,
+      shareCount: s.shareCount,
+      donationType: s.donationType || null,
+    });
   }
 
-  const siblings = Array.from(grouped.entries()).map(([donorName, extraIds]) => ({
+  const siblings = Array.from(grouped.entries()).map(([donorName, donations]) => ({
     donorName,
-    extraCount: extraIds.length,
-    extraIds,
+    extraCount: donations.length,
+    extraIds: donations.map(d => d.id),
+    donations,
   }));
 
   res.json({ siblings });

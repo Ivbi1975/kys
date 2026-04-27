@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ArrowRightLeft, Undo2, Trash2, X, Tag, StickyNote, Info } from "lucide-react";
-import type { DonorSiblings } from "@/lib/api/bagis-havuzu";
+import type { DonorSiblings, SiblingDonation } from "@/lib/api/bagis-havuzu";
 import type { PoolDonation } from "@/lib/types";
 import { turkishTitleCase } from "@/lib/formatting";
 
@@ -139,14 +139,24 @@ export function PoolBulkActions({
                   <span className="text-xs font-normal text-muted-foreground">(aynı bağışçıya ait, havuzda bekleyen)</span>
                 </h3>
                 <ul className="space-y-1">
-                  {siblingsData.map((s) => (
-                    <li key={s.donorName} className="flex items-center justify-between text-sm py-1.5 border-b border-border/50 last:border-0">
-                      <p className="font-medium truncate flex-1">{turkishTitleCase(s.donorName)}</p>
-                      <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                        {s.extraCount} ek kayıt
-                      </span>
-                    </li>
-                  ))}
+                  {siblingsData.flatMap((s) =>
+                    (s.donations ?? []).map((d: SiblingDonation) => (
+                      <li key={d.id} className="flex items-start gap-2 text-sm py-1.5 border-b border-border/50 last:border-0">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{turkishTitleCase(d.name)}</p>
+                          {d.vekalet && d.vekalet.trim() && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              Vekalet: {turkishTitleCase(d.vekalet)}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0 text-xs text-muted-foreground">
+                          <p>{d.shareCount} hisse</p>
+                          {d.donationType && <p className="capitalize">{d.donationType}</p>}
+                        </div>
+                      </li>
+                    ))
+                  )}
                 </ul>
               </section>
             )}
