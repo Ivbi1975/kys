@@ -1,5 +1,4 @@
 import type { AnimalGroup } from "@/lib/types";
-import { turkishTitleCase } from "@/lib/formatting";
 
 export const COLUMNS = [
   { key: "hayvan", label: "HAYVAN" },
@@ -25,6 +24,11 @@ export const DEFAULT_FONT_SIZES: Record<string, number> = {
 
 export const CONTENT_HIDE_ALLOWED_COLUMNS = ["vekaleti-veren", "notlar"];
 
+export function trUpper(s: string | null | undefined): string {
+  if (!s) return "";
+  return s.toLocaleUpperCase("tr-TR");
+}
+
 export function getAiLabel(d: AnimalGroup["donations"][0]): string {
   const parts: string[] = [];
   if (d.aiCategories && d.aiCategories.length > 0) {
@@ -38,12 +42,12 @@ export function getAiLabel(d: AnimalGroup["donations"][0]): string {
 
 export function getCellContent(columnKey: ColumnKey, d: AnimalGroup["donations"][0]): string {
   switch (columnKey) {
-    case "vekalet": return turkishTitleCase(d.vekalet);
-    case "vekaleti-veren": return turkishTitleCase(d.description);
-    case "adina-kesilen": return turkishTitleCase(d.name);
-    case "cinsi": return turkishTitleCase(d.donationType);
+    case "vekalet": return trUpper(d.vekalet);
+    case "vekaleti-veren": return trUpper(d.description);
+    case "adina-kesilen": return trUpper(d.name);
+    case "cinsi": return trUpper(d.donationType);
     case "notlar": {
-      const notes = d.notes || "";
+      const notes = d.notes ? trUpper(d.notes) : "";
       const ai = getAiLabel(d);
       if (ai) return notes ? `${notes} [${ai}]` : `[${ai}]`;
       return notes;
