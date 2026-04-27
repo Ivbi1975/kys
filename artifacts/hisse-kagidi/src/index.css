@@ -278,8 +278,6 @@
 @media print {
   .print-page {
     box-shadow: none;
-    page-break-after: always;
-    break-after: page;
     page-break-inside: avoid;
     break-inside: avoid;
     margin: 0;
@@ -288,6 +286,11 @@
     min-height: auto;
     max-height: none;
     overflow: visible;
+  }
+
+  .print-page:not(:last-child) {
+    page-break-after: always;
+    break-after: page;
   }
 }
 
@@ -461,8 +464,6 @@
 @media print {
   .template-portrait .print-page-portrait {
     box-shadow: none;
-    page-break-after: always;
-    break-after: page;
     page-break-inside: avoid;
     break-inside: avoid;
     margin: 0;
@@ -471,6 +472,11 @@
     min-height: auto;
     max-height: none;
     overflow: visible;
+  }
+
+  .template-portrait .print-page-portrait:not(:last-child) {
+    page-break-after: always;
+    break-after: page;
   }
 }
 
@@ -484,8 +490,6 @@
 @media print {
   .template-compact .print-page-compact {
     box-shadow: none;
-    page-break-after: always;
-    break-after: page;
     page-break-inside: avoid;
     break-inside: avoid;
     margin: 0;
@@ -494,6 +498,11 @@
     min-height: auto;
     max-height: none;
     overflow: visible;
+  }
+
+  .template-compact .print-page-compact:not(:last-child) {
+    page-break-after: always;
+    break-after: page;
   }
 }
 

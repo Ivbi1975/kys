@@ -412,8 +412,8 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
       // Embed logo image in the left section of the title row
       if (logoImageId !== null) {
         ws.addImage(logoImageId, {
-          tl: new ExcelJS.Anchor({ col: 0, row: titleRowIdx - 1 }),
-          br: new ExcelJS.Anchor({ col: LOGO_COLS, row: titleRowIdx }),
+          tl: { col: 0, row: titleRowIdx - 1 },
+          br: { col: LOGO_COLS, row: titleRowIdx },
           editAs: "oneCell",
         });
       }

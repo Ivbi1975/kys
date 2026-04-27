@@ -37,7 +37,7 @@ function renderAnimalTable({ group, visibleColumns, isColumnHidden, shouldHideCo
         {group.donations.map((d, idx) => (
           <tr key={d.id}>
             {!isColumnHidden("hayvan") && idx === 0 && (
-              <td className="hayvan-cell" rowSpan={7} style={{ fontSize: `${getColumnFontSize("hayvan")}px` }}>
+              <td className="hayvan-cell" rowSpan={group.donations.length} style={{ fontSize: `${getColumnFontSize("hayvan")}px` }}>
                 <div className="hayvan-number" style={{ fontSize: `${getColumnFontSize("hayvan")}px` }}>{group.animalNo}</div>
               </td>
             )}
