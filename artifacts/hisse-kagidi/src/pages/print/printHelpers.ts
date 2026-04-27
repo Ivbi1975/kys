@@ -43,7 +43,7 @@ export function getAiLabel(d: AnimalGroup["donations"][0]): string {
 export function getCellContent(columnKey: ColumnKey, d: AnimalGroup["donations"][0]): string {
   switch (columnKey) {
     case "vekalet": return trUpper(d.vekalet);
-    case "vekaleti-veren": return trUpper(d.description);
+    case "vekaleti-veren": return trUpper(d.description || d.name);
     case "adina-kesilen": return trUpper(d.name);
     case "cinsi": return trUpper(d.donationType);
     case "notlar": {

@@ -339,7 +339,7 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
       if (row.name !== null || row.description !== null || row.donation_type !== null) {
         groupMap.get(animalNo)!.slots.push({
           vekalet: row.vekalet || "",
-          vekaleti_veren: trUpperCase(row.description),
+          vekaleti_veren: trUpperCase((row.description as string | null) || (row.name as string | null)),
           adina_kesilen: trUpperCase(row.name),
           cinsi: trUpperCase(row.donation_type),
           notlar: trUpperCase(buildNotesValue(row)),

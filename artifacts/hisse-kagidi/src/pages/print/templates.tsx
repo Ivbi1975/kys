@@ -142,7 +142,7 @@ export function CompactTemplate(props: TemplateProps) {
                 {pageGroups.map((group) => {
                   const filledDonors = group.donations.filter(d => d.name.trim());
                   const donorNames = filledDonors.filter(d => !shouldHideContent("adina-kesilen", d.donationType)).map(d => trUpper(d.name)).join(", ");
-                  const vekaletNames = filledDonors.filter(d => !shouldHideContent("vekaleti-veren", d.donationType)).map(d => trUpper(d.description)).filter(Boolean).join(", ");
+                  const vekaletNames = filledDonors.filter(d => !shouldHideContent("vekaleti-veren", d.donationType)).map(d => trUpper(d.description || d.name)).filter(Boolean).join(", ");
                   const cinsTypes = [...new Set(filledDonors.filter(d => !shouldHideContent("cinsi", d.donationType)).map(d => trUpper(d.donationType)).filter(Boolean))].join(", ");
                   const groupNotes = [...new Set(filledDonors.filter(d => !shouldHideContent("notlar", d.donationType)).map(d => {
                     const note = d.notes ? trUpper(d.notes) : "";
@@ -216,7 +216,7 @@ export function NameListTemplate(props: TemplateProps) {
                     <td style={{ textAlign: "center" }}>{pageIdx * rowsPerPage + i + 1}</td>
                     <td style={{ textAlign: "center", fontWeight: 700 }}>{d.animalNo}</td>
                     <td>{trUpper(d.name)}</td>
-                    <td>{trUpper(d.description)}</td>
+                    <td>{trUpper(d.description || d.name)}</td>
                     <td style={{ textAlign: "center" }}>{trUpper(d.donationType)}</td>
                     <td style={{ textAlign: "center" }}>{d.shareCount}</td>
                   </tr>
