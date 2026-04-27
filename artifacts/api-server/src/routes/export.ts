@@ -168,7 +168,7 @@ const EXCEL_COLUMNS: { key: string; header: string; width: number }[] = [
   { key: "vekaleti_veren", header: "VEKALETİ VEREN", width: 33 },
   { key: "adina_kesilen",  header: "ADINA KESİLEN",  width: 49 },
   { key: "cinsi",          header: "CİNSİ",           width: 15 },
-  { key: "notlar",         header: "NOTLAR",          width: 12 },
+  { key: "notlar",         header: "NOTLAR",          width: 45 },
 ];
 
 const NUM_COLS = EXCEL_COLUMNS.length;
@@ -491,8 +491,8 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
             cell.alignment = { horizontal: "center", vertical: "middle" };
             if (isEven) cell.fill = EXCEL_EVEN_FILL;
           } else {
-            // NOTLAR — left-indented
-            cell.alignment = { vertical: "middle", indent: 1 };
+            // NOTLAR — left-indented, wrap long text
+            cell.alignment = { vertical: "middle", wrapText: true, indent: 1 };
             if (isEven) cell.fill = EXCEL_EVEN_FILL;
           }
         });
