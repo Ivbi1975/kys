@@ -94,6 +94,7 @@ async function fetchProjectWarnings(): Promise<Record<string, ProjectWarnings>> 
         JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
         WHERE ka.project_id IN (SELECT id FROM active_projects)
           AND ka.deleted_at IS NULL
+          AND ka.name != '__havuz__'
           AND d.deleted_at IS NULL
           AND d.vekalet IS NOT NULL AND d.vekalet != ''
         GROUP BY ka.project_id, d.vekalet
