@@ -241,19 +241,22 @@ function CreateKesimAlaniDialog({
   setNewName: (name: string) => void;
   createProjectId: string | null;
   setCreateProjectId: (id: string | null) => void;
-  handleCreate: (displayName?: string, maxVekalet?: number | null) => void;
+  handleCreate: (displayName?: string, maxVekalet?: number | null, maxAnimal?: number | null) => void;
   projects: Project[];
 }) {
   const [displayName, setDisplayName] = useState("");
   const [maxVekaletStr, setMaxVekaletStr] = useState("");
+  const [maxAnimalStr, setMaxAnimalStr] = useState("");
   const doCreate = () => {
     const maxVekalet = maxVekaletStr.trim() ? parseInt(maxVekaletStr.trim(), 10) : null;
-    handleCreate(displayName || undefined, maxVekalet);
+    const maxAnimal = maxAnimalStr.trim() ? parseInt(maxAnimalStr.trim(), 10) : null;
+    handleCreate(displayName || undefined, maxVekalet, maxAnimal);
     setDisplayName("");
     setMaxVekaletStr("");
+    setMaxAnimalStr("");
   };
   return (
-    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setCreateProjectId(null); setDisplayName(""); setMaxVekaletStr(""); } }}>
+    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setCreateProjectId(null); setDisplayName(""); setMaxVekaletStr(""); setMaxAnimalStr(""); } }}>
       <DialogTrigger asChild>
         <Button size="default">
           <Plus className="w-4 h-4 mr-2" />
@@ -300,6 +303,14 @@ function CreateKesimAlaniDialog({
             placeholder="Maksimum Vekalet Sayısı (isteğe bağlı)"
             value={maxVekaletStr}
             onChange={(e) => setMaxVekaletStr(e.target.value.replace(/[^0-9]/g, ""))}
+            onKeyDown={(e) => e.key === "Enter" && doCreate()}
+          />
+          <Input
+            type="number"
+            min={1}
+            placeholder="Maksimum Hayvan Sayısı (isteğe bağlı)"
+            value={maxAnimalStr}
+            onChange={(e) => setMaxAnimalStr(e.target.value.replace(/[^0-9]/g, ""))}
             onKeyDown={(e) => e.key === "Enter" && doCreate()}
           />
           <Button onClick={doCreate} className="w-full" disabled={!newName.trim()}>

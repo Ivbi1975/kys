@@ -123,13 +123,14 @@ interface CreateKesimAlaniParams {
   yetkili?: string | null;
   displayName?: string | null;
   maxVekalet?: number | null;
+  maxAnimal?: number | null;
   projectId?: string | null;
   donations: DonationPayload[];
   animalGroups: AnimalGroupPayload[];
 }
 
 export async function createKesimAlani(params: CreateKesimAlaniParams) {
-  const { id, name, createdAt, kesimListeId, yetkili, displayName, maxVekalet, donations, animalGroups } = params;
+  const { id, name, createdAt, kesimListeId, yetkili, displayName, maxVekalet, maxAnimal, donations, animalGroups } = params;
   const projectId = params.projectId || null;
 
   await db.transaction(async (tx) => {
@@ -143,6 +144,7 @@ export async function createKesimAlani(params: CreateKesimAlaniParams) {
       yetkili: yetkili ?? null,
       displayName: displayName ?? null,
       maxVekalet: maxVekalet ?? null,
+      maxAnimal: maxAnimal ?? null,
     });
 
     if (donations.length > 0) {
@@ -178,13 +180,14 @@ export async function updateKesimAlani(id: string, params: {
   yetkili?: string | null;
   displayName?: string | null;
   maxVekalet?: number | null;
+  maxAnimal?: number | null;
   donations?: DonationPayload[];
   animalGroups?: AnimalGroupPayload[];
 }): Promise<ServiceResult<{ data: unknown }>> {
   const kaCheck = await requireActiveKesimAlani(id);
   if (kaCheck.error) return serviceError(kaCheck.error, kaCheck.status);
 
-  const { name, kesimListeId, yetkili, displayName, maxVekalet, donations, animalGroups } = params;
+  const { name, kesimListeId, yetkili, displayName, maxVekalet, maxAnimal, donations, animalGroups } = params;
 
   await db.transaction(async (tx) => {
     const kaUpdates: Record<string, string | number | null> = {};
@@ -193,6 +196,7 @@ export async function updateKesimAlani(id: string, params: {
     if (yetkili !== undefined) kaUpdates.yetkili = yetkili ?? null;
     if (displayName !== undefined) kaUpdates.displayName = displayName ?? null;
     if (maxVekalet !== undefined) kaUpdates.maxVekalet = maxVekalet ?? null;
+    if (maxAnimal !== undefined) kaUpdates.maxAnimal = maxAnimal ?? null;
     if (Object.keys(kaUpdates).length > 0) {
       await tx.update(kesimAlanlariTable).set(kaUpdates).where(eq(kesimAlanlariTable.id, id));
     }

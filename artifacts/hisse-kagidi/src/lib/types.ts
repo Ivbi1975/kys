@@ -104,6 +104,7 @@ export interface KesimAlani {
   yetkili?: string | null;
   displayName?: string | null;
   maxVekalet?: number | null;
+  maxAnimal?: number | null;
   teams?: Team[];
   parentKesimAlaniId?: string | null;
   splitStatus?: string | null;

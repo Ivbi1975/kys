@@ -34,6 +34,7 @@ export const kesimAlanlariTable = pgTable("kesim_alanlari", {
   yetkili: text("yetkili"),
   displayName: text("display_name"),
   maxVekalet: integer("max_vekalet"),
+  maxAnimal: integer("max_animal"),
   parentKesimAlaniId: text("parent_kesim_alani_id"),
   splitStatus: text("split_status"),
 }, (table) => [
