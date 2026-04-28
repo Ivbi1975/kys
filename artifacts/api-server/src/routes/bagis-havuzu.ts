@@ -1154,9 +1154,23 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
   res.json({ success: true, moved: movedCount, alreadyInTarget, skipped: skipExisting ? alreadyInTarget : 0, transferredItems });
 }));
 
+async function getFilteredDonationIds(projectId: string, filter: Record<string, unknown>): Promise<string[]> {
+  const filterWhere = buildStatsFilterSQL(projectId, filter);
+  const result = await db.execute(sql`
+    SELECT d.id
+    FROM donations d
+    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+    WHERE ${filterWhere}
+  `);
+  return (result.rows as { id: string }[]).map(r => r.id);
+}
+
 const bulkUpdateSchema = z.object({
-  donationIds: z.array(z.string()).min(1).max(50000),
+  donationIds: z.array(z.string()).max(50000).optional(),
+  filter: z.record(z.unknown()).optional(),
   action: z.enum(["exclude", "include", "delete"]),
+}).refine(d => (d.donationIds && d.donationIds.length > 0) || d.filter, {
+  message: ERROR_MESSAGES.BULK_IDS_OR_FILTER_REQUIRED,
 });
 
 router.post("/projects/:id/donations/bulk-action", asyncHandler(async (req, res) => {
@@ -1170,7 +1184,13 @@ router.post("/projects/:id/donations/bulk-action", asyncHandler(async (req, res)
     return;
   }
 
-  const { donationIds, action } = parsed.data;
+  let donationIds: string[];
+  const { action } = parsed.data;
+  if (parsed.data.filter && (!parsed.data.donationIds || parsed.data.donationIds.length === 0)) {
+    donationIds = await getFilteredDonationIds(projectId, parsed.data.filter as Record<string, unknown>);
+  } else {
+    donationIds = parsed.data.donationIds!;
+  }
 
   const projectKAIds = await db.select({ id: kesimAlanlariTable.id })
     .from(kesimAlanlariTable)
@@ -1420,9 +1440,12 @@ router.post("/projects/:id/donations/vekalet-check", asyncHandler(async (req, re
 }));
 
 const bulkTagSchema = z.object({
-  donationIds: z.array(z.string()).min(1).max(50000),
+  donationIds: z.array(z.string()).max(50000).optional(),
+  filter: z.record(z.unknown()).optional(),
   tagId: z.string().min(1),
   action: z.enum(["add", "remove"]).default("add"),
+}).refine(d => (d.donationIds && d.donationIds.length > 0) || d.filter, {
+  message: ERROR_MESSAGES.BULK_IDS_OR_FILTER_REQUIRED,
 });
 
 router.post("/projects/:id/donations/bulk-tag", asyncHandler(async (req, res) => {
@@ -1436,7 +1459,13 @@ router.post("/projects/:id/donations/bulk-tag", asyncHandler(async (req, res) =>
     return;
   }
 
-  const { donationIds, tagId, action } = parsed.data;
+  let donationIds: string[];
+  const { tagId, action } = parsed.data;
+  if (parsed.data.filter && (!parsed.data.donationIds || parsed.data.donationIds.length === 0)) {
+    donationIds = await getFilteredDonationIds(projectId, parsed.data.filter as Record<string, unknown>);
+  } else {
+    donationIds = parsed.data.donationIds!;
+  }
 
   const [tag] = await db.select().from(customTagsTable).where(eq(customTagsTable.id, tagId));
   if (!tag) {
@@ -1598,9 +1627,12 @@ router.patch("/projects/:projectId/donations/:id", asyncHandler(async (req, res)
 }));
 
 const bulkNotesSchema = z.object({
-  donationIds: z.array(z.string()).min(1).max(50000),
+  donationIds: z.array(z.string()).max(50000).optional(),
+  filter: z.record(z.unknown()).optional(),
   note: z.string().min(1).max(5000),
   mode: z.enum(["append", "replace"]).default("append"),
+}).refine(d => (d.donationIds && d.donationIds.length > 0) || d.filter, {
+  message: ERROR_MESSAGES.BULK_IDS_OR_FILTER_REQUIRED,
 });
 
 router.post("/projects/:id/donations/bulk-notes", asyncHandler(async (req, res) => {
@@ -1614,7 +1646,13 @@ router.post("/projects/:id/donations/bulk-notes", asyncHandler(async (req, res) 
     return;
   }
 
-  const { donationIds, note, mode } = parsed.data;
+  let donationIds: string[];
+  const { note, mode } = parsed.data;
+  if (parsed.data.filter && (!parsed.data.donationIds || parsed.data.donationIds.length === 0)) {
+    donationIds = await getFilteredDonationIds(projectId, parsed.data.filter as Record<string, unknown>);
+  } else {
+    donationIds = parsed.data.donationIds!;
+  }
 
   const projectKAIds = await db.select({ id: kesimAlanlariTable.id })
     .from(kesimAlanlariTable)

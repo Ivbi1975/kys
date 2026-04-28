@@ -488,11 +488,13 @@ export default function BagisHavuzuPage() {
   }, [allFilteredIds]);
 
   const handleBulkAction = useCallback(async (action: "exclude" | "include" | "delete") => {
-    const ids = [...effectiveSelectedIds];
-    if (ids.length === 0) return;
+    if (effectiveSelectedIds.size === 0) return;
     const labels: Record<string, string> = { exclude: "sepetten çıkarıldı", include: "sepete eklendi", delete: "silindi" };
     try {
-      const result = await bulkActionDonations(projectId, ids, action);
+      const body = selectAllPages
+        ? { filter: statsFilters, action }
+        : { donationIds: [...effectiveSelectedIds], action };
+      const result = await bulkActionDonations(projectId, body);
       toast({ title: `${result.affected} bağış ${labels[action]}` });
       setSelectedIds(new Set());
       setSelectAllPages(false);
@@ -500,13 +502,15 @@ export default function BagisHavuzuPage() {
     } catch (err) {
       toast({ title: "İşlem başarısız", description: err instanceof Error ? err.message : "Hata", variant: "destructive" });
     }
-  }, [effectiveSelectedIds, projectId, toast, invalidatePool]);
+  }, [effectiveSelectedIds, selectAllPages, statsFilters, projectId, toast, invalidatePool]);
 
   const handleBulkTag = useCallback(async (tagId: string, action: "add" | "remove") => {
-    const ids = [...effectiveSelectedIds];
-    if (ids.length === 0) return;
+    if (effectiveSelectedIds.size === 0) return;
     try {
-      const result = await bulkTagDonations(projectId, ids, tagId, action);
+      const body = selectAllPages
+        ? { filter: statsFilters, tagId, action }
+        : { donationIds: [...effectiveSelectedIds], tagId, action };
+      const result = await bulkTagDonations(projectId, body);
       const tagName = globalTags.find(t => t.id === tagId)?.name || tagId;
       toast({ title: `${result.affected} bağışa "${tagName}" etiketi ${action === "add" ? "eklendi" : "kaldırıldı"}` });
       setSelectedIds(new Set());
@@ -515,13 +519,15 @@ export default function BagisHavuzuPage() {
     } catch (err) {
       toast({ title: "Etiketleme başarısız", description: err instanceof Error ? err.message : "Hata", variant: "destructive" });
     }
-  }, [effectiveSelectedIds, projectId, globalTags, toast, invalidatePool]);
+  }, [effectiveSelectedIds, selectAllPages, statsFilters, projectId, globalTags, toast, invalidatePool]);
 
   const handleBulkNote = useCallback(async (note: string, mode: "append" | "replace") => {
-    const ids = [...effectiveSelectedIds];
-    if (ids.length === 0) return;
+    if (effectiveSelectedIds.size === 0) return;
     try {
-      const result = await bulkNoteDonations(projectId, ids, note, mode);
+      const body = selectAllPages
+        ? { filter: statsFilters, note, mode }
+        : { donationIds: [...effectiveSelectedIds], note, mode };
+      const result = await bulkNoteDonations(projectId, body);
       toast({ title: `${result.affected} bağışa not ${mode === "append" ? "eklendi" : "güncellendi"}` });
       setSelectedIds(new Set());
       setSelectAllPages(false);
@@ -529,7 +535,7 @@ export default function BagisHavuzuPage() {
     } catch (err) {
       toast({ title: "Not ekleme başarısız", description: err instanceof Error ? err.message : "Hata", variant: "destructive" });
     }
-  }, [effectiveSelectedIds, projectId, toast, invalidatePool]);
+  }, [effectiveSelectedIds, selectAllPages, statsFilters, projectId, toast, invalidatePool]);
 
   const handleCreateTag = useCallback(async (name: string, color: string): Promise<CustomTag | null> => {
     try {

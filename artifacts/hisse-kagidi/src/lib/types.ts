@@ -117,6 +117,13 @@ export interface ProjectStats {
   lastKesildiAt: string | null;
 }
 
+export interface ProjectWarnings {
+  unassignedShares: number;
+  duplicateVekalets: number;
+  wrongCountGroups: number;
+  missingVekalet: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -124,6 +131,7 @@ export interface Project {
   deletedAt?: string | null;
   archivedAt?: string | null;
   stats: ProjectStats;
+  warnings?: ProjectWarnings;
 }
 
 export interface RuleCondition {

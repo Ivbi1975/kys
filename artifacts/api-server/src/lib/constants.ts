@@ -82,6 +82,13 @@ export const ERROR_MESSAGES = {
   TRACKING_TOKEN_EXPIRED: "Takip linki süresi dolmuş. Lütfen yöneticinizle iletişime geçin.",
   TRACKING_TOKEN_REVOKED: "Takip linki iptal edilmiş.",
   AI_JOB_EXPIRED: "AI işi zaman aşımına uğradı",
+  BULK_IDS_OR_FILTER_REQUIRED: "donationIds veya filter gerekli",
+  DONATION_ALREADY_IN_GROUP: "Bu bağışçı zaten bir hayvan grubuna atanmış",
+  GROUP_CAPACITY_EXCEEDED: "Bu hayvan grubunda 7 hissenin tamamı dolmuş, daha fazla eklenemiyor",
+  GROUP_SHARE_LIMIT: "Hayvan grubuna eklenen hisse sayısı 7'yi geçemez",
+  PROJECT_ARCHIVED_LOCKED: "Bu proje arşivde olduğu için düzenlenemez",
+  DONATION_EXCLUDED: "Hariç tutulan bağışlar gruba atanamaz",
+  FILTERS_OR_IDS_REQUIRED: "En az bir filtre veya bağış ID listesi gerekli",
 } as const;
 
 export const NOTE_WARNING_KEYWORDS = [

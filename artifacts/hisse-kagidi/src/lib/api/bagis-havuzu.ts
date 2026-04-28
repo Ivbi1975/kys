@@ -165,34 +165,48 @@ export async function transferDonationsToKA(
   });
 }
 
-export async function bulkActionDonations(projectId: string, donationIds: string[], action: "exclude" | "include" | "delete"): Promise<{ success: boolean; affected: number }> {
+type BulkActionBody = (
+  | { donationIds: string[]; filter?: never }
+  | { filter: Record<string, unknown>; donationIds?: never }
+) & { action: "exclude" | "include" | "delete" };
+
+export async function bulkActionDonations(
+  projectId: string,
+  body: BulkActionBody,
+): Promise<{ success: boolean; affected: number }> {
   return apiFetch<{ success: boolean; affected: number }>(`/projects/${projectId}/donations/bulk-action`, {
     method: "POST",
-    body: JSON.stringify({ donationIds, action }),
+    body: JSON.stringify(body),
   });
 }
+
+type BulkTagBody = (
+  | { donationIds: string[]; filter?: never }
+  | { filter: Record<string, unknown>; donationIds?: never }
+) & { tagId: string; action?: "add" | "remove" };
 
 export async function bulkTagDonations(
   projectId: string,
-  donationIds: string[],
-  tagId: string,
-  action: "add" | "remove" = "add",
+  body: BulkTagBody,
 ): Promise<{ success: boolean; affected: number }> {
   return apiFetch<{ success: boolean; affected: number }>(`/projects/${projectId}/donations/bulk-tag`, {
     method: "POST",
-    body: JSON.stringify({ donationIds, tagId, action }),
+    body: JSON.stringify(body),
   });
 }
 
+type BulkNoteBody = (
+  | { donationIds: string[]; filter?: never }
+  | { filter: Record<string, unknown>; donationIds?: never }
+) & { note: string; mode?: "append" | "replace" };
+
 export async function bulkNoteDonations(
   projectId: string,
-  donationIds: string[],
-  note: string,
-  mode: "append" | "replace" = "append",
+  body: BulkNoteBody,
 ): Promise<{ success: boolean; affected: number }> {
   return apiFetch<{ success: boolean; affected: number }>(`/projects/${projectId}/donations/bulk-notes`, {
     method: "POST",
-    body: JSON.stringify({ donationIds, note, mode }),
+    body: JSON.stringify(body),
   });
 }
 

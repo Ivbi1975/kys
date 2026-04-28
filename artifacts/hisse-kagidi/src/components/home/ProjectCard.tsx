@@ -1,8 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FolderOpen, ChevronRight, Plus } from "lucide-react";
-import type { KesimAlani } from "@/lib/types";
-import type { Project } from "@/lib/types";
+import { FolderOpen, ChevronRight, Plus, AlertTriangle, Info } from "lucide-react";
+import type { KesimAlani, Project } from "@/lib/types";
 import { getTotalShares } from "@/lib/grouping";
 
 interface ProjectCardProps {
@@ -32,6 +31,17 @@ export function ProjectCard({ project, kesimAlanlari, onNavigate, onBulkCreate }
 
   const projKesildiPercent = projTotals.groups > 0 ? Math.round((projTotals.kesildi / projTotals.groups) * 100) : 0;
   const projLastKesildiAt = projTotals.kesildiTimes.sort().pop();
+
+  const w = project.warnings;
+  const criticalWarnings: { label: string; count: number }[] = [];
+  const infoWarnings: { label: string; count: number }[] = [];
+
+  if (w) {
+    if (w.unassignedShares > 0) criticalWarnings.push({ label: "gruba atanmamış hisse", count: w.unassignedShares });
+    if (w.duplicateVekalets > 0) criticalWarnings.push({ label: "tekrarlayan vekalet no", count: w.duplicateVekalets });
+    if (w.wrongCountGroups > 0) infoWarnings.push({ label: "7 hisse tamamlanmamış grup", count: w.wrongCountGroups });
+    if (w.missingVekalet > 0) infoWarnings.push({ label: "vekalet numarası eksik hisse", count: w.missingVekalet });
+  }
 
   return (
     <div className="mb-6">
@@ -64,6 +74,30 @@ export function ProjectCard({ project, kesimAlanlari, onNavigate, onBulkCreate }
           </div>
           <ChevronRight className="w-5 h-5 text-muted-foreground" />
         </div>
+
+        {(criticalWarnings.length > 0 || infoWarnings.length > 0) && (
+          <div className="mt-2 pt-2 border-t flex flex-wrap gap-1.5">
+            {criticalWarnings.map(w => (
+              <span
+                key={w.label}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-destructive/10 text-destructive border border-destructive/20"
+              >
+                <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                {w.count} {w.label}
+              </span>
+            ))}
+            {infoWarnings.map(w => (
+              <span
+                key={w.label}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
+              >
+                <Info className="w-2.5 h-2.5 shrink-0" />
+                {w.count} {w.label}
+              </span>
+            ))}
+          </div>
+        )}
+
         {projTotals.groups > 0 && (
           <div className="mt-2 pt-2 border-t">
             <div className="flex items-center justify-between mb-1">

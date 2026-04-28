@@ -58,6 +58,103 @@ const projectsWithStatsQuery = sql`
   LEFT JOIN project_stats_view s ON s.project_id = p.id
 `;
 
+type ProjectWarnings = {
+  unassignedShares: number;
+  duplicateVekalets: number;
+  wrongCountGroups: number;
+  missingVekalet: number;
+};
+
+async function fetchProjectWarnings(): Promise<Record<string, ProjectWarnings>> {
+  const result = await db.execute(sql`
+    WITH active_projects AS (
+      SELECT id FROM projects WHERE deleted_at IS NULL AND archived_at IS NULL
+    ),
+    unassigned AS (
+      SELECT ka.project_id, COUNT(d.id)::int AS cnt
+      FROM donations d
+      JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+      WHERE ka.project_id IN (SELECT id FROM active_projects)
+        AND ka.deleted_at IS NULL
+        AND d.deleted_at IS NULL
+        AND d.excluded = false
+        AND ka.name != '__havuz__'
+        AND NOT EXISTS (
+          SELECT 1 FROM animal_group_donations agd
+          JOIN animal_groups ag ON ag.id = agd.group_id
+          WHERE agd.donation_id = d.id AND ag.deleted_at IS NULL
+        )
+      GROUP BY ka.project_id
+    ),
+    dup_vekalet AS (
+      SELECT project_id, COUNT(*)::int AS cnt
+      FROM (
+        SELECT ka.project_id, d.vekalet
+        FROM donations d
+        JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+        WHERE ka.project_id IN (SELECT id FROM active_projects)
+          AND ka.deleted_at IS NULL
+          AND d.deleted_at IS NULL
+          AND d.vekalet IS NOT NULL AND d.vekalet != ''
+        GROUP BY ka.project_id, d.vekalet
+        HAVING COUNT(*) > 1
+      ) t
+      GROUP BY project_id
+    ),
+    wrong_groups AS (
+      SELECT project_id, COUNT(*)::int AS cnt
+      FROM (
+        SELECT ag.id, ka.project_id,
+          COALESCE(SUM(CASE WHEN d.deleted_at IS NULL AND NOT d.excluded THEN d.share_count ELSE 0 END), 0) AS total_shares
+        FROM animal_groups ag
+        JOIN kesim_alanlari ka ON ka.id = ag.kesim_alani_id
+        LEFT JOIN animal_group_donations agd ON agd.group_id = ag.id
+        LEFT JOIN donations d ON d.id = agd.donation_id
+        WHERE ka.project_id IN (SELECT id FROM active_projects)
+          AND ka.deleted_at IS NULL
+          AND ag.deleted_at IS NULL
+        GROUP BY ag.id, ka.project_id
+        HAVING COALESCE(SUM(CASE WHEN d.deleted_at IS NULL AND NOT d.excluded THEN d.share_count ELSE 0 END), 0) NOT IN (0, 7)
+      ) t
+      GROUP BY project_id
+    ),
+    missing_vekalet AS (
+      SELECT ka.project_id, COUNT(d.id)::int AS cnt
+      FROM donations d
+      JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+      WHERE ka.project_id IN (SELECT id FROM active_projects)
+        AND ka.deleted_at IS NULL
+        AND d.deleted_at IS NULL
+        AND d.excluded = false
+        AND (d.vekalet IS NULL OR d.vekalet = '')
+        AND ka.name != '__havuz__'
+      GROUP BY ka.project_id
+    )
+    SELECT
+      p.id AS project_id,
+      COALESCE(u.cnt, 0) AS unassigned_shares,
+      COALESCE(dv.cnt, 0) AS duplicate_vekalets,
+      COALESCE(wg.cnt, 0) AS wrong_count_groups,
+      COALESCE(mv.cnt, 0) AS missing_vekalet
+    FROM active_projects p
+    LEFT JOIN unassigned u ON u.project_id = p.id
+    LEFT JOIN dup_vekalet dv ON dv.project_id = p.id
+    LEFT JOIN wrong_groups wg ON wg.project_id = p.id
+    LEFT JOIN missing_vekalet mv ON mv.project_id = p.id
+  `);
+
+  const map: Record<string, ProjectWarnings> = {};
+  for (const row of result.rows as { project_id: string; unassigned_shares: number; duplicate_vekalets: number; wrong_count_groups: number; missing_vekalet: number }[]) {
+    map[row.project_id] = {
+      unassignedShares: Number(row.unassigned_shares),
+      duplicateVekalets: Number(row.duplicate_vekalets),
+      wrongCountGroups: Number(row.wrong_count_groups),
+      missingVekalet: Number(row.missing_vekalet),
+    };
+  }
+  return map;
+}
+
 router.get("/home-data", asyncHandler(async (_req, res) => {
   const [
     kaResult,
@@ -67,6 +164,7 @@ router.get("/home-data", asyncHandler(async (_req, res) => {
     activeProjectsRows,
     deletedProjects,
     archivedProjectsRows,
+    warnings,
   ] = await Promise.all([
     listKesimAlanlari(false),
     listDeletedKesimAlanlari(),
@@ -106,14 +204,20 @@ router.get("/home-data", asyncHandler(async (_req, res) => {
       `);
       return (rows.rows as ProjectRow[]).map(mapProjectRow);
     })(),
+    fetchProjectWarnings().catch(() => ({} as Record<string, ProjectWarnings>)),
   ]);
+
+  const projectsWithWarnings = (activeProjectsRows as ReturnType<typeof mapProjectRow>[]).map(p => ({
+    ...p,
+    warnings: warnings[p.id] ?? { unassignedShares: 0, duplicateVekalets: 0, wrongCountGroups: 0, missingVekalet: 0 },
+  }));
 
   res.json({
     kesimAlanlari: kaResult.data,
     deletedKesimAlanlari: deletedKaResult.data,
     tags,
     logo: logoResult,
-    projects: activeProjectsRows,
+    projects: projectsWithWarnings,
     deletedProjects,
     archivedProjects: archivedProjectsRows,
   });
