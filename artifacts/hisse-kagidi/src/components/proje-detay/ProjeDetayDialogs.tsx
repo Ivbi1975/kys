@@ -104,17 +104,23 @@ function CreateKesimAlaniDialog({
   setDialogOpen: (open: boolean) => void;
   newKesimAdi: string;
   setNewKesimAdi: (name: string) => void;
-  handleCreateKesimAlani: (yetkili?: string, displayName?: string) => void;
+  handleCreateKesimAlani: (yetkili?: string, displayName?: string, maxVekalet?: number | null, maxAnimal?: number | null) => void;
 }) {
   const [yetkili, setYetkili] = React.useState("");
   const [displayName, setDisplayName] = React.useState("");
+  const [maxVekaletStr, setMaxVekaletStr] = React.useState("");
+  const [maxAnimalStr, setMaxAnimalStr] = React.useState("");
   const handleCreate = () => {
-    handleCreateKesimAlani(yetkili || undefined, displayName || undefined);
+    const maxVekalet = maxVekaletStr.trim() ? parseInt(maxVekaletStr.trim(), 10) : null;
+    const maxAnimal = maxAnimalStr.trim() ? parseInt(maxAnimalStr.trim(), 10) : null;
+    handleCreateKesimAlani(yetkili || undefined, displayName || undefined, maxVekalet, maxAnimal);
     setYetkili("");
     setDisplayName("");
+    setMaxVekaletStr("");
+    setMaxAnimalStr("");
   };
   return (
-    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setYetkili(""); setDisplayName(""); } }}>
+    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setYetkili(""); setDisplayName(""); setMaxVekaletStr(""); setMaxAnimalStr(""); } }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Yeni Kesim Alanı</DialogTitle>
@@ -137,6 +143,22 @@ function CreateKesimAlaniDialog({
             placeholder="Çıktıda Görünecek İsim (isteğe bağlı)"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+          />
+          <Input
+            type="number"
+            min={1}
+            placeholder="Maksimum Vekalet Sayısı (isteğe bağlı)"
+            value={maxVekaletStr}
+            onChange={(e) => setMaxVekaletStr(e.target.value.replace(/[^0-9]/g, ""))}
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+          />
+          <Input
+            type="number"
+            min={1}
+            placeholder="Maksimum Hayvan Sayısı (isteğe bağlı)"
+            value={maxAnimalStr}
+            onChange={(e) => setMaxAnimalStr(e.target.value.replace(/[^0-9]/g, ""))}
             onKeyDown={(e) => e.key === "Enter" && handleCreate()}
           />
           <Button onClick={handleCreate} className="w-full" disabled={!newKesimAdi.trim()}>

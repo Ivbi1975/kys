@@ -173,7 +173,7 @@ export function useProjeDetayState() {
     }
   }, [showTransferLog, projectId, loadTransferLog]);
 
-  const handleCreateKesimAlani = useCallback(async (yetkili?: string, displayName?: string) => {
+  const handleCreateKesimAlani = useCallback(async (yetkili?: string, displayName?: string, maxVekalet?: number | null, maxAnimal?: number | null) => {
     if (!newKesimAdi.trim()) return;
     try {
       const newKA: KesimAlani = {
@@ -185,6 +185,8 @@ export function useProjeDetayState() {
         projectId: projectId,
         yetkili: yetkili?.trim() || null,
         displayName: displayName?.trim() || null,
+        maxVekalet: maxVekalet ?? null,
+        maxAnimal: maxAnimal ?? null,
       };
       await createKesimAlani(newKA);
       setNewKesimAdi("");
