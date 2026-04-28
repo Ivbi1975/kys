@@ -161,7 +161,9 @@ function KesimAlaniCard({
         <>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-center">
             <div>
-              <div className="text-sm font-bold text-primary">{activeDonors}</div>
+              <div className="text-sm font-bold text-primary">
+                {activeDonors}{k.maxVekalet ? <span className="text-muted-foreground font-normal">/{k.maxVekalet}</span> : null}
+              </div>
               <div className="text-[10px] text-muted-foreground">Bağışçı</div>
             </div>
             <div>
@@ -169,7 +171,9 @@ function KesimAlaniCard({
               <div className="text-[10px] text-muted-foreground">Hisse</div>
             </div>
             <div>
-              <div className="text-sm font-bold text-primary">{animals}</div>
+              <div className="text-sm font-bold text-primary">
+                {animals}{k.maxAnimal ? <span className="text-muted-foreground font-normal">/{k.maxAnimal}</span> : null}
+              </div>
               <div className="text-[10px] text-muted-foreground">Hayvan</div>
             </div>
             <div>
