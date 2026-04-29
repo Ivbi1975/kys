@@ -1,11 +1,10 @@
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Package, Users, ShoppingBasket, Tag, ArrowRightLeft, Layers, AlertCircle } from "lucide-react";
 import type { PoolStats } from "@/lib/types";
 
@@ -40,10 +39,7 @@ export function PoolSummaryCard({ stats, loading, onNavigate }: PoolSummaryCardP
     { label: "Temsilci", count: stats.empty_temsilci_count || 0 },
     { label: "Özellik", count: stats.empty_ozellik_count || 0 },
     { label: "Fiyat", count: stats.empty_fiyat_count || 0 },
-    { label: "Yer Talebi", count: stats.empty_yer_talebi_count || 0 },
     { label: "Gün Talebi", count: stats.empty_gun_talebi_count || 0 },
-    { label: "İlk Hayvan", count: stats.empty_ilk_hayvan_count || 0 },
-    { label: "Safi", count: stats.empty_safi_count || 0 },
   ];
   const missingDetails = missingFields.filter(f => f.count > 0);
   const missingCount = missingDetails.reduce((s, f) => s + f.count, 0);
@@ -64,25 +60,34 @@ export function PoolSummaryCard({ stats, loading, onNavigate }: PoolSummaryCardP
             <h3 className="text-sm font-semibold text-foreground">Bağış Havuzu Özeti</h3>
           </div>
           {missingCount > 0 && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 cursor-default">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    <span>{missingCount} eksik bilgi</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
-                  <p className="font-semibold mb-1">Eksik alanlar:</p>
+            <Popover>
+              <PopoverTrigger asChild>
+                <div
+                  role="button"
+                  onClick={e => e.stopPropagation()}
+                  className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 cursor-pointer hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
+                >
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  <span>{missingCount} eksik bilgi</span>
+                </div>
+              </PopoverTrigger>
+              <PopoverContent
+                side="bottom"
+                align="end"
+                className="w-56 p-3 text-xs"
+                onClick={e => e.stopPropagation()}
+              >
+                <p className="font-semibold mb-2 text-foreground">Eksik alanlar:</p>
+                <div className="space-y-1.5">
                   {missingDetails.map(({ label, count }) => (
                     <div key={label} className="flex items-center justify-between gap-4">
                       <span className="text-muted-foreground">{label} eksik</span>
-                      <span className="font-bold">{count}</span>
+                      <span className="font-bold text-foreground">{count}</span>
                     </div>
                   ))}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+                </div>
+              </PopoverContent>
+            </Popover>
           )}
         </div>
         <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
