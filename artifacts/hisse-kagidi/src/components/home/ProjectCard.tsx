@@ -53,8 +53,8 @@ export function ProjectCard({ project, kesimAlanlari, onNavigate, onBulkCreate }
           <FolderOpen className="w-5 h-5 text-primary" />
           <div className="flex-1 min-w-0">
             <h2 className="font-semibold text-foreground text-lg">{project.name}</h2>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-              <span className="flex items-center gap-1">
+            <div className="flex items-center gap-2.5 text-sm mt-1 flex-wrap">
+              <span className="flex items-center gap-1 font-medium text-foreground/80">
                 {projTotals.areas} kesim alanı
                 {onBulkCreate && (
                   <button
@@ -67,32 +67,35 @@ export function ProjectCard({ project, kesimAlanlari, onNavigate, onBulkCreate }
                   </button>
                 )}
               </span>
-              <span>{projTotals.donors} bağışçı</span>
-              <span>{projTotals.shares} hisse</span>
-              <span>{projTotals.groups} grup</span>
+              <span className="text-muted-foreground">·</span>
+              <span className="font-medium text-foreground/80">{projTotals.donors} bağışçı</span>
+              <span className="text-muted-foreground">·</span>
+              <span className="font-medium text-foreground/80">{projTotals.shares} hisse</span>
+              <span className="text-muted-foreground">·</span>
+              <span className="font-medium text-foreground/80">{projTotals.groups} grup</span>
             </div>
           </div>
           <ChevronRight className="w-5 h-5 text-muted-foreground" />
         </div>
 
         {(criticalWarnings.length > 0 || infoWarnings.length > 0) && (
-          <div className="mt-2 pt-2 border-t flex flex-wrap gap-1.5">
+          <div className="mt-2.5 pt-2.5 border-t flex flex-wrap gap-2">
             {criticalWarnings.map(w => (
               <span
                 key={w.label}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-destructive/10 text-destructive border border-destructive/20"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-destructive/15 text-destructive border border-destructive/30"
               >
-                <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
-                {w.count} {w.label}
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span><strong>{w.count}</strong> {w.label}</span>
               </span>
             ))}
             {infoWarnings.map(w => (
               <span
                 key={w.label}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30"
               >
-                <Info className="w-2.5 h-2.5 shrink-0" />
-                {w.count} {w.label}
+                <Info className="w-3.5 h-3.5 shrink-0" />
+                <span><strong>{w.count}</strong> {w.label}</span>
               </span>
             ))}
           </div>
