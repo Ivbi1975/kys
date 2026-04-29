@@ -1,5 +1,11 @@
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Package, Users, ShoppingBasket, Tag, ArrowRightLeft, Layers, AlertCircle } from "lucide-react";
 import type { PoolStats } from "@/lib/types";
 
@@ -28,10 +34,19 @@ export function PoolSummaryCard({ stats, loading, onNavigate }: PoolSummaryCardP
 
   if (!stats) return null;
 
-  const missingCount =
-    (stats.empty_type_count || 0) +
-    (stats.empty_birim_count || 0) +
-    (stats.empty_temsilci_count || 0);
+  const missingFields: { label: string; count: number }[] = [
+    { label: "Tür", count: stats.empty_type_count || 0 },
+    { label: "Birim", count: stats.empty_birim_count || 0 },
+    { label: "Temsilci", count: stats.empty_temsilci_count || 0 },
+    { label: "Özellik", count: stats.empty_ozellik_count || 0 },
+    { label: "Fiyat", count: stats.empty_fiyat_count || 0 },
+    { label: "Yer Talebi", count: stats.empty_yer_talebi_count || 0 },
+    { label: "Gün Talebi", count: stats.empty_gun_talebi_count || 0 },
+    { label: "İlk Hayvan", count: stats.empty_ilk_hayvan_count || 0 },
+    { label: "Safi", count: stats.empty_safi_count || 0 },
+  ];
+  const missingDetails = missingFields.filter(f => f.count > 0);
+  const missingCount = missingDetails.reduce((s, f) => s + f.count, 0);
 
   const transferRate = stats.active > 0
     ? Math.round((stats.transferredToLists / stats.active) * 100)
@@ -49,10 +64,25 @@ export function PoolSummaryCard({ stats, loading, onNavigate }: PoolSummaryCardP
             <h3 className="text-sm font-semibold text-foreground">Bağış Havuzu Özeti</h3>
           </div>
           {missingCount > 0 && (
-            <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-              <AlertCircle className="w-3.5 h-3.5" />
-              <span>{missingCount} eksik bilgi</span>
-            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 cursor-default">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    <span>{missingCount} eksik bilgi</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  <p className="font-semibold mb-1">Eksik alanlar:</p>
+                  {missingDetails.map(({ label, count }) => (
+                    <div key={label} className="flex items-center justify-between gap-4">
+                      <span className="text-muted-foreground">{label} eksik</span>
+                      <span className="font-bold">{count}</span>
+                    </div>
+                  ))}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
         <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
