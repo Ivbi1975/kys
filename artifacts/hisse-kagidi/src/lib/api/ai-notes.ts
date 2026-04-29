@@ -54,10 +54,14 @@ export async function classifyNotes(donations: AiDonationInput[]): Promise<{ res
 
 const AI_CHUNK_SIZE = 5000;
 
-export async function classifyNotesAsync(donations: AiDonationInput[], kesimAlaniId?: string): Promise<{ jobId: string; status: string; totalDonations: number }> {
+export async function classifyNotesAsync(
+  donations: AiDonationInput[],
+  kesimAlaniId?: string,
+  batchSize?: number,
+): Promise<{ jobId: string; status: string; totalDonations: number }> {
   return apiFetch<{ jobId: string; status: string; totalDonations: number }>("/ai-notes/classify-async", {
     method: "POST",
-    body: JSON.stringify({ donations, kesimAlaniId }),
+    body: JSON.stringify({ donations, kesimAlaniId, ...(batchSize ? { batchSize } : {}) }),
   });
 }
 
@@ -77,9 +81,13 @@ export class PartialChunkError extends Error {
   }
 }
 
-export async function classifyNotesAsyncChunked(donations: AiDonationInput[], kesimAlaniId?: string): Promise<{ jobIds: string[]; totalDonations: number }> {
+export async function classifyNotesAsyncChunked(
+  donations: AiDonationInput[],
+  kesimAlaniId?: string,
+  batchSize?: number,
+): Promise<{ jobIds: string[]; totalDonations: number }> {
   if (donations.length <= AI_CHUNK_SIZE) {
-    const result = await classifyNotesAsync(donations, kesimAlaniId);
+    const result = await classifyNotesAsync(donations, kesimAlaniId, batchSize);
     return { jobIds: [result.jobId], totalDonations: result.totalDonations };
   }
 
@@ -90,7 +98,7 @@ export async function classifyNotesAsyncChunked(donations: AiDonationInput[], ke
     const chunkIndex = Math.floor(i / AI_CHUNK_SIZE);
     const chunk = donations.slice(i, i + AI_CHUNK_SIZE);
     try {
-      const result = await classifyNotesAsync(chunk, kesimAlaniId);
+      const result = await classifyNotesAsync(chunk, kesimAlaniId, batchSize);
       jobIds.push(result.jobId);
       totalDonations += result.totalDonations;
     } catch (err) {
@@ -117,7 +125,9 @@ export async function fetchActiveJob(kesimAlaniId: string): Promise<{ job: AiJob
   return apiFetch<{ job: AiJobStatus | null }>(`/ai-notes/active-job?kesimAlaniId=${encodeURIComponent(kesimAlaniId)}`);
 }
 
-export async function saveAiClassifications(classifications: { donationId: string; categories: string[]; warnings: string }[]): Promise<{ success: boolean }> {
+export async function saveAiClassifications(
+  classifications: { donationId: string; categories: string[]; warnings: string; requests?: string; summary?: string }[],
+): Promise<{ success: boolean }> {
   return apiFetch<{ success: boolean }>("/ai-notes/save-classifications", {
     method: "PUT",
     body: JSON.stringify({ classifications }),

@@ -26,6 +26,8 @@ interface AiResult extends AiClassificationResult {
   donorName?: string;
 }
 
+const AI_FAIL_MESSAGES = new Set(["AI bu bağışı sınıflandıramadı", "AI işlemi başarısız oldu", "AI sonuç eşleşmesi bulunamadı"]);
+
 const CATEGORY_COLORS: Record<string, string> = {
   "erken_kesim": "bg-orange-100 text-orange-800 border-orange-200",
   "özel_kesim": "bg-amber-100 text-amber-800 border-amber-200",
@@ -223,7 +225,9 @@ export default function AiSiniflandirmaPage() {
 
     try {
       const { jobIds } = await classifyNotesAsyncChunked(
-        toProcess.map(d => ({ id: d.id, name: d.description || d.name || "", donationType: d.donationType || "", vekalet: d.vekalet || "", notes: d.notes || "" }))
+        toProcess.map(d => ({ id: d.id, name: d.description || d.name || "", donationType: d.donationType || "", vekalet: d.vekalet || "", notes: d.notes || "" })),
+        undefined,
+        batchSize,
       );
       activeJobIdsRef.current = jobIds;
       startPollingJobs(jobIds, toProcess.length);
@@ -257,6 +261,8 @@ export default function AiSiniflandirmaPage() {
         donationId: r.donationId,
         categories: r.categories,
         warnings: r.warnings || "",
+        requests: r.requests || "",
+        summary: r.summary || "",
       }));
       const CHUNK = 2000;
       for (let i = 0; i < toSave.length; i += CHUNK) {
@@ -287,8 +293,13 @@ export default function AiSiniflandirmaPage() {
     [aiResults],
   );
 
+  const permanentlyFailedResults = useMemo(
+    () => Array.from(aiResults.values()).filter(r => AI_FAIL_MESSAGES.has(r.warnings)),
+    [aiResults],
+  );
+
   const requestResults = useMemo(
-    () => Array.from(aiResults.values()).filter(r => (r as AiResult & { requests?: string }).requests?.trim()),
+    () => Array.from(aiResults.values()).filter(r => r.requests?.trim()),
     [aiResults],
   );
 
@@ -419,8 +430,8 @@ export default function AiSiniflandirmaPage() {
                 <span>{aiProgress.total} toplam</span>
               </div>
               {aiErrorBatches > 0 && (
-                <p className="text-[11px] text-destructive">
-                  {aiErrorBatches}/{aiTotalBatches} batch hatalı
+                <p className="text-[11px] text-amber-600" title="Bu batch'ler AI'dan eksik yanıt aldı ve otomatik olarak yeniden denendi. Hâlâ başarısız olanlar 'Uyarılı Bağışçılar' bölümünde görünür.">
+                  ⚠ {aiErrorBatches}/{aiTotalBatches} batch yeniden denendi
                 </p>
               )}
             </div>
@@ -448,6 +459,12 @@ export default function AiSiniflandirmaPage() {
                   <div className="text-lg font-bold text-muted-foreground">{categoryDistribution.length}</div>
                   <div className="text-[10px] text-muted-foreground">Kategori</div>
                 </div>
+                {permanentlyFailedResults.length > 0 && (
+                  <div className="col-span-2 bg-red-50 dark:bg-red-950/20 rounded-lg p-2.5 text-center border border-red-200 dark:border-red-900">
+                    <div className="text-lg font-bold text-destructive">{permanentlyFailedResults.length}</div>
+                    <div className="text-[10px] text-destructive/80">AI işleyemedi</div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -521,11 +538,12 @@ export default function AiSiniflandirmaPage() {
                     {filteredResults.map((r, idx) => {
                       const donor = allItems.find(d => d.id === r.donationId);
                       const hasWarning = r.warnings && r.warnings.trim();
-                      const extR = r as AiResult & { requests?: string; summary?: string };
+                      const isAiFailed = AI_FAIL_MESSAGES.has(r.warnings);
                       return (
-                        <tr key={r.donationId} className={`${idx % 2 === 0 ? "bg-background" : "bg-muted/20"} ${hasWarning ? "border-l-2 border-l-destructive" : ""}`}>
+                        <tr key={r.donationId} className={`${isAiFailed ? "bg-red-50 dark:bg-red-950/20" : idx % 2 === 0 ? "bg-background" : "bg-muted/20"} ${hasWarning ? "border-l-2 border-l-destructive" : ""}`}>
                           <td className="px-3 py-2.5 font-medium text-xs truncate max-w-[160px]" title={donor?.description || donor?.name || r.donationId}>
                             {donor?.description || donor?.name || r.donationId}
+                            {isAiFailed && <span className="ml-1 text-[10px] text-destructive font-semibold">[hata]</span>}
                           </td>
                           <td className="px-3 py-2.5 text-xs text-muted-foreground">{donor?.donationType || "—"}</td>
                           <td className="px-3 py-2.5">
@@ -539,12 +557,12 @@ export default function AiSiniflandirmaPage() {
                               )}
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 text-xs text-muted-foreground">{extR.summary || "—"}</td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground">{r.summary || "—"}</td>
                           <td className="px-3 py-2.5 text-xs">
-                            {extR.requests?.trim() ? (
+                            {r.requests?.trim() ? (
                               <span className="flex items-start gap-1">
                                 <MessageSquare className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
-                                <span className="text-blue-700 dark:text-blue-400">{extR.requests}</span>
+                                <span className="text-blue-700 dark:text-blue-400">{r.requests}</span>
                               </span>
                             ) : "—"}
                           </td>

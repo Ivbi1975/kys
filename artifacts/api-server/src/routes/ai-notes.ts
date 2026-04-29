@@ -163,41 +163,30 @@ function parseAiResults(content: string): unknown[] {
 }
 
 function tryRecoverTruncatedJson(content: string): unknown[] {
-  const arrayMatch = content.match(/\[[\s\S]*/);
-  if (!arrayMatch) {
-    const objMatch = content.match(/\{[\s\S]*/);
-    if (!objMatch) return [];
-    const raw = objMatch[0];
-    const objects: unknown[] = [];
-    const objRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
-    let m: RegExpExecArray | null;
-    while ((m = objRegex.exec(raw)) !== null) {
-      try {
-        objects.push(JSON.parse(m[0]));
-      } catch { /* skip */ }
-    }
-    return objects;
-  }
-
-  let raw = arrayMatch[0];
-  for (let i = raw.length; i >= 1; i--) {
-    const attempt = raw.slice(0, i);
-    const closed = attempt.endsWith("]") ? attempt : attempt.replace(/,\s*$/, "") + "]";
+  const objects: unknown[] = [];
+  const objRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = objRegex.exec(content)) !== null) {
     try {
-      const parsed = JSON.parse(closed);
+      objects.push(JSON.parse(m[0]));
+    } catch { /* skip malformed object */ }
+  }
+  if (objects.length > 0) return objects;
+
+  const arrayMatch = content.match(/\[[\s\S]*/);
+  if (!arrayMatch) return [];
+  const raw = arrayMatch[0];
+
+  const lastBracket = raw.lastIndexOf("},");
+  if (lastBracket !== -1) {
+    try {
+      const attempt = raw.slice(0, lastBracket + 1) + "]";
+      const parsed = JSON.parse(attempt);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     } catch { /* continue */ }
   }
 
-  const objects: unknown[] = [];
-  const objRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
-  let m: RegExpExecArray | null;
-  while ((m = objRegex.exec(raw)) !== null) {
-    try {
-      objects.push(JSON.parse(m[0]));
-    } catch { /* skip */ }
-  }
-  return objects;
+  return [];
 }
 
 router.get("/ai-notes/settings", asyncHandler(async (_req, res) => {
@@ -286,6 +275,7 @@ const classifyAsyncSchema = z.object({
     notes: z.string().nullable().optional().transform(v => v ?? ""),
   })).min(1).max(50000),
   kesimAlaniId: z.string().optional(),
+  batchSize: z.number().int().min(5).max(100).optional().default(25),
 });
 
 router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
@@ -295,7 +285,7 @@ router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
     return;
   }
 
-  const { donations, kesimAlaniId } = parsed.data;
+  const { donations, kesimAlaniId, batchSize } = parsed.data;
   const jobId = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + AI_JOB_TTL_MS);
 
@@ -310,7 +300,7 @@ router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
 
   res.status(202).json({ jobId, status: AiJobStatus.PENDING, totalDonations: donations.length });
 
-  processClassifyJob(jobId, donations).catch(err => {
+  processClassifyJob(jobId, donations, batchSize).catch(err => {
     logger.error({ err, jobId }, "AI job unhandled error");
   });
 }));
@@ -492,7 +482,8 @@ function deduplicateResults(results: unknown[]): unknown[] {
 
 async function processClassifyJob(
   jobId: string,
-  donations: Array<{ id: string; name: string; donationType: string; vekalet: string; notes: string }>
+  donations: Array<{ id: string; name: string; donationType: string; vekalet: string; notes: string }>,
+  chunkSize: number = CHUNK_SIZE,
 ) {
   try {
     await db.update(aiJobsTable)
@@ -504,8 +495,8 @@ async function processClassifyJob(
 
     const allResults: unknown[] = [];
     const chunks: Array<{ id: string; name: string; donationType: string; vekalet: string; notes: string }>[] = [];
-    for (let i = 0; i < donations.length; i += CHUNK_SIZE) {
-      chunks.push(donations.slice(i, i + CHUNK_SIZE));
+    for (let i = 0; i < donations.length; i += chunkSize) {
+      chunks.push(donations.slice(i, i + chunkSize));
     }
 
     let processedCount = 0;
@@ -717,6 +708,8 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
         z.array(z.string()),
       ),
       warnings: z.string().optional().default(""),
+      requests: z.string().optional().default(""),
+      summary: z.string().optional().default(""),
     })).max(50000),
   }).safeParse(req.body);
 
@@ -734,7 +727,9 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
         tx.update(donationsTable)
           .set({
             aiCategories: JSON.stringify(c.categories),
-            aiWarnings: c.warnings,
+            aiWarnings: c.warnings || null,
+            aiRequests: c.requests || null,
+            aiSummary: c.summary || null,
           })
           .where(eq(donationsTable.id, c.donationId))
       ));

@@ -74,6 +74,8 @@ export const donationsTable = pgTable("donations", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   aiCategories: text("ai_categories"),
   aiWarnings: text("ai_warnings"),
+  aiRequests: text("ai_requests"),
+  aiSummary: text("ai_summary"),
   isFlagged: boolean("is_flagged").notNull().default(false),
   flagReason: text("flag_reason").notNull().default(""),
   flagResolvedAt: timestamp("flag_resolved_at", { withTimezone: true }),
