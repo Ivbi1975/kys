@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { ChevronDown, ChevronRight, FolderOpen, Inbox, PanelLeftClose, PanelLeftOpen, Home, Trash2 } from "lucide-react";
+import {
+  ChevronDown, ChevronRight, FolderOpen, Inbox,
+  PanelLeftClose, PanelLeftOpen, Home, Trash2, Scissors
+} from "lucide-react";
 import { fetchHomeData } from "@/lib/api/projects";
 import type { HomeData } from "@/lib/api/projects";
 import { cn } from "@/lib/utils";
@@ -55,14 +58,16 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
 
   const go = (path: string) => navigate(path);
 
+  const sidebarBase = cn(
+    "flex flex-col border-r transition-all duration-200 overflow-hidden flex-shrink-0",
+    "bg-[hsl(224,50%,9%)] border-[hsl(224,50%,14%)]",
+    collapsed ? "w-12" : "w-64"
+  );
+
   if (!homeData) {
     return (
-      <aside className={cn("flex flex-col bg-sidebar border-r border-sidebar-border transition-all duration-200", collapsed ? "w-12" : "w-60")}>
-        <div className="flex items-center justify-end p-2">
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-sidebar-foreground/60 hover:text-sidebar-foreground" onClick={onToggle}>
-            {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-          </Button>
-        </div>
+      <aside className={sidebarBase}>
+        <SidebarHeader collapsed={collapsed} onToggle={onToggle} />
       </aside>
     );
   }
@@ -73,31 +78,12 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
   const orphanKesim = homeData.kesimAlanlari.filter(k => !k.projectId && !k.deletedAt && k.name !== "__havuz__");
 
   return (
-    <aside className={cn(
-      "flex flex-col border-r transition-all duration-200 overflow-hidden flex-shrink-0",
-      "bg-[hsl(222,47%,10%)] border-[hsl(222,47%,15%)]",
-      collapsed ? "w-12" : "w-60"
-    )}>
-      {/* Header */}
-      <div className={cn(
-        "flex items-center border-b border-[hsl(222,47%,15%)] h-12 flex-shrink-0",
-        collapsed ? "justify-center px-0" : "justify-between px-3"
-      )}>
-        {!collapsed && (
-          <span className="text-[11px] font-bold text-white/40 uppercase tracking-widest">Gezgin</span>
-        )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-white/40 hover:text-white/80 hover:bg-white/5"
-          onClick={onToggle}
-        >
-          {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-        </Button>
-      </div>
+    <aside className={sidebarBase}>
+      <SidebarHeader collapsed={collapsed} onToggle={onToggle} />
 
-      <nav className="flex-1 overflow-y-auto py-2 thin-scrollbar space-y-0.5 px-2">
-        {/* Home */}
+      <nav className="flex-1 overflow-y-auto thin-scrollbar py-3 px-2 flex flex-col gap-0.5">
+
+        {/* Ana Sayfa */}
         <NavItem
           collapsed={collapsed}
           icon={<Home className="h-4 w-4 flex-shrink-0" />}
@@ -106,86 +92,86 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
           onClick={() => go("/")}
         />
 
-        {/* Bağış Havuzu per project */}
-        {activeProjects.map(project => (
-          <NavItem
-            key={`havuz-${project.id}`}
-            collapsed={collapsed}
-            icon={<Inbox className="h-4 w-4 flex-shrink-0" />}
-            label={`Havuz: ${project.name}`}
-            active={location === `/bagis-havuzu/${project.id}`}
-            onClick={() => go(`/bagis-havuzu/${project.id}`)}
-          />
-        ))}
-
-        {/* Divider */}
-        {!collapsed && activeProjects.length > 0 && (
-          <div className="pt-2 pb-1 px-1">
-            <div className="h-px bg-white/8" />
-          </div>
+        {/* Bağış Havuzları */}
+        {activeProjects.length > 0 && (
+          <>
+            <SectionLabel icon={<Inbox className="h-3 w-3" />} label="Bağış Havuzları" collapsed={collapsed} />
+            {activeProjects.map(project => (
+              <NavItem
+                key={`havuz-${project.id}`}
+                collapsed={collapsed}
+                icon={<Inbox className="h-4 w-4 flex-shrink-0" />}
+                label={project.name}
+                active={location === `/bagis-havuzu/${project.id}`}
+                onClick={() => go(`/bagis-havuzu/${project.id}`)}
+                indent
+              />
+            ))}
+          </>
         )}
 
-        {/* Projects tree */}
-        {activeProjects.map(project => {
-          const kesimList = getKesimForProject(project.id);
-          const isOpen = openProjects.has(project.id);
-          const isProjectActive = activeProjectId === project.id;
-          return (
-            <div key={project.id}>
-              <div className={cn("flex items-center gap-1", collapsed ? "justify-center" : "")}>
-                {!collapsed && (
-                  <button
-                    className="flex-shrink-0 p-1 rounded text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors"
-                    onClick={() => toggleProject(project.id)}
-                  >
-                    {isOpen
-                      ? <ChevronDown className="h-3.5 w-3.5" />
-                      : <ChevronRight className="h-3.5 w-3.5" />}
-                  </button>
-                )}
-                <NavItem
-                  collapsed={collapsed}
-                  icon={<FolderOpen className="h-4 w-4 flex-shrink-0" />}
-                  label={project.name}
-                  active={isProjectActive}
-                  onClick={() => {
-                    go(`/proje/${project.id}`);
-                    if (!isOpen) toggleProject(project.id);
-                  }}
-                  className="flex-1 min-w-0"
-                />
-              </div>
-
-              {!collapsed && isOpen && (
-                <div className="ml-6 mt-0.5 space-y-0.5 border-l border-white/8 pl-2">
-                  {kesimList.map(ka => (
+        {/* Projeler */}
+        {activeProjects.length > 0 && (
+          <>
+            <SectionLabel icon={<FolderOpen className="h-3 w-3" />} label="Projeler" collapsed={collapsed} />
+            {activeProjects.map(project => {
+              const kesimList = getKesimForProject(project.id);
+              const isOpen = openProjects.has(project.id);
+              const isProjectActive = activeProjectId === project.id;
+              return (
+                <div key={project.id}>
+                  <div className={cn("flex items-center gap-0.5", collapsed ? "justify-center" : "")}>
+                    {!collapsed && (
+                      <button
+                        className="flex-shrink-0 w-5 h-7 flex items-center justify-center rounded text-white/25 hover:text-white/55 hover:bg-white/5 transition-colors"
+                        onClick={() => toggleProject(project.id)}
+                      >
+                        {isOpen
+                          ? <ChevronDown className="h-3.5 w-3.5" />
+                          : <ChevronRight className="h-3.5 w-3.5" />}
+                      </button>
+                    )}
                     <NavItem
-                      key={ka.id}
-                      collapsed={false}
-                      icon={<img src="/kurban-logo.png" alt="" className="h-3.5 w-3.5 flex-shrink-0 object-contain opacity-70" />}
-                      label={ka.name}
-                      active={activeKesimId === ka.id}
-                      onClick={() => go(`/kesim/${ka.id}`)}
-                      small
+                      collapsed={collapsed}
+                      icon={<FolderOpen className="h-4 w-4 flex-shrink-0" />}
+                      label={project.name}
+                      active={isProjectActive}
+                      onClick={() => {
+                        go(`/proje/${project.id}`);
+                        if (!isOpen) toggleProject(project.id);
+                      }}
+                      className="flex-1 min-w-0"
                     />
-                  ))}
-                  {kesimList.length === 0 && (
-                    <p className="text-xs text-white/25 px-2 py-1 italic">Kesim listesi yok</p>
+                  </div>
+
+                  {!collapsed && isOpen && (
+                    <div className="ml-5 mt-0.5 mb-1 space-y-0.5 border-l-2 border-white/8 pl-2">
+                      {kesimList.map(ka => (
+                        <NavItem
+                          key={ka.id}
+                          collapsed={false}
+                          icon={<img src="/kurban-logo.png" alt="" className="h-3.5 w-3.5 flex-shrink-0 object-contain opacity-60" />}
+                          label={ka.name}
+                          active={activeKesimId === ka.id}
+                          onClick={() => go(`/kesim/${ka.id}`)}
+                          small
+                        />
+                      ))}
+                      {kesimList.length === 0 && (
+                        <p className="text-[11px] text-white/20 px-2 py-1.5 italic">Kesim alanı yok</p>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-          );
-        })}
+              );
+            })}
+          </>
+        )}
 
-        {/* Orphan kesim lists */}
+        {/* Bağımsız Kesim Alanları */}
         {orphanKesim.length > 0 && (
-          <div>
-            {!collapsed && (
-              <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest px-2 pt-3 pb-1">
-                Listeler
-              </p>
-            )}
+          <>
+            <SectionLabel icon={<Scissors className="h-3 w-3" />} label="Bağımsız Kesim Alanları" collapsed={collapsed} />
             {orphanKesim.map(ka => (
               <NavItem
                 key={ka.id}
@@ -194,27 +180,66 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
                 label={ka.name}
                 active={activeKesimId === ka.id}
                 onClick={() => go(`/kesim/${ka.id}`)}
+                indent
               />
             ))}
-          </div>
+          </>
         )}
 
-        {/* Divider before trash */}
-        <div className="pt-2 pb-1 px-1">
-          <div className="h-px bg-white/8" />
-        </div>
+        {/* Boşluk bırak */}
+        <div className="flex-1" />
 
-        {/* Çöp Kutusu */}
-        <NavItem
-          collapsed={collapsed}
-          icon={<Trash2 className="h-4 w-4 flex-shrink-0" />}
-          label="Çöp Kutusu"
-          active={location === "/cop-kutusu"}
-          onClick={() => go("/cop-kutusu")}
-          muted
-        />
+        {/* Ayırıcı + Çöp Kutusu */}
+        <div className="mt-2 pt-2 border-t border-white/8">
+          <NavItem
+            collapsed={collapsed}
+            icon={<Trash2 className="h-4 w-4 flex-shrink-0" />}
+            label="Çöp Kutusu"
+            active={location === "/cop-kutusu"}
+            onClick={() => go("/cop-kutusu")}
+            muted
+          />
+        </div>
       </nav>
     </aside>
+  );
+}
+
+function SidebarHeader({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  return (
+    <div className={cn(
+      "flex items-center border-b border-[hsl(224,50%,14%)] h-12 flex-shrink-0 gap-2",
+      collapsed ? "justify-center px-0" : "justify-between px-3"
+    )}>
+      {!collapsed && (
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 rounded-md bg-primary/20 flex items-center justify-center">
+            <img src="/kurban-logo.png" alt="" className="h-3 w-3 object-contain opacity-90" />
+          </div>
+          <span className="text-[11px] font-bold text-white/50 uppercase tracking-[0.15em]">Gezgin</span>
+        </div>
+      )}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-white/35 hover:text-white/75 hover:bg-white/6 transition-colors"
+        onClick={onToggle}
+      >
+        {collapsed
+          ? <PanelLeftOpen className="h-4 w-4" />
+          : <PanelLeftClose className="h-4 w-4" />}
+      </Button>
+    </div>
+  );
+}
+
+function SectionLabel({ icon, label, collapsed }: { icon: React.ReactNode; label: string; collapsed: boolean }) {
+  if (collapsed) return <div className="h-3" />;
+  return (
+    <div className="flex items-center gap-1.5 px-2 pt-3 pb-1">
+      <span className="text-white/25">{icon}</span>
+      <span className="text-[10px] font-semibold text-white/30 uppercase tracking-[0.12em]">{label}</span>
+    </div>
   );
 }
 
@@ -227,30 +252,37 @@ interface NavItemProps {
   className?: string;
   small?: boolean;
   muted?: boolean;
+  indent?: boolean;
 }
 
-function NavItem({ collapsed, icon, label, active, onClick, className, small, muted }: NavItemProps) {
+function NavItem({ collapsed, icon, label, active, onClick, className, small, muted, indent }: NavItemProps) {
   const button = (
     <button
       onClick={onClick}
       className={cn(
-        "flex items-center gap-2.5 w-full rounded-md text-left transition-all duration-150 select-none",
+        "flex items-center gap-2.5 w-full rounded-lg text-left transition-all duration-150 select-none relative",
         small
           ? "px-2 py-1.5 text-[13px]"
-          : "px-2.5 py-2 text-sm",
-        active
-          ? "bg-primary text-primary-foreground font-medium shadow-sm"
-          : muted
-            ? "text-white/35 hover:text-white/60 hover:bg-white/5"
-            : "text-white/65 hover:text-white hover:bg-white/8",
+          : "px-2.5 py-2 text-[13.5px]",
+        active && [
+          "bg-primary/15 text-white font-medium",
+          "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2",
+          "before:h-5 before:w-[3px] before:rounded-r-full before:bg-primary",
+        ],
+        !active && muted && "text-white/30 hover:text-white/55 hover:bg-white/5",
+        !active && !muted && "text-white/55 hover:text-white/90 hover:bg-white/7",
+        indent && !collapsed && "pl-3.5",
         collapsed && "justify-center px-0 py-2.5",
         className
       )}
     >
-      <span className={cn(active ? "text-primary-foreground" : muted ? "text-white/35" : "text-white/50")}>
+      <span className={cn(
+        "flex-shrink-0",
+        active ? "text-primary" : muted ? "text-white/25" : "text-white/40"
+      )}>
         {icon}
       </span>
-      {!collapsed && <span className="truncate">{label}</span>}
+      {!collapsed && <span className="truncate leading-tight">{label}</span>}
     </button>
   );
 
@@ -258,7 +290,7 @@ function NavItem({ collapsed, icon, label, active, onClick, className, small, mu
     return (
       <Tooltip>
         <TooltipTrigger asChild>{button}</TooltipTrigger>
-        <TooltipContent side="right" className="text-sm">{label}</TooltipContent>
+        <TooltipContent side="right" className="text-sm font-medium">{label}</TooltipContent>
       </Tooltip>
     );
   }

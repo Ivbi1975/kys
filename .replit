@@ -34,3 +34,15 @@ channel = "stable-25_05"
 
 [userenv.production]
 ALLOWED_ORIGINS = "https://kys.gelecekvadisi.org,https://liste.gelecekvadisi.org"
+
+[[ports]]
+localPort = 8080
+externalPort = 80
+
+[[ports]]
+localPort = 8081
+externalPort = 8081
+
+[[ports]]
+localPort = 18604
+externalPort = 3000
