@@ -272,54 +272,56 @@ export async function deleteKesimAlani(id: string, permanent: boolean): Promise<
   const [existing] = await db.select().from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
   if (!existing) return serviceError("not_found", 404);
 
-  await db.transaction(async (tx) => {
-    if (existing.projectId) {
-      let [pool] = await tx.select({ id: kesimAlanlariTable.id })
-        .from(kesimAlanlariTable)
-        .where(and(
-          eq(kesimAlanlariTable.projectId, existing.projectId),
-          eq(kesimAlanlariTable.name, "__havuz__"),
-          isNull(kesimAlanlariTable.deletedAt),
-        ));
+  if (permanent) {
+    // Permanent delete: cascades handle all related data (donations, groups, teams, notes, photos)
+    await db.delete(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
+  } else {
+    // Soft delete: move donations to __havuz__ pool to preserve them, then soft-delete the KA
+    await db.transaction(async (tx) => {
+      if (existing.projectId) {
+        let [pool] = await tx.select({ id: kesimAlanlariTable.id })
+          .from(kesimAlanlariTable)
+          .where(and(
+            eq(kesimAlanlariTable.projectId, existing.projectId),
+            eq(kesimAlanlariTable.name, "__havuz__"),
+            isNull(kesimAlanlariTable.deletedAt),
+          ));
 
-      if (!pool) {
-        const poolId = crypto.randomBytes(16).toString("hex");
-        await tx.insert(kesimAlanlariTable).values({
-          id: poolId,
-          name: "__havuz__",
-          projectId: existing.projectId,
-          trackingToken: crypto.randomBytes(16).toString("hex"),
-          createdAt: new Date(),
-        });
-        pool = { id: poolId };
-      }
+        if (!pool) {
+          const poolId = crypto.randomBytes(16).toString("hex");
+          await tx.insert(kesimAlanlariTable).values({
+            id: poolId,
+            name: "__havuz__",
+            projectId: existing.projectId,
+            trackingToken: crypto.randomBytes(16).toString("hex"),
+            createdAt: new Date(),
+          });
+          pool = { id: poolId };
+        }
 
-      const donations = await tx.select({ id: donationsTable.id })
-        .from(donationsTable)
-        .where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)));
+        const donations = await tx.select({ id: donationsTable.id })
+          .from(donationsTable)
+          .where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)));
 
-      if (donations.length > 0) {
-        const donationIds = donations.map(d => d.id);
-        const BATCH = 500;
-        for (let i = 0; i < donationIds.length; i += BATCH) {
-          const batch = donationIds.slice(i, i + BATCH);
-          await tx.delete(animalGroupDonationsTable)
-            .where(inArray(animalGroupDonationsTable.donationId, batch));
-          await tx.update(donationsTable)
-            .set({ kesimAlaniId: pool.id })
-            .where(inArray(donationsTable.id, batch));
+        if (donations.length > 0) {
+          const donationIds = donations.map(d => d.id);
+          const BATCH = 500;
+          for (let i = 0; i < donationIds.length; i += BATCH) {
+            const batch = donationIds.slice(i, i + BATCH);
+            await tx.delete(animalGroupDonationsTable)
+              .where(inArray(animalGroupDonationsTable.donationId, batch));
+            await tx.update(donationsTable)
+              .set({ kesimAlaniId: pool.id })
+              .where(inArray(donationsTable.id, batch));
+          }
         }
       }
-    }
 
-    if (permanent) {
-      await tx.delete(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
-    } else {
       await tx.update(kesimAlanlariTable)
         .set({ deletedAt: new Date() })
         .where(eq(kesimAlanlariTable.id, id));
-    }
-  });
+    });
+  }
 
   invalidateKACache();
   return serviceOk({ success: true as const });
