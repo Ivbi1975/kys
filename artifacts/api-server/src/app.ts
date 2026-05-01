@@ -202,6 +202,16 @@ const bulkImportLimiter = rateLimit({
   },
 });
 
+const vysLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: {
+    error: "VYS API için çok fazla istek gönderildi. Lütfen bir dakika bekleyin.",
+  },
+});
+
 app.use("/api/v1/tracking", trackingLimiter);
 app.use("/api/v1/ai-notes/classify-async", aiClassifyLimiter);
 app.use("/api/v1/ai-notes/classify", aiClassifyLimiter);
@@ -212,7 +222,7 @@ app.use("/api/ai-notes/classify-async", aiClassifyLimiter);
 app.use("/api/ai-notes/classify", aiClassifyLimiter);
 app.use("/api/backup/import", bulkImportLimiter);
 
-app.use("/api/vys", vysApiKeyAuth, vysRouter);
+app.use("/api/vys", vysLimiter, vysApiKeyAuth, vysRouter);
 
 app.use("/api/v1", apiKeyAuth, adminKeyAuth, router);
 

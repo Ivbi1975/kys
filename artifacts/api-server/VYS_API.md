@@ -21,6 +21,31 @@ X-API-Key: <VYS_API_KEY değeri>
 
 ---
 
+## Hız Sınırlama (Rate Limiting)
+
+VYS endpoint'leri dakikada **60 istek** ile sınırlandırılmıştır. Her yanıt aşağıdaki başlıkları içerir (IETF draft-7 standardı):
+
+| Başlık | Açıklama |
+|--------|----------|
+| `RateLimit` | Mevcut penceredeki kota bilgisi (`limit=60, remaining=N, reset=T` formatında) |
+| `RateLimit-Policy` | Politika tanımı (`60;w=60` formatında — 60 saniyede 60 istek) |
+
+**Limit aşıldığında (`429 Too Many Requests`):**
+
+```json
+{
+  "error": "VYS API için çok fazla istek gönderildi. Lütfen bir dakika bekleyin."
+}
+```
+
+| HTTP Kodu | Açıklama |
+|-----------|----------|
+| 429 | Dakikada 60 istek limiti aşıldı |
+
+> Not: Genel sunucu limiti de dakikada 200 istektir; bu limite çarpmak da `429` döndürür.
+
+---
+
 ## Temel URL
 
 ```
