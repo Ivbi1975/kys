@@ -5,8 +5,10 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import pinoHttp from "pino-http";
 import router from "./routes";
+import vysRouter from "./routes/vys";
 import { logger } from "./lib/logger";
 import { apiKeyAuth, adminKeyAuth } from "./middleware/auth";
+import { vysApiKeyAuth } from "./middleware/vys-auth";
 import { errorHandler } from "./middleware/error-handler";
 import { sanitizeRequestId } from "./lib/signed-url";
 
@@ -209,6 +211,8 @@ app.use("/api/tracking", trackingLimiter);
 app.use("/api/ai-notes/classify-async", aiClassifyLimiter);
 app.use("/api/ai-notes/classify", aiClassifyLimiter);
 app.use("/api/backup/import", bulkImportLimiter);
+
+app.use("/api/vys", vysApiKeyAuth, vysRouter);
 
 app.use("/api/v1", apiKeyAuth, adminKeyAuth, router);
 
