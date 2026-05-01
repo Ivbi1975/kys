@@ -29,7 +29,6 @@ function parsePositiveInt(envKey: string, defaultValue: number): number {
 }
 
 const GLOBAL_RATE_LIMIT = parsePositiveInt("GLOBAL_RATE_LIMIT", 200);
-const VYS_RATE_LIMIT = parsePositiveInt("VYS_RATE_LIMIT", 60);
 const TRACKING_RATE_LIMIT = parsePositiveInt("TRACKING_RATE_LIMIT", 30);
 const AI_CLASSIFY_RATE_LIMIT = parsePositiveInt("AI_CLASSIFY_RATE_LIMIT", 5);
 const BULK_IMPORT_RATE_LIMIT = parsePositiveInt("BULK_IMPORT_RATE_LIMIT", 3);
@@ -222,16 +221,6 @@ const bulkImportLimiter = rateLimit({
   },
 });
 
-const vysLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  limit: VYS_RATE_LIMIT,
-  standardHeaders: "draft-7",
-  legacyHeaders: false,
-  message: {
-    error: "VYS API için çok fazla istek gönderildi. Lütfen bir dakika bekleyin.",
-  },
-});
-
 app.use("/api/v1/tracking", trackingLimiter);
 app.use("/api/v1/ai-notes/classify-async", aiClassifyLimiter);
 app.use("/api/v1/ai-notes/classify", aiClassifyLimiter);
@@ -242,7 +231,7 @@ app.use("/api/ai-notes/classify-async", aiClassifyLimiter);
 app.use("/api/ai-notes/classify", aiClassifyLimiter);
 app.use("/api/backup/import", bulkImportLimiter);
 
-app.use("/api/vys", vysLimiter, vysApiKeyAuth, vysRouter);
+app.use("/api/vys", vysApiKeyAuth, vysRouter);
 
 app.use("/api/v1", apiKeyAuth, adminKeyAuth, router);
 

@@ -140,7 +140,7 @@ export default function ApiDokumantasyon() {
             <div className="flex items-center gap-2 text-white/35 text-[11px]">
               <Zap className="h-3.5 w-3.5" /> Hız Sınırı
             </div>
-            <p className="font-mono text-[12px] text-white/70">60 istek / dakika</p>
+            <p className="font-mono text-[12px] text-white/70">Sınır yok</p>
           </div>
         </div>
 
@@ -158,7 +158,6 @@ export default function ApiDokumantasyon() {
                 <div className="text-[12.5px] text-white/60 space-y-1">
                   <p><span className="text-yellow-400 font-semibold">401</span> — X-API-Key başlığı eksik veya geçersiz</p>
                   <p><span className="text-red-400 font-semibold">503</span> — VYS_API_KEY ortam değişkeni sunucuda ayarlanmamış</p>
-                  <p><span className="text-orange-400 font-semibold">429</span> — Dakikada 60 istek limiti aşıldı</p>
                 </div>
               </div>
             </div>
@@ -335,12 +334,11 @@ export default function ApiDokumantasyon() {
         <Section
           id="env"
           title="Ortam Değişkenleri"
-          description="Sunucuda yapılandırılabilecek tüm VYS ilgili değişkenler. Tüm rate limit değerleri 60 saniyelik pencere için geçerlidir."
+          description="Sunucuda yapılandırılabilecek VYS ilgili değişkenler."
         >
           <FieldTable rows={[
             { alan: "VYS_API_KEY", tur: "string (zorunlu)", aciklama: "VYS erişim anahtarı — ayarlanmazsa 503 döner" },
-            { alan: "VYS_RATE_LIMIT", tur: "number (varsayılan: 60)", aciklama: "/api/vys/* için dakika başı maks. istek" },
-            { alan: "GLOBAL_RATE_LIMIT", tur: "number (varsayılan: 200)", aciklama: "Tüm rotalar için genel limit" },
+            { alan: "GLOBAL_RATE_LIMIT", tur: "number (varsayılan: 200)", aciklama: "Tüm rotalar için genel sunucu limiti" },
           ]} />
         </Section>
 
