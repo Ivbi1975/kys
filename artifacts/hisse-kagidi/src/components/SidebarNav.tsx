@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import {
   ChevronDown, ChevronRight, FolderOpen, Inbox,
-  PanelLeftClose, PanelLeftOpen, Home, Trash2, Scissors
+  PanelLeftClose, PanelLeftOpen, Home, Trash2, Scissors, BookOpen
 } from "lucide-react";
 import { fetchHomeData } from "@/lib/api/projects";
 import type { HomeData } from "@/lib/api/projects";
@@ -189,8 +189,16 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
         {/* Boşluk bırak */}
         <div className="flex-1" />
 
-        {/* Ayırıcı + Çöp Kutusu */}
-        <div className="mt-2 pt-2 border-t border-white/8">
+        {/* Ayırıcı + Alt Menü */}
+        <div className="mt-2 pt-2 border-t border-white/8 space-y-0.5">
+          <NavItem
+            collapsed={collapsed}
+            icon={<BookOpen className="h-4 w-4 flex-shrink-0" />}
+            label="API Dokümantasyon"
+            active={location === "/api-dokumantasyon"}
+            onClick={() => go("/api-dokumantasyon")}
+            muted
+          />
           <NavItem
             collapsed={collapsed}
             icon={<Trash2 className="h-4 w-4 flex-shrink-0" />}
