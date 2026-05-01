@@ -14,6 +14,26 @@ import { sanitizeRequestId } from "./lib/signed-url";
 
 const COMPRESSION_THRESHOLD = 1024;
 
+function parsePositiveInt(envKey: string, defaultValue: number): number {
+  const raw = process.env[envKey];
+  if (raw === undefined || raw === "") return defaultValue;
+  const parsed = parseInt(raw, 10);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    logger.warn(
+      { envKey, raw, defaultValue },
+      `Invalid value for ${envKey} — must be a positive integer. Falling back to default.`,
+    );
+    return defaultValue;
+  }
+  return parsed;
+}
+
+const GLOBAL_RATE_LIMIT = parsePositiveInt("GLOBAL_RATE_LIMIT", 200);
+const VYS_RATE_LIMIT = parsePositiveInt("VYS_RATE_LIMIT", 60);
+const TRACKING_RATE_LIMIT = parsePositiveInt("TRACKING_RATE_LIMIT", 30);
+const AI_CLASSIFY_RATE_LIMIT = parsePositiveInt("AI_CLASSIFY_RATE_LIMIT", 5);
+const BULK_IMPORT_RATE_LIMIT = parsePositiveInt("BULK_IMPORT_RATE_LIMIT", 3);
+
 function compressionMiddleware(req: Request, res: Response, next: NextFunction) {
   const acceptEncoding = req.headers["accept-encoding"] || "";
 
@@ -127,7 +147,7 @@ app.use(
 
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 200,
+  limit: GLOBAL_RATE_LIMIT,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: {
@@ -137,7 +157,7 @@ const globalLimiter = rateLimit({
 
 const trackingLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 30,
+  limit: TRACKING_RATE_LIMIT,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: {
@@ -184,7 +204,7 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 const aiClassifyLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 5,
+  limit: AI_CLASSIFY_RATE_LIMIT,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: {
@@ -194,7 +214,7 @@ const aiClassifyLimiter = rateLimit({
 
 const bulkImportLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 3,
+  limit: BULK_IMPORT_RATE_LIMIT,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: {
@@ -204,7 +224,7 @@ const bulkImportLimiter = rateLimit({
 
 const vysLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 60,
+  limit: VYS_RATE_LIMIT,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: {
