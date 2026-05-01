@@ -103,7 +103,9 @@ curl -H "X-API-Key: my-vys-key" \
       "description": "Hisse 1",
       "shareCount": 2,
       "vekalet": "var",
-      "tags": ["tag-id-1"]
+      "tags": [
+        { "id": "tag-id-1", "name": "VIP" }
+      ]
     }
   ],
   "total": 250,
@@ -121,7 +123,9 @@ curl -H "X-API-Key: my-vys-key" \
 | `items[].description` | string | Açıklama |
 | `items[].shareCount` | number | Hisse sayısı |
 | `items[].vekalet` | string | Vekalet bilgisi |
-| `items[].tags` | string[] | Etiket ID listesi |
+| `items[].tags` | object[] | Etiket listesi (`{ id, name }` nesneleri) |
+| `items[].tags[].id` | string | Etiket kimliği |
+| `items[].tags[].name` | string | Etiket görünen adı |
 | `total` | number | Toplam kayıt sayısı |
 | `page` | number | Mevcut sayfa |
 | `limit` | number | Sayfa başına kayıt |

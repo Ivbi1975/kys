@@ -6,6 +6,7 @@ import {
   animalGroupsTable,
   donationsTable,
   donationTagsTable,
+  customTagsTable,
 } from "@workspace/db/schema";
 import { eq, isNull, and, sql, inArray } from "drizzle-orm";
 import { asyncHandler } from "../middleware/error-handler";
@@ -82,15 +83,20 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   const total = countResult[0]?.count ?? 0;
   const donationIds = rows.map(r => r.id);
 
-  let tagsByDonation: Record<string, string[]> = {};
+  let tagsByDonation: Record<string, { id: string; name: string }[]> = {};
   if (donationIds.length > 0) {
     const tags = await db
-      .select({ donationId: donationTagsTable.donationId, tagId: donationTagsTable.tagId })
+      .select({
+        donationId: donationTagsTable.donationId,
+        tagId: donationTagsTable.tagId,
+        tagName: customTagsTable.name,
+      })
       .from(donationTagsTable)
+      .innerJoin(customTagsTable, eq(customTagsTable.id, donationTagsTable.tagId))
       .where(inArray(donationTagsTable.donationId, donationIds));
     for (const t of tags) {
       if (!tagsByDonation[t.donationId]) tagsByDonation[t.donationId] = [];
-      tagsByDonation[t.donationId].push(t.tagId);
+      tagsByDonation[t.donationId].push({ id: t.tagId, name: t.tagName });
     }
   }
 
