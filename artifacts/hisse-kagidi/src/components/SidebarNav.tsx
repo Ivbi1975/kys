@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import {
-  ChevronDown, ChevronRight, FolderOpen, Inbox,
-  PanelLeftClose, PanelLeftOpen, Home, Trash2, Scissors,
-  BookOpen, Layers
+  ChevronDown, ChevronRight, FolderOpen,
+  PanelLeftClose, Home, Trash2,
+  BookOpen, Layers, Scissors
 } from "lucide-react";
 import { fetchHomeData } from "@/lib/api/projects";
 import type { HomeData } from "@/lib/api/projects";
@@ -65,13 +65,19 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
     collapsed ? "w-[52px]" : "w-[220px]"
   );
 
+  const activeProjects = homeData?.projects.filter(p => !p.deletedAt && !p.archivedAt) ?? [];
+  const getKesimForProject = (projectId: string) =>
+    homeData?.kesimAlanlari.filter(k => k.projectId === projectId && !k.deletedAt) ?? [];
+  const orphanKesim = homeData?.kesimAlanlari.filter(k => !k.projectId && !k.deletedAt && k.name !== "__havuz__") ?? [];
+
   return (
     <aside className={sidebarBase}>
       <SidebarHeader collapsed={collapsed} onToggle={onToggle} />
 
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden thin-scrollbar flex flex-col py-2">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden thin-scrollbar flex flex-col py-2 gap-1">
 
-        <div className="px-2 space-y-0.5">
+        {/* Ana Sayfa */}
+        <div className="px-2">
           <NavItem
             collapsed={collapsed}
             icon={<Home className="h-[15px] w-[15px]" />}
@@ -81,120 +87,96 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
           />
         </div>
 
-        {homeData && (() => {
-          const activeProjects = homeData.projects.filter(p => !p.deletedAt && !p.archivedAt);
-          const getKesimForProject = (projectId: string) =>
-            homeData.kesimAlanlari.filter(k => k.projectId === projectId && !k.deletedAt);
-          const orphanKesim = homeData.kesimAlanlari.filter(k => !k.projectId && !k.deletedAt && k.name !== "__havuz__");
+        {/* Projeler */}
+        {activeProjects.length > 0 && (
+          <div className="mt-1">
+            <SectionLabel icon={<FolderOpen className="h-3 w-3" />} label="Projeler" collapsed={collapsed} />
+            <div className="px-2 mt-1 space-y-0.5">
+              {activeProjects.map(project => {
+                const kesimList = getKesimForProject(project.id);
+                const isOpen = openProjects.has(project.id);
+                const isProjectActive = activeProjectId === project.id;
 
-          return (
-            <>
-              {activeProjects.length > 0 && (
-                <div className="mt-3">
-                  <SectionLabel icon={<Inbox className="h-3 w-3" />} label="Bağış Havuzları" collapsed={collapsed} />
-                  <div className="px-2 space-y-0.5 mt-1">
-                    {activeProjects.map(project => (
+                return (
+                  <div key={project.id}>
+                    {/* Project row */}
+                    <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-0.5")}>
+                      {!collapsed && (
+                        <button
+                          className="flex-shrink-0 w-5 h-[30px] flex items-center justify-center rounded-md text-white/20 hover:text-white/50 hover:bg-white/5 transition-all duration-150"
+                          onClick={() => toggleProject(project.id)}
+                        >
+                          {isOpen
+                            ? <ChevronDown className="h-3 w-3" />
+                            : <ChevronRight className="h-3 w-3" />}
+                        </button>
+                      )}
                       <NavItem
-                        key={`havuz-${project.id}`}
                         collapsed={collapsed}
-                        icon={<Inbox className="h-[15px] w-[15px]" />}
+                        icon={<FolderOpen className="h-[15px] w-[15px]" />}
                         label={project.name}
-                        active={location === `/bagis-havuzu/${project.id}`}
-                        onClick={() => go(`/bagis-havuzu/${project.id}`)}
-                        indent
+                        active={isProjectActive}
+                        onClick={() => {
+                          go(`/proje/${project.id}`);
+                          if (!isOpen) toggleProject(project.id);
+                        }}
+                        className="flex-1 min-w-0"
+                        badge={!collapsed && !isOpen && kesimList.length > 0 ? String(kesimList.length) : undefined}
                       />
-                    ))}
-                  </div>
-                </div>
-              )}
+                    </div>
 
-              {activeProjects.length > 0 && (
-                <div className="mt-3">
-                  <SectionLabel icon={<FolderOpen className="h-3 w-3" />} label="Projeler" collapsed={collapsed} />
-                  <div className="px-2 space-y-0.5 mt-1">
-                    {activeProjects.map(project => {
-                      const kesimList = getKesimForProject(project.id);
-                      const isOpen = openProjects.has(project.id);
-                      const isProjectActive = activeProjectId === project.id;
-                      return (
-                        <div key={project.id}>
-                          <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-0.5")}>
-                            {!collapsed && (
-                              <button
-                                className="flex-shrink-0 w-5 h-[30px] flex items-center justify-center rounded-md text-white/20 hover:text-white/50 hover:bg-white/5 transition-all duration-150"
-                                onClick={() => toggleProject(project.id)}
-                              >
-                                {isOpen
-                                  ? <ChevronDown className="h-3 w-3" />
-                                  : <ChevronRight className="h-3 w-3" />}
-                              </button>
-                            )}
-                            <NavItem
-                              collapsed={collapsed}
-                              icon={<FolderOpen className="h-[15px] w-[15px]" />}
-                              label={project.name}
-                              active={isProjectActive}
-                              onClick={() => {
-                                go(`/proje/${project.id}`);
-                                if (!isOpen) toggleProject(project.id);
-                              }}
-                              className="flex-1 min-w-0"
-                            />
-                          </div>
-
-                          {!collapsed && isOpen && (
-                            <div className="ml-[22px] mt-0.5 mb-1 pl-3 border-l border-white/[0.07] space-y-0.5">
-                              {kesimList.map(ka => (
-                                <NavItem
-                                  key={ka.id}
-                                  collapsed={false}
-                                  icon={
-                                    <span className="h-[14px] w-[14px] flex-shrink-0 flex items-center justify-center">
-                                      <img src="/kurban-logo.png" alt="" className="h-[13px] w-[13px] object-contain opacity-50" />
-                                    </span>
-                                  }
-                                  label={ka.name}
-                                  active={activeKesimId === ka.id}
-                                  onClick={() => go(`/kesim/${ka.id}`)}
-                                  small
-                                />
-                              ))}
-                              {kesimList.length === 0 && (
-                                <p className="text-[11px] text-white/18 px-2 py-1.5 italic">Kesim alanı yok</p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                    {/* Expanded kesim list */}
+                    {!collapsed && isOpen && (
+                      <div className="ml-[22px] mt-0.5 mb-1 pl-3 border-l border-white/[0.07] space-y-0.5">
+                        {kesimList.map(ka => (
+                          <NavItem
+                            key={ka.id}
+                            collapsed={false}
+                            icon={
+                              <span className="h-[14px] w-[14px] flex-shrink-0 flex items-center justify-center">
+                                <img src="/kurban-logo.png" alt="" className="h-[13px] w-[13px] object-contain opacity-50" />
+                              </span>
+                            }
+                            label={ka.name}
+                            active={activeKesimId === ka.id}
+                            onClick={() => go(`/kesim/${ka.id}`)}
+                            small
+                          />
+                        ))}
+                        {kesimList.length === 0 && (
+                          <p className="text-[11px] text-white/18 px-2 py-1.5 italic">Kesim alanı yok</p>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })}
+            </div>
+          </div>
+        )}
 
-              {orphanKesim.length > 0 && (
-                <div className="mt-3">
-                  <SectionLabel icon={<Scissors className="h-3 w-3" />} label="Bağımsız" collapsed={collapsed} />
-                  <div className="px-2 space-y-0.5 mt-1">
-                    {orphanKesim.map(ka => (
-                      <NavItem
-                        key={ka.id}
-                        collapsed={collapsed}
-                        icon={<Layers className="h-[15px] w-[15px]" />}
-                        label={ka.name}
-                        active={activeKesimId === ka.id}
-                        onClick={() => go(`/kesim/${ka.id}`)}
-                        indent
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          );
-        })()}
+        {/* Bağımsız kesimler */}
+        {orphanKesim.length > 0 && (
+          <div className="mt-1">
+            <SectionLabel icon={<Scissors className="h-3 w-3" />} label="Bağımsız" collapsed={collapsed} />
+            <div className="px-2 mt-1 space-y-0.5">
+              {orphanKesim.map(ka => (
+                <NavItem
+                  key={ka.id}
+                  collapsed={collapsed}
+                  icon={<Layers className="h-[15px] w-[15px]" />}
+                  label={ka.name}
+                  active={activeKesimId === ka.id}
+                  onClick={() => go(`/kesim/${ka.id}`)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 min-h-4" />
 
+        {/* Footer links */}
         <div className="px-2 pb-2">
           <div className="h-px bg-white/[0.06] mb-2" />
           <div className="space-y-0.5">
@@ -276,10 +258,10 @@ interface NavItemProps {
   className?: string;
   small?: boolean;
   muted?: boolean;
-  indent?: boolean;
+  badge?: string;
 }
 
-function NavItem({ collapsed, icon, label, active, onClick, className, small, muted, indent }: NavItemProps) {
+function NavItem({ collapsed, icon, label, active, onClick, className, small, muted, badge }: NavItemProps) {
   const button = (
     <button
       onClick={onClick}
@@ -292,7 +274,6 @@ function NavItem({ collapsed, icon, label, active, onClick, className, small, mu
           : muted
             ? "text-white/28 hover:text-white/55 hover:bg-white/[0.04]"
             : "text-white/50 hover:text-white/85 hover:bg-white/[0.05]",
-        indent && !collapsed && "pl-3",
         collapsed && "justify-center px-0 py-[9px]",
         className
       )}
@@ -312,11 +293,16 @@ function NavItem({ collapsed, icon, label, active, onClick, className, small, mu
       </span>
       {!collapsed && (
         <span className={cn(
-          "truncate leading-none",
+          "flex-1 truncate leading-none",
           small ? "text-[12px]" : "text-[13px]",
           active ? "font-medium" : "font-normal"
         )}>
           {label}
+        </span>
+      )}
+      {!collapsed && badge && (
+        <span className="ml-auto flex-shrink-0 text-[10px] font-medium text-white/25 bg-white/[0.07] rounded-full px-1.5 py-0.5 leading-none">
+          {badge}
         </span>
       )}
     </button>
