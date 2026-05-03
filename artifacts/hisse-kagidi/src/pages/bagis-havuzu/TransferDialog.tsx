@@ -11,6 +11,8 @@ interface TransferDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedCount: number;
+  siblingCount?: number;
+  siblingsData?: DonorSiblings[];
   selectedIds: string[];
   transferTarget: string;
   setTransferTarget: (v: string) => void;
@@ -26,7 +28,7 @@ interface TransferDialogProps {
 }
 
 export function TransferDialog({
-  open, onOpenChange, selectedCount, selectedIds, transferTarget, setTransferTarget,
+  open, onOpenChange, selectedCount, siblingCount = 0, siblingsData = [], selectedIds, transferTarget, setTransferTarget,
   newListName, setNewListName, creatingNewList, setCreatingNewList,
   transferring, onTransfer, kesimAlanlari: propKesimAlanlari, projectId,
   skipSiblings = false,
@@ -57,7 +59,8 @@ export function TransferDialog({
   const handleActarClick = useCallback(async () => {
     if (selectedIds.length === 0) return;
     if (skipSiblings) {
-      onTransfer([]);
+      const extraIds = siblingsData.flatMap(s => s.extraIds);
+      onTransfer(extraIds);
       return;
     }
     setCheckingSiblings(true);
@@ -74,7 +77,7 @@ export function TransferDialog({
     } finally {
       setCheckingSiblings(false);
     }
-  }, [selectedIds, projectId, onTransfer, skipSiblings]);
+  }, [selectedIds, projectId, onTransfer, skipSiblings, siblingsData]);
 
   const handleConfirmWithExtra = useCallback(() => {
     const extraIds = siblings.flatMap(s => s.extraIds);
@@ -102,7 +105,24 @@ export function TransferDialog({
         {step === "select" ? (
           <>
             <DialogHeader><DialogTitle>Kesim Listesine Aktar</DialogTitle></DialogHeader>
-            <p className="text-sm text-muted-foreground mb-3">{selectedCount} bağış aktarılacak.</p>
+            {siblingCount > 0 ? (
+              <div className="mb-3 space-y-1">
+                <p className="text-sm text-muted-foreground">
+                  <strong className="text-foreground">{selectedCount}</strong> seçili bağış
+                  {" + "}
+                  <strong className="text-foreground">{siblingCount}</strong> ek bağış
+                  {" = "}
+                  <strong className="text-foreground">{selectedCount + siblingCount}</strong> toplam aktarılacak.
+                </p>
+                <p className="text-xs text-muted-foreground/80">
+                  Aynı bağışçılara ait havuzda bekleyen ek bağışlar da otomatik dahil edilecek.
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground mb-3">
+                <strong className="text-foreground">{selectedCount}</strong> bağış aktarılacak.
+              </p>
+            )}
             <div className="space-y-3">
               <div className="flex gap-1">
                 <Select value={transferTarget} onValueChange={(v) => { setTransferTarget(v); setCreatingNewList(false); }}>

@@ -1270,6 +1270,8 @@ export default function BagisHavuzuPage() {
           open={transferOpen}
           onOpenChange={setTransferOpen}
           selectedCount={effectiveSelectedIds.size}
+          siblingCount={siblingCount}
+          siblingsData={siblingsData}
           selectedIds={[...effectiveSelectedIds]}
           transferTarget={transferTarget}
           setTransferTarget={setTransferTarget}
