@@ -7,7 +7,9 @@ import type { ReactNode } from "react";
 const NotFound = lazy(() => import("@/pages/not-found"));
 import { useTheme } from "@/lib/useTheme";
 import PasswordGate from "@/components/PasswordGate";
-import ReloadPrompt from "@/components/ReloadPrompt";
+const ReloadPrompt = import.meta.env.PROD
+  ? lazy(() => import("@/components/ReloadPrompt"))
+  : () => null;
 import { SidebarNav } from "@/components/SidebarNav";
 
 class ErrorBoundary extends Component<
@@ -170,7 +172,9 @@ function App() {
           <AppRouter />
         </WouterRouter>
         <Toaster />
-        <ReloadPrompt />
+        <Suspense fallback={null}>
+          <ReloadPrompt />
+        </Suspense>
       </TooltipProvider>
     </QueryClientProvider>
   );
