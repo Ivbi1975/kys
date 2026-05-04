@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { fetchKesimAlaniTrackingNotes, fetchNotificationLogs } from "@/lib/api";
 import {
   ChevronRight, ChevronDown, FileSpreadsheet, History, Home, Keyboard, Link2, Loader2,
-  Maximize, MessageSquarePlus, Minimize, Printer, QrCode,
+  MessageSquarePlus, Printer, QrCode,
   Redo2, Save, Search, Send, Settings2, ShoppingBag, Undo2, UserCog, Download,
   CheckCircle2, AlertCircle,
 } from "lucide-react";
@@ -162,13 +162,6 @@ export function KesimAlaniHeader() {
               title="Klavye Kısayolları (?)"
             >
               <Keyboard className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost" size="sm" className="h-8 w-8 p-0"
-              onClick={toggleFullscreen}
-              title={isFullscreen ? "Tam Ekrandan Çık (F11)" : "Tam Ekran (F11)"}
-            >
-              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
             </Button>
           </div>
 
