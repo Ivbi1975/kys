@@ -26,6 +26,7 @@ import {
   restoreProject,
   unarchiveProject,
   moveKesimAlani,
+  renameKesimAlani,
   downloadCsvExport,
   runIntegrityCheck,
   repairIntegrity,
@@ -72,6 +73,8 @@ export function useHomeState() {
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [movingKesim, setMovingKesim] = useState<{ id: string; name: string; currentProjectId: string | null } | null>(null);
   const [moveTargetProjectId, setMoveTargetProjectId] = useState<string>("__none__");
+  const [renameKesimDialogOpen, setRenameKesimDialogOpen] = useState(false);
+  const [editingKesim, setEditingKesim] = useState<{ id: string; name: string } | null>(null);
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const { toast } = useToast();
@@ -277,6 +280,20 @@ export function useHomeState() {
       });
     }
   }, [editingProject, toast]);
+
+  const handleRenameKesim = useCallback(async () => {
+    if (!editingKesim || !editingKesim.name.trim()) return;
+    try {
+      await renameKesimAlani(editingKesim.id, editingKesim.name.trim());
+      invalidateHomeDataCache();
+      setKesimAlanlari(prev => prev.map(k => k.id === editingKesim.id ? { ...k, name: editingKesim.name.trim() } : k));
+      setRenameKesimDialogOpen(false);
+      setEditingKesim(null);
+      toast({ title: "Kesim alanı yeniden adlandırıldı" });
+    } catch (err) {
+      toast({ title: "Hata", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+    }
+  }, [editingKesim, toast]);
 
   const handleDeleteProject = useCallback(async () => {
     if (!deleteProjectConfirm) return;
@@ -755,6 +772,11 @@ export function useHomeState() {
     handleImportBackup,
     executeImport,
     toggleProjectCollapse,
+    renameKesimDialogOpen,
+    setRenameKesimDialogOpen,
+    editingKesim,
+    setEditingKesim,
+    handleRenameKesim,
     openMoveDialog,
     handleShowQrCode: kesimActions.handleShowQrCode,
     handleCopyTrackingLink: kesimActions.handleCopyTrackingLink,

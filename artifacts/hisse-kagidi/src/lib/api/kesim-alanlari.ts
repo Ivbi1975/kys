@@ -343,6 +343,13 @@ export async function apiDeleteAnimalGroup(kesimAlaniId: string, groupId: string
   return apiFetch<{ success: boolean }>(`/kesim-alanlari/${kesimAlaniId}/animal-groups/${groupId}`, { method: "DELETE" });
 }
 
+export async function renameKesimAlani(id: string, name: string): Promise<{ id: string; name: string }> {
+  return apiFetch<{ id: string; name: string }>(`/kesim-alanlari/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ name }),
+  });
+}
+
 export async function apiDeleteKesimAlani(id: string): Promise<{ success: boolean }> {
   return apiFetch<{ success: boolean }>(`/kesim-alanlari/${id}`, { method: "DELETE" });
 }

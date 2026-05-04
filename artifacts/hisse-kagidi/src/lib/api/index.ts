@@ -51,6 +51,7 @@ export {
   fetchKesimAlaniMeta,
   fetchAllDonations,
   fetchAllGroupsCompact,
+  renameKesimAlani,
 } from "./kesim-alanlari";
 export type { DeletedDonation, SplitTarget, SplitResult, ChunkProgress, KesimAlaniMeta } from "./kesim-alanlari";
 

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Plus, Trash2, ChevronRight, Calendar,
-  Link2, ExternalLink, QrCode, GitBranch, CornerDownRight,
+  Link2, ExternalLink, QrCode, GitBranch, CornerDownRight, Pencil,
 } from "lucide-react";
 import type { KesimAlani } from "@/lib/types";
 import { getTotalShares, getRequiredAnimals } from "@/lib/grouping";
@@ -19,6 +19,7 @@ interface KesimAlaniListProps {
   onShowQrCode: (e: React.MouseEvent, k: KesimAlani) => void;
   onDelete: (id: string) => void;
   onSplit?: (k: KesimAlani) => void;
+  onRename?: (k: KesimAlani) => void;
 }
 
 function KesimAlaniCard({
@@ -30,6 +31,7 @@ function KesimAlaniCard({
   onShowQrCode,
   onDelete,
   onSplit,
+  onRename,
   parentName,
 }: {
   k: KesimAlani;
@@ -40,6 +42,7 @@ function KesimAlaniCard({
   onShowQrCode: (e: React.MouseEvent, k: KesimAlani) => void;
   onDelete: (id: string) => void;
   onSplit?: (k: KesimAlani) => void;
+  onRename?: (k: KesimAlani) => void;
   parentName?: string;
 }) {
   const shares = getTotalShares(k.donations);
@@ -143,6 +146,20 @@ function KesimAlaniCard({
           >
             <QrCode className="w-4 h-4 text-muted-foreground" />
           </Button>
+          {onRename && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              title="Yeniden adlandır"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRename(k);
+              }}
+            >
+              <Pencil className="w-4 h-4 text-muted-foreground" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -226,6 +243,7 @@ export function KesimAlaniList({
   onShowQrCode,
   onDelete,
   onSplit,
+  onRename,
 }: KesimAlaniListProps) {
   const { parentItems, childrenMap, standaloneItems, parentNameMap } = useMemo(() => {
     const parents: KesimAlani[] = [];
@@ -285,6 +303,7 @@ export function KesimAlaniList({
           onShowQrCode={onShowQrCode}
           onDelete={onDelete}
           onSplit={onSplit}
+          onRename={onRename}
         />
       ))}
       {parentItems.map(parent => {
@@ -298,6 +317,7 @@ export function KesimAlaniList({
               onOpenTrackingPage={onOpenTrackingPage}
               onShowQrCode={onShowQrCode}
               onDelete={onDelete}
+              onRename={onRename}
             />
             {children.length > 0 && (
               <div className="ml-6 space-y-1">
@@ -312,6 +332,7 @@ export function KesimAlaniList({
                     onOpenTrackingPage={onOpenTrackingPage}
                     onShowQrCode={onShowQrCode}
                     onDelete={onDelete}
+                    onRename={onRename}
                   />
                 ))}
               </div>

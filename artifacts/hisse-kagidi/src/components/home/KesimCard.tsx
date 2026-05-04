@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Trash2, Calendar, Link2, ExternalLink, QrCode, MoveRight } from "lucide-react";
+import { ChevronRight, Trash2, Calendar, Link2, ExternalLink, QrCode, MoveRight, Pencil } from "lucide-react";
 import type { KesimAlani } from "@/lib/types";
 import { getTotalShares, getRequiredAnimals } from "@/lib/grouping";
 import { formatDate, timeSince } from "@/lib/formatting";
@@ -13,6 +13,7 @@ interface KesimCardProps {
   onShowQrCode: (e: React.MouseEvent, k: KesimAlani) => void;
   onMove: (k: KesimAlani) => void;
   onDelete: (id: string) => void;
+  onRename?: (k: KesimAlani) => void;
 }
 
 export function KesimCard({
@@ -23,6 +24,7 @@ export function KesimCard({
   onShowQrCode,
   onMove,
   onDelete,
+  onRename,
 }: KesimCardProps) {
   const shares = getTotalShares(k.donations);
   const animals = getRequiredAnimals(k.donations);
@@ -88,6 +90,20 @@ export function KesimCard({
           >
             <QrCode className="w-4 h-4 text-muted-foreground" />
           </Button>
+          {onRename && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              title="Yeniden adlandır"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRename(k);
+              }}
+            >
+              <Pencil className="w-4 h-4 text-muted-foreground" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"

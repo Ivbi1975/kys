@@ -150,6 +150,11 @@ export default function Home() {
           editingProject={state.editingProject}
           setEditingProject={state.setEditingProject}
           handleUpdateProject={state.handleUpdateProject}
+          renameKesimDialogOpen={state.renameKesimDialogOpen}
+          setRenameKesimDialogOpen={state.setRenameKesimDialogOpen}
+          editingKesim={state.editingKesim}
+          setEditingKesim={state.setEditingKesim}
+          handleRenameKesim={state.handleRenameKesim}
           moveDialogOpen={state.moveDialogOpen}
           setMoveDialogOpen={state.setMoveDialogOpen}
           movingKesim={state.movingKesim}
@@ -199,6 +204,10 @@ export default function Home() {
                 project={project}
                 kesimAlanlari={state.kesimAlanlari}
                 onNavigate={(projectId) => state.setLocation(`/proje/${projectId}`)}
+                onEdit={(p) => {
+                  state.setEditingProject({ id: p.id, name: p.name });
+                  state.setEditProjectDialogOpen(true);
+                }}
               />
             ))}
 
@@ -221,6 +230,10 @@ export default function Home() {
                       onShowQrCode={state.handleShowQrCode}
                       onMove={state.openMoveDialog}
                       onDelete={state.requestDelete}
+                      onRename={(k) => {
+                        state.setEditingKesim({ id: k.id, name: k.name });
+                        state.setRenameKesimDialogOpen(true);
+                      }}
                     />
                   ))}
                 </div>

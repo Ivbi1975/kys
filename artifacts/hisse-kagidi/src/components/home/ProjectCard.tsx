@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FolderOpen, ChevronRight, AlertTriangle, Info } from "lucide-react";
+import { FolderOpen, ChevronRight, AlertTriangle, Info, Pencil } from "lucide-react";
 import type { KesimAlani, Project } from "@/lib/types";
 import { getTotalShares } from "@/lib/grouping";
 
@@ -8,9 +8,10 @@ interface ProjectCardProps {
   project: Project;
   kesimAlanlari: KesimAlani[];
   onNavigate: (projectId: string) => void;
+  onEdit?: (project: Project) => void;
 }
 
-export function ProjectCard({ project, kesimAlanlari, onNavigate }: ProjectCardProps) {
+export function ProjectCard({ project, kesimAlanlari, onNavigate, onEdit }: ProjectCardProps) {
   const projectKesimAlanlari = kesimAlanlari.filter(k => k.projectId === project.id);
 
   const projTotals = projectKesimAlanlari.reduce((acc, k) => {
@@ -51,7 +52,23 @@ export function ProjectCard({ project, kesimAlanlari, onNavigate }: ProjectCardP
         >
           <FolderOpen className="w-5 h-5 text-primary" />
           <div className="flex-1 min-w-0">
-            <h2 className="font-semibold text-foreground text-lg">{project.name}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-semibold text-foreground text-lg">{project.name}</h2>
+              {onEdit && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 shrink-0"
+                  title="Projeyi yeniden adlandır"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(project);
+                  }}
+                >
+                  <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                </Button>
+              )}
+            </div>
             <div className="flex items-center gap-2.5 text-sm mt-1 flex-wrap">
               <span className="flex items-center gap-1 font-medium text-foreground/80">
                 {projTotals.areas} kesim alanı

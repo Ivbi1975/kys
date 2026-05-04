@@ -16,6 +16,7 @@ import {
   fetchTransferLog,
   fetchPendingEditRequests,
   splitKesimAlani,
+  renameKesimAlani,
 } from "@/lib/api";
 import type { PendingEditRequest, Conflict, ConflictEntry, DonationTransferEntry } from "@/lib/api";
 import { getTotalShares, getRequiredAnimals } from "@/lib/grouping";
@@ -122,6 +123,8 @@ export function useProjeDetayState() {
 
   const [splitModalOpen, setSplitModalOpen] = useState(false);
   const [splitTarget, setSplitTarget] = useState<KesimAlani | null>(null);
+  const [renameKesimDialogOpen, setRenameKesimDialogOpen] = useState(false);
+  const [editingKesim, setEditingKesim] = useState<{ id: string; name: string } | null>(null);
 
   const [transferDialog, setTransferDialog] = useState<{
     entry: ConflictEntry;
@@ -248,6 +251,20 @@ export function useProjeDetayState() {
     }
   }, [projectId, toast, setLocation]);
 
+
+  const handleRenameKesim = useCallback(async () => {
+    if (!editingKesim || !editingKesim.name.trim()) return;
+    try {
+      await renameKesimAlani(editingKesim.id, editingKesim.name.trim());
+      setKesimAlanlari(prev => prev.map(k => k.id === editingKesim.id ? { ...k, name: editingKesim.name.trim() } : k));
+      setAllKesimAlanlari(prev => prev.map(k => k.id === editingKesim.id ? { ...k, name: editingKesim.name.trim() } : k));
+      setRenameKesimDialogOpen(false);
+      setEditingKesim(null);
+      toast({ title: "Kesim alanı yeniden adlandırıldı" });
+    } catch (err) {
+      toast({ title: "Hata", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
+    }
+  }, [editingKesim, toast]);
 
   const openSplitModal = useCallback((ka: KesimAlani) => {
     setSplitTarget(ka);
@@ -433,6 +450,11 @@ export function useProjeDetayState() {
     splitTarget,
     openSplitModal,
     handleSplit,
+    renameKesimDialogOpen,
+    setRenameKesimDialogOpen,
+    editingKesim,
+    setEditingKesim,
+    handleRenameKesim,
   };
 }
 

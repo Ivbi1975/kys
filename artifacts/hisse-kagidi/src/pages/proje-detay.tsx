@@ -177,6 +177,10 @@ export default function ProjeDetayPage() {
           onShowQrCode={state.handleShowQrCode}
           onDelete={state.requestDelete}
           onSplit={state.openSplitModal}
+          onRename={(k) => {
+            state.setEditingKesim({ id: k.id, name: k.name });
+            state.setRenameKesimDialogOpen(true);
+          }}
         />
 
         <ConflictSection
@@ -230,6 +234,11 @@ export default function ProjeDetayPage() {
         transferring={state.transferring}
         executeTransfer={state.executeTransfer}
         allKesimAlanlari={state.allKesimAlanlari}
+        renameKesimDialogOpen={state.renameKesimDialogOpen}
+        setRenameKesimDialogOpen={state.setRenameKesimDialogOpen}
+        editingKesim={state.editingKesim}
+        setEditingKesim={state.setEditingKesim}
+        handleRenameKesim={state.handleRenameKesim}
         projectName={state.project.name}
         projectId={state.project.id}
         onBulkSuccess={state.refreshData}

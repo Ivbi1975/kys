@@ -40,6 +40,7 @@ type ProjeDetayDialogsProps = Pick<ProjeDetayState,
   | "transferDialog" | "setTransferDialog" | "targetKesimAlaniId" | "setTargetKesimAlaniId"
   | "transferAnimal" | "setTransferAnimal" | "transferring" | "executeTransfer"
   | "allKesimAlanlari"
+  | "renameKesimDialogOpen" | "setRenameKesimDialogOpen" | "editingKesim" | "setEditingKesim" | "handleRenameKesim"
 > & {
   projectName: string;
   projectId: string;
@@ -99,7 +100,48 @@ export function ProjeDetayDialogs(props: ProjeDetayDialogsProps) {
         handleArchiveProject={props.handleArchiveProject}
         projectName={props.projectName}
       />
+
+      <RenameKesimAlaniDialog
+        open={props.renameKesimDialogOpen}
+        setOpen={props.setRenameKesimDialogOpen}
+        editingKesim={props.editingKesim}
+        setEditingKesim={props.setEditingKesim}
+        onConfirm={props.handleRenameKesim}
+      />
     </>
+  );
+}
+
+function RenameKesimAlaniDialog({
+  open, setOpen, editingKesim, setEditingKesim, onConfirm,
+}: {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  editingKesim: { id: string; name: string } | null;
+  setEditingKesim: (v: { id: string; name: string } | null) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Kesim Alanını Yeniden Adlandır</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
+          <Input
+            placeholder="Yeni ad"
+            value={editingKesim?.name ?? ""}
+            onChange={e => editingKesim && setEditingKesim({ ...editingKesim, name: e.target.value })}
+            onKeyDown={e => e.key === "Enter" && onConfirm()}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setOpen(false)}>İptal</Button>
+            <Button onClick={onConfirm} disabled={!editingKesim?.name.trim()}>Kaydet</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
