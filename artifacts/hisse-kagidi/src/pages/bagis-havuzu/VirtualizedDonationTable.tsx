@@ -4,10 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { AlertTriangle, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, Flag, FlagOff } from "lucide-react";
+import { AlertTriangle, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, Flag, FlagOff, Loader2 } from "lucide-react";
 import type { PoolDonation } from "@/lib/types";
 import { ALL_TABLE_COLUMNS, getStatusLabel, type TableColumnKey } from "./types";
 import { turkishTitleCase } from "@/lib/formatting";
+import { fetchDonationSiblings } from "@/lib/api";
+import type { DonorSiblings } from "@/lib/api/bagis-havuzu";
 
 const SORT_KEY_MAP: Partial<Record<TableColumnKey, string>> = {
   vekalet: "vekalet",
@@ -48,6 +50,7 @@ interface VirtualizedDonationTableProps {
   donorMissedCounts?: Record<string, number>;
   kesimAlaniColorMap?: Record<string, string>;
   assignedVekalets?: Set<string>;
+  projectId?: string;
 }
 
 const ROW_HEIGHT = 36;
@@ -97,7 +100,84 @@ function getFieldValue(d: PoolDonation, key: TableColumnKey): string {
   }
 }
 
-function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean, missedCount?: number) {
+function SiblingsBadge({ donationId, donorName, missedCount, projectId }: {
+  donationId: string;
+  donorName: string;
+  missedCount: number;
+  projectId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [siblings, setSiblings] = useState<DonorSiblings[]>([]);
+  const fetchedRef = useRef(false);
+
+  const handleOpen = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpen(true);
+    if (fetchedRef.current) return;
+    setLoading(true);
+    try {
+      const result = await fetchDonationSiblings(projectId, [donationId]);
+      setSiblings(result.siblings);
+      fetchedRef.current = true;
+    } catch {
+      setSiblings([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, donationId]);
+
+  const allDonations = siblings.flatMap(s => s.donations);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="ml-1 inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[10px] font-semibold px-1.5 py-0 leading-tight border border-blue-200 dark:border-blue-700 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/70 transition-colors"
+          title={`Bu bağışçının ${missedCount} ek bağışını görmek için tıklayın`}
+          onClick={handleOpen}
+        >
+          +{missedCount}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-0" align="start" onClick={e => e.stopPropagation()}>
+        <div className="px-3 py-2 border-b bg-muted/30">
+          <p className="text-xs font-semibold text-foreground">{donorName}</p>
+          <p className="text-[10px] text-muted-foreground">Bu filtreye girmeyen {missedCount} ek bağış</p>
+        </div>
+        {loading ? (
+          <div className="flex items-center justify-center py-4 gap-2 text-xs text-muted-foreground">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Yükleniyor...
+          </div>
+        ) : allDonations.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-4">Bağış bulunamadı</p>
+        ) : (
+          <div className="max-h-56 overflow-y-auto">
+            {allDonations.map((d, idx) => (
+              <div key={d.id} className={`px-3 py-2 text-xs ${idx < allDonations.length - 1 ? "border-b" : ""}`}>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono text-[10px] text-muted-foreground/60 flex-shrink-0">{d.vekalet || "—"}</span>
+                  {d.donationType && (
+                    <span className="px-1 py-0 rounded bg-muted text-[10px]">{d.donationType}</span>
+                  )}
+                  {d.shareCount > 1 && (
+                    <span className="text-[10px] text-muted-foreground ml-auto">{d.shareCount} hisse</span>
+                  )}
+                </div>
+                {d.name && d.name !== donorName && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{d.name}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean, missedCount?: number, projectId?: string) {
   switch (key) {
     case "vekalet":
       return (
@@ -113,7 +193,14 @@ function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
               <AlertTriangle className="w-3 h-3 inline" />
             </span>
           )}
-          {missedCount && missedCount > 0 ? (
+          {missedCount && missedCount > 0 && projectId && d.name ? (
+            <SiblingsBadge
+              donationId={d.id}
+              donorName={d.name}
+              missedCount={missedCount}
+              projectId={projectId}
+            />
+          ) : missedCount && missedCount > 0 ? (
             <span
               className="ml-1 inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[10px] font-semibold px-1.5 py-0 leading-tight border border-blue-200 dark:border-blue-700 cursor-default"
               title={`Bu bağışçının ${missedCount} adet daha bağışı bu filtreye girmedi`}
@@ -153,7 +240,7 @@ function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
   }
 }
 
-function renderDisplayValue(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean, missedCount?: number) {
+function renderDisplayValue(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean, missedCount?: number, projectId?: string) {
   switch (key) {
     case "vekalet":
       return (
@@ -169,7 +256,14 @@ function renderDisplayValue(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
               <AlertTriangle className="w-3 h-3 inline" />
             </span>
           )}
-          {missedCount && missedCount > 0 ? (
+          {missedCount && missedCount > 0 && projectId && d.name ? (
+            <SiblingsBadge
+              donationId={d.id}
+              donorName={d.name}
+              missedCount={missedCount}
+              projectId={projectId}
+            />
+          ) : missedCount && missedCount > 0 ? (
             <span
               className="ml-1 inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[10px] font-semibold px-1.5 py-0 leading-tight border border-blue-200 dark:border-blue-700 cursor-default"
               title={`Bu bağışçının ${missedCount} adet daha bağışı bu filtreye girmedi`}
@@ -296,7 +390,7 @@ function InlineEditInput({
 export function VirtualizedDonationTable({
   items, isLoading, activeFilterCount, selectedIds, toggleSelect, toggleSelectAll, multiLocationVekalets, visibleColumns,
   sortBy, sortDir, onColumnSort, onFlagDonation, onUnflagDonation, onInlineEdit, donorMissedCounts, kesimAlaniColorMap,
-  assignedVekalets,
+  assignedVekalets, projectId,
 }: VirtualizedDonationTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const headerInnerRef = useRef<HTMLDivElement>(null);
@@ -390,7 +484,7 @@ export function VirtualizedDonationTable({
 
   return (
     <div className="border rounded-lg overflow-hidden">
-      {/* Fixed header — outside the scroll container so it stays visible while scrolling vertically */}
+      {/* Fixed header */}
       <div className="overflow-hidden bg-background border-b shadow-sm relative z-10">
         <div ref={headerInnerRef} style={{ minWidth: tableWidth }}>
           <table className="w-full text-sm" style={{ tableLayout: "fixed", minWidth: tableWidth }}>
@@ -499,14 +593,14 @@ export function VirtualizedDonationTable({
                                   className={`p-2 text-xs overflow-hidden text-ellipsis whitespace-nowrap cursor-text hover:bg-muted/50 ${col.key === "vekalet" ? "font-mono" : ""}`}
                                   onClick={() => startEditing(d.id, col.key)}
                                 >
-                                  {renderDisplayValue(d, col.key, isMultiLoc, col.key === "vekalet" ? missedCount : undefined)}
+                                  {renderDisplayValue(d, col.key, isMultiLoc, col.key === "vekalet" ? missedCount : undefined, projectId)}
                                 </td>
                               );
                             }
 
                             return (
                               <td key={col.key} className={`p-2 text-xs overflow-hidden text-ellipsis whitespace-nowrap ${col.key === "vekalet" ? "font-mono" : ""}`}>
-                                {renderReadOnlyCell(d, col.key, isMultiLoc, col.key === "vekalet" ? missedCount : undefined)}
+                                {renderReadOnlyCell(d, col.key, isMultiLoc, col.key === "vekalet" ? missedCount : undefined, projectId)}
                               </td>
                             );
                           })}

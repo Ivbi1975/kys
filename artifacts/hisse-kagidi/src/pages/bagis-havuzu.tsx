@@ -1229,6 +1229,7 @@ export default function BagisHavuzuPage() {
           donorMissedCounts={donorMissedCounts}
           kesimAlaniColorMap={kesimAlaniColorMap}
           assignedVekalets={assignedVekalets}
+          projectId={projectId}
         />
 
         {totalPages > 1 && (
