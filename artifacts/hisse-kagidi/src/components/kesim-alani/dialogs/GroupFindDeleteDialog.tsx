@@ -1,9 +1,9 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SearchX, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useGroupContext } from "../KesimAlaniContext";
 import { FIND_DELETE_COLUMN_LABELS } from "../hooks/types";
 
@@ -17,9 +17,6 @@ export function GroupFindDeleteDialog() {
 
   return (
     <Dialog open={groupFindDeleteOpen} onOpenChange={(open) => { setGroupFindDeleteOpen(open); if (!open) { setGroupFindDeleteValue(""); setGroupFindDeleteConfirm(false); } }}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" title="Gruplarda Bul ve Sil"><SearchX className="w-4 h-4 mr-1" />Bul ve Sil</Button>
-      </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader><DialogTitle>Gruplarda Bul ve Sil</DialogTitle></DialogHeader>
         <div className="space-y-4 pt-2">
