@@ -31,8 +31,8 @@ export default function ProjeDetayPage() {
 
   const projectId = state.project?.id ?? "";
   const { data: poolStats, isLoading: poolStatsLoading } = useQuery({
-    queryKey: ["pool-stats", projectId, {}],
-    queryFn: () => fetchPoolStats(projectId),
+    queryKey: ["pool-stats", projectId, { kesimAlaniId: "none" }],
+    queryFn: () => fetchPoolStats(projectId, { kesimAlaniId: "none" }),
     enabled: !!projectId,
     staleTime: 30_000,
   });

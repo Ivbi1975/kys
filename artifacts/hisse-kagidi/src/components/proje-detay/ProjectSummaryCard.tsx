@@ -17,7 +17,7 @@ export function ProjectSummaryCard({ totals, occupancy }: ProjectSummaryCardProp
     <Card className="p-4 mb-6 bg-primary/5 border-primary/20">
       <div className="flex items-center gap-2 mb-3">
         <PieChart className="w-4 h-4 text-primary" />
-        <h3 className="text-sm font-semibold text-foreground">Genel Özet</h3>
+        <h3 className="text-sm font-semibold text-foreground">Kesim Listeleri Özeti</h3>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <div className="text-center">
