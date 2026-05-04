@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FolderOpen, ChevronRight, Plus, AlertTriangle, Info } from "lucide-react";
+import { FolderOpen, ChevronRight, AlertTriangle, Info } from "lucide-react";
 import type { KesimAlani, Project } from "@/lib/types";
 import { getTotalShares } from "@/lib/grouping";
 
@@ -8,10 +8,9 @@ interface ProjectCardProps {
   project: Project;
   kesimAlanlari: KesimAlani[];
   onNavigate: (projectId: string) => void;
-  onBulkCreate?: (projectId: string) => void;
 }
 
-export function ProjectCard({ project, kesimAlanlari, onNavigate, onBulkCreate }: ProjectCardProps) {
+export function ProjectCard({ project, kesimAlanlari, onNavigate }: ProjectCardProps) {
   const projectKesimAlanlari = kesimAlanlari.filter(k => k.projectId === project.id);
 
   const projTotals = projectKesimAlanlari.reduce((acc, k) => {
@@ -56,16 +55,6 @@ export function ProjectCard({ project, kesimAlanlari, onNavigate, onBulkCreate }
             <div className="flex items-center gap-2.5 text-sm mt-1 flex-wrap">
               <span className="flex items-center gap-1 font-medium text-foreground/80">
                 {projTotals.areas} kesim alanı
-                {onBulkCreate && (
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/20 hover:bg-primary/40 text-primary transition-colors"
-                    title="Toplu kesim alanı ekle"
-                    onClick={(e) => { e.stopPropagation(); onBulkCreate(project.id); }}
-                  >
-                    <Plus className="w-2.5 h-2.5" />
-                  </button>
-                )}
               </span>
               <span className="text-muted-foreground">·</span>
               <span className="font-medium text-foreground/80">{projTotals.donors} bağışçı</span>

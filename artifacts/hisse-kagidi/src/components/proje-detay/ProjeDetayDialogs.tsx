@@ -24,7 +24,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MoveRight, Loader2, Archive } from "lucide-react";
+import { MoveRight, Loader2, Archive, Plus, Minus, ChevronDown } from "lucide-react";
+import { createKesimAlani } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 import type { KesimAlani } from "@/lib/types";
 import type { ConflictEntry } from "@/lib/api";
 import type { ProjeDetayState } from "@/hooks/useProjeDetayState";
@@ -40,6 +42,8 @@ type ProjeDetayDialogsProps = Pick<ProjeDetayState,
   | "allKesimAlanlari"
 > & {
   projectName: string;
+  projectId: string;
+  onBulkSuccess?: () => void;
 };
 
 export function ProjeDetayDialogs(props: ProjeDetayDialogsProps) {
@@ -51,6 +55,8 @@ export function ProjeDetayDialogs(props: ProjeDetayDialogsProps) {
         newKesimAdi={props.newKesimAdi}
         setNewKesimAdi={props.setNewKesimAdi}
         handleCreateKesimAlani={props.handleCreateKesimAlani}
+        projectId={props.projectId}
+        onBulkSuccess={props.onBulkSuccess}
       />
 
       <EditProjectDialog
@@ -97,18 +103,70 @@ export function ProjeDetayDialogs(props: ProjeDetayDialogsProps) {
   );
 }
 
+type BulkItemPD = {
+  id: string;
+  name: string;
+  autoName: string;
+  yetkili: string;
+  displayName: string;
+  maxAnimalStr: string;
+  expanded: boolean;
+};
+
 function CreateKesimAlaniDialog({
-  dialogOpen, setDialogOpen, newKesimAdi, setNewKesimAdi, handleCreateKesimAlani,
+  dialogOpen, setDialogOpen, newKesimAdi, setNewKesimAdi, handleCreateKesimAlani, projectId, onBulkSuccess,
 }: {
   dialogOpen: boolean;
   setDialogOpen: (open: boolean) => void;
   newKesimAdi: string;
   setNewKesimAdi: (name: string) => void;
   handleCreateKesimAlani: (yetkili?: string, displayName?: string, maxVekalet?: number | null, maxAnimal?: number | null) => void;
+  projectId: string;
+  onBulkSuccess?: () => void;
 }) {
+  const [mode, setMode] = React.useState<"single" | "bulk">("single");
   const [yetkili, setYetkili] = React.useState("");
   const [displayName, setDisplayName] = React.useState("");
   const [maxAnimalStr, setMaxAnimalStr] = React.useState("");
+  const [baseName, setBaseName] = React.useState("Kesim Alanı");
+  const [count, setCount] = React.useState(3);
+  const [bulkItems, setBulkItems] = React.useState<BulkItemPD[]>([]);
+  const [bulkLoading, setBulkLoading] = React.useState(false);
+  const { toast } = useToast();
+
+  React.useEffect(() => {
+    if (mode !== "bulk") return;
+    const base = baseName.trim() || "Kesim Alanı";
+    setBulkItems(prev => {
+      const result: BulkItemPD[] = [];
+      for (let i = 0; i < count; i++) {
+        const autoName = `${base} ${i + 1}`;
+        const existing = prev[i];
+        if (existing) {
+          const wasAuto = existing.name === existing.autoName;
+          result.push({ ...existing, autoName, name: wasAuto ? autoName : existing.name });
+        } else {
+          result.push({ id: crypto.randomUUID(), name: autoName, autoName, yetkili: "", displayName: "", maxAnimalStr: "", expanded: false });
+        }
+      }
+      return result;
+    });
+  }, [baseName, count, mode]);
+
+  const updateBulkItem = (id: string, patch: Partial<BulkItemPD>) =>
+    setBulkItems(prev => prev.map(item => item.id === id ? { ...item, ...patch } : item));
+
+  const reset = () => {
+    setYetkili("");
+    setDisplayName("");
+    setMaxAnimalStr("");
+    setMode("single");
+    setBaseName("Kesim Alanı");
+    setCount(3);
+    setBulkItems([]);
+    setBulkLoading(false);
+  };
+
   const handleCreate = () => {
     const maxAnimal = maxAnimalStr.trim() ? parseInt(maxAnimalStr.trim(), 10) : null;
     handleCreateKesimAlani(yetkili || undefined, displayName || undefined, null, maxAnimal);
@@ -116,44 +174,191 @@ function CreateKesimAlaniDialog({
     setDisplayName("");
     setMaxAnimalStr("");
   };
+
+  const doBulkCreate = async () => {
+    if (bulkItems.length === 0 || bulkLoading) return;
+    setBulkLoading(true);
+    let success = 0;
+    let fail = 0;
+    for (const item of bulkItems) {
+      if (!item.name.trim()) { fail++; continue; }
+      try {
+        await createKesimAlani({
+          id: crypto.randomUUID(),
+          name: item.name.trim(),
+          donations: [],
+          animalGroups: [],
+          createdAt: new Date().toISOString(),
+          projectId: projectId || null,
+          yetkili: item.yetkili.trim() || null,
+          displayName: item.displayName.trim() || null,
+          maxVekalet: null,
+          maxAnimal: item.maxAnimalStr.trim() ? parseInt(item.maxAnimalStr.trim(), 10) : null,
+        });
+        success++;
+      } catch {
+        fail++;
+      }
+    }
+    setBulkLoading(false);
+    onBulkSuccess?.();
+    toast({
+      title: `${success} kesim alanı oluşturuldu`,
+      ...(fail > 0 ? { description: `${fail} adet oluşturulamadı`, variant: "destructive" as const } : {}),
+    });
+    setDialogOpen(false);
+    reset();
+  };
+
   return (
-    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setYetkili(""); setDisplayName(""); setMaxAnimalStr(""); } }}>
-      <DialogContent>
+    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) reset(); }}>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Yeni Kesim Alanı</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 pt-4">
-          <Input
-            placeholder="Kesim alanı adı"
-            value={newKesimAdi}
-            onChange={(e) => setNewKesimAdi(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-            autoFocus
-          />
-          <Input
-            placeholder="Yetkili (isteğe bağlı)"
-            value={yetkili}
-            onChange={(e) => setYetkili(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-          />
-          <Input
-            placeholder="Çıktıda Görünecek İsim (isteğe bağlı)"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-          />
-          <Input
-            type="number"
-            min={1}
-            placeholder="Maksimum Hayvan Sayısı (isteğe bağlı)"
-            value={maxAnimalStr}
-            onChange={(e) => setMaxAnimalStr(e.target.value.replace(/[^0-9]/g, ""))}
-            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-          />
-          <Button onClick={handleCreate} className="w-full" disabled={!newKesimAdi.trim()}>
-            Oluştur
-          </Button>
+
+        <div className="flex rounded-lg border p-1 bg-muted/30 gap-1">
+          <button
+            type="button"
+            onClick={() => setMode("single")}
+            className={`flex-1 text-sm font-medium py-1.5 rounded-md transition-colors ${mode === "single" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Tekli
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("bulk")}
+            className={`flex-1 text-sm font-medium py-1.5 rounded-md transition-colors ${mode === "bulk" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Toplu
+          </button>
         </div>
+
+        {mode === "single" ? (
+          <div className="space-y-3">
+            <Input
+              placeholder="Kesim alanı adı"
+              value={newKesimAdi}
+              onChange={(e) => setNewKesimAdi(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+              autoFocus
+            />
+            <Input
+              placeholder="Yetkili (isteğe bağlı)"
+              value={yetkili}
+              onChange={(e) => setYetkili(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            />
+            <Input
+              placeholder="Çıktıda Görünecek İsim (isteğe bağlı)"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            />
+            <Input
+              type="number"
+              min={1}
+              placeholder="Maksimum Hayvan Sayısı (isteğe bağlı)"
+              value={maxAnimalStr}
+              onChange={(e) => setMaxAnimalStr(e.target.value.replace(/[^0-9]/g, ""))}
+              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            />
+            <Button onClick={handleCreate} className="w-full" disabled={!newKesimAdi.trim()}>
+              Oluştur
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <Input
+                className="flex-1"
+                placeholder="Temel ad (örn: Kesim Alanı)"
+                value={baseName}
+                onChange={(e) => setBaseName(e.target.value)}
+                autoFocus
+              />
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center h-9 w-9 rounded-md border border-input bg-background hover:bg-accent transition-colors disabled:opacity-50"
+                  onClick={() => setCount(c => Math.max(1, c - 1))}
+                  disabled={count <= 1}
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <span className="w-8 text-center font-bold text-sm tabular-nums">{count}</span>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center h-9 w-9 rounded-md border border-input bg-background hover:bg-accent transition-colors disabled:opacity-50"
+                  onClick={() => setCount(c => Math.min(50, c + 1))}
+                  disabled={count >= 50}
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-64 overflow-y-auto space-y-2 pr-0.5">
+              {bulkItems.map((item, idx) => (
+                <div key={item.id} className="rounded-lg border bg-muted/20 overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2">
+                    <span className="text-xs text-muted-foreground font-mono w-5 shrink-0 text-right">{idx + 1}</span>
+                    <Input
+                      className="h-7 text-sm border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 flex-1"
+                      value={item.name}
+                      onChange={(e) => updateBulkItem(item.id, { name: e.target.value })}
+                      placeholder="Kesim alanı adı"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => updateBulkItem(item.id, { expanded: !item.expanded })}
+                      className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                      title="Detayları göster / gizle"
+                    >
+                      <ChevronDown className={`w-4 h-4 transition-transform ${item.expanded ? "rotate-180" : ""}`} />
+                    </button>
+                  </div>
+                  {item.expanded && (
+                    <div className="px-3 pb-3 space-y-2 border-t pt-2 bg-muted/10">
+                      <Input
+                        className="h-7 text-xs"
+                        placeholder="Yetkili (isteğe bağlı)"
+                        value={item.yetkili}
+                        onChange={(e) => updateBulkItem(item.id, { yetkili: e.target.value })}
+                      />
+                      <Input
+                        className="h-7 text-xs"
+                        placeholder="Çıktıda görünecek isim (isteğe bağlı)"
+                        value={item.displayName}
+                        onChange={(e) => updateBulkItem(item.id, { displayName: e.target.value })}
+                      />
+                      <Input
+                        className="h-7 text-xs"
+                        type="number"
+                        min={1}
+                        placeholder="Maks. hayvan sayısı (isteğe bağlı)"
+                        value={item.maxAnimalStr}
+                        onChange={(e) => updateBulkItem(item.id, { maxAnimalStr: e.target.value.replace(/[^0-9]/g, "") })}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <Button
+              onClick={doBulkCreate}
+              className="w-full"
+              disabled={bulkItems.length === 0 || bulkItems.every(i => !i.name.trim()) || bulkLoading}
+            >
+              {bulkLoading ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Oluşturuluyor…</>
+              ) : (
+                <>{count} Kesim Alanı Oluştur</>
+              )}
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

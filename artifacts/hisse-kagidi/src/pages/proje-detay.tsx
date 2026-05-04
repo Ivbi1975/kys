@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchPoolStats } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -26,11 +25,9 @@ import { SplitModal } from "@/components/proje-detay/SplitModal";
 import { ConflictSection } from "@/components/proje-detay/ConflictSection";
 import { TransferLogSection } from "@/components/proje-detay/TransferLogSection";
 import { ProjeDetayDialogs } from "@/components/proje-detay/ProjeDetayDialogs";
-import { BulkCreateKesimAlaniCountDialog } from "@/components/proje-detay/BulkCreateKesimAlaniCountDialog";
 
 export default function ProjeDetayPage() {
   const state = useProjeDetayState();
-  const [bulkCountOpen, setBulkCountOpen] = useState(false);
 
   const projectId = state.project?.id ?? "";
   const { data: poolStats, isLoading: poolStatsLoading } = useQuery({
@@ -152,13 +149,6 @@ export default function ProjeDetayPage() {
               <p className="text-muted-foreground text-sm">
                 {state.kesimAlanlari.length} kesim alanı
               </p>
-              <button
-                onClick={() => setBulkCountOpen(true)}
-                title="Toplu kesim alanı ekle"
-                className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
             </div>
           </div>
         </div>
@@ -241,6 +231,8 @@ export default function ProjeDetayPage() {
         executeTransfer={state.executeTransfer}
         allKesimAlanlari={state.allKesimAlanlari}
         projectName={state.project.name}
+        projectId={state.project.id}
+        onBulkSuccess={state.refreshData}
       />
 
       {state.splitTarget && (
@@ -264,12 +256,6 @@ export default function ProjeDetayPage() {
         onOpenChange={state.setGlobalSearchOpen}
       />
 
-      <BulkCreateKesimAlaniCountDialog
-        open={bulkCountOpen}
-        onOpenChange={setBulkCountOpen}
-        projectId={state.project.id}
-        onSuccess={state.refreshData}
-      />
     </div>
   );
 }
