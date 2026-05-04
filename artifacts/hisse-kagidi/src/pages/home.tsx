@@ -231,7 +231,14 @@ export default function Home() {
                       onMove={state.openMoveDialog}
                       onDelete={state.requestDelete}
                       onRename={(k) => {
-                        state.setEditingKesim({ id: k.id, name: k.name });
+                        state.setEditingKesim({
+                          id: k.id,
+                          name: k.name,
+                          yetkili: k.yetkili ?? "",
+                          displayName: k.displayName ?? "",
+                          maxVekalet: k.maxVekalet != null ? String(k.maxVekalet) : "",
+                          maxAnimal: k.maxAnimal != null ? String(k.maxAnimal) : "",
+                        });
                         state.setRenameKesimDialogOpen(true);
                       }}
                     />
