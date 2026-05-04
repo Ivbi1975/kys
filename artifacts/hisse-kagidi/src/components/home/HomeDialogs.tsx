@@ -245,18 +245,15 @@ function CreateKesimAlaniDialog({
   projects: Project[];
 }) {
   const [displayName, setDisplayName] = useState("");
-  const [maxVekaletStr, setMaxVekaletStr] = useState("");
   const [maxAnimalStr, setMaxAnimalStr] = useState("");
   const doCreate = () => {
-    const maxVekalet = maxVekaletStr.trim() ? parseInt(maxVekaletStr.trim(), 10) : null;
     const maxAnimal = maxAnimalStr.trim() ? parseInt(maxAnimalStr.trim(), 10) : null;
-    handleCreate(displayName || undefined, maxVekalet, maxAnimal);
+    handleCreate(displayName || undefined, null, maxAnimal);
     setDisplayName("");
-    setMaxVekaletStr("");
     setMaxAnimalStr("");
   };
   return (
-    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setCreateProjectId(null); setDisplayName(""); setMaxVekaletStr(""); setMaxAnimalStr(""); } }}>
+    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setCreateProjectId(null); setDisplayName(""); setMaxAnimalStr(""); } }}>
       <DialogTrigger asChild>
         <Button size="default">
           <Plus className="w-4 h-4 mr-2" />
@@ -295,14 +292,6 @@ function CreateKesimAlaniDialog({
             placeholder="Çıktıda Görünecek İsim (isteğe bağlı)"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && doCreate()}
-          />
-          <Input
-            type="number"
-            min={1}
-            placeholder="Maksimum Vekalet Sayısı (isteğe bağlı)"
-            value={maxVekaletStr}
-            onChange={(e) => setMaxVekaletStr(e.target.value.replace(/[^0-9]/g, ""))}
             onKeyDown={(e) => e.key === "Enter" && doCreate()}
           />
           <Input
