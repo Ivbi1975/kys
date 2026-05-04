@@ -292,6 +292,26 @@ export default function BagisHavuzuPage() {
     placeholderData: (prev) => prev,
   });
 
+  const baseStatsFilters = useMemo(() => ({
+    search: debouncedSearch || undefined,
+    status: statusFilter || undefined,
+    kesimAlaniId: kesimAlaniFilter || undefined,
+    shareCountMin: shareCountMin ? Number(shareCountMin) : undefined,
+    shareCountMax: shareCountMax ? Number(shareCountMax) : undefined,
+    excludeFields: excludeFieldsStr || undefined,
+    dateField: dateField !== "updatedAt" ? dateField : undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+  }), [debouncedSearch, statusFilter, kesimAlaniFilter, shareCountMin, shareCountMax, excludeFieldsStr, dateField, dateFrom, dateTo]);
+
+  const { data: baseStats } = useQuery({
+    queryKey: ["pool-stats-base", projectId, baseStatsFilters],
+    queryFn: () => fetchPoolStats(projectId, baseStatsFilters),
+    enabled: !!projectId,
+    placeholderData: (prev) => prev,
+    staleTime: 60_000,
+  });
+
   const { data: globalTags = [] } = useQuery({
     queryKey: ["tags"],
     queryFn: fetchTags,
@@ -955,57 +975,125 @@ export default function BagisHavuzuPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-4">
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <Button variant="ghost" size="sm" onClick={() => setLocation(`/proje/${projectId}`)}>
+        {/* Header row */}
+        <div className="flex items-center gap-2 mb-2">
+          <Button variant="ghost" size="sm" className="h-8 px-2 shrink-0" onClick={() => setLocation(`/proje/${projectId}`)}>
             <ArrowLeft className="w-4 h-4 mr-1" />Geri
           </Button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-              <Package className="w-5 h-5 text-primary" />
+            <h1 className="text-lg font-bold text-foreground flex items-center gap-1.5 leading-tight">
+              <Package className="w-5 h-5 text-primary shrink-0" />
               Bağış Havuzu
             </h1>
-            <p className="text-sm text-muted-foreground">{projectName}</p>
+            <p className="text-xs text-muted-foreground truncate">{projectName}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Button variant="outline" size="sm" onClick={() => setShowStats(!showStats)}>
-              <BarChart3 className="w-4 h-4 mr-1" />İstatistik
+          <ThemeToggle className="h-8 w-8 p-0 shrink-0" />
+        </div>
+
+        {/* Toolbar row */}
+        <div className="flex flex-wrap items-center gap-1.5 mb-3">
+          {/* Group 1: View toggles */}
+          <div className="flex items-center gap-0.5 border rounded-md px-0.5 h-8">
+            <Button variant={showStats ? "secondary" : "ghost"} size="sm" className="h-7 px-2" onClick={() => setShowStats(!showStats)}>
+              <BarChart3 className="w-3.5 h-3.5" /><span className="hidden sm:inline ml-1 text-xs">İstatistik</span>
             </Button>
-            <Button variant={showRules ? "default" : "outline"} size="sm" onClick={() => setShowRules(!showRules)}>
-              <Zap className="w-4 h-4 mr-1" />Kurallar
+            <Button variant={showRules ? "secondary" : "ghost"} size="sm" className="h-7 px-2" onClick={() => setShowRules(!showRules)}>
+              <Zap className="w-3.5 h-3.5" /><span className="hidden sm:inline ml-1 text-xs">Kurallar</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setBulkCreateListeOpen(true)}>
-              <ListPlus className="w-4 h-4 mr-1" />Toplu Liste Oluştur
+          </div>
+
+          {/* Group 2: Import / Export */}
+          <div className="flex items-center gap-0.5 border rounded-md px-0.5 h-8">
+            <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setImportOpen(true)} title="Toplu Yükle">
+              <Upload className="w-3.5 h-3.5" /><span className="hidden lg:inline ml-1 text-xs">Yükle</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
-              <Upload className="w-4 h-4 mr-1" />Toplu Yükle
+            <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleExportExcel} disabled={items.length === 0} title="Görünen bağışları Excel">
+              <FileSpreadsheet className="w-3.5 h-3.5" /><span className="hidden lg:inline ml-1 text-xs">Excel</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={handleExportExcel} disabled={items.length === 0} title="Görünen bağışları Excel olarak indir">
-              <FileSpreadsheet className="w-4 h-4 mr-1" />Excel
+            <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleExportProjectExcel} disabled={projectExportLoading || !projectId} title="Tüm proje bağışçıları Excel">
+              {projectExportLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
+              <span className="hidden lg:inline ml-1 text-xs">Proje</span>
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportProjectExcel}
-              disabled={projectExportLoading || !projectId}
-              title="Tüm proje bağışçılarını sunucudan Excel olarak indir"
-            >
-              {projectExportLoading ? (
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-              ) : (
-                <FileSpreadsheet className="w-4 h-4 mr-1" />
+            <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setBulkCreateListeOpen(true)} title="Toplu Liste Oluştur">
+              <ListPlus className="w-3.5 h-3.5" /><span className="hidden lg:inline ml-1 text-xs">Liste</span>
+            </Button>
+          </div>
+
+          <div className="flex-1 min-w-0" />
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Ara..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(0); }}
+              className="pl-8 h-8 text-xs w-44"
+            />
+            {search && (
+              <button onClick={() => { setSearch(""); setDebouncedSearch(""); }} className="absolute right-2 top-1/2 -translate-y-1/2">
+                <X className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+
+          {/* Group 3: Filter */}
+          <div className="flex items-center gap-0.5 border rounded-md px-0.5 h-8">
+            <Button variant={showFilters ? "secondary" : "ghost"} size="sm" className="h-7 px-2" onClick={() => setShowFilters(!showFilters)}>
+              <Filter className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline ml-1 text-xs">Filtre</span>
+              {activeFilterCount > 0 && <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{activeFilterCount}</Badge>}
+            </Button>
+            {activeFilterCount > 0 && (
+              <Button variant="ghost" size="sm" className="h-7 px-2" onClick={clearFilters} title="Filtreleri temizle">
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
+
+          {/* Group 4: Analysis & columns */}
+          <div className="flex items-center gap-0.5 border rounded-md px-0.5 h-8">
+            <div className="relative" ref={columnPickerRef}>
+              <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setShowColumnPicker(!showColumnPicker)} title="Sütunları düzenle">
+                <Settings2 className="w-3.5 h-3.5" /><span className="hidden sm:inline ml-1 text-xs">Sütunlar</span>
+              </Button>
+              {showColumnPicker && (
+                <div className="absolute right-0 top-full mt-1 z-50 bg-background border rounded-lg shadow-lg p-2 min-w-[180px]">
+                  {ALL_TABLE_COLUMNS.map(col => (
+                    <label key={col.key} className="flex items-center gap-2 px-2 py-1 text-xs hover:bg-muted/50 rounded cursor-pointer">
+                      <input type="checkbox" checked={visibleColumns.has(col.key)} onChange={() => toggleColumn(col.key)} className="rounded" />
+                      {col.label}
+                    </label>
+                  ))}
+                  <div className="border-t mt-1 pt-1">
+                    <button className="w-full text-xs text-muted-foreground hover:text-foreground px-2 py-1 text-left rounded hover:bg-muted/50" onClick={() => { const defaults = new Set(ALL_TABLE_COLUMNS.filter(c => c.defaultVisible).map(c => c.key)); setVisibleColumns(defaults); localStorage.removeItem(`bagis-havuzu-columns-${projectId}`); }}>
+                      Varsayılanlara dön
+                    </button>
+                  </div>
+                </div>
               )}
-              Tüm Proje Excel
+            </div>
+            <Button variant={aiRunning ? "secondary" : "ghost"} size="sm" className="h-7 px-2" onClick={() => setLocation(`/bagis-havuzu/${projectId}/ai`)} title="AI Sınıflandırma">
+              <Brain className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline ml-1 text-xs">AI</span>
+              {aiRunning && <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px] animate-pulse">{aiProgress.done}/{aiProgress.total}</Badge>}
+              {!aiRunning && aiResults.size > 0 && <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{aiResults.size}</Badge>}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
-              onClick={() => setDeleteAllDialogOpen(true)}
-            >
-              <Trash2 className="w-4 h-4 mr-1" />Tüm Bağışları Sil
-            </Button>
-            <ThemeToggle />
           </div>
+
+          {/* Destructive actions */}
+          {total > 0 && (
+            <Button variant="ghost" size="sm" className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleOpenBulkDeleteFiltered} title={activeFilterCount > 0 ? "Filtredeki bağışları sil" : "Havuzu kalıcı sil"}>
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline ml-1 text-xs">{activeFilterCount > 0 ? "Filtreyi Sil" : "Havuzu Sil"}</span>
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setDeleteAllDialogOpen(true)} title="Tüm bağışları sil">
+            <Trash2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline ml-1 text-xs">Tümünü Sil</span>
+          </Button>
+
+          {isFetching && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
         </div>
 
         {showStats && stats && <StatsPanel stats={stats} />}
@@ -1019,106 +1107,6 @@ export default function BagisHavuzuPage() {
             />
           </div>
         )}
-
-        <div className="flex items-center gap-2 mb-3">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Ara..."
-              value={search}
-              onChange={e => { setSearch(e.target.value); setPage(0); }}
-              className="pl-8 h-9"
-            />
-            {search && (
-              <button onClick={() => { setSearch(""); setDebouncedSearch(""); }} className="absolute right-2 top-1/2 -translate-y-1/2">
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
-          </div>
-
-          <Button
-            variant={showFilters ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <Filter className="w-4 h-4 mr-1" />
-            Filtre
-            {activeFilterCount > 0 && (
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{activeFilterCount}</Badge>
-            )}
-          </Button>
-
-          {activeFilterCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={clearFilters}>
-              <X className="w-4 h-4 mr-1" />Temizle
-            </Button>
-          )}
-
-          {total > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
-              onClick={handleOpenBulkDeleteFiltered}
-              title={activeFilterCount > 0 ? "Filtredeki bağışları kalıcı olarak sil" : "Tüm havuzu kalıcı olarak sil"}
-            >
-              <Trash2 className="w-4 h-4 mr-1" />
-              {activeFilterCount > 0 ? "Filtredeki Bağışları Sil" : "Havuzu Kalıcı Sil"}
-            </Button>
-          )}
-
-          <Button
-            variant={aiRunning ? "default" : "outline"}
-            size="sm"
-            onClick={() => setLocation(`/bagis-havuzu/${projectId}/ai`)}
-          >
-            <Brain className="w-4 h-4 mr-1" />
-            AI Sınıfla
-            {aiRunning && (
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs animate-pulse">
-                {aiProgress.done}/{aiProgress.total}
-              </Badge>
-            )}
-            {!aiRunning && aiResults.size > 0 && (
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{aiResults.size}</Badge>
-            )}
-          </Button>
-
-          <div className="relative" ref={columnPickerRef}>
-            <Button variant="outline" size="sm" onClick={() => setShowColumnPicker(!showColumnPicker)}>
-              <Settings2 className="w-4 h-4 mr-1" />Sütunlar
-            </Button>
-            {showColumnPicker && (
-              <div className="absolute right-0 top-full mt-1 z-50 bg-background border rounded-lg shadow-lg p-2 min-w-[180px]">
-                {ALL_TABLE_COLUMNS.map(col => (
-                  <label key={col.key} className="flex items-center gap-2 px-2 py-1 text-xs hover:bg-muted/50 rounded cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={visibleColumns.has(col.key)}
-                      onChange={() => toggleColumn(col.key)}
-                      className="rounded"
-                    />
-                    {col.label}
-                  </label>
-                ))}
-                <div className="border-t mt-1 pt-1">
-                  <button
-                    className="w-full text-xs text-muted-foreground hover:text-foreground px-2 py-1 text-left rounded hover:bg-muted/50"
-                    onClick={() => {
-                      const defaults = new Set(ALL_TABLE_COLUMNS.filter(c => c.defaultVisible).map(c => c.key));
-                      setVisibleColumns(defaults);
-                      localStorage.removeItem(`bagis-havuzu-columns-${projectId}`);
-                    }}
-                  >
-                    Varsayılanlara dön
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {isFetching && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-        </div>
 
         {aiCategoryFilter && (
           <div className="flex items-center gap-2 mb-2">
@@ -1159,6 +1147,7 @@ export default function BagisHavuzuPage() {
             dateFrom={dateFrom} setDateFrom={v => { setDateFrom(v); setPage(0); }}
             dateTo={dateTo} setDateTo={v => { setDateTo(v); setPage(0); }}
             stats={stats}
+            baseStats={baseStats}
             kesimAlanlari={kesimAlanlari}
             globalTags={globalTags}
           />

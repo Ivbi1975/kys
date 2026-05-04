@@ -60,6 +60,7 @@ interface PoolFiltersProps {
   dateTo: string;
   setDateTo: (v: string) => void;
   stats: PoolStats | undefined;
+  baseStats?: PoolStats;
   kesimAlanlari: { id: string; name: string }[];
   globalTags: CustomTag[];
 }
@@ -236,7 +237,7 @@ function NotesMultiFilter({ value, onChange }: { value: string; onChange: (v: st
 
   return (
     <div className="space-y-1">
-      <label className="text-xs font-medium text-muted-foreground">Notlar (çoklu şart)</label>
+      <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Notlar</label>
       <div className="flex gap-1">
         <Input
           placeholder="Not filtresi ekle..."
@@ -309,12 +310,7 @@ function CompactSortLevel({
         </SelectContent>
       </Select>
       {value && value !== "sortOrder" && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 text-[10px] px-1.5"
-          onClick={onDirChange}
-        >
+        <Button variant="outline" size="sm" className="h-7 text-[10px] px-1.5" onClick={onDirChange}>
           {dir === "asc" ? "↑" : "↓"}
         </Button>
       )}
@@ -350,12 +346,15 @@ export function PoolFilters({
   dateFrom, setDateFrom,
   dateTo, setDateTo,
   stats,
+  baseStats,
   kesimAlanlari,
   globalTags,
 }: PoolFiltersProps) {
+  const optStats = baseStats || stats;
+
   const tagCountMap = new Map<string, number>();
-  if (stats?.tagDistribution) {
-    for (const t of stats.tagDistribution) {
+  if (optStats?.tagDistribution) {
+    for (const t of optStats.tagDistribution) {
       tagCountMap.set(t.id, t.count);
     }
   }
@@ -367,313 +366,350 @@ export function PoolFilters({
     }
   }
 
+  const showCinsi = !!(optStats && (optStats.typeDistribution.length > 0 || (optStats.empty_type_count ?? 0) > 0 || donationTypeFilter.length > 0));
+  const showBirim = !!(optStats && (optStats.birimDistribution.length > 0 || (optStats.empty_birim_count ?? 0) > 0 || birimFilter.length > 0));
+  const showTemsilci = !!(optStats && (optStats.temsilciDistribution.length > 0 || (optStats.empty_temsilci_count ?? 0) > 0 || temsilciFilter.length > 0));
+  const showOzellik = !!(optStats && ((optStats.ozellikDistribution && optStats.ozellikDistribution.length > 0) || (optStats.empty_ozellik_count ?? 0) > 0 || ozellikFilter.length > 0));
+  const showFiyat = !!(optStats && ((optStats.fiyatDistribution && optStats.fiyatDistribution.length > 0) || (optStats.empty_fiyat_count ?? 0) > 0 || fiyatFilter.length > 0));
+  const showYer = !!(optStats && ((optStats.yerTalebiDistribution && optStats.yerTalebiDistribution.length > 0) || (optStats.empty_yer_talebi_count ?? 0) > 0 || yerTalebiFilter.length > 0));
+  const showGun = !!(optStats && ((optStats.gunTalebiDistribution && optStats.gunTalebiDistribution.length > 0) || (optStats.empty_gun_talebi_count ?? 0) > 0 || gunTalebiFilter.length > 0));
+  const showIlkHayvan = !!(optStats && ((optStats.ilkHayvanDistribution && optStats.ilkHayvanDistribution.length > 0) || (optStats.empty_ilk_hayvan_count ?? 0) > 0 || ilkHayvanFilter.length > 0));
+  const showSafi = !!(optStats && ((optStats.safiDistribution && optStats.safiDistribution.length > 0) || (optStats.empty_safi_count ?? 0) > 0 || safiFilter.length > 0));
+  const hasFacets = showCinsi || showBirim || showTemsilci || showOzellik || showFiyat || showYer || showGun || showIlkHayvan || showSafi || globalTags.length > 0;
+
   return (
-    <div className="mb-3 p-3 border rounded-lg bg-muted/30 space-y-3">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
-        <div>
-          <span className="block text-xs text-muted-foreground mb-0.5">Durum</span>
-          <Select value={statusFilter || "all"} onValueChange={v => setStatusFilter(v === "all" ? "" : v)}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Durum" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tümü</SelectItem>
-              <SelectItem value="active">Aktif</SelectItem>
-              <SelectItem value="excluded">Sepette</SelectItem>
-            </SelectContent>
-          </Select>
+    <div className="mb-3 border rounded-lg bg-muted/20 overflow-hidden">
+
+      {/* ── Section 1: Primary single-select filters ── */}
+      <div className="px-3 py-2.5 bg-muted/30 border-b">
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Birincil Filtreler</p>
+        <div className="flex flex-wrap gap-2">
+          <div className="min-w-[140px] flex-1 max-w-[200px]">
+            <span className="block text-[10px] text-muted-foreground mb-0.5">Durum</span>
+            <Select value={statusFilter || "all"} onValueChange={v => setStatusFilter(v === "all" ? "" : v)}>
+              <SelectTrigger className="h-8 text-xs bg-background"><SelectValue placeholder="Durum" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tümü</SelectItem>
+                <SelectItem value="active">Aktif</SelectItem>
+                <SelectItem value="excluded">Sepette</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="min-w-[180px] flex-[2] max-w-[320px]">
+            <span className="block text-[10px] text-muted-foreground mb-0.5">Kesim Listesi</span>
+            <Select value={kesimAlaniFilter || "all"} onValueChange={v => setKesimAlaniFilter(v === "all" ? "" : v)}>
+              <SelectTrigger className="h-8 text-xs bg-background"><SelectValue placeholder="Kesim Listesi" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tümü</SelectItem>
+                <SelectItem value="none">Aktarılmamış</SelectItem>
+                {kesimAlanlari.map(ka => {
+                  const cnt = kesimAlaniCountMap.get(ka.id);
+                  return (
+                    <SelectItem key={ka.id} value={ka.id}>
+                      {ka.name}{cnt !== undefined ? ` (${cnt})` : ""}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+      </div>
 
-        <div>
-          <span className="block text-xs text-muted-foreground mb-0.5">Kesim Listesi</span>
-          <Select value={kesimAlaniFilter || "all"} onValueChange={v => setKesimAlaniFilter(v === "all" ? "" : v)}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Kesim Listesi" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tümü</SelectItem>
-              <SelectItem value="none">Aktarılmamış</SelectItem>
-              {kesimAlanlari.map(ka => {
-                const cnt = kesimAlaniCountMap.get(ka.id);
-                return (
-                  <SelectItem key={ka.id} value={ka.id}>
-                    {ka.name}{cnt !== undefined ? ` (${cnt})` : ""}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {stats && (stats.typeDistribution.length > 0 || (stats.empty_type_count ?? 0) > 0 || donationTypeFilter.length > 0) && (
-          <div>
-            <span className="block text-xs text-muted-foreground mb-0.5">Cinsi</span>
-            <MultiSelectDropdown
-              label="Cinsi"
-              options={[
-                ...[...stats.typeDistribution.map(t => ({ value: t.type, count: t.count }))]
-                  .sort((a, b) => a.value.localeCompare(b.value, "tr")),
-                ...((stats.empty_type_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_type_count, label: "(Boş)" }] : []),
-              ]}
-              selected={donationTypeFilter}
-              onChange={setDonationTypeFilter}
-              excluded={excludeFields.has("donationType")}
-              onToggleExclude={() => toggleExcludeField("donationType")}
-            />
-          </div>
-        )}
-
-        {stats && (stats.birimDistribution.length > 0 || (stats.empty_birim_count ?? 0) > 0 || birimFilter.length > 0) && (
-          <div>
-            <span className="block text-xs text-muted-foreground mb-0.5">Birim</span>
-            <MultiSelectDropdown
-              label="Birim"
-              options={[
-                ...[...stats.birimDistribution.map(b => ({ value: b.birim, count: b.count }))]
-                  .sort((a, b) => a.value.localeCompare(b.value, "tr")),
-                ...((stats.empty_birim_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_birim_count, label: "(Boş)" }] : []),
-              ]}
-              selected={birimFilter}
-              onChange={setBirimFilter}
-              excluded={excludeFields.has("birim")}
-              onToggleExclude={() => toggleExcludeField("birim")}
-            />
-          </div>
-        )}
-
-        {stats && (stats.temsilciDistribution.length > 0 || (stats.empty_temsilci_count ?? 0) > 0 || temsilciFilter.length > 0) && (
-          <div>
-            <span className="block text-xs text-muted-foreground mb-0.5">Temsilci</span>
-            <MultiSelectDropdown
-              label="Temsilci"
-              options={[
-                ...[...stats.temsilciDistribution.map(t => ({ value: t.temsilci, count: t.count }))]
-                  .sort((a, b) => a.value.localeCompare(b.value, "tr")),
-                ...((stats.empty_temsilci_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_temsilci_count, label: "(Boş)" }] : []),
-              ]}
-              selected={temsilciFilter}
-              onChange={setTemsilciFilter}
-              excluded={excludeFields.has("temsilci")}
-              onToggleExclude={() => toggleExcludeField("temsilci")}
-            />
-          </div>
-        )}
-
-        {stats && ((stats.ozellikDistribution && stats.ozellikDistribution.length > 0) || (stats.empty_ozellik_count ?? 0) > 0 || ozellikFilter.length > 0) && (
-          <div>
-            <span className="block text-xs text-muted-foreground mb-0.5">Özellik</span>
-            <MultiSelectDropdown
-              label="Özellik"
-              options={[
-                ...[...(stats.ozellikDistribution || []).map(o => ({ value: o.ozellik, count: o.count }))]
-                  .sort((a, b) => a.value.localeCompare(b.value, "tr")),
-                ...((stats.empty_ozellik_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_ozellik_count, label: "(Boş)" }] : []),
-              ]}
-              selected={ozellikFilter}
-              onChange={setOzellikFilter}
-              excluded={excludeFields.has("ozellik")}
-              onToggleExclude={() => toggleExcludeField("ozellik")}
-            />
-          </div>
-        )}
-
-        {stats && ((stats.fiyatDistribution && stats.fiyatDistribution.length > 0) || (stats.empty_fiyat_count ?? 0) > 0 || fiyatFilter.length > 0) && (
-          <div>
-            <span className="block text-xs text-muted-foreground mb-0.5">Fiyat</span>
-            <MultiSelectDropdown
-              label="Fiyat"
-              options={[
-                ...[...(stats.fiyatDistribution || []).map(f => ({ value: f.fiyat, count: f.count }))]
-                  .sort((a, b) => parseFloat(a.value) - parseFloat(b.value)),
-                ...((stats.empty_fiyat_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_fiyat_count, label: "(Boş)" }] : []),
-              ]}
-              selected={fiyatFilter}
-              onChange={setFiyatFilter}
-              excluded={excludeFields.has("fiyat")}
-              onToggleExclude={() => toggleExcludeField("fiyat")}
-            />
-          </div>
-        )}
-
-        {stats && ((stats.yerTalebiDistribution && stats.yerTalebiDistribution.length > 0) || (stats.empty_yer_talebi_count ?? 0) > 0 || yerTalebiFilter.length > 0) && (
-          <div>
-            <span className="block text-xs text-muted-foreground mb-0.5">Yer Talebi</span>
-            <MultiSelectDropdown
-              label="Yer Talebi"
-              options={[
-                ...[...(stats.yerTalebiDistribution || []).map(y => ({ value: y.yerTalebi, count: y.count }))]
-                  .sort((a, b) => a.value.localeCompare(b.value, "tr")),
-                ...((stats.empty_yer_talebi_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_yer_talebi_count, label: "(Boş)" }] : []),
-              ]}
-              selected={yerTalebiFilter}
-              onChange={setYerTalebiFilter}
-              excluded={excludeFields.has("yerTalebi")}
-              onToggleExclude={() => toggleExcludeField("yerTalebi")}
-            />
-          </div>
-        )}
-
-        {stats && ((stats.gunTalebiDistribution && stats.gunTalebiDistribution.length > 0) || (stats.empty_gun_talebi_count ?? 0) > 0 || gunTalebiFilter.length > 0) && (
-          <div>
-            <span className="block text-xs text-muted-foreground mb-0.5">Gün Talebi</span>
-            <MultiSelectDropdown
-              label="Gün Talebi"
-              options={[
-                ...[...(stats.gunTalebiDistribution || []).map(g => ({ value: g.gunTalebi, count: g.count }))]
-                  .sort((a, b) => parseFloat(a.value) - parseFloat(b.value)),
-                ...((stats.empty_gun_talebi_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_gun_talebi_count, label: "(Boş)" }] : []),
-              ]}
-              selected={gunTalebiFilter}
-              onChange={setGunTalebiFilter}
-              excluded={excludeFields.has("gunTalebi")}
-              onToggleExclude={() => toggleExcludeField("gunTalebi")}
-            />
-          </div>
-        )}
-
-        {stats && ((stats.ilkHayvanDistribution && stats.ilkHayvanDistribution.length > 0) || (stats.empty_ilk_hayvan_count ?? 0) > 0 || ilkHayvanFilter.length > 0) && (
-          <div>
-            <span className="block text-xs text-muted-foreground mb-0.5">İlk Hayvan</span>
-            <MultiSelectDropdown
-              label="İlk Hayvan"
-              options={[
-                ...[...(stats.ilkHayvanDistribution || []).map(i => ({ value: i.ilkHayvan, count: i.count }))]
-                  .sort((a, b) => a.value.localeCompare(b.value, "tr")),
-                ...((stats.empty_ilk_hayvan_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_ilk_hayvan_count, label: "(Boş)" }] : []),
-              ]}
-              selected={ilkHayvanFilter}
-              onChange={setIlkHayvanFilter}
-              excluded={excludeFields.has("ilkHayvan")}
-              onToggleExclude={() => toggleExcludeField("ilkHayvan")}
-            />
-          </div>
-        )}
-
-        {stats && ((stats.safiDistribution && stats.safiDistribution.length > 0) || (stats.empty_safi_count ?? 0) > 0 || safiFilter.length > 0) && (
-          <div>
-            <span className="block text-xs text-muted-foreground mb-0.5">Şafi</span>
-            <MultiSelectDropdown
-              label="Şafi"
-              options={[
-                ...[...(stats.safiDistribution || []).map(s => ({ value: s.safi, count: s.count }))]
-                  .sort((a, b) => a.value.localeCompare(b.value, "tr")),
-                ...((stats.empty_safi_count ?? 0) > 0 ? [{ value: "__empty__", count: stats.empty_safi_count, label: "(Boş)" }] : []),
-              ]}
-              selected={safiFilter}
-              onChange={setSafiFilter}
-              excluded={excludeFields.has("safi")}
-              onToggleExclude={() => toggleExcludeField("safi")}
-            />
-          </div>
-        )}
-
-        {globalTags.length > 0 && (
-          <div>
-            <span className="block text-xs text-muted-foreground mb-0.5">Etiket</span>
-            <MultiSelectDropdown
-              label="Etiket"
-              options={globalTags.map(t => ({
-                value: t.id,
-                count: tagCountMap.get(t.id) ?? undefined,
-                label: t.name,
-                color: t.color,
-              }))}
-              selected={tagFilter}
-              onChange={setTagFilter}
-              excluded={excludeFields.has("tags")}
-              onToggleExclude={() => toggleExcludeField("tags")}
-            />
-          </div>
-        )}
-
-        <div>
-          <span className="block text-xs text-muted-foreground mb-0.5">AI Etiketi</span>
-          <div className="flex gap-0.5">
-            <Input
-              placeholder="AI Etiketi..."
-              value={aiCategoryFilter}
-              onChange={e => setAiCategoryFilter(e.target.value)}
-              className={`h-8 text-xs flex-1 ${aiCategoryFilter && excludeFields.has("aiCategory") ? "border-destructive/50 ring-1 ring-destructive/20" : ""}`}
-            />
-            {aiCategoryFilter && (
-              <button
-                onClick={() => toggleExcludeField("aiCategory")}
-                title={excludeFields.has("aiCategory") ? "Dahil et moduna geç" : "Hariç tut moduna geç"}
-                className={`h-8 w-7 flex items-center justify-center rounded-md border text-xs transition-colors ${excludeFields.has("aiCategory") ? "bg-destructive/10 border-destructive/30 text-destructive hover:bg-destructive/20" : "bg-muted/30 border-input text-muted-foreground hover:bg-muted/50 hover:text-foreground"}`}
-              >
-                <Ban className="w-3.5 h-3.5" />
-              </button>
+      {/* ── Section 2: Multi-select facet filters ── */}
+      {hasFacets && (
+        <div className="px-3 py-2.5 border-b">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Çoklu Filtreler</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+            {showCinsi && (
+              <div>
+                <span className="block text-[10px] text-muted-foreground mb-0.5">Cinsi</span>
+                <MultiSelectDropdown
+                  label="Cinsi"
+                  options={[
+                    ...[...optStats!.typeDistribution.map(t => ({ value: t.type, count: t.count }))]
+                      .sort((a, b) => a.value.localeCompare(b.value, "tr")),
+                    ...((optStats!.empty_type_count ?? 0) > 0 ? [{ value: "__empty__", count: optStats!.empty_type_count, label: "(Boş)" }] : []),
+                  ]}
+                  selected={donationTypeFilter}
+                  onChange={setDonationTypeFilter}
+                  excluded={excludeFields.has("donationType")}
+                  onToggleExclude={() => toggleExcludeField("donationType")}
+                />
+              </div>
             )}
+
+            {showBirim && (
+              <div>
+                <span className="block text-[10px] text-muted-foreground mb-0.5">Birim</span>
+                <MultiSelectDropdown
+                  label="Birim"
+                  options={[
+                    ...[...optStats!.birimDistribution.map(b => ({ value: b.birim, count: b.count }))]
+                      .sort((a, b) => a.value.localeCompare(b.value, "tr")),
+                    ...((optStats!.empty_birim_count ?? 0) > 0 ? [{ value: "__empty__", count: optStats!.empty_birim_count, label: "(Boş)" }] : []),
+                  ]}
+                  selected={birimFilter}
+                  onChange={setBirimFilter}
+                  excluded={excludeFields.has("birim")}
+                  onToggleExclude={() => toggleExcludeField("birim")}
+                />
+              </div>
+            )}
+
+            {showTemsilci && (
+              <div>
+                <span className="block text-[10px] text-muted-foreground mb-0.5">Temsilci</span>
+                <MultiSelectDropdown
+                  label="Temsilci"
+                  options={[
+                    ...[...optStats!.temsilciDistribution.map(t => ({ value: t.temsilci, count: t.count }))]
+                      .sort((a, b) => a.value.localeCompare(b.value, "tr")),
+                    ...((optStats!.empty_temsilci_count ?? 0) > 0 ? [{ value: "__empty__", count: optStats!.empty_temsilci_count, label: "(Boş)" }] : []),
+                  ]}
+                  selected={temsilciFilter}
+                  onChange={setTemsilciFilter}
+                  excluded={excludeFields.has("temsilci")}
+                  onToggleExclude={() => toggleExcludeField("temsilci")}
+                />
+              </div>
+            )}
+
+            {showOzellik && (
+              <div>
+                <span className="block text-[10px] text-muted-foreground mb-0.5">Özellik</span>
+                <MultiSelectDropdown
+                  label="Özellik"
+                  options={[
+                    ...[...(optStats!.ozellikDistribution || []).map(o => ({ value: o.ozellik, count: o.count }))]
+                      .sort((a, b) => a.value.localeCompare(b.value, "tr")),
+                    ...((optStats!.empty_ozellik_count ?? 0) > 0 ? [{ value: "__empty__", count: optStats!.empty_ozellik_count, label: "(Boş)" }] : []),
+                  ]}
+                  selected={ozellikFilter}
+                  onChange={setOzellikFilter}
+                  excluded={excludeFields.has("ozellik")}
+                  onToggleExclude={() => toggleExcludeField("ozellik")}
+                />
+              </div>
+            )}
+
+            {showFiyat && (
+              <div>
+                <span className="block text-[10px] text-muted-foreground mb-0.5">Fiyat</span>
+                <MultiSelectDropdown
+                  label="Fiyat"
+                  options={[
+                    ...[...(optStats!.fiyatDistribution || []).map(f => ({ value: f.fiyat, count: f.count }))]
+                      .sort((a, b) => parseFloat(a.value) - parseFloat(b.value)),
+                    ...((optStats!.empty_fiyat_count ?? 0) > 0 ? [{ value: "__empty__", count: optStats!.empty_fiyat_count, label: "(Boş)" }] : []),
+                  ]}
+                  selected={fiyatFilter}
+                  onChange={setFiyatFilter}
+                  excluded={excludeFields.has("fiyat")}
+                  onToggleExclude={() => toggleExcludeField("fiyat")}
+                />
+              </div>
+            )}
+
+            {showYer && (
+              <div>
+                <span className="block text-[10px] text-muted-foreground mb-0.5">Yer Talebi</span>
+                <MultiSelectDropdown
+                  label="Yer Talebi"
+                  options={[
+                    ...[...(optStats!.yerTalebiDistribution || []).map(y => ({ value: y.yerTalebi, count: y.count }))]
+                      .sort((a, b) => a.value.localeCompare(b.value, "tr")),
+                    ...((optStats!.empty_yer_talebi_count ?? 0) > 0 ? [{ value: "__empty__", count: optStats!.empty_yer_talebi_count, label: "(Boş)" }] : []),
+                  ]}
+                  selected={yerTalebiFilter}
+                  onChange={setYerTalebiFilter}
+                  excluded={excludeFields.has("yerTalebi")}
+                  onToggleExclude={() => toggleExcludeField("yerTalebi")}
+                />
+              </div>
+            )}
+
+            {showGun && (
+              <div>
+                <span className="block text-[10px] text-muted-foreground mb-0.5">Gün Talebi</span>
+                <MultiSelectDropdown
+                  label="Gün Talebi"
+                  options={[
+                    ...[...(optStats!.gunTalebiDistribution || []).map(g => ({ value: g.gunTalebi, count: g.count }))]
+                      .sort((a, b) => parseFloat(a.value) - parseFloat(b.value)),
+                    ...((optStats!.empty_gun_talebi_count ?? 0) > 0 ? [{ value: "__empty__", count: optStats!.empty_gun_talebi_count, label: "(Boş)" }] : []),
+                  ]}
+                  selected={gunTalebiFilter}
+                  onChange={setGunTalebiFilter}
+                  excluded={excludeFields.has("gunTalebi")}
+                  onToggleExclude={() => toggleExcludeField("gunTalebi")}
+                />
+              </div>
+            )}
+
+            {showIlkHayvan && (
+              <div>
+                <span className="block text-[10px] text-muted-foreground mb-0.5">İlk Hayvan</span>
+                <MultiSelectDropdown
+                  label="İlk Hayvan"
+                  options={[
+                    ...[...(optStats!.ilkHayvanDistribution || []).map(i => ({ value: i.ilkHayvan, count: i.count }))]
+                      .sort((a, b) => a.value.localeCompare(b.value, "tr")),
+                    ...((optStats!.empty_ilk_hayvan_count ?? 0) > 0 ? [{ value: "__empty__", count: optStats!.empty_ilk_hayvan_count, label: "(Boş)" }] : []),
+                  ]}
+                  selected={ilkHayvanFilter}
+                  onChange={setIlkHayvanFilter}
+                  excluded={excludeFields.has("ilkHayvan")}
+                  onToggleExclude={() => toggleExcludeField("ilkHayvan")}
+                />
+              </div>
+            )}
+
+            {showSafi && (
+              <div>
+                <span className="block text-[10px] text-muted-foreground mb-0.5">Şafi</span>
+                <MultiSelectDropdown
+                  label="Şafi"
+                  options={[
+                    ...[...(optStats!.safiDistribution || []).map(s => ({ value: s.safi, count: s.count }))]
+                      .sort((a, b) => a.value.localeCompare(b.value, "tr")),
+                    ...((optStats!.empty_safi_count ?? 0) > 0 ? [{ value: "__empty__", count: optStats!.empty_safi_count, label: "(Boş)" }] : []),
+                  ]}
+                  selected={safiFilter}
+                  onChange={setSafiFilter}
+                  excluded={excludeFields.has("safi")}
+                  onToggleExclude={() => toggleExcludeField("safi")}
+                />
+              </div>
+            )}
+
+            {globalTags.length > 0 && (
+              <div>
+                <span className="block text-[10px] text-muted-foreground mb-0.5">Etiket</span>
+                <MultiSelectDropdown
+                  label="Etiket"
+                  options={globalTags.map(t => ({
+                    value: t.id,
+                    count: tagCountMap.get(t.id) ?? undefined,
+                    label: t.name,
+                    color: t.color,
+                  }))}
+                  selected={tagFilter}
+                  onChange={setTagFilter}
+                  excluded={excludeFields.has("tags")}
+                  onToggleExclude={() => toggleExcludeField("tags")}
+                />
+              </div>
+            )}
+
+            <div>
+              <span className="block text-[10px] text-muted-foreground mb-0.5">AI Etiketi</span>
+              <div className="flex gap-0.5">
+                <Input
+                  placeholder="AI Etiketi..."
+                  value={aiCategoryFilter}
+                  onChange={e => setAiCategoryFilter(e.target.value)}
+                  className={`h-8 text-xs flex-1 ${aiCategoryFilter && excludeFields.has("aiCategory") ? "border-destructive/50 ring-1 ring-destructive/20" : ""}`}
+                />
+                {aiCategoryFilter && (
+                  <button
+                    onClick={() => toggleExcludeField("aiCategory")}
+                    title={excludeFields.has("aiCategory") ? "Dahil et moduna geç" : "Hariç tut moduna geç"}
+                    className={`h-8 w-7 flex items-center justify-center rounded-md border text-xs transition-colors ${excludeFields.has("aiCategory") ? "bg-destructive/10 border-destructive/30 text-destructive hover:bg-destructive/20" : "bg-muted/30 border-input text-muted-foreground hover:bg-muted/50 hover:text-foreground"}`}
+                  >
+                    <Ban className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Section 3: Range filters ── */}
+      <div className="px-3 py-2.5 border-b">
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Aralık Filtreleri</p>
+        <div className="flex flex-wrap gap-x-4 gap-y-2 items-end">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">Hisse:</span>
+            <Input
+              type="number"
+              min={1}
+              placeholder="Min"
+              value={shareCountMin}
+              onChange={e => setShareCountMin(e.target.value)}
+              className="h-7 text-xs w-16"
+            />
+            <span className="text-xs text-muted-foreground">–</span>
+            <Input
+              type="number"
+              min={1}
+              placeholder="Max"
+              value={shareCountMax}
+              onChange={e => setShareCountMax(e.target.value)}
+              className="h-7 text-xs w-16"
+            />
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Select value={dateField || "updatedAt"} onValueChange={v => setDateField(v)}>
+              <SelectTrigger className="h-7 text-[10px] w-auto min-w-[120px] bg-background"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="updatedAt">Güncelleme Tarihi</SelectItem>
+                <SelectItem value="transfer">Aktarım Tarihi</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              className="h-7 text-xs w-32"
+            />
+            <span className="text-xs text-muted-foreground">–</span>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              className="h-7 text-xs w-32"
+            />
           </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 items-center">
-        <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">Hisse:</span>
-        <Input
-          type="number"
-          min={1}
-          placeholder="Min"
-          value={shareCountMin}
-          onChange={e => setShareCountMin(e.target.value)}
-          className="h-7 text-xs w-16"
-        />
-        <span className="text-xs text-muted-foreground">–</span>
-        <Input
-          type="number"
-          min={1}
-          placeholder="Max"
-          value={shareCountMax}
-          onChange={e => setShareCountMax(e.target.value)}
-          className="h-7 text-xs w-16"
-        />
-        <Select value={dateField || "updatedAt"} onValueChange={v => setDateField(v)}>
-          <SelectTrigger className="h-7 text-[10px] w-auto min-w-[110px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="updatedAt">Güncelleme Tarihi</SelectItem>
-            <SelectItem value="transfer">Aktarım Tarihi</SelectItem>
-          </SelectContent>
-        </Select>
-        <Input
-          type="date"
-          value={dateFrom}
-          onChange={e => setDateFrom(e.target.value)}
-          className="h-7 text-xs w-32"
-        />
-        <span className="text-xs text-muted-foreground">–</span>
-        <Input
-          type="date"
-          value={dateTo}
-          onChange={e => setDateTo(e.target.value)}
-          className="h-7 text-xs w-32"
-        />
+      {/* ── Section 4: Notes + Sort ── */}
+      <div className="px-3 py-2.5">
+        <div className="flex flex-wrap gap-4 items-start">
+          <div className="flex-1 min-w-[200px] max-w-xs">
+            <NotesMultiFilter value={notesFilter} onChange={setNotesFilter} />
+          </div>
+          <div className="flex-[2] min-w-[300px]">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Sıralama</p>
+            <div className="flex gap-2 flex-wrap">
+              <CompactSortLevel
+                label="1."
+                value={sortBy}
+                dir={sortDir}
+                onChange={setSortBy}
+                onDirChange={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+              />
+              <CompactSortLevel
+                label="2."
+                value={sortBy2}
+                dir={sortDir2}
+                onChange={setSortBy2}
+                onDirChange={() => setSortDir2(d => d === "asc" ? "desc" : "asc")}
+              />
+              <CompactSortLevel
+                label="3."
+                value={sortBy3}
+                dir={sortDir3}
+                onChange={setSortBy3}
+                onDirChange={() => setSortDir3(d => d === "asc" ? "desc" : "asc")}
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 items-start">
-        <div className="flex-1 min-w-[200px]">
-          <NotesMultiFilter value={notesFilter} onChange={setNotesFilter} />
-        </div>
-        <div className="flex gap-2 items-center flex-wrap flex-1 min-w-[320px]">
-          <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">Sıralama:</span>
-          <CompactSortLevel
-            label="1."
-            value={sortBy}
-            dir={sortDir}
-            onChange={setSortBy}
-            onDirChange={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
-          />
-          <CompactSortLevel
-            label="2."
-            value={sortBy2}
-            dir={sortDir2}
-            onChange={setSortBy2}
-            onDirChange={() => setSortDir2(d => d === "asc" ? "desc" : "asc")}
-          />
-          <CompactSortLevel
-            label="3."
-            value={sortBy3}
-            dir={sortDir3}
-            onChange={setSortBy3}
-            onDirChange={() => setSortDir3(d => d === "asc" ? "desc" : "asc")}
-          />
-        </div>
-      </div>
     </div>
   );
 }
