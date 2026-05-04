@@ -37,6 +37,11 @@ tags:
   - name: home-data
   - name: integrity
   - name: photos
+  - name: vys
+    description: |
+      Read-only endpoints consumed by the VYS (Vekalet Yönetim Sistemi) integration.
+      All routes are under `/api/vys/` and require `X-API-Key: <VYS_API_KEY>` authentication
+      (a separate key from the main `API_KEY`/`ADMIN_KEY`).
 paths:
   /healthz:
     get:
@@ -179,8 +184,42 @@ paths:
     get:
       operationId: getProjectDashboard
       tags: [projects]
+      summary: Project slaughter progress dashboard
+      description: |
+        Returns a per-project slaughter progress snapshot: overall animal counts and per-area
+        breakdowns. Cached with a short TTL. Used by the main dashboard UI to display live
+        slaughter progress without loading the full kesim-alanlari detail.
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
-      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  projectId: { type: string }
+                  projectName: { type: string }
+                  totalAnimals: { type: integer, description: "Total animal groups across all kesim alanlari" }
+                  kesildiCount: { type: integer, description: "Animals slaughtered so far" }
+                  remainingCount: { type: integer, description: "Animals yet to be slaughtered" }
+                  kesildiPercent: { type: integer, description: "Overall progress percentage (0–100)" }
+                  lastKesildiAt: { type: string, format: date-time, nullable: true, description: "Timestamp of most recent slaughter across all areas" }
+                  kesimAlanlari:
+                    type: array
+                    description: Per-area breakdown
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        totalAnimals: { type: integer }
+                        kesildiCount: { type: integer }
+                        kesildiPercent: { type: integer }
+                        lastKesildiAt: { type: string, format: date-time, nullable: true }
+                      additionalProperties: true
+                additionalProperties: true
+        "404": { $ref: "#/components/responses/Error" }
   /projects/{id}/donations:
     parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
     get:
@@ -396,7 +435,32 @@ paths:
     get:
       operationId: getKesimAlani
       tags: [kesim-alanlari]
-      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+      summary: Full kesim-alani detail with nested donations and groups
+      description: |
+        Returns the complete state of a kesim-alani: metadata (name, projectId, tracking token),
+        all active animal groups with their assigned donations, and team assignments.
+        Pass `?compact=1` to receive `donationIds` arrays instead of full donation objects within
+        each group — useful when the client already has donation data cached.
+
+        **Use this endpoint when you need the full nested structure for editing or display.**
+        For lightweight aggregate counts only, prefer `GET /kesim-alanlari/{id}/meta`.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  projectId: { type: string }
+                  maxAnimal: { type: integer, nullable: true, description: "Capacity (null if unlimited)" }
+                  donations: { type: array, items: { $ref: "#/components/schemas/JsonObject" }, description: "All donations in the area" }
+                  animalGroups: { type: array, items: { $ref: "#/components/schemas/JsonObject" }, description: "Active groups with nested donation data" }
+                  teams: { type: array, items: { $ref: "#/components/schemas/JsonObject" } }
+                additionalProperties: true
+        "404": { $ref: "#/components/responses/Error" }
     put:
       operationId: updateKesimAlani
       tags: [kesim-alanlari]
@@ -410,8 +474,34 @@ paths:
     get:
       operationId: getKesimAlaniMeta
       tags: [kesim-alanlari]
+      summary: Lightweight kesim-alani metadata and aggregate counts
+      description: |
+        Returns a lightweight derived summary of a kesim-alani: area details (name, projectId,
+        split status), team list, and **aggregate counts** (`donationCount`, `groupCount`) instead
+        of the full donation and group records. Unlike `GET /kesim-alanlari/{id}`, it does not
+        include the nested donations or animalGroups arrays but adds derived count fields not
+        present in the full payload.
+
+        **Use this endpoint for polling or quick status checks** where loading the full nested
+        structure would be wasteful. Use `GET /kesim-alanlari/{id}` when you need the actual
+        donation or group records.
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
-      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  projectId: { type: string }
+                  donationCount: { type: integer, description: "Total active donations in this area" }
+                  groupCount: { type: integer, description: "Total active animal groups in this area" }
+                  teams: { type: array, items: { $ref: "#/components/schemas/JsonObject" } }
+                additionalProperties: true
+        "404": { $ref: "#/components/responses/Error" }
   /kesim-alanlari/{id}/move:
     put:
       operationId: moveKesimAlani
@@ -494,17 +584,70 @@ paths:
     get:
       operationId: listAnimalGroups
       tags: [animal-groups]
-      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonArray" } } } } }
+      summary: List animal groups (read / discovery)
+      description: |
+        Returns active animal groups for a kesim-alani with keyset pagination.
+
+        **Path convention — `/groups` vs `/animal-groups`:**
+        The `/groups` sub-path hosts **read, discovery, and in-place bulk status operations**
+        (list, count, get, bulk-lock). The `/animal-groups` sub-path handles **structural
+        write operations** that create, fully update, or delete group records (create, bulk-update,
+        delete). `bulk-lock` lives under `/groups` because it only toggles a status flag in-place
+        rather than creating or destroying records.
+
+        Pass `compact=1` to receive `donationIds` arrays instead of counts for each group.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+        - { name: cursor, in: query, schema: { type: string }, description: "Keyset pagination cursor from previous response's nextCursor" }
+        - { name: offset, in: query, schema: { type: integer }, description: "Offset-based pagination (used when no cursor is provided)" }
+        - { name: compact, in: query, schema: { type: string, enum: ["1"] }, description: "If '1', return donationIds array per group instead of donationCount" }
+        - { name: locked, in: query, schema: { type: boolean }, description: "Filter by locked status" }
+        - { name: kesildi, in: query, schema: { type: boolean }, description: "Filter by slaughter status" }
+        - { name: teamId, in: query, schema: { type: string }, description: "Filter by team assignment" }
+        - { name: sortField, in: query, schema: { type: string, enum: [sortOrder, animalNo] } }
+        - { name: sortDir, in: query, schema: { type: string, enum: [asc, desc] } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        animalNo: { type: integer }
+                        colorTag: { type: string, nullable: true }
+                        locked: { type: boolean }
+                        notes: { type: string, nullable: true }
+                        kesildi: { type: boolean }
+                        kesildiAt: { type: string, format: date-time, nullable: true }
+                        teamId: { type: string, nullable: true }
+                        sortOrder: { type: integer }
+                        updatedAt: { type: string, format: date-time, nullable: true }
+                        donationCount: { type: integer }
+                        photoCount: { type: integer }
+                      additionalProperties: true
+                  nextCursor: { type: string, nullable: true, description: "Opaque keyset cursor for the next page; null if no more pages" }
+                  hasMore: { type: boolean }
+                required: [items, nextCursor, hasMore]
   /kesim-alanlari/{id}/groups/count:
     get:
       operationId: countAnimalGroups
       tags: [animal-groups]
+      summary: Count animal groups
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
   /kesim-alanlari/{id}/groups/{groupId}:
     get:
       operationId: getAnimalGroup
       tags: [animal-groups]
+      summary: Get a single animal group
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
         - { name: groupId, in: path, required: true, schema: { type: string } }
@@ -513,6 +656,7 @@ paths:
     post:
       operationId: bulkLockAnimalGroups
       tags: [animal-groups]
+      summary: Bulk lock or unlock groups
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
       responses: { "200": { $ref: "#/components/responses/Success" } }
@@ -520,6 +664,14 @@ paths:
     post:
       operationId: createAnimalGroup
       tags: [animal-groups]
+      summary: Create a new animal group (write)
+      description: |
+        Creates a new animal group within the kesim-alani.
+
+        **Path convention — `/animal-groups` vs `/groups`:**
+        The `/animal-groups` sub-path handles **structural write operations** (create, bulk-update,
+        delete). Read, discovery, and in-place status operations live under `/groups`.
+        See `listAnimalGroups` for the full convention explanation.
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
       responses: { "200": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
@@ -527,6 +679,7 @@ paths:
     put:
       operationId: bulkUpdateAnimalGroups
       tags: [animal-groups]
+      summary: Bulk update animal groups (write)
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
       responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
@@ -534,6 +687,8 @@ paths:
     put:
       operationId: bulkUpdateAnimalGroupsChunked
       tags: [animal-groups]
+      summary: Bulk update animal groups in chunks (write)
+      description: Handles large updates by splitting them into multiple requests using a session ID.
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
       responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
@@ -544,11 +699,13 @@ paths:
     put:
       operationId: updateAnimalGroup
       tags: [animal-groups]
+      summary: Update a single animal group (write)
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
       responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
     delete:
       operationId: deleteAnimalGroup
       tags: [animal-groups]
+      summary: Delete an animal group (write)
       responses: { "200": { $ref: "#/components/responses/Success" } }
   /kesim-alanlari/{id}/teams:
     parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
@@ -729,8 +886,60 @@ paths:
       operationId: getTrackingData
       tags: [tracking]
       security: []
+      summary: Public tracking page data for a kesim-alani
+      description: |
+        Returns the full snapshot of a kesim-alani for the public tracking page — no auth required.
+        The `token` is a short-lived signed token issued by `generateTrackingToken`. Response
+        includes area name, animal group list with donor info, team assignments, and
+        aggregate counts. Donors (families) can use this page to watch slaughter progress live.
       parameters: [{ name: token, in: path, required: true, schema: { type: string } }]
-      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  serverTime: { type: string, format: date-time, description: "Current server time" }
+                  kesimAlaniName: { type: string }
+                  projectName: { type: string, nullable: true }
+                  totalGroups: { type: integer }
+                  kesildiCount: { type: integer, description: "Number of groups marked as slaughtered" }
+                  groups:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        animalNo: { type: integer, nullable: true }
+                        colorTag: { type: string, nullable: true }
+                        kesildi: { type: boolean }
+                        kesildiAt: { type: string, format: date-time, nullable: true }
+                        teamId: { type: string, nullable: true }
+                        filledCount: { type: integer, description: "Number of donors in this group who have a name" }
+                        donors:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              name: { type: string }
+                              description: { type: string }
+                              donationType: { type: string }
+                              vekalet: { type: string }
+                              notes: { type: string }
+                      additionalProperties: true
+                  teams:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        color: { type: string }
+                additionalProperties: true
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /tracking/{token}/delta:
     get:
       operationId: getTrackingDelta
@@ -864,6 +1073,188 @@ paths:
       tags: [ai-notes]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } }
       responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonObject" } } } } }
+
+  # ─── VYS (Vekalet Yönetim Sistemi) endpoints ─────────────────────────────
+  /vys/projects:
+    get:
+      operationId: vysListProjects
+      tags: [vys]
+      summary: List active projects (VYS)
+      security: [{ apiKeyAuth: [] }]
+      description: Returns all active (non-deleted, non-archived) projects with share counts.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string }
+                    name: { type: string }
+                    createdAt: { type: string, format: date-time }
+                    totalShareCount: { type: integer }
+                  required: [id, name, createdAt, totalShareCount]
+        "401": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+  /vys/projects/{id}/donations:
+    get:
+      operationId: vysListDonations
+      tags: [vys]
+      summary: Paginated donor/share list for a project (VYS)
+      security: [{ apiKeyAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 100, maximum: 500 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        description: { type: string, nullable: true }
+                        shareCount: { type: integer }
+                        vekalet: { type: string, nullable: true }
+                        tags:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id: { type: string }
+                              name: { type: string }
+                            required: [id, name]
+                      required: [id, name, shareCount, tags]
+                  total: { type: integer }
+                  page: { type: integer }
+                  limit: { type: integer }
+                  totalPages: { type: integer }
+                required: [items, total, page, limit, totalPages]
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /vys/projects/{id}/kesim-alanlari:
+    get:
+      operationId: vysListKesimAlanlari
+      tags: [vys]
+      summary: List active slaughter areas for a project (VYS)
+      security: [{ apiKeyAuth: [] }]
+      description: |
+        Returns active kesim alanlari (excluding the internal `__havuz__` area).
+        For the full nested view with animal groups included, prefer
+        `GET /vys/projects/{id}/kesim-listesi`.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string }
+                    name: { type: string }
+                    capacity: { type: integer, nullable: true }
+                    activeGroupCount: { type: integer }
+                  required: [id, name, capacity, activeGroupCount]
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /vys/projects/{id}/kesim-listesi:
+    get:
+      operationId: vysGetKesimListesi
+      tags: [vys]
+      summary: All slaughter areas with nested animal groups in a single call (VYS)
+      security: [{ apiKeyAuth: [] }]
+      description: |
+        Returns all active kesim alanlari and each area's animal groups in a single HTTP request.
+        This eliminates the N+1 pattern of fetching `/kesim-alanlari` first and then calling
+        `/kesim-alanlari/:kesimId/groups` for each area separately.
+
+        `__havuz__` (internal pool area) is excluded. Areas with no groups return an empty
+        `groups` array. This is the **preferred endpoint** for VYS to display the full cutting list.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VysKesimListesiResponse"
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /vys/projects/{id}/kesim-alanlari/{kesimId}/groups:
+    get:
+      operationId: vysGetKesimAlaniGroups
+      tags: [vys]
+      deprecated: true
+      summary: Animal groups for a single slaughter area (VYS) — deprecated
+      security: [{ apiKeyAuth: [] }]
+      description: |
+        **Deprecated.** Use `GET /vys/projects/{id}/kesim-listesi` instead. That endpoint returns
+        all slaughter areas and their groups in a single call, avoiding N+1 HTTP requests.
+
+        Returns animal groups for a single kesim-alani together with the area's name.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: kesimId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kesimAlaniId: { type: string }
+                  kesimAlaniName: { type: string }
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/VysAnimalGroup" }
+                required: [kesimAlaniId, kesimAlaniName, items]
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /vys/projects/{id}/summary:
+    get:
+      operationId: vysGetSummary
+      tags: [vys]
+      summary: Project summary statistics (VYS)
+      security: [{ apiKeyAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  projectId: { type: string }
+                  projectName: { type: string }
+                  totalShares: { type: integer }
+                  assignedShares: { type: integer }
+                  unassignedShares: { type: integer }
+                  totalGroups: { type: integer }
+                  kesildiGroups: { type: integer }
+                  remainingGroups: { type: integer }
+                required: [projectId, projectName, totalShares, assignedShares, unassignedShares, totalGroups, kesildiGroups, remainingGroups]
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -894,6 +1285,36 @@ components:
     JsonArray:
       type: array
       items: { $ref: "#/components/schemas/JsonObject" }
+    VysAnimalGroup:
+      type: object
+      description: A single animal group as returned by VYS endpoints.
+      properties:
+        id: { type: string, description: "Group ID" }
+        animalNo: { type: integer, description: "Animal number within the area" }
+        colorTag: { type: string, nullable: true, description: "Color label (e.g. kırmızı, mavi)" }
+        kesildi: { type: boolean, description: "Whether the animal has been slaughtered" }
+        kesildiAt: { type: string, format: date-time, nullable: true, description: "Slaughter timestamp; null if not yet slaughtered" }
+        sortOrder: { type: integer, description: "Display sort order" }
+        assignedShares: { type: integer, description: "Total donation shares assigned to this group" }
+      required: [id, animalNo, kesildi, sortOrder, assignedShares]
+    VysKesimAlaniWithGroups:
+      type: object
+      description: A slaughter area with its animal groups nested inline.
+      properties:
+        id: { type: string }
+        name: { type: string }
+        capacity: { type: integer, nullable: true, description: "Max animal capacity; null if unlimited" }
+        groups:
+          type: array
+          description: Active animal groups within this area (empty array if none)
+          items: { $ref: "#/components/schemas/VysAnimalGroup" }
+      required: [id, name, capacity, groups]
+    VysKesimListesiResponse:
+      type: array
+      description: |
+        Response for `GET /vys/projects/{id}/kesim-listesi`. Each element is a slaughter area
+        with its animal groups nested. The internal `__havuz__` area is excluded.
+      items: { $ref: "#/components/schemas/VysKesimAlaniWithGroups" }
     HealthStatus:
       type: object
       properties:

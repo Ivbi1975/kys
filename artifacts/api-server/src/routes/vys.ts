@@ -223,6 +223,98 @@ router.get("/projects/:id/kesim-alanlari/:kesimId/groups", asyncHandler(async (r
   res.json({ kesimAlaniId: ka.id, kesimAlaniName: ka.name, items });
 }));
 
+router.get("/projects/:id/kesim-listesi", asyncHandler(async (req, res) => {
+  const projectId = req.params.id;
+
+  const [project] = await db
+    .select({ id: projectsTable.id })
+    .from(projectsTable)
+    .where(and(eq(projectsTable.id, projectId), isNull(projectsTable.deletedAt), isNull(projectsTable.archivedAt)));
+
+  if (!project) {
+    res.status(404).json({ error: "Proje bulunamadı." });
+    return;
+  }
+
+  const kaRows = await db.execute(sql`
+    SELECT
+      ka.id,
+      ka.name,
+      ka.max_animal AS capacity
+    FROM kesim_alanlari ka
+    WHERE ka.project_id = ${projectId}
+      AND ka.deleted_at IS NULL
+      AND ka.name != '__havuz__'
+    ORDER BY ka.name
+  `);
+
+  type KaRow = { id: string; name: string; capacity: number | null };
+  const kesimAlanlari = kaRows.rows as KaRow[];
+
+  if (kesimAlanlari.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  const kaIds = kesimAlanlari.map(k => k.id);
+
+  const groupRows = await db.execute(sql`
+    SELECT
+      ag.id,
+      ag.kesim_alani_id,
+      ag.animal_no,
+      ag.color_tag,
+      ag.kesildi,
+      ag.kesildi_at,
+      ag.sort_order,
+      COALESCE(
+        (SELECT SUM(d.share_count)
+         FROM animal_group_donations agd
+         JOIN donations d ON d.id = agd.donation_id AND d.deleted_at IS NULL
+         WHERE agd.group_id = ag.id
+        ), 0
+      )::int AS assigned_shares
+    FROM animal_groups ag
+    WHERE ag.kesim_alani_id IN (${sql.join(kaIds.map(id => sql`${id}`), sql`, `)})
+      AND ag.deleted_at IS NULL
+    ORDER BY ag.kesim_alani_id, ag.sort_order, ag.animal_no
+  `);
+
+  type GroupRow = {
+    id: string;
+    kesim_alani_id: string;
+    animal_no: number;
+    color_tag: string | null;
+    kesildi: boolean;
+    kesildi_at: string | null;
+    sort_order: number;
+    assigned_shares: number;
+  };
+
+  const groupsByKa: Record<string, GroupRow[]> = {};
+  for (const row of groupRows.rows as GroupRow[]) {
+    if (!groupsByKa[row.kesim_alani_id]) groupsByKa[row.kesim_alani_id] = [];
+    groupsByKa[row.kesim_alani_id].push(row);
+  }
+
+  const result = kesimAlanlari.map(ka => ({
+    id: ka.id,
+    name: ka.name,
+    capacity: ka.capacity ?? null,
+    groups: (groupsByKa[ka.id] || []).map(g => ({
+      id: g.id,
+      animalNo: g.animal_no,
+      colorTag: g.color_tag,
+      kesildi: g.kesildi,
+      kesildiAt: g.kesildi_at ?? null,
+      sortOrder: g.sort_order,
+      assignedShares: Number(g.assigned_shares),
+    })),
+  }));
+
+  res.json(result);
+}));
+
 router.get("/projects/:id/summary", asyncHandler(async (req, res) => {
   const projectId = req.params.id;
 

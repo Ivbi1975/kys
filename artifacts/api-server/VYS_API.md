@@ -183,7 +183,94 @@ curl -H "X-API-Key: my-vys-key" \
 
 ---
 
-### 4. Hayvan Grupları ve Kesim Durumu
+### 4. Tüm Kesim Listesi (Gruplar Dahil) ✨ Önerilen
+
+Bir projeye ait tüm aktif kesim alanlarını ve her alanın hayvan gruplarını tek HTTP isteğiyle iç içe (nested) döndürür.
+
+Bu endpoint, **Bölüm 3** ve **Bölüm 5**'i birleştirir; N+1 çağrı problemini ortadan kaldırır. VYS'nin kesim listesini görüntülemesi için tercih edilen yöntemdir.
+
+**İstek**
+```
+GET /api/vys/projects/:id/kesim-listesi
+```
+
+**Örnek cURL**
+```bash
+curl -H "X-API-Key: my-vys-key" \
+  https://<sunucu>/api/vys/projects/abc123/kesim-listesi
+```
+
+**Başarılı Yanıt** `200 OK`
+```json
+[
+  {
+    "id": "ka-001",
+    "name": "A Alanı",
+    "capacity": 7,
+    "groups": [
+      {
+        "id": "group-1",
+        "animalNo": 1,
+        "colorTag": "kırmızı",
+        "kesildi": true,
+        "kesildiAt": "2025-06-15T08:30:00.000Z",
+        "sortOrder": 1,
+        "assignedShares": 7
+      },
+      {
+        "id": "group-2",
+        "animalNo": 2,
+        "colorTag": "mavi",
+        "kesildi": false,
+        "kesildiAt": null,
+        "sortOrder": 2,
+        "assignedShares": 5
+      }
+    ]
+  },
+  {
+    "id": "ka-002",
+    "name": "B Alanı",
+    "capacity": null,
+    "groups": []
+  }
+]
+```
+
+**Alan Tablosu — Kesim Alanı**
+
+| Alan | Tür | Açıklama |
+|------|-----|----------|
+| `id` | string | Kesim alanı kimliği |
+| `name` | string | Kesim alanı adı |
+| `capacity` | number \| null | Maksimum hayvan kapasitesi (ayarlanmadıysa `null`) |
+| `groups` | array | Bu alana ait aktif hayvan grupları |
+
+**Alan Tablosu — Hayvan Grubu (`groups[]`)**
+
+| Alan | Tür | Açıklama |
+|------|-----|----------|
+| `id` | string | Grup kimliği |
+| `animalNo` | number | Hayvan numarası |
+| `colorTag` | string \| null | Renk etiketi (örn. `"kırmızı"`, `"mavi"`) |
+| `kesildi` | boolean | Kesildi mi? |
+| `kesildiAt` | ISO 8601 \| null | Kesim zamanı (kesilmediyse `null`) |
+| `sortOrder` | number | Sıralama değeri |
+| `assignedShares` | number | Gruba atanmış toplam hisse sayısı |
+
+> Not: `__havuz__` kesim alanı bu yanıtta yer almaz. Henüz grubu olmayan kesim alanları boş `groups: []` dizisiyle döner.
+
+**Hata Yanıtları**
+
+| HTTP Kodu | Açıklama |
+|-----------|----------|
+| 404 | Proje bulunamadı |
+
+---
+
+### 5. Hayvan Grupları ve Kesim Durumu ⚠️ Deprecated
+
+> **Bu endpoint kullanımdan kaldırılmıştır.** Tek bir kesim alanının gruplarını çekmek yerine **Bölüm 4** (`GET /api/vys/projects/:id/kesim-listesi`) kullanın. Yeni endpoint tüm alanları ve gruplarını tek bir çağrıda döndürerek N+1 HTTP isteği sorununu ortadan kaldırır.
 
 Belirli bir kesim alanındaki hayvan gruplarını ve her grubun kesim durumunu döner.
 
@@ -247,7 +334,7 @@ curl -H "X-API-Key: my-vys-key" \
 
 ---
 
-### 5. Proje Özeti
+### 6. Proje Özeti
 
 Bir proje için özet istatistikleri döner.
 
@@ -311,3 +398,4 @@ Tüm hata yanıtları aşağıdaki formattadır:
 - Yanıtlar yalnızca VYS'nin ihtiyaç duyduğu alanları içerir; iç sistem alanları (telefon, notlar, AI kategorileri vb.) gizlidir.
 - Büyük bağışçı listeleri için `page` ve `limit` parametrelerini kullanarak sayfalama yapın.
 - `VYS_API_KEY`, diğer API anahtarlarıyla (`API_KEY`, `ADMIN_KEY`) karıştırılmamalı; yalnızca VYS entegrasyonu için kullanılmalıdır.
+- Kesim listesini tek seferde çekmek için **Bölüm 4** (`/kesim-listesi`) tercih edilmeli; **Bölüm 5** (`/kesim-alanlari/:kesimId/groups`) artık kullanımdan kaldırılmıştır.
