@@ -20,11 +20,30 @@ if (!process.env.DATABASE_URL) {
 
 const poolMax = Math.max(1, Number(process.env.DB_POOL_MAX) || 10);
 
-const connectionString = process.env.DATABASE_URL!
-  .replace(/([?&])sslmode=[^&]*/g, "$1")
-  .replace(/&&+/g, "&")
-  .replace(/\?&/, "?")
-  .replace(/[?&]$/, "");
+function buildConnectionString(): string {
+  const remoteHost = process.env.DB_HOST;
+  const remotePass = process.env.DB_POSTGRESQL_PASS;
+  const remoteName = process.env.DB_NAME;
+
+  if (remoteHost && remotePass && remoteName) {
+    const user = encodeURIComponent("postgres");
+    const pass = encodeURIComponent(remotePass);
+    const host = remoteHost;
+    const port = 5432;
+    const db = encodeURIComponent(remoteName);
+    const url = `postgresql://${user}:${pass}@${host}:${port}/${db}?sslmode=disable`;
+    dbLog.info(`Uzak veritabanı kullanılıyor: ${host}:${port}/${remoteName}`);
+    return url;
+  }
+
+  return process.env.DATABASE_URL!
+    .replace(/([?&])sslmode=[^&]*/g, "$1")
+    .replace(/&&+/g, "&")
+    .replace(/\?&/, "?")
+    .replace(/[?&]$/, "");
+}
+
+const connectionString = buildConnectionString();
 
 function resolveSsl(): boolean | { rejectUnauthorized: boolean } {
   const dbSsl = process.env.DB_SSL;
