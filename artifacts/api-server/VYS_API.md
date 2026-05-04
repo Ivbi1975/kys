@@ -103,6 +103,8 @@ curl -H "X-API-Key: my-vys-key" \
       "description": "Hisse 1",
       "shareCount": 2,
       "vekalet": "var",
+      "kesimAlaniId": "ka-001",
+      "kesimAlaniName": "A Alanı",
       "tags": [
         { "id": "tag-id-1", "name": "VIP" }
       ]
@@ -123,6 +125,8 @@ curl -H "X-API-Key: my-vys-key" \
 | `items[].description` | string | Açıklama |
 | `items[].shareCount` | number | Hisse sayısı |
 | `items[].vekalet` | string | Vekalet bilgisi |
+| `items[].kesimAlaniId` | string | Bağışçının ait olduğu kesim alanının kimliği |
+| `items[].kesimAlaniName` | string | Bağışçının ait olduğu kesim alanının adı |
 | `items[].tags` | object[] | Etiket listesi (`{ id, name }` nesneleri) |
 | `items[].tags[].id` | string | Etiket kimliği |
 | `items[].tags[].name` | string | Etiket görünen adı |

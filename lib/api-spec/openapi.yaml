@@ -1127,6 +1127,8 @@ paths:
                         description: { type: string, nullable: true }
                         shareCount: { type: integer }
                         vekalet: { type: string, nullable: true }
+                        kesimAlaniId: { type: string, description: "ID of the kesim alanı this donor belongs to" }
+                        kesimAlaniName: { type: string, description: "Name of the kesim alanı this donor belongs to" }
                         tags:
                           type: array
                           items:
@@ -1135,7 +1137,7 @@ paths:
                               id: { type: string }
                               name: { type: string }
                             required: [id, name]
-                      required: [id, name, shareCount, tags]
+                      required: [id, name, shareCount, kesimAlaniId, kesimAlaniName, tags]
                   total: { type: integer }
                   page: { type: integer }
                   limit: { type: integer }

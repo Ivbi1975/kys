@@ -55,7 +55,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   const offset = (page - 1) * limit;
 
   const kaRows = await db
-    .select({ id: kesimAlanlariTable.id })
+    .select({ id: kesimAlanlariTable.id, name: kesimAlanlariTable.name })
     .from(kesimAlanlariTable)
     .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
 
@@ -65,6 +65,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   }
 
   const kaIds = kaRows.map(k => k.id);
+  const kaNameById = Object.fromEntries(kaRows.map(k => [k.id, k.name]));
   const whereClause = and(inArray(donationsTable.kesimAlaniId, kaIds), isNull(donationsTable.deletedAt))!;
 
   const [countResult, rows] = await Promise.all([
@@ -75,6 +76,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
       description: donationsTable.description,
       shareCount: donationsTable.shareCount,
       vekalet: donationsTable.vekalet,
+      kesimAlaniId: donationsTable.kesimAlaniId,
     }).from(donationsTable).where(whereClause)
       .orderBy(donationsTable.sortOrder, donationsTable.id)
       .limit(limit).offset(offset),
@@ -106,6 +108,8 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     description: d.description,
     shareCount: d.shareCount,
     vekalet: d.vekalet,
+    kesimAlaniId: d.kesimAlaniId,
+    kesimAlaniName: kaNameById[d.kesimAlaniId],
     tags: tagsByDonation[d.id] || [],
   }));
 
