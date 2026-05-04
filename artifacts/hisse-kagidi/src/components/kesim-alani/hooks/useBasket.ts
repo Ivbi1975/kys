@@ -1,7 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { produce } from "immer";
 import type { Donation, AnimalGroup, KesimAlani } from "@/lib/types";
-import { computeEffectiveShares } from "@/lib/grouping";
 import { moveDonationsToKesimAlani, moveAnimalGroupToKesimAlani, fetchKesimAlani, createDonationTransfers, apiDeleteAnimalGroup, apiUpdateBulkAnimalGroups } from "@/lib/api";
 import type { DonationTransferEntry } from "@/lib/api";
 import { MAX_SHARES_PER_ANIMAL } from "@/lib/constants";
@@ -326,15 +325,15 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
         }
       }
     }
-    const sharesMap = computeEffectiveShares(kesim.donations);
+    const basketShareMap = new Map(localBasketItems.map(b => [b.donationId, b.donorShareCount || 1]));
     let ungroupedSlots = 0;
     for (const b of localBasketItems) {
       if (groupedBasketIds.has(b.donationId) || lockedBasketIds.has(b.donationId)) continue;
       const donor = kesim.donations.find((d) => d.id === b.donationId);
       if (donor && !donor.excluded) {
-        const effectiveShares = sharesMap.get(b.donationId) || donor.shareCount;
+        const slots = basketShareMap.get(b.donationId) || donor.shareCount || 1;
         ungroupedBasketDonors.push(donor);
-        ungroupedSlots += effectiveShares;
+        ungroupedSlots += slots;
       }
     }
     const totalSlotsNeeded = groupedBasketIds.size + ungroupedSlots;
@@ -366,8 +365,8 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
       }
     }
     for (const donor of ungroupedBasketDonors) {
-      const effectiveShares = sharesMap.get(donor.id) || donor.shareCount;
-      for (let s = 0; s < effectiveShares; s++) {
+      const slots = basketShareMap.get(donor.id) || donor.shareCount || 1;
+      for (let s = 0; s < slots; s++) {
         itemsToMove.push({ ...donor, id: s === 0 ? donor.id : generateId() });
       }
     }
@@ -408,7 +407,6 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
 
   function autoDistributeBasket() {
     if (!kesim || localBasketItems.length === 0) return;
-    const sharesMap = computeEffectiveShares(kesim.donations);
 
     const lockedGroupDonorIds = new Set<string>();
     for (const g of kesim.animalGroups) {
@@ -432,6 +430,8 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
       return;
     }
 
+    const basketShareMap = new Map(localBasketItems.map(b => [b.donationId, b.donorShareCount || 1]));
+
     const basketDonors: Donation[] = [];
     for (const id of movableIds) {
       const fromGroup = kesim.animalGroups.flatMap((g) => g.donations).find((d) => d.id === id);
@@ -444,11 +444,7 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
     let totalShares = 0;
     for (const d of basketDonors) {
       const inGroup = kesim.animalGroups.some((g) => g.donations.some((dd) => dd.id === d.id));
-      if (inGroup) {
-        totalShares += 1;
-      } else {
-        totalShares += sharesMap.get(d.id) || d.shareCount;
-      }
+      totalShares += inGroup ? 1 : (basketShareMap.get(d.id) || d.shareCount || 1);
     }
     const animalsNeeded = Math.ceil(totalShares / MAX_SHARES_PER_ANIMAL);
 
@@ -479,7 +475,7 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
     }
     for (const donor of basketDonors) {
       if (!itemsToPlace.find((d) => d.id === donor.id)) {
-        const eff = sharesMap.get(donor.id) || donor.shareCount;
+        const eff = basketShareMap.get(donor.id) || donor.shareCount || 1;
         for (let s = 0; s < eff; s++) {
           itemsToPlace.push({ ...donor, id: s === 0 ? donor.id : generateId() });
         }
@@ -1157,7 +1153,6 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
 
     if (collectedDonors.length === 0) return false;
 
-    const sharesMap = computeEffectiveShares(kesim.donations);
     const slotsToPlace: Donation[] = [];
     const snapshotDonorIds = new Set<string>();
 
@@ -1173,8 +1168,8 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
       if (snapshotDonorIds.has(donor.id)) {
         slotsToPlace.push(donor);
       } else {
-        const effectiveShares = sharesMap.get(donor.id) || donor.shareCount;
-        for (let s = 0; s < effectiveShares; s++) {
+        const slots = donor.shareCount || 1;
+        for (let s = 0; s < slots; s++) {
           slotsToPlace.push({ ...donor, id: s === 0 ? donor.id : generateId() });
         }
       }
@@ -1265,8 +1260,7 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
       kesim.animalGroups.flatMap(g => g.donations).find(d => d.id === donationId);
     if (!donor) return false;
 
-    const sharesMap = computeEffectiveShares(kesim.donations);
-    const effectiveShares = sharesMap.get(donationId) || donor.shareCount || 1;
+    const effectiveShares = item.donorShareCount || donor.shareCount || 1;
     const emptySlots = group.donations.filter(d => !d.name.trim()).length;
 
     if (effectiveShares > emptySlots) {

@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowUpDown, ChevronUp, ChevronLeft, ChevronRight, CornerDownLeft, Filter, ListPlus, Loader2, MoveRight, Package, Search, Send, ShoppingBag, UserPlus, Wand2, X, ShoppingCart, ArrowRightLeft, Clock, AlertTriangle, GripVertical } from "lucide-react";
 import { COLOR_MAP } from "@/lib/constants";
-import { computeEffectiveShares } from "@/lib/grouping";
 import type { BasketItem, ReturnToSourceResult, BasketSortKey, BasketSortDir } from "../hooks/types";
 import {
   ITEMS_PER_PAGE,
@@ -87,17 +86,15 @@ export function BasketPanel({
   const localAnimalGroupItems = useMemo(() => localBasketItems.filter(b => b.type === "animalGroup"), [localBasketItems]);
 
   const { basketTotalShares, basketAnimals } = useMemo(() => {
-    const sharesMap = computeEffectiveShares(kesim.donations);
     let total = 0;
     for (const b of localDonationItems) {
-      const grouped = kesim.animalGroups.flatMap(g => g.donations).find(d => d.id === b.donationId);
-      total += grouped ? 1 : (sharesMap.get(b.donationId) || 1);
+      total += b.donorShareCount || 1;
     }
     for (const b of localAnimalGroupItems) {
       total += (b.filledCount || 0);
     }
     return { basketTotalShares: total, basketAnimals: Math.ceil(total / 7) };
-  }, [localDonationItems, localAnimalGroupItems, kesim.donations, kesim.animalGroups]);
+  }, [localDonationItems, localAnimalGroupItems]);
 
   const allCinsValues = useMemo(() => {
     const set = new Set<string>();
