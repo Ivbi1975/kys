@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fetchKesimAlaniTrackingNotes, fetchNotificationLogs } from "@/lib/api";
 import {
-  ChevronRight, FileSpreadsheet, History, Home, Keyboard, Link2, Loader2,
+  ChevronRight, ChevronDown, FileSpreadsheet, History, Home, Keyboard, Link2, Loader2,
   Maximize, MessageSquarePlus, Minimize, Printer, QrCode,
-  Redo2, Save, Search, Send, ShoppingBag, Undo2, UserCog, Download,
+  Redo2, Save, Search, Send, Settings2, ShoppingBag, Undo2, UserCog, Download,
 } from "lucide-react";
 import { useKesimAlaniContext } from "../KesimAlaniContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -22,6 +22,8 @@ export function KesimAlaniHeader() {
     totalShares, requiredAnimals,
     basketItems, basketOpen, setBasketOpen,
   } = useKesimAlaniContext();
+
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const { resolveToken, buildTrackingUrl } = useTrackingActions({
     onTokenGenerated: (_, token) => {
@@ -49,150 +51,36 @@ export function KesimAlaniHeader() {
         <ChevronRight className="w-3 h-3" />
         <span className="text-foreground font-medium truncate max-w-[200px]">{kesim.name}</span>
       </nav>
+
       <div className="flex items-center gap-2 mb-2">
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">{kesim.name}</h1>
-          <div className="flex items-center gap-2 mt-0.5">
-            <p className="text-xs md:text-sm text-muted-foreground truncate">
-              {kesim.donations.length} bağışçı • {totalShares} hisse • {requiredAnimals} hayvan
-            </p>
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-muted-foreground">ID:</span>
-              <Input
-                className="h-6 text-xs w-28 px-1.5"
-                placeholder="Liste ID"
-                aria-label="Liste ID"
-                value={kesim.kesimListeId || ""}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  const updated = { ...kesim, kesimListeId: val || null };
-                  save(updated, undefined, false);
-                }}
-                onBlur={() => {
-                  save(kesim, undefined, true);
-                }}
-              />
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-muted-foreground">Yetkili:</span>
-              <Input
-                className="h-6 text-xs w-28 px-1.5"
-                placeholder="Yetkili"
-                aria-label="Yetkili"
-                value={kesim.yetkili || ""}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  const updated = { ...kesim, yetkili: val || null };
-                  save(updated, undefined, false);
-                }}
-                onBlur={() => {
-                  save(kesim, undefined, true);
-                }}
-              />
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-muted-foreground">Çıktı İsmi:</span>
-              <Input
-                className="h-6 text-xs w-32 px-1.5"
-                placeholder="Çıktıda Görünecek İsim"
-                aria-label="Çıktıda Görünecek İsim"
-                value={kesim.displayName || ""}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  const updated = { ...kesim, displayName: val || null };
-                  save(updated, undefined, false);
-                }}
-                onBlur={() => {
-                  save(kesim, undefined, true);
-                }}
-              />
-            </div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">{kesim.name}</h1>
+            <button
+              type="button"
+              onClick={() => setPanelOpen(prev => !prev)}
+              title={panelOpen ? "Ayarları Gizle" : "Çıktı Ayarları & Araçlar"}
+              className={`shrink-0 inline-flex items-center justify-center h-7 w-7 rounded-md border transition-colors ${
+                panelOpen
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-input bg-background hover:bg-accent text-muted-foreground hover:text-foreground"
+              }`}
+              aria-label={panelOpen ? "Ayarları Gizle" : "Çıktı Ayarları & Araçlar"}
+              aria-expanded={panelOpen}
+            >
+              {panelOpen ? (
+                <ChevronDown className="w-3.5 h-3.5" />
+              ) : (
+                <Settings2 className="w-3.5 h-3.5" />
+              )}
+            </button>
           </div>
+          <p className="text-xs md:text-sm text-muted-foreground truncate mt-0.5">
+            {kesim.donations.length} bağışçı • {totalShares} hisse • {requiredAnimals} hayvan
+          </p>
         </div>
+
         <div className="flex items-center gap-2 shrink-0">
-          <Button
-            size="sm"
-            variant="outline"
-            aria-label="Takip Linki"
-            onClick={async () => {
-              try {
-                const token = await resolveToken(kesim);
-                const url = buildTrackingUrl(token);
-                await navigator.clipboard.writeText(url);
-                toast({ title: "Takip linki kopyalandı", description: "Link panoya kopyalandı" });
-              } catch {
-                toast({ title: "Hata", description: "Link oluşturulamadı", variant: "destructive" });
-              }
-            }}
-          >
-            <Link2 className="w-4 h-4" />
-            <span className="hidden sm:inline ml-1">Takip Linki</span>
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            aria-label="QR Kod"
-            onClick={async () => {
-              try {
-                const token = await resolveToken(kesim);
-                const url = buildTrackingUrl(token);
-                setQrUrl(url);
-                setQrModalOpen(true);
-              } catch {
-                toast({ title: "Hata", description: "QR kod oluşturulamadı", variant: "destructive" });
-              }
-            }}
-          >
-            <QrCode className="w-4 h-4" />
-            <span className="hidden sm:inline ml-1">QR Kod</span>
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            aria-label="Saha Notları"
-            onClick={async () => {
-              setTrackingNotesOpen(true);
-              setTrackingNotesLoading(true);
-              try {
-                const notes = await fetchKesimAlaniTrackingNotes(kesim.id);
-                setTrackingNotes(notes);
-              } catch {} finally {
-                setTrackingNotesLoading(false);
-              }
-            }}
-          >
-            <MessageSquarePlus className="w-4 h-4" />
-            <span className="hidden sm:inline ml-1">Saha Notları</span>
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            aria-label="Ekipler"
-            onClick={() => setTeamDialogOpen(true)}
-          >
-            <UserCog className="w-4 h-4" />
-            <span className="hidden sm:inline ml-1">Ekipler</span>
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            aria-label="Bildirimler"
-            onClick={async () => {
-              setNotificationLogsOpen(true);
-              setNotificationLogsLoading(true);
-              try {
-                const logs = await fetchNotificationLogs(kesim.id);
-                setNotificationLogs(logs);
-              } catch {
-                toast({ title: "Hata", description: "Bildirim kayıtları yüklenemedi", variant: "destructive" });
-              } finally {
-                setNotificationLogsLoading(false);
-              }
-            }}
-          >
-            <Send className="w-4 h-4" />
-            <span className="hidden sm:inline ml-1">Bildirimler</span>
-          </Button>
           {basketItems.length > 0 && (
             <Button
               size="sm"
@@ -224,6 +112,150 @@ export function KesimAlaniHeader() {
           </Button>
         </div>
       </div>
+
+      {panelOpen && (
+        <div className="mb-2 rounded-lg border bg-muted/20 p-3 space-y-3">
+          <div>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Çıktı Ayarları</p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">ID:</span>
+                <Input
+                  className="h-7 text-xs w-28 px-1.5"
+                  placeholder="Liste ID"
+                  aria-label="Liste ID"
+                  value={kesim.kesimListeId || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const updated = { ...kesim, kesimListeId: val || null };
+                    save(updated, undefined, false);
+                  }}
+                  onBlur={() => save(kesim, undefined, true)}
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">Yetkili:</span>
+                <Input
+                  className="h-7 text-xs w-28 px-1.5"
+                  placeholder="Yetkili"
+                  aria-label="Yetkili"
+                  value={kesim.yetkili || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const updated = { ...kesim, yetkili: val || null };
+                    save(updated, undefined, false);
+                  }}
+                  onBlur={() => save(kesim, undefined, true)}
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">Çıktı İsmi:</span>
+                <Input
+                  className="h-7 text-xs w-36 px-1.5"
+                  placeholder="Çıktıda Görünecek İsim"
+                  aria-label="Çıktıda Görünecek İsim"
+                  value={kesim.displayName || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const updated = { ...kesim, displayName: val || null };
+                    save(updated, undefined, false);
+                  }}
+                  onBlur={() => save(kesim, undefined, true)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-3">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Araçlar</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant="outline"
+                aria-label="Takip Linki"
+                onClick={async () => {
+                  try {
+                    const token = await resolveToken(kesim);
+                    const url = buildTrackingUrl(token);
+                    await navigator.clipboard.writeText(url);
+                    toast({ title: "Takip linki kopyalandı", description: "Link panoya kopyalandı" });
+                  } catch {
+                    toast({ title: "Hata", description: "Link oluşturulamadı", variant: "destructive" });
+                  }
+                }}
+              >
+                <Link2 className="w-4 h-4" />
+                <span className="ml-1">Takip Linki</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                aria-label="QR Kod"
+                onClick={async () => {
+                  try {
+                    const token = await resolveToken(kesim);
+                    const url = buildTrackingUrl(token);
+                    setQrUrl(url);
+                    setQrModalOpen(true);
+                  } catch {
+                    toast({ title: "Hata", description: "QR kod oluşturulamadı", variant: "destructive" });
+                  }
+                }}
+              >
+                <QrCode className="w-4 h-4" />
+                <span className="ml-1">QR Kod</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                aria-label="Saha Notları"
+                onClick={async () => {
+                  setTrackingNotesOpen(true);
+                  setTrackingNotesLoading(true);
+                  try {
+                    const notes = await fetchKesimAlaniTrackingNotes(kesim.id);
+                    setTrackingNotes(notes);
+                  } catch {} finally {
+                    setTrackingNotesLoading(false);
+                  }
+                }}
+              >
+                <MessageSquarePlus className="w-4 h-4" />
+                <span className="ml-1">Saha Notları</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                aria-label="Ekipler"
+                onClick={() => setTeamDialogOpen(true)}
+              >
+                <UserCog className="w-4 h-4" />
+                <span className="ml-1">Ekipler</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                aria-label="Bildirimler"
+                onClick={async () => {
+                  setNotificationLogsOpen(true);
+                  setNotificationLogsLoading(true);
+                  try {
+                    const logs = await fetchNotificationLogs(kesim.id);
+                    setNotificationLogs(logs);
+                  } catch {
+                    toast({ title: "Hata", description: "Bildirim kayıtları yüklenemedi", variant: "destructive" });
+                  } finally {
+                    setNotificationLogsLoading(false);
+                  }
+                }}
+              >
+                <Send className="w-4 h-4" />
+                <span className="ml-1">Bildirimler</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
