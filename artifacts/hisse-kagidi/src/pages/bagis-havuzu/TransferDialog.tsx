@@ -96,6 +96,7 @@ export function TransferDialog({
   const totalExtraCount = siblings.reduce((sum, s) => sum + s.extraCount, 0);
   const allSelected = siblings.length > 0 && selectedDonors.size === siblings.length;
   const totalToTransfer = selectedCount + selectedExtraCount;
+  const canTransfer = (!!transferTarget || (creatingNewList && !!newListName.trim())) && !transferring && !loadingSiblings;
 
   const handleTransfer = useCallback(() => { onTransfer(selectedExtraIds); }, [selectedExtraIds, onTransfer]);
 
@@ -106,54 +107,45 @@ export function TransferDialog({
     setTransferTarget("");
   }, [onOpenChange, setNewListName, setCreatingNewList, setTransferTarget]);
 
-  const canTransfer = (!!transferTarget || (creatingNewList && !!newListName.trim())) && !transferring && !loadingSiblings;
-
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); else onOpenChange(v); }}>
       <DialogContent className="max-w-md">
 
-        {/* Title row */}
+        {/* Header */}
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 flex-shrink-0">
+          <DialogTitle className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
               <ArrowRightLeft className="h-4 w-4 text-primary" />
             </span>
             Kesim Listesine Aktar
           </DialogTitle>
         </DialogHeader>
 
-        {/* Summary badge row */}
-        <div className="flex items-center gap-2 flex-wrap -mt-1">
-          <div className="flex items-center gap-1.5 text-sm">
-            <span className="font-semibold">{selectedCount}</span>
-            <span className="text-muted-foreground">seçili bağış</span>
-            {loadingSiblings && (
-              <>
-                <span className="text-muted-foreground">·</span>
-                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">kontrol ediliyor…</span>
-              </>
-            )}
-            {!loadingSiblings && selectedExtraCount > 0 && (
-              <>
-                <span className="text-muted-foreground">+</span>
-                <span className="font-semibold text-amber-600 dark:text-amber-400">{selectedExtraCount}</span>
-                <span className="text-muted-foreground">ek bağış</span>
-                <span className="text-muted-foreground">=</span>
-                <span className="font-semibold text-primary">{totalToTransfer} toplam</span>
-              </>
-            )}
-          </div>
+        {/* Summary line */}
+        <div className="flex items-center gap-2 flex-wrap text-sm -mt-1">
+          <span><strong>{selectedCount}</strong> <span className="text-muted-foreground">seçili bağış</span></span>
+          {loadingSiblings && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />kontrol ediliyor…
+            </span>
+          )}
+          {!loadingSiblings && selectedExtraCount > 0 && (
+            <>
+              <span className="text-muted-foreground">+</span>
+              <span><strong className="text-amber-600 dark:text-amber-400">{selectedExtraCount}</strong> <span className="text-muted-foreground">ek bağış</span></span>
+              <span className="text-muted-foreground">=</span>
+              <span className="font-semibold text-primary">{totalToTransfer} toplam</span>
+            </>
+          )}
         </div>
 
         {/* Siblings panel */}
         {!loadingSiblings && siblings.length > 0 && (
-          <div className="rounded-lg border overflow-hidden -mx-0">
-            {/* Sibling header */}
+          <div className="rounded-lg border overflow-hidden">
             <div className="flex items-center justify-between px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-100 dark:border-amber-900/50">
               <button
                 onClick={toggleAll}
-                className="flex items-center gap-2 text-xs font-medium text-amber-800 dark:text-amber-200 hover:opacity-80 transition-opacity"
+                className="flex items-center gap-2 text-xs font-medium text-amber-800 dark:text-amber-200 hover:opacity-75 transition-opacity"
               >
                 {allSelected
                   ? <CheckSquare className="h-4 w-4 text-primary flex-shrink-0" />
@@ -162,26 +154,22 @@ export function TransferDialog({
                     : <CheckSquare className="h-4 w-4 text-muted-foreground/50 flex-shrink-0" />}
                 {totalExtraCount} ek bağış — {allSelected ? "Tümünü kaldır" : "Tümünü seç"}
               </button>
-              <span className="text-xs text-amber-700/60 dark:text-amber-300/60 tabular-nums">
-                {selectedDonors.size}/{siblings.length}
-              </span>
+              <span className="text-xs text-muted-foreground tabular-nums">{selectedDonors.size}/{siblings.length}</span>
             </div>
-
-            {/* Sibling rows */}
-            <div className="max-h-40 overflow-y-auto divide-y divide-border/50">
+            <div className="max-h-40 overflow-y-auto divide-y">
               {siblings.map(s => {
                 const checked = selectedDonors.has(s.donorName);
                 return (
                   <button
                     key={s.donorName}
-                    className={`flex items-start gap-3 w-full px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/40 ${checked ? "bg-primary/5" : "bg-background"}`}
+                    className={`flex items-start gap-3 w-full px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/40 ${checked ? "bg-primary/5" : ""}`}
                     onClick={() => toggleDonor(s.donorName)}
                   >
-                    <span className={`mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border transition-colors ${checked ? "bg-primary border-primary" : "border-input bg-background"}`}>
+                    <span className={`mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border transition-colors ${checked ? "bg-primary border-primary" : "border-input"}`}>
                       {checked && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <span className="font-medium leading-snug block">{s.donorName}</span>
+                      <span className="font-medium block">{s.donorName}</span>
                       <div className="flex flex-wrap gap-x-2 mt-0.5">
                         {s.donations.map(d => (
                           <span key={d.id} className="text-[10px] text-muted-foreground font-mono">
@@ -192,9 +180,7 @@ export function TransferDialog({
                         ))}
                       </div>
                     </div>
-                    <span className="flex-shrink-0 text-xs font-medium text-muted-foreground mt-0.5 tabular-nums">
-                      +{s.extraCount}
-                    </span>
+                    <span className="flex-shrink-0 text-xs text-muted-foreground mt-0.5 tabular-nums">+{s.extraCount}</span>
                   </button>
                 );
               })}
@@ -202,22 +188,17 @@ export function TransferDialog({
           </div>
         )}
 
-        {/* Destination selection */}
+        {/* Destination */}
         <div className="space-y-3">
           <div className="space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-              <FolderOpen className="h-3.5 w-3.5" />
-              Mevcut listeye aktar
+              <FolderOpen className="h-3.5 w-3.5" />Mevcut listeye aktar
             </p>
             <div className="flex gap-1.5">
               <Select value={transferTarget} onValueChange={(v) => { setTransferTarget(v); setCreatingNewList(false); }}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Kesim listesi seçin…" />
-                </SelectTrigger>
+                <SelectTrigger className="flex-1"><SelectValue placeholder="Kesim listesi seçin…" /></SelectTrigger>
                 <SelectContent>
-                  {kaList.map((ka) => (
-                    <SelectItem key={ka.id} value={ka.id}>{ka.name}</SelectItem>
-                  ))}
+                  {kaList.map((ka) => <SelectItem key={ka.id} value={ka.id}>{ka.name}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Button variant="ghost" size="icon" className="h-10 w-10 flex-shrink-0" onClick={refetchKA} title="Listeyi yenile">
@@ -234,8 +215,7 @@ export function TransferDialog({
 
           <div className="space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-              <FolderPlus className="h-3.5 w-3.5" />
-              Yeni liste oluştur
+              <FolderPlus className="h-3.5 w-3.5" />Yeni liste oluştur
             </p>
             <Input
               placeholder="Liste adı girin…"
@@ -252,14 +232,8 @@ export function TransferDialog({
 
         {/* Actions */}
         <div className="flex gap-2 pt-1">
-          <Button variant="outline" className="flex-1" onClick={handleClose}>
-            İptal
-          </Button>
-          <Button
-            className="flex-[2]"
-            onClick={handleTransfer}
-            disabled={!canTransfer}
-          >
+          <Button variant="outline" className="flex-1" onClick={handleClose}>İptal</Button>
+          <Button className="flex-[2]" onClick={handleTransfer} disabled={!canTransfer}>
             {transferring
               ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Aktarılıyor…</>
               : <><ArrowRightLeft className="h-4 w-4 mr-2" />{totalToTransfer} Bağışı Aktar</>}

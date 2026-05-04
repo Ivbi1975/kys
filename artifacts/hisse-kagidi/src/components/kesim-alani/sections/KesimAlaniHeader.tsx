@@ -6,6 +6,7 @@ import {
   ChevronRight, ChevronDown, FileSpreadsheet, History, Home, Keyboard, Link2, Loader2,
   Maximize, MessageSquarePlus, Minimize, Printer, QrCode,
   Redo2, Save, Search, Send, Settings2, ShoppingBag, Undo2, UserCog, Download,
+  CheckCircle2, AlertCircle,
 } from "lucide-react";
 import { useKesimAlaniContext } from "../KesimAlaniContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -33,131 +34,198 @@ export function KesimAlaniHeader() {
 
   if (!kesim) return null;
 
+  const hasGroups = kesim.animalGroups.length > 0;
+
   return (
-    <div className="mb-4">
-      {/* Breadcrumb */}
-      <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-muted-foreground mb-1.5 flex-wrap">
-        <button onClick={() => setLocation("/")} className="flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Ana Sayfa">
-          <Home className="w-3 h-3" aria-hidden="true" />
+    <div className="mb-4 space-y-2">
+
+      {/* ── Breadcrumb ── */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-muted-foreground">
+        <button
+          onClick={() => setLocation("/")}
+          className="flex items-center gap-1 hover:text-foreground transition-colors"
+          aria-label="Ana Sayfa"
+        >
+          <Home className="w-3 h-3" />
           <span>Ana Sayfa</span>
         </button>
         {kesim.projectId && projectName && (
           <>
-            <ChevronRight className="w-3 h-3" />
-            <button onClick={() => setLocation(`/proje/${kesim.projectId}`)} className="hover:text-foreground transition-colors truncate max-w-[120px]">
+            <ChevronRight className="w-3 h-3 flex-shrink-0" />
+            <button
+              onClick={() => setLocation(`/proje/${kesim.projectId}`)}
+              className="hover:text-foreground transition-colors truncate max-w-[120px]"
+            >
               {projectName}
             </button>
           </>
         )}
-        <ChevronRight className="w-3 h-3" />
+        <ChevronRight className="w-3 h-3 flex-shrink-0" />
         <span className="text-foreground font-medium truncate max-w-[200px]">{kesim.name}</span>
       </nav>
 
-      {/* Single unified toolbar row */}
-      <div className="flex items-center gap-2">
-        {/* Left: Title + settings toggle */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <h1 className="text-xl md:text-2xl font-bold text-foreground truncate leading-tight">{kesim.name}</h1>
+      {/* ── Title row ── */}
+      <div className="flex items-start justify-between gap-2">
+        {/* Left: Title + stats */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-foreground truncate leading-tight">{kesim.name}</h1>
             <button
               type="button"
               onClick={() => setPanelOpen(prev => !prev)}
               title={panelOpen ? "Ayarları Gizle" : "Çıktı Ayarları & Araçlar"}
-              className={`shrink-0 inline-flex items-center justify-center h-6 w-6 rounded border transition-colors ${
+              className={`shrink-0 inline-flex items-center justify-center h-6 w-6 rounded-md border transition-colors ${
                 panelOpen
                   ? "bg-primary text-primary-foreground border-primary"
-                  : "border-input bg-background hover:bg-accent text-muted-foreground hover:text-foreground"
+                  : "border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground"
               }`}
-              aria-label={panelOpen ? "Ayarları Gizle" : "Çıktı Ayarları & Araçlar"}
               aria-expanded={panelOpen}
             >
               {panelOpen ? <ChevronDown className="w-3 h-3" /> : <Settings2 className="w-3 h-3" />}
             </button>
           </div>
-          {/* Subtitle: stats + save status inline */}
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            <span className="text-xs text-muted-foreground">
-              {kesim.donations.length} bağışçı • {totalShares} hisse • {requiredAnimals} hayvan
-            </span>
+          {/* Stats + save status */}
+          <div className="flex items-center gap-3 mt-1 flex-wrap">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="tabular-nums">{kesim.donations.length} bağışçı</span>
+              <span className="text-border">·</span>
+              <span className="tabular-nums">{totalShares} hisse</span>
+              <span className="text-border">·</span>
+              <span className="tabular-nums">{requiredAnimals} hayvan</span>
+            </div>
+            {/* Save status */}
             {saveStatus === "saving" && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground animate-pulse">
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Loader2 className="w-3 h-3 animate-spin" />
                 {saveProgress
-                  ? `Kaydediliyor... (${saveProgress.chunkIndex + 1}/${saveProgress.totalChunks})`
-                  : "Kaydediliyor..."}
+                  ? `Kaydediliyor… ${saveProgress.chunkIndex + 1}/${saveProgress.totalChunks}`
+                  : "Kaydediliyor…"}
               </span>
             )}
             {saveStatus === "saved" && (
               <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                <Save className="w-3 h-3" />
+                <CheckCircle2 className="w-3 h-3" />
                 Kaydedildi
               </span>
             )}
             {saveStatus === "error" && (
               <span className="flex items-center gap-1 text-xs text-destructive">
-                ⚠ Kaydetme hatası
+                <AlertCircle className="w-3 h-3" />
+                Kaydetme hatası
               </span>
             )}
             {(saveStatus === "idle" || saveStatus === "saved") && lastSavedTime && (
-              <span className="text-xs text-muted-foreground">
-                Son kayıt: {lastSavedTime.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" })} {lastSavedTime.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+              <span className="text-xs text-muted-foreground/60">
+                {lastSavedTime.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" })}{" "}
+                {lastSavedTime.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
               </span>
             )}
           </div>
         </div>
 
-        {/* Right: grouped action controls */}
+        {/* Right: action toolbar */}
         <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
 
-          {/* Group 1: Undo / Redo / History */}
-          <div className="flex items-center gap-0.5 border rounded-md px-0.5 h-8">
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleUndo} disabled={!history.canUndo} title="Geri Al (Ctrl+Z)" aria-label="Geri Al">
-              <Undo2 className="w-3.5 h-3.5" />
+          {/* Undo / Redo / History */}
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost" size="sm" className="h-8 w-8 p-0"
+              onClick={handleUndo} disabled={!history.canUndo}
+              title="Geri Al (Ctrl+Z)"
+            >
+              <Undo2 className="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleRedo} disabled={!history.canRedo} title="İleri Al (Ctrl+Y)" aria-label="İleri Al">
-              <Redo2 className="w-3.5 h-3.5" />
+            <Button
+              variant="ghost" size="sm" className="h-8 w-8 p-0"
+              onClick={handleRedo} disabled={!history.canRedo}
+              title="İleri Al (Ctrl+Y)"
+            >
+              <Redo2 className="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setHistoryPanelOpen(!historyPanelOpen)} title="Geçmiş" aria-label="Geçmiş">
-              <History className="w-3.5 h-3.5" />
+            <Button
+              variant="ghost" size="sm" className="h-8 w-8 p-0"
+              onClick={() => setHistoryPanelOpen(!historyPanelOpen)}
+              title="Geçmiş"
+            >
+              <History className="w-4 h-4" />
             </Button>
           </div>
 
-          {/* Group 2: View utilities */}
-          <div className="hidden sm:flex items-center gap-0.5 border rounded-md px-0.5 h-8">
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShortcutHelpOpen(true)} title="Klavye Kısayolları (?)" aria-label="Klavye Kısayolları">
-              <Keyboard className="w-3.5 h-3.5" />
+          {/* Separator */}
+          <div className="h-5 w-px bg-border mx-0.5" />
+
+          {/* View utilities */}
+          <div className="hidden sm:flex items-center gap-0.5">
+            <Button
+              variant="ghost" size="sm" className="h-8 w-8 p-0"
+              onClick={() => setShortcutHelpOpen(true)}
+              title="Klavye Kısayolları (?)"
+            >
+              <Keyboard className="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={toggleFullscreen} title="Tam Ekran (F11)" aria-label={isFullscreen ? "Tam Ekrandan Çık" : "Tam Ekran"}>
-              {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
+            <Button
+              variant="ghost" size="sm" className="h-8 w-8 p-0"
+              onClick={toggleFullscreen}
+              title={isFullscreen ? "Tam Ekrandan Çık (F11)" : "Tam Ekran (F11)"}
+            >
+              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
             </Button>
           </div>
 
-          {/* Group 3: Export actions */}
-          <div className="flex items-center gap-0.5 border rounded-md px-0.5 h-8">
-            <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={exportDonorsExcel} title="Bağışçı Listesi Excel" aria-label="Bağışçı Listesi Excel">
-              <FileSpreadsheet className="w-3.5 h-3.5" />
+          {/* Separator */}
+          <div className="h-5 w-px bg-border mx-0.5" />
+
+          {/* Export actions */}
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost" size="sm" className="h-8 w-8 p-0"
+              onClick={exportDonorsExcel}
+              title="Bağışçı Listesi Excel"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
             </Button>
-            {kesim.animalGroups.length > 0 && (
+            {hasGroups && (
               <>
-                <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={exportGroupsExcel} disabled={excelExporting} title="Kesim Kağıdı Excel" aria-label="Kesim Kağıdı Excel">
-                  {excelExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
-                  <span className="hidden sm:inline ml-0.5 text-[11px]">{excelExporting ? "..." : "KK"}</span>
+                <Button
+                  variant="ghost" size="sm" className="h-8 px-2 gap-1 text-xs"
+                  onClick={exportGroupsExcel} disabled={excelExporting}
+                  title="Kesim Kağıdı Excel"
+                >
+                  {excelExporting
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <FileSpreadsheet className="w-3.5 h-3.5" />}
+                  <span className="hidden sm:inline font-medium">KK</span>
                 </Button>
-                <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={() => setLocation(`/not-duzenleme/${kesim.id}`)}>
-                  <Search className="w-3.5 h-3.5" />
+                <Button
+                  variant="ghost" size="sm" className="h-8 w-8 p-0"
+                  onClick={() => setLocation(`/not-duzenleme/${kesim.id}`)}
+                  title="Not Düzenleme"
+                >
+                  <Search className="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={() => setLocation(`/print/${kesim.id}`)}>
-                  <Printer className="w-3.5 h-3.5" />
+                <Button
+                  variant="ghost" size="sm" className="h-8 w-8 p-0"
+                  onClick={() => setLocation(`/print/${kesim.id}`)}
+                  title="Yazdır"
+                >
+                  <Printer className="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={handleExportKaCsv} disabled={csvExporting}>
+                <Button
+                  variant="ghost" size="sm" className="h-8 px-2 gap-1 text-xs"
+                  onClick={handleExportKaCsv} disabled={csvExporting}
+                  title="CSV İndir"
+                >
                   <Download className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline ml-0.5 text-[11px]">{csvExporting ? "..." : "CSV"}</span>
+                  <span className="hidden sm:inline font-medium">{csvExporting ? "…" : "CSV"}</span>
                 </Button>
               </>
             )}
           </div>
 
-          {/* Basket (contextual, only when items exist) */}
+          {/* Separator */}
+          <div className="h-5 w-px bg-border mx-0.5" />
+
+          {/* Basket */}
           {basketItems.length > 0 && (
             <Button
               size="sm"
@@ -165,6 +233,7 @@ export function KesimAlaniHeader() {
               className="relative h-8 w-8 p-0 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300"
               aria-label="Sepet"
               onClick={() => setBasketOpen(prev => !prev)}
+              title={`Sepet (${basketItems.length})`}
             >
               <ShoppingBag className="w-4 h-4" />
               <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-emerald-500 text-white text-[10px] font-bold leading-none px-1">
@@ -173,85 +242,75 @@ export function KesimAlaniHeader() {
             </Button>
           )}
 
-          {/* Theme toggle */}
+          {/* Theme */}
           <ThemeToggle className="h-8 w-8 p-0 shrink-0" />
 
-          {/* Primary CTA: Save */}
+          {/* Save — primary CTA */}
           <Button
             size="sm"
-            className="h-8 shrink-0"
+            className="h-8 shrink-0 min-w-[80px]"
             onClick={() => saveToApi(kesim)}
             disabled={saveStatus === "saving"}
             aria-label="Kaydet"
           >
-            {saveStatus === "saving" ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            <span className="hidden sm:inline ml-1">Kaydet</span>
+            {saveStatus === "saving"
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <Save className="w-4 h-4" />}
+            <span className="ml-1.5">Kaydet</span>
           </Button>
         </div>
       </div>
 
-      {/* Collapsible settings panel */}
+      {/* ── Collapsible settings panel ── */}
       {panelOpen && (
-        <div className="mt-2 rounded-lg border bg-muted/20 p-3 space-y-3">
+        <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+          {/* Çıktı Ayarları */}
           <div>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Çıktı Ayarları</p>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">
+              Çıktı Ayarları
+            </p>
             <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">ID:</span>
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-muted-foreground whitespace-nowrap">ID:</label>
                 <Input
-                  className="h-7 text-xs w-28 px-1.5"
+                  className="h-8 text-sm w-28"
                   placeholder="Liste ID"
-                  aria-label="Liste ID"
                   value={kesim.kesimListeId || ""}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    save({ ...kesim, kesimListeId: val || null }, undefined, false);
-                  }}
+                  onChange={(e) => save({ ...kesim, kesimListeId: e.target.value || null }, undefined, false)}
                   onBlur={() => save(kesim, undefined, true)}
                 />
               </div>
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">Yetkili:</span>
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-muted-foreground whitespace-nowrap">Yetkili:</label>
                 <Input
-                  className="h-7 text-xs w-28 px-1.5"
+                  className="h-8 text-sm w-28"
                   placeholder="Yetkili"
-                  aria-label="Yetkili"
                   value={kesim.yetkili || ""}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    save({ ...kesim, yetkili: val || null }, undefined, false);
-                  }}
+                  onChange={(e) => save({ ...kesim, yetkili: e.target.value || null }, undefined, false)}
                   onBlur={() => save(kesim, undefined, true)}
                 />
               </div>
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">Çıktı İsmi:</span>
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-muted-foreground whitespace-nowrap">Çıktı İsmi:</label>
                 <Input
-                  className="h-7 text-xs w-36 px-1.5"
-                  placeholder="Çıktıda Görünecek İsim"
-                  aria-label="Çıktıda Görünecek İsim"
+                  className="h-8 text-sm w-40"
+                  placeholder="Çıktıda görünecek isim"
                   value={kesim.displayName || ""}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    save({ ...kesim, displayName: val || null }, undefined, false);
-                  }}
+                  onChange={(e) => save({ ...kesim, displayName: e.target.value || null }, undefined, false)}
                   onBlur={() => save(kesim, undefined, true)}
                 />
               </div>
             </div>
           </div>
 
-          <div className="border-t pt-3">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Araçlar</p>
+          {/* Araçlar */}
+          <div className="border-t pt-3.5">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">
+              Araçlar
+            </p>
             <div className="flex items-center gap-2 flex-wrap">
               <Button
-                size="sm"
-                variant="outline"
-                aria-label="Takip Linki"
+                size="sm" variant="outline"
                 onClick={async () => {
                   try {
                     const token = await resolveToken(kesim);
@@ -263,12 +322,10 @@ export function KesimAlaniHeader() {
                   }
                 }}
               >
-                <Link2 className="w-4 h-4" /><span className="ml-1">Takip Linki</span>
+                <Link2 className="w-4 h-4 mr-1.5" />Takip Linki
               </Button>
               <Button
-                size="sm"
-                variant="outline"
-                aria-label="QR Kod"
+                size="sm" variant="outline"
                 onClick={async () => {
                   try {
                     const token = await resolveToken(kesim);
@@ -280,12 +337,10 @@ export function KesimAlaniHeader() {
                   }
                 }}
               >
-                <QrCode className="w-4 h-4" /><span className="ml-1">QR Kod</span>
+                <QrCode className="w-4 h-4 mr-1.5" />QR Kod
               </Button>
               <Button
-                size="sm"
-                variant="outline"
-                aria-label="Saha Notları"
+                size="sm" variant="outline"
                 onClick={async () => {
                   setTrackingNotesOpen(true);
                   setTrackingNotesLoading(true);
@@ -297,15 +352,13 @@ export function KesimAlaniHeader() {
                   }
                 }}
               >
-                <MessageSquarePlus className="w-4 h-4" /><span className="ml-1">Saha Notları</span>
+                <MessageSquarePlus className="w-4 h-4 mr-1.5" />Saha Notları
               </Button>
-              <Button size="sm" variant="outline" aria-label="Ekipler" onClick={() => setTeamDialogOpen(true)}>
-                <UserCog className="w-4 h-4" /><span className="ml-1">Ekipler</span>
+              <Button size="sm" variant="outline" onClick={() => setTeamDialogOpen(true)}>
+                <UserCog className="w-4 h-4 mr-1.5" />Ekipler
               </Button>
               <Button
-                size="sm"
-                variant="outline"
-                aria-label="Bildirimler"
+                size="sm" variant="outline"
                 onClick={async () => {
                   setNotificationLogsOpen(true);
                   setNotificationLogsLoading(true);
@@ -319,7 +372,7 @@ export function KesimAlaniHeader() {
                   }
                 }}
               >
-                <Send className="w-4 h-4" /><span className="ml-1">Bildirimler</span>
+                <Send className="w-4 h-4 mr-1.5" />Bildirimler
               </Button>
             </div>
           </div>

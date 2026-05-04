@@ -21,6 +21,13 @@ import { GroupConflictPanel } from "./GroupConflictPanel";
 import { GroupFindDeleteDialog } from "../dialogs/GroupFindDeleteDialog";
 import { GroupBulkLockPopover } from "./GroupBulkLockPopover";
 
+const COLOR_TAGS: { key: ColorTag; bg: string; label: string }[] = [
+  { key: "green",  bg: "#22c55e", label: "Yeşil" },
+  { key: "orange", bg: "#f97316", label: "Turuncu" },
+  { key: "red",    bg: "#ef4444", label: "Kırmızı" },
+  { key: "",       bg: "",        label: "Renksiz" },
+];
+
 export function GroupListPanel() {
   const ctx = useKesimAlaniContext();
   const groupsListBottomRef = useRef<HTMLDivElement>(null);
@@ -154,26 +161,19 @@ export function GroupListPanel() {
 
   const hasGroups = kesim.animalGroups.length > 0;
 
-  const COLOR_TAGS: { key: ColorTag; bg: string; label: string }[] = [
-    { key: "green",  bg: "#22c55e", label: "Yeşil" },
-    { key: "orange", bg: "#f97316", label: "Turuncu" },
-    { key: "red",    bg: "#ef4444", label: "Kırmızı" },
-    { key: "",       bg: "",        label: "Renksiz" },
-  ];
-
   return (
     <Profiler id="GroupListPanel" onRender={onRenderCallback}>
 
-      {/* ─── Sticky header ─── */}
+      {/* ── Sticky header ── */}
       <div
         ref={groupsHeaderRef}
-        className="sticky top-0 z-20 bg-background/95 -mt-2 pt-2 border-b border-border mb-3"
+        className="sticky top-0 z-20 bg-background/95 -mt-2 pt-2 pb-3 border-b border-border mb-3"
         style={{ backdropFilter: "blur(8px)" }}
       >
-        {/* Row 1: title + controls on left, actions on right */}
-        <div className="flex items-center justify-between flex-wrap gap-y-1 gap-x-2 pb-2">
+        {/* Row 1: left controls ↔ right actions */}
+        <div className="flex items-center justify-between flex-wrap gap-y-1.5 gap-x-2 mb-2">
 
-          {/* LEFT: panel toggle, title, view controls */}
+          {/* LEFT: panel toggle + title + view/layout controls */}
           <div className="flex items-center gap-1 flex-wrap">
             {!fullscreenMode && !isMobile && (
               <Button
@@ -188,7 +188,7 @@ export function GroupListPanel() {
             <h2 className="text-sm font-semibold whitespace-nowrap">
               Hayvan Grupları
               {hasGroups && (
-                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                <span className="ml-1.5 text-xs font-normal text-muted-foreground tabular-nums">
                   ({kesim.animalGroups.length})
                 </span>
               )}
@@ -196,112 +196,93 @@ export function GroupListPanel() {
 
             {hasGroups && (
               <>
-                {/* Add + Minimap */}
-                <div className="flex items-center gap-0.5 ml-1">
-                  <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={addEmptyGroup} title="Boş Grup Ekle">
-                    <Plus className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button variant={ctx.minimapOpen ? "secondary" : "ghost"} size="sm" className="h-7 w-7 p-0" onClick={() => ctx.setMinimapOpen(!ctx.minimapOpen)} title="Genel Bakış">
-                    <MapIcon className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-
-                {/* Separator */}
                 <div className="h-4 w-px bg-border mx-0.5" />
 
-                {/* Layout: column count, compact, fullscreen, column settings */}
-                <div className="flex items-center gap-0.5">
-                  <Select value={String(workspace.prefs.columnCount)} onValueChange={(v) => workspace.setColumnCount(Number(v) as 1 | 2 | 3)}>
-                    <SelectTrigger className="h-7 w-16 text-xs" aria-label="Sütun sayısı">
-                      <LayoutGrid className="w-3 h-3 mr-1 flex-shrink-0" />
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1</SelectItem>
-                      <SelectItem value="2">2</SelectItem>
-                      <SelectItem value="3">3</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant={workspace.prefs.compactMode ? "secondary" : "ghost"}
-                    size="sm" className="h-7 w-7 p-0"
-                    onClick={() => workspace.setCompactMode(!workspace.prefs.compactMode)}
-                    title="Kompakt Mod" aria-pressed={workspace.prefs.compactMode}
-                  >
-                    <Minimize2 className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant={fullscreenMode ? "secondary" : "ghost"}
-                    size="sm" className="h-7 w-7 p-0"
-                    onClick={() => setFullscreenMode(!fullscreenMode)}
-                    title={fullscreenMode ? "Tam Ekrandan Çık (ESC)" : "Tam Ekran"}
-                  >
-                    <Maximize2 className="w-3.5 h-3.5" />
-                  </Button>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Sütun Ayarları">
-                        <Settings2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-56 p-3" align="start">
-                      <p className="text-xs font-semibold mb-2">Görünür Sütunlar</p>
-                      <div className="space-y-1">
-                        {workspace.prefs.columnOrder.map(key => {
-                          const col = ALL_GROUP_COLUMNS.find(c => c.key === key);
-                          if (!col) return null;
-                          const visible = !workspace.prefs.hiddenColumns.includes(key);
-                          return (
-                            <div key={key} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted cursor-grab text-sm" draggable onDragStart={() => handleColumnDragStart(key)} onDragOver={(e) => handleColumnDragOver(e, key)} onDrop={() => handleColumnDrop(key)} onDragEnd={handleColumnDragEnd}>
-                              <GripVertical className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                              <button className="flex items-center gap-2 flex-1 text-left" onClick={() => workspace.toggleColumn(key)} disabled={col.alwaysVisible}>
-                                {col.alwaysVisible ? <Lock className="w-3 h-3 text-muted-foreground" /> : visible ? <Eye className="w-3 h-3 text-primary" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
-                                <span className={!visible && !col.alwaysVisible ? "text-muted-foreground" : ""}>{col.label}</span>
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
+                {/* Add + Minimap */}
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={addEmptyGroup} title="Boş Grup Ekle">
+                  <Plus className="w-3.5 h-3.5" />
+                </Button>
+                <Button variant={ctx.minimapOpen ? "secondary" : "ghost"} size="sm" className="h-7 w-7 p-0" onClick={() => ctx.setMinimapOpen(!ctx.minimapOpen)} title="Genel Bakış">
+                  <MapIcon className="w-3.5 h-3.5" />
+                </Button>
 
-                {/* Separator */}
+                <div className="h-4 w-px bg-border mx-0.5" />
+
+                {/* Layout controls */}
+                <Select value={String(workspace.prefs.columnCount)} onValueChange={(v) => workspace.setColumnCount(Number(v) as 1 | 2 | 3)}>
+                  <SelectTrigger className="h-7 w-16 text-xs" aria-label="Sütun sayısı">
+                    <LayoutGrid className="w-3 h-3 mr-1" /><SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1</SelectItem>
+                    <SelectItem value="2">2</SelectItem>
+                    <SelectItem value="3">3</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant={workspace.prefs.compactMode ? "secondary" : "ghost"} size="sm" className="h-7 w-7 p-0" onClick={() => workspace.setCompactMode(!workspace.prefs.compactMode)} title="Kompakt Mod">
+                  <Minimize2 className="w-3.5 h-3.5" />
+                </Button>
+                <Button variant={fullscreenMode ? "secondary" : "ghost"} size="sm" className="h-7 w-7 p-0" onClick={() => setFullscreenMode(!fullscreenMode)} title={fullscreenMode ? "Tam Ekrandan Çık (ESC)" : "Tam Ekran"}>
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Sütun Ayarları">
+                      <Settings2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-3" align="start">
+                    <p className="text-xs font-semibold mb-2">Görünür Sütunlar</p>
+                    <div className="space-y-1">
+                      {workspace.prefs.columnOrder.map(key => {
+                        const col = ALL_GROUP_COLUMNS.find(c => c.key === key);
+                        if (!col) return null;
+                        const visible = !workspace.prefs.hiddenColumns.includes(key);
+                        return (
+                          <div key={key} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted cursor-grab text-sm" draggable onDragStart={() => handleColumnDragStart(key)} onDragOver={(e) => handleColumnDragOver(e, key)} onDrop={() => handleColumnDrop(key)} onDragEnd={handleColumnDragEnd}>
+                            <GripVertical className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                            <button className="flex items-center gap-2 flex-1 text-left" onClick={() => workspace.toggleColumn(key)} disabled={col.alwaysVisible}>
+                              {col.alwaysVisible ? <Lock className="w-3 h-3 text-muted-foreground" /> : visible ? <Eye className="w-3 h-3 text-primary" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
+                              <span className={!visible && !col.alwaysVisible ? "text-muted-foreground" : ""}>{col.label}</span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
                 <div className="h-4 w-px bg-border mx-0.5" />
 
                 {/* Collapse / Expand */}
-                <div className="flex items-center gap-0.5">
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={collapseAll} title="Tümünü Daralt">
-                    <ChevronsDownUp className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={expandAll} title="Tümünü Genişlet">
-                    <ChevronsUpDown className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={collapseAll} title="Tümünü Daralt">
+                  <ChevronsDownUp className="w-3.5 h-3.5" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={expandAll} title="Tümünü Genişlet">
+                  <ChevronsUpDown className="w-3.5 h-3.5" />
+                </Button>
               </>
             )}
           </div>
 
-          {/* RIGHT: jump, tools */}
+          {/* RIGHT: jump + tools */}
           {hasGroups && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <div className="flex items-center gap-1">
-                <Input
-                  ref={jumpInputRef}
-                  className="h-7 w-20 text-xs text-center cursor-pointer"
-                  placeholder="No (Ctrl+G)"
-                  readOnly
-                  onClick={() => setJumpDialogOpen(true)}
-                />
-                <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => setJumpDialogOpen(true)}>
-                  Git
-                </Button>
-              </div>
+            <div className="flex items-center gap-1 flex-wrap">
+              <Input
+                ref={jumpInputRef}
+                className="h-7 w-20 text-xs text-center cursor-pointer"
+                placeholder="No (Ctrl+G)"
+                readOnly
+                onClick={() => setJumpDialogOpen(true)}
+              />
+              <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => setJumpDialogOpen(true)}>
+                Git
+              </Button>
 
-              <div className="h-4 w-px bg-border" />
+              <div className="h-4 w-px bg-border mx-0.5" />
 
               {kesim.animalGroups.some(g => !g.donations.some(d => d.name.trim())) && (
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={cleanEmptyGroups} title="Boş Grupları Temizle">
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={cleanEmptyGroups}>
                   <Trash2 className="w-3.5 h-3.5 mr-1" />Boşları Temizle
                 </Button>
               )}
@@ -319,7 +300,8 @@ export function GroupListPanel() {
 
         {/* Row 2: filter bar */}
         {hasGroups && (
-          <div className="flex flex-wrap items-center gap-2 pb-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+
             {/* Search */}
             <div className="flex items-center gap-1 flex-1 min-w-[180px] max-w-xs">
               <div className="relative flex-1">
@@ -335,7 +317,7 @@ export function GroupListPanel() {
                   <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                     {groupSearchQuery.trim() && (
                       <>
-                        <span className="text-xs text-muted-foreground mr-1">
+                        <span className="text-xs text-muted-foreground mr-0.5 tabular-nums">
                           {currentGroupMatches.length > 0 ? `${(groupSearchMatchIdx % currentGroupMatches.length) + 1}/${currentGroupMatches.length}` : "0"}
                         </span>
                         <button className="p-0.5 hover:bg-muted rounded" onClick={() => setGroupSearchMatchIdx(prev => Math.max(0, prev - 1))} disabled={currentGroupMatches.length === 0}><ArrowUp className="w-3 h-3" /></button>
@@ -349,29 +331,29 @@ export function GroupListPanel() {
               <Button variant="outline" size="sm" className="h-8 px-2" onClick={handleGroupSearch}>Ara</Button>
             </div>
 
+            <div className="h-4 w-px bg-border" />
+
             {/* Color tag filters */}
             <div className="flex items-center gap-1">
               <button
                 onClick={() => startFilterTransition(() => setColorTagFilter("all"))}
-                className={`text-xs px-2 py-0.5 rounded border transition-colors ${colorTagFilter === "all" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+                className={`text-xs px-2 py-0.5 rounded-md border transition-colors ${colorTagFilter === "all" ? "bg-primary text-primary-foreground border-transparent" : "border-border hover:bg-muted"}`}
               >Tümü</button>
               {COLOR_TAGS.map(({ key, bg, label }) => (
                 <button
                   key={key === "" ? "__none" : key}
                   onClick={() => startFilterTransition(() => setColorTagFilter(key))}
-                  className={`rounded-full border-2 transition-all ${colorTagFilter === key ? "ring-2 ring-offset-1 ring-primary scale-110" : "opacity-80 hover:opacity-100"} ${!bg ? "border-dashed border-muted-foreground/40" : "border-transparent"}`}
+                  className={`rounded-full border-2 transition-all ${colorTagFilter === key ? "ring-2 ring-offset-1 ring-primary scale-110" : "opacity-70 hover:opacity-100"} ${!bg ? "border-dashed border-muted-foreground/40 bg-muted" : "border-transparent"}`}
                   style={{ width: 18, height: 18, backgroundColor: bg || undefined }}
                   title={label}
-                  aria-label={label}
                   aria-pressed={colorTagFilter === key}
                 />
               ))}
             </div>
 
-            {/* Separator */}
             <div className="h-4 w-px bg-border" />
 
-            {/* Incomplete filters */}
+            {/* Incomplete toggles */}
             <div className="flex items-center gap-1">
               <Button
                 variant={showOnlyIncomplete ? "default" : "outline"}
@@ -399,7 +381,7 @@ export function GroupListPanel() {
                   <span className="text-xs text-muted-foreground">Cins:</span>
                   <button
                     onClick={() => startFilterTransition(() => setGroupCinsFilter(new Set()))}
-                    className={`text-xs px-2 py-0.5 rounded border transition-colors ${groupCinsFilter.size === 0 ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+                    className={`text-xs px-2 py-0.5 rounded-md border transition-colors ${groupCinsFilter.size === 0 ? "bg-primary text-primary-foreground border-transparent" : "border-border hover:bg-muted"}`}
                   >Tümü</button>
                   {uniqueGroupDonationTypes.map(t => {
                     const isActive = groupCinsFilter.has(t);
@@ -409,12 +391,11 @@ export function GroupListPanel() {
                         onClick={() => startFilterTransition(() => {
                           setGroupCinsFilter(prev => {
                             const next = new Set(prev);
-                            if (next.has(t)) next.delete(t);
-                            else next.add(t);
+                            if (next.has(t)) next.delete(t); else next.add(t);
                             return next;
                           });
                         })}
-                        className={`text-xs px-2 py-0.5 rounded border transition-colors ${isActive ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+                        className={`text-xs px-2 py-0.5 rounded-md border transition-colors ${isActive ? "bg-primary text-primary-foreground border-transparent" : "border-border hover:bg-muted"}`}
                       >{t}</button>
                     );
                   })}
@@ -429,24 +410,26 @@ export function GroupListPanel() {
 
       {/* Selected groups action bar */}
       {selectedGroupIds.size > 0 && (
-        <div className="mb-3 flex items-center gap-2 p-2 bg-primary/10 rounded-lg flex-wrap">
+        <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg border border-primary/20 flex-wrap">
           <span className="text-sm font-medium">{selectedGroupIds.size} grup seçildi</span>
+          <div className="h-3.5 w-px bg-border/60" />
           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={mergeSelectedGroups} disabled={selectedGroupIds.size < 2}>
             <Merge className="w-3 h-3 mr-1" />Birleştir
           </Button>
           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={bulkRemoveFromGroups}>
             <Trash2 className="w-3 h-3 mr-1" />Bağışçıları Çıkar
           </Button>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedGroupIds(new Set())}>
-            Seçimi Kaldır
+          <Button variant="ghost" size="sm" className="h-7 text-xs ml-auto" onClick={() => setSelectedGroupIds(new Set())}>
+            <X className="w-3 h-3 mr-1" />Seçimi Kaldır
           </Button>
         </div>
       )}
 
       {/* Selected group donations action bar */}
       {selectedGroupDonations.size > 0 && (
-        <div className="mb-3 flex items-center gap-2 p-2 bg-primary/10 rounded-lg flex-wrap">
-          <span className="text-sm font-medium">{selectedGroupDonations.size} bağışçı seçildi (gruplarda)</span>
+        <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg border border-primary/20 flex-wrap">
+          <span className="text-sm font-medium">{selectedGroupDonations.size} bağışçı seçildi</span>
+          <div className="h-3.5 w-px bg-border/60" />
           <div className="flex items-center gap-1">
             <Select value={bulkMoveTargetGroup < 0 ? "" : String(bulkMoveTargetGroup)} onValueChange={(v) => setBulkMoveTargetGroup(parseInt(v))}>
               <SelectTrigger className="h-7 w-36 text-xs"><SelectValue placeholder="Hedef grup..." /></SelectTrigger>
@@ -458,9 +441,7 @@ export function GroupListPanel() {
           </div>
           <Dialog open={bulkGroupEditOpen} onOpenChange={setBulkGroupEditOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 text-xs">
-                <Settings2 className="w-3 h-3 mr-1" />Toplu Düzenle
-              </Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs"><Settings2 className="w-3 h-3 mr-1" />Toplu Düzenle</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>{selectedGroupDonations.size} Bağışçıyı Toplu Düzenle</DialogTitle></DialogHeader>
@@ -477,8 +458,8 @@ export function GroupListPanel() {
               </div>
             </DialogContent>
           </Dialog>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedGroupDonations(new Set())}>
-            Seçimi Kaldır
+          <Button variant="ghost" size="sm" className="h-7 text-xs ml-auto" onClick={() => setSelectedGroupDonations(new Set())}>
+            <X className="w-3 h-3 mr-1" />Seçimi Kaldır
           </Button>
         </div>
       )}
@@ -487,8 +468,8 @@ export function GroupListPanel() {
       {swapSelection && (() => {
         const selDonor = kesim.animalGroups[swapSelection.groupIdx]?.donations[swapSelection.donationIdx];
         return (
-          <div className="flex items-center gap-3 p-2 mb-3 bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg">
-            <ArrowLeftRight className="w-4 h-4 text-purple-600 flex-shrink-0" />
+          <div className="flex items-center gap-3 px-3 py-2 mb-3 bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800/60 rounded-lg">
+            <ArrowLeftRight className="w-4 h-4 text-purple-500 flex-shrink-0" />
             <span className="text-sm text-purple-800 dark:text-purple-200 flex-1">
               <strong>Takas modu:</strong> Hayvan {kesim.animalGroups[swapSelection.groupIdx]?.animalNo}, Sıra {swapSelection.donationIdx + 1}
               {selDonor ? ` — ${selDonor.description || selDonor.name} (${selDonor.shareCount || 1} hisse)` : ""} seçildi. Başka bir gruptaki bağışçıya tıklayın.
@@ -523,16 +504,8 @@ export function GroupListPanel() {
             ))}
             {hasMore && (
               <div className="flex justify-center mt-2 mb-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setVisibleGroupCount(filteredGroupItems.length);
-                    setAllShown(true);
-                  }}
-                >
-                  <ChevronDown className="w-4 h-4 mr-1" />
-                  {remaining} grup daha göster
+                <Button variant="outline" size="sm" onClick={() => { setVisibleGroupCount(filteredGroupItems.length); setAllShown(true); }}>
+                  <ChevronDown className="w-4 h-4 mr-1" />{remaining} grup daha göster
                 </Button>
               </div>
             )}
