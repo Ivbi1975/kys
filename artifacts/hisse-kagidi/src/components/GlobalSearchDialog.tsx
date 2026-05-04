@@ -177,7 +177,7 @@ export default function GlobalSearchDialog({ open, onOpenChange, projectId }: Gl
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mt-1.5">
                         <span className="inline-flex items-center gap-1 text-primary">
-                          <img src="/kurban-logo.png" alt="" className="w-3 h-3 object-contain" />
+                          <img src="/kurban-logo.png" alt="" className="w-3 h-3 object-contain invert dark:invert-0" />
                           {r.kesimAlaniName}
                         </span>
                         {r.projectName && (

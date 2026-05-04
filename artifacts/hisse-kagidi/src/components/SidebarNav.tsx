@@ -134,7 +134,7 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
                             collapsed={false}
                             icon={
                               <span className="h-[14px] w-[14px] flex-shrink-0 flex items-center justify-center">
-                                <img src="/kurban-logo.png" alt="" className="h-[13px] w-[13px] object-contain brightness-0 invert opacity-50" />
+                                <img src="/kurban-logo.png" alt="" className="h-[13px] w-[13px] object-contain opacity-50" />
                               </span>
                             }
                             label={ka.name}
@@ -214,13 +214,13 @@ function SidebarHeader({ collapsed, onToggle }: { collapsed: boolean; onToggle: 
           onClick={onToggle}
           className="w-[34px] h-[34px] rounded-lg bg-primary/15 ring-1 ring-primary/20 flex items-center justify-center hover:bg-primary/22 transition-all duration-150"
         >
-          <img src="/kurban-logo.png" alt="" className="h-[15px] w-[15px] object-contain brightness-0 invert" />
+          <img src="/kurban-logo.png" alt="" className="h-[15px] w-[15px] object-contain" />
         </button>
       ) : (
         <>
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-[28px] h-[28px] rounded-lg bg-primary/15 ring-1 ring-primary/20 flex items-center justify-center flex-shrink-0">
-              <img src="/kurban-logo.png" alt="" className="h-[14px] w-[14px] object-contain brightness-0 invert" />
+              <img src="/kurban-logo.png" alt="" className="h-[14px] w-[14px] object-contain" />
             </div>
             <div className="min-w-0">
               <p className="text-[12px] font-semibold text-white/80 leading-none tracking-wide">KYS</p>

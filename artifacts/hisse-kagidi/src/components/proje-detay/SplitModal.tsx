@@ -292,7 +292,7 @@ export function SplitModal({ open, onOpenChange, kesimAlani, onSplit }: SplitMod
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <img src="/kurban-logo.png" alt="" className="w-5 h-5 object-contain" />
+            <img src="/kurban-logo.png" alt="" className="w-5 h-5 object-contain invert dark:invert-0" />
             Kesim Listesi Parçala
           </DialogTitle>
         </DialogHeader>
@@ -309,7 +309,7 @@ export function SplitModal({ open, onOpenChange, kesimAlani, onSplit }: SplitMod
             className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "split" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             onClick={() => setActiveTab("split")}
           >
-            <img src="/kurban-logo.png" alt="" className="w-4 h-4 object-contain" />
+            <img src="/kurban-logo.png" alt="" className="w-4 h-4 object-contain invert dark:invert-0" />
             Listeye Parçala
           </button>
         </div>

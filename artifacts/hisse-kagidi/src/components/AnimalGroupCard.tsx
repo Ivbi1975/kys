@@ -422,7 +422,7 @@ const GroupOverflowMenu = memo(function GroupOverflowMenu({
             onClick={() => { onSplit(groupIdx); setOpen(false); }}
             disabled={group.locked || filledCount <= 1}
           >
-            <img src="/kurban-logo.png" alt="" className="w-3.5 h-3.5 object-contain" />
+            <img src="/kurban-logo.png" alt="" className="w-3.5 h-3.5 object-contain invert dark:invert-0" />
             Grubu Böl
           </button>
           <button

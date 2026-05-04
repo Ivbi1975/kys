@@ -23,7 +23,7 @@ export function SplitDialogs({
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <img src="/kurban-logo.png" alt="" className="w-5 h-5 object-contain" />
+              <img src="/kurban-logo.png" alt="" className="w-5 h-5 object-contain invert dark:invert-0" />
               Hisse Bölme
             </DialogTitle>
           </DialogHeader>
@@ -61,7 +61,7 @@ export function SplitDialogs({
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <img src="/kurban-logo.png" alt="" className="w-5 h-5 object-contain" />
+              <img src="/kurban-logo.png" alt="" className="w-5 h-5 object-contain invert dark:invert-0" />
               Grubu Böl
             </DialogTitle>
           </DialogHeader>
@@ -97,7 +97,7 @@ export function SplitDialogs({
                 <div className="flex justify-end gap-2 pt-2">
                   <Button variant="outline" onClick={() => setSplitGroupDialog(null)}>İptal</Button>
                   <Button onClick={executeSplitGroup}>
-                    <img src="/kurban-logo.png" alt="" className="w-3 h-3 mr-1 object-contain" />
+                    <img src="/kurban-logo.png" alt="" className="w-3 h-3 mr-1 object-contain invert dark:invert-0" />
                     {splitGroupDialog.splitAt}/{filled.length - splitGroupDialog.splitAt} Olarak Böl
                   </Button>
                 </div>

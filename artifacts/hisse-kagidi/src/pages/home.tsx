@@ -44,7 +44,7 @@ export default function Home() {
         )}
 
         <div className="flex items-center gap-3 mb-6 sm:mb-8">
-          <img src="/kurban-logo.png" alt="Kurban Logo" className="w-16 h-16 shrink-0 object-contain" />
+          <img src="/kurban-logo.png" alt="Kurban Logo" className="w-16 h-16 shrink-0 object-contain invert dark:invert-0" />
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
               Kurban Hisse Kağıdı
@@ -175,7 +175,7 @@ export default function Home() {
 
         {state.kesimAlanlari.length === 0 && state.projects.length === 0 ? (
           <Card className="p-12 text-center">
-            <img src="/kurban-logo.png" alt="logo" className="w-28 h-14 mx-auto mb-4 opacity-50 object-contain" />
+            <img src="/kurban-logo.png" alt="logo" className="w-28 h-14 mx-auto mb-4 opacity-50 object-contain invert dark:invert-0" />
             <h3 className="text-lg font-semibold text-foreground mb-2">
               Henüz proje veya kesim alanı yok
             </h3>
@@ -209,7 +209,7 @@ export default function Home() {
               <div className="mb-6">
                 {state.projects.length > 0 && (
                   <div className="flex items-center gap-2 mb-3">
-                    <img src="/kurban-logo.png" alt="" className="w-4 h-4 object-contain opacity-60" />
+                    <img src="/kurban-logo.png" alt="" className="w-4 h-4 object-contain opacity-60 invert dark:invert-0" />
                     <h3 className="text-sm font-semibold text-muted-foreground">Projesiz Kesim Alanları</h3>
                   </div>
                 )}
