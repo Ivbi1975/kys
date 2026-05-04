@@ -6,3 +6,9 @@ id = "9PlqXPN-gKXi_gdgfaez6"
 uri = "file://test_report.md"
 type = "text"
 title = "Uçtan Uca Test Raporu"
+
+[[outputs]]
+id = "uVLJaja8DzIG0ezhqs5js"
+uri = "file://.local/veritabani-dokumani.md"
+type = "text"
+title = "Kurban Hisse Sistemi - Veritabanı Dökümanı (Laravel için)"
