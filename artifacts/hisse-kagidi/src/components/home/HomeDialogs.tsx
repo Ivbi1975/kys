@@ -140,8 +140,8 @@ function RenameKesimAlaniDialog({
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
-  editingKesim: { id: string; name: string; yetkili: string; displayName: string; maxVekalet: string; maxAnimal: string } | null;
-  setEditingKesim: (v: { id: string; name: string; yetkili: string; displayName: string; maxVekalet: string; maxAnimal: string } | null) => void;
+  editingKesim: { id: string; name: string; yetkili: string; displayName: string; maxAnimal: string } | null;
+  setEditingKesim: (v: { id: string; name: string; yetkili: string; displayName: string; maxAnimal: string } | null) => void;
   onConfirm: () => void;
 }) {
   const set = (patch: Partial<typeof editingKesim>) =>
@@ -178,27 +178,15 @@ function RenameKesimAlaniDialog({
               onChange={e => set({ displayName: e.target.value })}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Maks. Vekalet</label>
-              <Input
-                placeholder="Sınırsız"
-                type="number"
-                min={1}
-                value={editingKesim?.maxVekalet ?? ""}
-                onChange={e => set({ maxVekalet: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Maks. Hayvan</label>
-              <Input
-                placeholder="Sınırsız"
-                type="number"
-                min={1}
-                value={editingKesim?.maxAnimal ?? ""}
-                onChange={e => set({ maxAnimal: e.target.value })}
-              />
-            </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Maks. Hayvan</label>
+            <Input
+              placeholder="Sınırsız"
+              type="number"
+              min={1}
+              value={editingKesim?.maxAnimal ?? ""}
+              onChange={e => set({ maxAnimal: e.target.value })}
+            />
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="outline" onClick={() => setOpen(false)}>İptal</Button>

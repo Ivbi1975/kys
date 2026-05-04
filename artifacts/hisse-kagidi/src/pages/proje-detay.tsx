@@ -183,7 +183,6 @@ export default function ProjeDetayPage() {
               name: k.name,
               yetkili: k.yetkili ?? "",
               displayName: k.displayName ?? "",
-              maxVekalet: k.maxVekalet != null ? String(k.maxVekalet) : "",
               maxAnimal: k.maxAnimal != null ? String(k.maxAnimal) : "",
             });
             state.setRenameKesimDialogOpen(true);

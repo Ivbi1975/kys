@@ -124,7 +124,7 @@ export function useProjeDetayState() {
   const [splitModalOpen, setSplitModalOpen] = useState(false);
   const [splitTarget, setSplitTarget] = useState<KesimAlani | null>(null);
   const [renameKesimDialogOpen, setRenameKesimDialogOpen] = useState(false);
-  const [editingKesim, setEditingKesim] = useState<{ id: string; name: string; yetkili: string; displayName: string; maxVekalet: string; maxAnimal: string } | null>(null);
+  const [editingKesim, setEditingKesim] = useState<{ id: string; name: string; yetkili: string; displayName: string; maxAnimal: string } | null>(null);
 
   const [transferDialog, setTransferDialog] = useState<{
     entry: ConflictEntry;
@@ -254,7 +254,6 @@ export function useProjeDetayState() {
 
   const handleRenameKesim = useCallback(async () => {
     if (!editingKesim || !editingKesim.name.trim()) return;
-    const maxVekalet = editingKesim.maxVekalet.trim() ? parseInt(editingKesim.maxVekalet.trim(), 10) : null;
     const maxAnimal = editingKesim.maxAnimal.trim() ? parseInt(editingKesim.maxAnimal.trim(), 10) : null;
     try {
       await renameKesimAlani(
@@ -262,14 +261,12 @@ export function useProjeDetayState() {
         editingKesim.name.trim(),
         editingKesim.yetkili.trim() || null,
         editingKesim.displayName.trim() || null,
-        maxVekalet,
         maxAnimal,
       );
       const patch = {
         name: editingKesim.name.trim(),
         yetkili: editingKesim.yetkili.trim() || null,
         displayName: editingKesim.displayName.trim() || null,
-        maxVekalet,
         maxAnimal,
       };
       setKesimAlanlari(prev => prev.map(k => k.id === editingKesim.id ? { ...k, ...patch } : k));

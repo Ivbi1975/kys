@@ -74,7 +74,7 @@ export function useHomeState() {
   const [movingKesim, setMovingKesim] = useState<{ id: string; name: string; currentProjectId: string | null } | null>(null);
   const [moveTargetProjectId, setMoveTargetProjectId] = useState<string>("__none__");
   const [renameKesimDialogOpen, setRenameKesimDialogOpen] = useState(false);
-  const [editingKesim, setEditingKesim] = useState<{ id: string; name: string; yetkili: string; displayName: string; maxVekalet: string; maxAnimal: string } | null>(null);
+  const [editingKesim, setEditingKesim] = useState<{ id: string; name: string; yetkili: string; displayName: string; maxAnimal: string } | null>(null);
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const { toast } = useToast();
@@ -283,7 +283,6 @@ export function useHomeState() {
 
   const handleRenameKesim = useCallback(async () => {
     if (!editingKesim || !editingKesim.name.trim()) return;
-    const maxVekalet = editingKesim.maxVekalet.trim() ? parseInt(editingKesim.maxVekalet.trim(), 10) : null;
     const maxAnimal = editingKesim.maxAnimal.trim() ? parseInt(editingKesim.maxAnimal.trim(), 10) : null;
     try {
       await renameKesimAlani(
@@ -291,7 +290,6 @@ export function useHomeState() {
         editingKesim.name.trim(),
         editingKesim.yetkili.trim() || null,
         editingKesim.displayName.trim() || null,
-        maxVekalet,
         maxAnimal,
       );
       invalidateHomeDataCache();
@@ -300,7 +298,6 @@ export function useHomeState() {
         name: editingKesim.name.trim(),
         yetkili: editingKesim.yetkili.trim() || null,
         displayName: editingKesim.displayName.trim() || null,
-        maxVekalet,
         maxAnimal,
       } : k));
       setRenameKesimDialogOpen(false);

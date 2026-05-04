@@ -348,12 +348,11 @@ export async function renameKesimAlani(
   name: string,
   yetkili?: string | null,
   displayName?: string | null,
-  maxVekalet?: number | null,
   maxAnimal?: number | null,
 ): Promise<{ id: string; name: string }> {
   return apiFetch<{ id: string; name: string }>(`/kesim-alanlari/${id}`, {
     method: "PUT",
-    body: JSON.stringify({ name, yetkili, displayName, maxVekalet, maxAnimal }),
+    body: JSON.stringify({ name, yetkili, displayName, maxAnimal }),
   });
 }
 
