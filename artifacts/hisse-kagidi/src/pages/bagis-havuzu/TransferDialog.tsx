@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowRightLeft, Loader2, RefreshCw, Check, Square, CheckSquare } from "lucide-react";
+import { ArrowRightLeft, Loader2, RefreshCw, Check, Square, CheckSquare, ListPlus, FolderPlus } from "lucide-react";
 import { fetchPoolDonations, fetchDonationSiblings } from "@/lib/api";
 import type { DonorSiblings } from "@/lib/api/bagis-havuzu";
 
@@ -46,21 +46,17 @@ export function TransferDialog({
     } catch { /* ignore */ }
   }, [projectId]);
 
-  // Fetch siblings eagerly when dialog opens
   useEffect(() => {
     if (!open) return;
     refetchKA();
-
     const key = selectedIds.join(",");
     if (fetchedForIds.current === key) return;
-
     if (selectedIds.length === 0 || siblingCount === 0) {
       setSiblings([]);
       setSelectedDonors(new Set());
       fetchedForIds.current = key;
       return;
     }
-
     fetchedForIds.current = key;
     setLoadingSiblings(true);
     fetchDonationSiblings(projectId, selectedIds)
@@ -72,7 +68,6 @@ export function TransferDialog({
       .finally(() => setLoadingSiblings(false));
   }, [open, selectedIds, siblingCount, projectId, refetchKA]);
 
-  // Reset when closed
   useEffect(() => {
     if (!open) {
       setSiblings([]);
@@ -92,24 +87,17 @@ export function TransferDialog({
   }, []);
 
   const toggleAll = useCallback(() => {
-    if (selectedDonors.size === siblings.length) {
-      setSelectedDonors(new Set());
-    } else {
-      setSelectedDonors(new Set(siblings.map(s => s.donorName)));
-    }
+    if (selectedDonors.size === siblings.length) setSelectedDonors(new Set());
+    else setSelectedDonors(new Set(siblings.map(s => s.donorName)));
   }, [selectedDonors.size, siblings]);
 
-  const selectedExtraIds = siblings
-    .filter(s => selectedDonors.has(s.donorName))
-    .flatMap(s => s.extraIds);
-
+  const selectedExtraIds = siblings.filter(s => selectedDonors.has(s.donorName)).flatMap(s => s.extraIds);
   const selectedExtraCount = selectedExtraIds.length;
   const totalExtraCount = siblings.reduce((sum, s) => sum + s.extraCount, 0);
   const allSelected = siblings.length > 0 && selectedDonors.size === siblings.length;
+  const totalToTransfer = selectedCount + selectedExtraCount;
 
-  const handleTransfer = useCallback(() => {
-    onTransfer(selectedExtraIds);
-  }, [selectedExtraIds, onTransfer]);
+  const handleTransfer = useCallback(() => { onTransfer(selectedExtraIds); }, [selectedExtraIds, onTransfer]);
 
   const handleClose = useCallback(() => {
     onOpenChange(false);
@@ -118,123 +106,162 @@ export function TransferDialog({
     setTransferTarget("");
   }, [onOpenChange, setNewListName, setCreatingNewList, setTransferTarget]);
 
+  const canTransfer = (!!transferTarget || (creatingNewList && !!newListName.trim())) && !transferring && !loadingSiblings;
+
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); else onOpenChange(v); }}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Kesim Listesine Aktar</DialogTitle>
-        </DialogHeader>
+      <DialogContent className="max-w-[440px] p-0 gap-0 overflow-hidden">
 
-        {/* Summary line */}
-        <p className="text-sm text-muted-foreground -mt-1">
-          <strong className="text-foreground">{selectedCount}</strong> seçili bağış
-          {selectedExtraCount > 0 && (
-            <> + <strong className="text-foreground">{selectedExtraCount}</strong> ek bağış</>
-          )}
-          {" "}<span className="text-muted-foreground">aktarılacak.</span>
-        </p>
-
-        {/* Siblings section */}
-        {loadingSiblings && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            Ek bağışlar kontrol ediliyor...
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 border-b bg-muted/20">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2.5 text-base">
+              <span className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <ArrowRightLeft className="w-4 h-4 text-primary" />
+              </span>
+              Kesim Listesine Aktar
+            </DialogTitle>
+          </DialogHeader>
+          {/* Summary chips */}
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+              {selectedCount} seçili bağış
+            </span>
+            {loadingSiblings && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-muted text-muted-foreground text-xs">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                kontrol ediliyor…
+              </span>
+            )}
+            {!loadingSiblings && selectedExtraCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-xs font-semibold">
+                +{selectedExtraCount} ek bağış
+              </span>
+            )}
+            {(selectedExtraCount > 0 || selectedCount > 0) && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-bold ml-auto">
+                = {totalToTransfer} toplam
+              </span>
+            )}
           </div>
-        )}
-
-        {!loadingSiblings && siblings.length > 0 && (
-          <div className="border rounded-md overflow-hidden">
-            {/* Header row with toggle-all */}
-            <div className="flex items-center justify-between px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800">
-              <div className="flex items-center gap-2">
-                <button onClick={toggleAll} className="text-muted-foreground hover:text-foreground flex-shrink-0">
-                  {allSelected
-                    ? <CheckSquare className="w-4 h-4 text-primary" />
-                    : selectedDonors.size === 0
-                      ? <Square className="w-4 h-4" />
-                      : <CheckSquare className="w-4 h-4 text-muted-foreground/50" />}
-                </button>
-                <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                  {totalExtraCount} ek bağış — eklemek istediklerinizi seçin
-                </span>
-              </div>
-              <span className="text-xs text-muted-foreground">{selectedDonors.size}/{siblings.length}</span>
-            </div>
-
-            {/* Donor rows */}
-            <div className="max-h-40 overflow-y-auto divide-y">
-              {siblings.map(s => {
-                const checked = selectedDonors.has(s.donorName);
-                return (
-                  <button
-                    key={s.donorName}
-                    className={`flex items-start gap-2.5 w-full px-3 py-2 text-left text-sm transition-colors hover:bg-muted/40 ${checked ? "bg-primary/5" : ""}`}
-                    onClick={() => toggleDonor(s.donorName)}
-                  >
-                    <span className={`mt-0.5 flex-shrink-0 w-4 h-4 border rounded flex items-center justify-center ${checked ? "bg-primary border-primary text-primary-foreground" : "border-input"}`}>
-                      {checked && <Check className="w-3 h-3" />}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <span className="font-medium text-sm truncate block">{s.donorName}</span>
-                      <div className="flex flex-wrap gap-x-2 mt-0.5">
-                        {s.donations.map(d => (
-                          <span key={d.id} className="text-[10px] text-muted-foreground">
-                            <span className="font-mono">{d.vekalet || "—"}</span>
-                            {d.donationType && <span className="ml-1">{d.donationType}</span>}
-                            {d.shareCount > 1 && <span className="ml-1">{d.shareCount}h</span>}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <span className="text-xs text-muted-foreground flex-shrink-0 ml-1 mt-0.5">{s.extraCount}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* List selection */}
-        <div className="space-y-3">
-          <div className="flex gap-1">
-            <Select value={transferTarget} onValueChange={(v) => { setTransferTarget(v); setCreatingNewList(false); }}>
-              <SelectTrigger className="flex-1"><SelectValue placeholder="Mevcut kesim listesi seçin..." /></SelectTrigger>
-              <SelectContent>
-                {kaList.map((ka) => (
-                  <SelectItem key={ka.id} value={ka.id}>{ka.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="ghost" size="icon" className="h-10 w-10 flex-shrink-0" onClick={refetchKA} title="Listeyi yenile">
-              <RefreshCw className="w-4 h-4" />
-            </Button>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="flex-1 h-px bg-border" />
-            <span>veya</span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
-          <Input
-            placeholder="Yeni kesim listesi adı..."
-            value={newListName}
-            onChange={(e) => {
-              setNewListName(e.target.value);
-              if (e.target.value) { setTransferTarget(""); setCreatingNewList(true); }
-              else { setCreatingNewList(false); }
-            }}
-            className="h-9"
-          />
         </div>
 
-        <div className="flex gap-2 mt-2">
-          <Button variant="outline" className="flex-1" onClick={handleClose}>İptal</Button>
+        <div className="px-6 py-4 space-y-4">
+          {/* Siblings panel */}
+          {!loadingSiblings && siblings.length > 0 && (
+            <div className="rounded-lg border overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/60">
+                <button
+                  onClick={toggleAll}
+                  className="flex items-center gap-2 text-xs font-medium text-amber-800 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-200 transition-colors"
+                >
+                  {allSelected
+                    ? <CheckSquare className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                    : selectedDonors.size === 0
+                      ? <Square className="w-3.5 h-3.5 flex-shrink-0" />
+                      : <CheckSquare className="w-3.5 h-3.5 text-muted-foreground/60 flex-shrink-0" />}
+                  {totalExtraCount} ek bağış — {allSelected ? "Tümünü kaldır" : "Tümünü seç"}
+                </button>
+                <span className="text-xs tabular-nums text-amber-700/70 dark:text-amber-400/70">
+                  {selectedDonors.size}/{siblings.length} seçili
+                </span>
+              </div>
+              <div className="max-h-36 overflow-y-auto divide-y divide-border/60">
+                {siblings.map(s => {
+                  const checked = selectedDonors.has(s.donorName);
+                  return (
+                    <button
+                      key={s.donorName}
+                      onClick={() => toggleDonor(s.donorName)}
+                      className={`flex items-center gap-3 w-full px-3 py-2.5 text-left transition-colors hover:bg-muted/50 ${checked ? "bg-primary/5" : "bg-background"}`}
+                    >
+                      <span className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${checked ? "bg-primary border-primary" : "border-input bg-background"}`}>
+                        {checked && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate leading-tight">{s.donorName}</p>
+                        <div className="flex flex-wrap gap-x-2 gap-y-0 mt-0.5">
+                          {s.donations.map(d => (
+                            <span key={d.id} className="text-[10px] text-muted-foreground font-mono">
+                              {d.vekalet || "—"}
+                              {d.donationType && <span className="font-sans ml-0.5 not-italic">{d.donationType}</span>}
+                              {d.shareCount > 1 && <span className="font-sans ml-0.5">{d.shareCount}h</span>}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <span className="flex-shrink-0 text-xs font-semibold tabular-nums text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+                        {s.extraCount}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Destination: existing list */}
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <ListPlus className="w-3.5 h-3.5" />
+              Mevcut listeye aktar
+            </label>
+            <div className="flex gap-1.5">
+              <Select value={transferTarget} onValueChange={(v) => { setTransferTarget(v); setCreatingNewList(false); }}>
+                <SelectTrigger className="flex-1 h-9">
+                  <SelectValue placeholder="Kesim listesi seçin…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {kaList.map((ka) => (
+                    <SelectItem key={ka.id} value={ka.id}>{ka.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0 text-muted-foreground hover:text-foreground" onClick={refetchKA} title="Listeyi yenile">
+                <RefreshCw className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-muted-foreground">veya</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
+          {/* Destination: new list */}
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <FolderPlus className="w-3.5 h-3.5" />
+              Yeni liste oluştur
+            </label>
+            <Input
+              placeholder="Liste adı girin…"
+              value={newListName}
+              onChange={(e) => {
+                setNewListName(e.target.value);
+                if (e.target.value) { setTransferTarget(""); setCreatingNewList(true); }
+                else { setCreatingNewList(false); }
+              }}
+              className="h-9"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 pb-6 pt-2 flex gap-2.5">
+          <Button variant="outline" className="flex-1 h-10" onClick={handleClose}>
+            İptal
+          </Button>
           <Button
-            className="flex-1"
+            className="flex-[2] h-10 font-semibold"
             onClick={handleTransfer}
-            disabled={(!transferTarget && !creatingNewList) || transferring || loadingSiblings || (creatingNewList && !newListName.trim())}
+            disabled={!canTransfer}
           >
-            {transferring ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <ArrowRightLeft className="w-4 h-4 mr-1" />}
-            Aktar ({selectedCount + selectedExtraCount})
+            {transferring
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Aktarılıyor…</>
+              : <><ArrowRightLeft className="w-4 h-4 mr-2" />{totalToTransfer} Bağışı Aktar</>}
           </Button>
         </div>
       </DialogContent>

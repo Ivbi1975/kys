@@ -20,6 +20,7 @@ import { GroupMinimap } from "./GroupMinimap";
 import { GroupConflictPanel } from "./GroupConflictPanel";
 import { GroupFindDeleteDialog } from "../dialogs/GroupFindDeleteDialog";
 import { GroupBulkLockPopover } from "./GroupBulkLockPopover";
+import type { ColorTag } from "@/lib/types";
 
 export function GroupListPanel() {
   const ctx = useKesimAlaniContext();
@@ -152,188 +153,355 @@ export function GroupListPanel() {
     effectiveColumnCount === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
   }`;
 
+  const hasGroups = kesim.animalGroups.length > 0;
+
   return (
     <Profiler id="GroupListPanel" onRender={onRenderCallback}>
-      <div ref={groupsHeaderRef} className="flex items-center justify-between mb-4 flex-wrap gap-2 sticky top-0 z-20 bg-background py-2 -mt-2 border-b border-transparent" style={{ backdropFilter: "blur(8px)" }}>
-        <div className="flex items-center gap-2 flex-wrap">
+      {/* ── Main Header ── */}
+      <div
+        ref={groupsHeaderRef}
+        className="sticky top-0 z-20 bg-background/95 -mt-2 pt-2 pb-3 border-b border-border/60"
+        style={{ backdropFilter: "blur(8px)" }}
+      >
+        {/* Row 1: title + primary controls */}
+        <div className="flex items-center gap-2 mb-2">
           {!fullscreenMode && !isMobile && (
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDonorListVisible(!donorListVisible)} title={donorListVisible ? "Bağışçı Listesini Gizle" : "Bağışçı Listesini Göster"} aria-label={donorListVisible ? "Bağışçı Listesini Gizle" : "Bağışçı Listesini Göster"}>
+            <Button
+              variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground flex-shrink-0"
+              onClick={() => setDonorListVisible(!donorListVisible)}
+              title={donorListVisible ? "Bağışçı Listesini Gizle" : "Bağışçı Listesini Göster"}
+              aria-label={donorListVisible ? "Bağışçı Listesini Gizle" : "Bağışçı Listesini Göster"}
+            >
               {donorListVisible ? <PanelLeftClose className="w-3.5 h-3.5" /> : <PanelLeftOpen className="w-3.5 h-3.5" />}
             </Button>
           )}
-          <h2 className="text-lg font-semibold whitespace-nowrap">Hayvan Grupları ({kesim.animalGroups.length})</h2>
-          {kesim.animalGroups.length > 0 && (
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" className="h-7 px-2" onClick={addEmptyGroup} title="Boş Grup Ekle" aria-label="Boş Grup Ekle"><Plus className="w-3.5 h-3.5" /></Button>
-              <Button variant={ctx.minimapOpen ? "default" : "ghost"} size="sm" className="h-7 px-2" onClick={() => ctx.setMinimapOpen(!ctx.minimapOpen)} title="Genel Bakış" aria-label="Genel Bakış"><MapIcon className="w-3.5 h-3.5" /></Button>
-              <Select value={String(workspace.prefs.columnCount)} onValueChange={(v) => workspace.setColumnCount(Number(v) as 1 | 2 | 3)}>
-                <SelectTrigger className="h-7 w-16 text-xs" aria-label="Sütun sayısı"><LayoutGrid className="w-3.5 h-3.5 mr-1" /><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="1">1</SelectItem><SelectItem value="2">2</SelectItem><SelectItem value="3">3</SelectItem></SelectContent>
-              </Select>
-              <Button variant={workspace.prefs.compactMode ? "default" : "ghost"} size="sm" className="h-7 px-2" onClick={() => workspace.setCompactMode(!workspace.prefs.compactMode)} title="Kompakt Mod" aria-label="Kompakt Mod" aria-pressed={workspace.prefs.compactMode}><Minimize2 className="w-3.5 h-3.5" /></Button>
-              <Button variant={fullscreenMode ? "default" : "ghost"} size="sm" className="h-7 px-2" onClick={() => setFullscreenMode(!fullscreenMode)} title={fullscreenMode ? "Tam Ekrandan Çık (ESC)" : "Tam Ekran"} aria-label={fullscreenMode ? "Tam Ekrandan Çık" : "Tam Ekran"}><Maximize2 className="w-3.5 h-3.5" /></Button>
-              <Popover>
-                <PopoverTrigger asChild><Button variant="ghost" size="sm" className="h-7 px-2" title="Sütun Ayarları" aria-label="Sütun Ayarları"><Settings2 className="w-3.5 h-3.5" /></Button></PopoverTrigger>
-                <PopoverContent className="w-56 p-3" align="start">
-                  <p className="text-xs font-semibold mb-2">Görünür Sütunlar</p>
-                  <div className="space-y-1">
-                    {workspace.prefs.columnOrder.map(key => {
-                      const col = ALL_GROUP_COLUMNS.find(c => c.key === key);
-                      if (!col) return null;
-                      const visible = !workspace.prefs.hiddenColumns.includes(key);
-                      return (
-                        <div key={key} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted cursor-grab text-sm" draggable onDragStart={() => handleColumnDragStart(key)} onDragOver={(e) => handleColumnDragOver(e, key)} onDrop={() => handleColumnDrop(key)} onDragEnd={handleColumnDragEnd}>
-                          <GripVertical className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                          <button className="flex items-center gap-2 flex-1 text-left" onClick={() => workspace.toggleColumn(key)} disabled={col.alwaysVisible}>
-                            {col.alwaysVisible ? <Lock className="w-3 h-3 text-muted-foreground" /> : visible ? <Eye className="w-3 h-3 text-primary" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
-                            <span className={!visible && !col.alwaysVisible ? "text-muted-foreground" : ""}>{col.label}</span>
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </PopoverContent>
-              </Popover>
-              <div className="flex items-center gap-1 ml-1">
-                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={collapseAll} title="Tümünü Daralt" aria-label="Tümünü Daralt"><ChevronsDownUp className="w-3.5 h-3.5" /></Button>
-                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={expandAll} title="Tümünü Genişlet" aria-label="Tümünü Genişlet"><ChevronsUpDown className="w-3.5 h-3.5" /></Button>
+
+          <h2 className="text-sm font-semibold text-foreground whitespace-nowrap">
+            Hayvan Grupları
+            <span className="ml-1.5 px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground text-xs font-normal tabular-nums">
+              {kesim.animalGroups.length}
+            </span>
+          </h2>
+
+          {hasGroups && (
+            <>
+              {/* View controls group */}
+              <div className="flex items-center gap-0.5 ml-1">
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={addEmptyGroup} title="Boş Grup Ekle" aria-label="Boş Grup Ekle">
+                  <Plus className="w-3.5 h-3.5" />
+                </Button>
+                <Button variant={ctx.minimapOpen ? "secondary" : "ghost"} size="sm" className="h-7 w-7 p-0" onClick={() => ctx.setMinimapOpen(!ctx.minimapOpen)} title="Genel Bakış" aria-label="Genel Bakış">
+                  <MapIcon className="w-3.5 h-3.5" />
+                </Button>
               </div>
-            </div>
+
+              {/* Separator */}
+              <div className="w-px h-4 bg-border mx-0.5 flex-shrink-0" />
+
+              {/* Layout controls group */}
+              <div className="flex items-center gap-0.5">
+                <Select value={String(workspace.prefs.columnCount)} onValueChange={(v) => workspace.setColumnCount(Number(v) as 1 | 2 | 3)}>
+                  <SelectTrigger className="h-7 w-[68px] text-xs gap-1 px-2" aria-label="Sütun sayısı">
+                    <LayoutGrid className="w-3 h-3 flex-shrink-0" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 Sütun</SelectItem>
+                    <SelectItem value="2">2 Sütun</SelectItem>
+                    <SelectItem value="3">3 Sütun</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant={workspace.prefs.compactMode ? "secondary" : "ghost"}
+                  size="sm" className="h-7 w-7 p-0"
+                  onClick={() => workspace.setCompactMode(!workspace.prefs.compactMode)}
+                  title="Kompakt Mod" aria-label="Kompakt Mod" aria-pressed={workspace.prefs.compactMode}
+                >
+                  <Minimize2 className="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  variant={fullscreenMode ? "secondary" : "ghost"}
+                  size="sm" className="h-7 w-7 p-0"
+                  onClick={() => setFullscreenMode(!fullscreenMode)}
+                  title={fullscreenMode ? "Tam Ekrandan Çık (ESC)" : "Tam Ekran"}
+                  aria-label={fullscreenMode ? "Tam Ekrandan Çık" : "Tam Ekran"}
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Sütun Ayarları" aria-label="Sütun Ayarları">
+                      <Settings2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-3" align="start">
+                    <p className="text-xs font-semibold mb-2">Görünür Sütunlar</p>
+                    <div className="space-y-1">
+                      {workspace.prefs.columnOrder.map(key => {
+                        const col = ALL_GROUP_COLUMNS.find(c => c.key === key);
+                        if (!col) return null;
+                        const visible = !workspace.prefs.hiddenColumns.includes(key);
+                        return (
+                          <div key={key} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted cursor-grab text-sm" draggable onDragStart={() => handleColumnDragStart(key)} onDragOver={(e) => handleColumnDragOver(e, key)} onDrop={() => handleColumnDrop(key)} onDragEnd={handleColumnDragEnd}>
+                            <GripVertical className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                            <button className="flex items-center gap-2 flex-1 text-left" onClick={() => workspace.toggleColumn(key)} disabled={col.alwaysVisible}>
+                              {col.alwaysVisible ? <Lock className="w-3 h-3 text-muted-foreground" /> : visible ? <Eye className="w-3 h-3 text-primary" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
+                              <span className={!visible && !col.alwaysVisible ? "text-muted-foreground" : ""}>{col.label}</span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Separator */}
+              <div className="w-px h-4 bg-border mx-0.5 flex-shrink-0" />
+
+              {/* Collapse/Expand */}
+              <div className="flex items-center gap-0.5">
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={collapseAll} title="Tümünü Daralt" aria-label="Tümünü Daralt">
+                  <ChevronsDownUp className="w-3.5 h-3.5" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={expandAll} title="Tümünü Genişlet" aria-label="Tümünü Genişlet">
+                  <ChevronsUpDown className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+
+              {/* Right-side actions */}
+              <div className="flex items-center gap-1.5 ml-auto">
+                <Input
+                  ref={jumpInputRef}
+                  className="h-7 w-24 text-xs text-center cursor-pointer"
+                  placeholder="No (Ctrl+G)"
+                  readOnly
+                  onClick={() => setJumpDialogOpen(true)}
+                />
+                <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => setJumpDialogOpen(true)}>
+                  Git
+                </Button>
+
+                <div className="w-px h-4 bg-border mx-0.5 flex-shrink-0" />
+
+                <Button
+                  variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => { ctx.runCheckConflicts(kesim.animalGroups).then(found => { setConflicts(found); setShowConflicts(true); }).catch(() => {}); }}
+                  title="Çakışma Kontrol"
+                >
+                  <Search className="w-3.5 h-3.5 mr-1" />
+                  Çakışma
+                </Button>
+                <GroupFindDeleteDialog />
+                <GroupBulkLockPopover />
+                {kesim.animalGroups.some(g => !g.donations.some(d => d.name.trim())) && (
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-destructive hover:text-destructive" onClick={cleanEmptyGroups} title="Boş Grupları Temizle">
+                    <Trash2 className="w-3.5 h-3.5 mr-1" />
+                    Temizle
+                  </Button>
+                )}
+              </div>
+            </>
           )}
         </div>
-        {kesim.animalGroups.length > 0 && (
-          <div className="flex gap-2 items-center">
-            <div className="flex items-center gap-1">
-              <Input ref={jumpInputRef} className="h-8 w-20 text-sm text-center cursor-pointer" placeholder="No (Ctrl+G)" readOnly onClick={() => setJumpDialogOpen(true)} />
-              <Button variant="outline" size="sm" className="h-8" onClick={() => setJumpDialogOpen(true)}>Git</Button>
+
+        {/* Row 2: filter bar */}
+        {hasGroups && (
+          <div className="flex flex-wrap items-center gap-2 px-1">
+            {/* Search */}
+            <div className="flex items-center gap-1 flex-1 min-w-[160px] max-w-xs">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input
+                  className="h-7 text-xs pl-7 pr-14"
+                  placeholder="Gruplarda ara…"
+                  value={groupSearchInput}
+                  onChange={(e) => setGroupSearchInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleGroupSearch(); } }}
+                />
+                {(groupSearchInput || groupSearchQuery) && (
+                  <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                    {groupSearchQuery.trim() && (
+                      <>
+                        <span className="text-[10px] text-muted-foreground tabular-nums mr-0.5">
+                          {currentGroupMatches.length > 0 ? `${(groupSearchMatchIdx % currentGroupMatches.length) + 1}/${currentGroupMatches.length}` : "0"}
+                        </span>
+                        <button className="p-0.5 hover:bg-muted rounded" onClick={() => setGroupSearchMatchIdx(prev => Math.max(0, prev - 1))} disabled={currentGroupMatches.length === 0}><ArrowUp className="w-3 h-3" /></button>
+                        <button className="p-0.5 hover:bg-muted rounded" onClick={() => setGroupSearchMatchIdx(prev => prev + 1)} disabled={currentGroupMatches.length === 0}><ArrowDown className="w-3 h-3" /></button>
+                      </>
+                    )}
+                    <button className="p-0.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground" onClick={handleGroupSearchClear}><X className="w-3 h-3" /></button>
+                  </div>
+                )}
+              </div>
+              <Button variant="outline" size="sm" className="h-7 px-2 text-xs flex-shrink-0" onClick={handleGroupSearch}>Ara</Button>
             </div>
-            {kesim.animalGroups.some(g => !g.donations.some(d => d.name.trim())) && (
-              <Button variant="outline" size="sm" onClick={cleanEmptyGroups} title="Boş Grupları Temizle"><Trash2 className="w-4 h-4 mr-1" />Boşları Temizle</Button>
+
+            {/* Color tag filters */}
+            <div className="flex items-center gap-1 bg-muted/40 rounded-md px-2 py-1">
+              <button
+                onClick={() => startFilterTransition(() => setColorTagFilter("all"))}
+                className={`text-[11px] px-2 py-0.5 rounded font-medium transition-colors ${colorTagFilter === "all" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >Tümü</button>
+              {(
+                [
+                  { key: "green"  as ColorTag, color: "#22c55e", label: "Yeşil" },
+                  { key: "orange" as ColorTag, color: "#f97316", label: "Turuncu" },
+                  { key: "red"    as ColorTag, color: "#ef4444", label: "Kırmızı" },
+                  { key: ""       as ColorTag, color: "",        label: "Renksiz" },
+                ] as { key: ColorTag; color: string; label: string }[]
+              ).map(({ key, color, label }) => (
+                <button
+                  key={key === "" ? "__none__" : key}
+                  onClick={() => startFilterTransition(() => setColorTagFilter(key))}
+                  className={`rounded-full border transition-all ${colorTagFilter === key ? "ring-2 ring-offset-1 ring-primary scale-110" : "opacity-70 hover:opacity-100 hover:scale-105"} ${!color ? "border-dashed bg-muted" : "border-transparent"}`}
+                  style={{ backgroundColor: color || undefined, width: 18, height: 18 }}
+                  title={label}
+                  aria-label={label}
+                  aria-pressed={colorTagFilter === key}
+                />
+              ))}
+            </div>
+
+            {/* Separator */}
+            <div className="w-px h-4 bg-border flex-shrink-0" />
+
+            {/* Filter toggles */}
+            <div className="flex items-center gap-1">
+              <Button
+                variant={showOnlyIncomplete ? "secondary" : "ghost"}
+                size="sm" className="h-7 px-2.5 text-xs"
+                onClick={() => startFilterTransition(() => setShowOnlyIncomplete(!showOnlyIncomplete))}
+                title="Sadece eksik grupları göster"
+              >
+                <Filter className="w-3 h-3 mr-1" />Eksik
+              </Button>
+              <Button
+                variant={highlightIncomplete ? "secondary" : "ghost"}
+                size="sm" className="h-7 px-2.5 text-xs"
+                onClick={() => startFilterTransition(() => setHighlightIncomplete(!highlightIncomplete))}
+                title="Eksik grupları vurgula"
+              >
+                <AlertTriangle className="w-3 h-3 mr-1" />Vurgula
+              </Button>
+            </div>
+
+            {/* Cins (type) filters */}
+            {uniqueGroupDonationTypes.length > 0 && (
+              <>
+                <div className="w-px h-4 bg-border flex-shrink-0" />
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="text-[11px] text-muted-foreground font-medium">Cins:</span>
+                  <button
+                    onClick={() => startFilterTransition(() => setGroupCinsFilter(new Set()))}
+                    className={`text-[11px] px-2 py-0.5 rounded border transition-colors ${groupCinsFilter.size === 0 ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+                  >Tümü</button>
+                  {uniqueGroupDonationTypes.map(t => {
+                    const isActive = groupCinsFilter.has(t);
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => startFilterTransition(() => {
+                          setGroupCinsFilter(prev => {
+                            const next = new Set(prev);
+                            if (next.has(t)) next.delete(t);
+                            else next.add(t);
+                            return next;
+                          });
+                        })}
+                        className={`text-[11px] px-2 py-0.5 rounded border transition-colors ${isActive ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+                      >{t}</button>
+                    );
+                  })}
+                </div>
+              </>
             )}
-            <Button variant="outline" size="sm" onClick={() => { ctx.runCheckConflicts(kesim.animalGroups).then(found => { setConflicts(found); setShowConflicts(true); }).catch(() => {}); }}><Search className="w-4 h-4 mr-1" />Çakışma Kontrol</Button>
-            <GroupFindDeleteDialog />
-            <GroupBulkLockPopover />
           </div>
         )}
       </div>
 
-      {kesim.animalGroups.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 mb-3 p-2 bg-muted/30 rounded-lg">
-          <div className="flex items-center gap-1 flex-1 min-w-[180px] max-w-xs">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input className="h-8 text-sm pl-8 pr-16" placeholder="Gruplarda ara..." value={groupSearchInput} onChange={(e) => setGroupSearchInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleGroupSearch(); } }} />
-              {(groupSearchInput || groupSearchQuery) && (
-                <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                  {groupSearchQuery.trim() && (
-                    <>
-                      <span className="text-xs text-muted-foreground mr-1">{currentGroupMatches.length > 0 ? `${(groupSearchMatchIdx % currentGroupMatches.length) + 1}/${currentGroupMatches.length}` : "0"}</span>
-                      <button className="p-0.5 hover:bg-muted rounded" onClick={() => setGroupSearchMatchIdx(prev => Math.max(0, prev - 1))} disabled={currentGroupMatches.length === 0}><ArrowUp className="w-3 h-3" /></button>
-                      <button className="p-0.5 hover:bg-muted rounded" onClick={() => setGroupSearchMatchIdx(prev => prev + 1)} disabled={currentGroupMatches.length === 0}><ArrowDown className="w-3 h-3" /></button>
-                    </>
-                  )}
-                  <button className="p-0.5 hover:bg-muted rounded" onClick={handleGroupSearchClear}><X className="w-3 h-3" /></button>
-                </div>
-              )}
-            </div>
-            <Button variant="outline" size="sm" className="h-8 px-2" onClick={handleGroupSearch} title="Ara">Ara</Button>
-          </div>
-          <div className="flex items-center gap-1">
-            <button onClick={() => startFilterTransition(() => setColorTagFilter("all"))} className={`text-xs px-2 py-0.5 rounded border ${colorTagFilter === "all" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>Tümü</button>
-            <button onClick={() => startFilterTransition(() => setColorTagFilter("green"))} className={`w-5 h-5 rounded-full border-2 ${colorTagFilter === "green" ? "ring-2 ring-offset-1 ring-green-500" : ""}`} style={{ backgroundColor: "#22c55e" }} title="Yeşil" aria-label="Yeşil filtre" aria-pressed={colorTagFilter === "green"} />
-            <button onClick={() => startFilterTransition(() => setColorTagFilter("orange"))} className={`w-5 h-5 rounded-full border-2 ${colorTagFilter === "orange" ? "ring-2 ring-offset-1 ring-orange-500" : ""}`} style={{ backgroundColor: "#f97316" }} title="Turuncu" aria-label="Turuncu filtre" aria-pressed={colorTagFilter === "orange"} />
-            <button onClick={() => startFilterTransition(() => setColorTagFilter("red"))} className={`w-5 h-5 rounded-full border-2 ${colorTagFilter === "red" ? "ring-2 ring-offset-1 ring-red-500" : ""}`} style={{ backgroundColor: "#ef4444" }} title="Kırmızı" aria-label="Kırmızı filtre" aria-pressed={colorTagFilter === "red"} />
-            <button onClick={() => startFilterTransition(() => setColorTagFilter(""))} className={`w-5 h-5 rounded-full border-2 border-dashed ${colorTagFilter === "" ? "ring-2 ring-offset-1 ring-gray-400" : ""}`} title="Renksiz" aria-label="Renksiz filtre" aria-pressed={colorTagFilter === ""} />
-          </div>
-          <div className="flex items-center gap-1 border-l pl-2 ml-1">
-            <Button variant={showOnlyIncomplete ? "default" : "outline"} size="sm" className="h-7 text-xs" onClick={() => startFilterTransition(() => setShowOnlyIncomplete(!showOnlyIncomplete))} title="Sadece eksik grupları göster"><Filter className="w-3 h-3 mr-1" />Eksik</Button>
-            <Button variant={highlightIncomplete ? "default" : "outline"} size="sm" className="h-7 text-xs" onClick={() => startFilterTransition(() => setHighlightIncomplete(!highlightIncomplete))} title="Eksik grupları vurgula"><AlertTriangle className="w-3 h-3 mr-1" />Vurgula</Button>
-          </div>
-          {uniqueGroupDonationTypes.length > 0 && (
-            <div className="flex items-center gap-1 border-l pl-2 ml-1 flex-wrap">
-              <span className="text-xs text-muted-foreground mr-0.5">Cins:</span>
-              <button
-                onClick={() => startFilterTransition(() => setGroupCinsFilter(new Set()))}
-                className={`text-xs px-2 py-0.5 rounded border ${groupCinsFilter.size === 0 ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-              >Tümü</button>
-              {uniqueGroupDonationTypes.map(t => {
-                const isActive = groupCinsFilter.has(t);
-                return (
-                  <button
-                    key={t}
-                    onClick={() => startFilterTransition(() => {
-                      setGroupCinsFilter(prev => {
-                        const next = new Set(prev);
-                        if (next.has(t)) next.delete(t);
-                        else next.add(t);
-                        return next;
-                      });
-                    })}
-                    className={`text-xs px-2 py-0.5 rounded border ${isActive ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-                  >{t}</button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
       <GroupMinimap />
 
+      {/* Selected group actions */}
       {selectedGroupIds.size > 0 && (
-        <div className="mb-3 flex items-center gap-3 p-2 bg-primary/10 rounded-lg flex-wrap">
-          <span className="text-sm font-medium">{selectedGroupIds.size} grup seçildi</span>
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={mergeSelectedGroups} disabled={selectedGroupIds.size < 2}><Merge className="w-3 h-3 mr-1" />Birleştir</Button>
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={bulkRemoveFromGroups}><Trash2 className="w-3 h-3 mr-1" />Bağışçıları Çıkar</Button>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedGroupIds(new Set())}>Seçimi Kaldır</Button>
+        <div className="my-3 flex items-center gap-2 px-3 py-2 bg-primary/8 border border-primary/20 rounded-lg flex-wrap">
+          <span className="text-xs font-semibold text-primary">{selectedGroupIds.size} grup seçildi</span>
+          <div className="w-px h-3.5 bg-border" />
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={mergeSelectedGroups} disabled={selectedGroupIds.size < 2}>
+            <Merge className="w-3 h-3 mr-1" />Birleştir
+          </Button>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={bulkRemoveFromGroups}>
+            <Trash2 className="w-3 h-3 mr-1" />Bağışçıları Çıkar
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 text-xs ml-auto text-muted-foreground" onClick={() => setSelectedGroupIds(new Set())}>
+            <X className="w-3 h-3 mr-1" />Seçimi Kaldır
+          </Button>
         </div>
       )}
 
+      {/* Selected group donations actions */}
       {selectedGroupDonations.size > 0 && (
-        <div className="mb-3 flex items-center gap-3 p-2 bg-primary/10 rounded-lg flex-wrap">
-          <span className="text-sm font-medium">{selectedGroupDonations.size} bağışçı seçildi (gruplarda)</span>
+        <div className="my-3 flex items-center gap-2 px-3 py-2 bg-primary/8 border border-primary/20 rounded-lg flex-wrap">
+          <span className="text-xs font-semibold text-primary">{selectedGroupDonations.size} bağışçı seçildi</span>
+          <div className="w-px h-3.5 bg-border" />
           <div className="flex items-center gap-1">
             <Select value={bulkMoveTargetGroup < 0 ? "" : String(bulkMoveTargetGroup)} onValueChange={(v) => setBulkMoveTargetGroup(parseInt(v))}>
-              <SelectTrigger className="h-7 w-36 text-xs"><SelectValue placeholder="Hedef grup..." /></SelectTrigger>
+              <SelectTrigger className="h-7 w-36 text-xs"><SelectValue placeholder="Hedef grup…" /></SelectTrigger>
               <SelectContent>{kesim.animalGroups.map((g, gi) => (<SelectItem key={g.id} value={String(gi)}>Hayvan {g.animalNo}</SelectItem>))}</SelectContent>
             </Select>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => bulkMoveToGroup(bulkMoveTargetGroup)} disabled={bulkMoveTargetGroup < 0}><MoveRight className="w-3 h-3 mr-1" />Taşı</Button>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => bulkMoveToGroup(bulkMoveTargetGroup)} disabled={bulkMoveTargetGroup < 0}>
+              <MoveRight className="w-3 h-3 mr-1" />Taşı
+            </Button>
           </div>
           <Dialog open={bulkGroupEditOpen} onOpenChange={setBulkGroupEditOpen}>
-            <DialogTrigger asChild><Button variant="outline" size="sm" className="h-7 text-xs"><Settings2 className="w-3 h-3 mr-1" />Toplu Düzenle</Button></DialogTrigger>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 text-xs">
+                <Settings2 className="w-3 h-3 mr-1" />Toplu Düzenle
+              </Button>
+            </DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>{selectedGroupDonations.size} Bağışçıyı Toplu Düzenle</DialogTitle></DialogHeader>
               <div className="space-y-4 pt-4">
-                <Select value={bulkGroupEditField} onValueChange={(v: "donationType" | "notes") => setBulkGroupEditField(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="donationType">Cinsi</SelectItem><SelectItem value="notes">Notlar</SelectItem></SelectContent></Select>
+                <Select value={bulkGroupEditField} onValueChange={(v: "donationType" | "notes") => setBulkGroupEditField(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="donationType">Cinsi</SelectItem>
+                    <SelectItem value="notes">Notlar</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Input placeholder="Yeni değer" value={bulkGroupEditValue} onChange={(e) => setBulkGroupEditValue(e.target.value)} />
                 <Button onClick={bulkChangeGroupDonationType} className="w-full">Uygula</Button>
               </div>
             </DialogContent>
           </Dialog>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedGroupDonations(new Set())}>Seçimi Kaldır</Button>
+          <Button variant="ghost" size="sm" className="h-7 text-xs ml-auto text-muted-foreground" onClick={() => setSelectedGroupDonations(new Set())}>
+            <X className="w-3 h-3 mr-1" />Seçimi Kaldır
+          </Button>
         </div>
       )}
 
+      {/* Swap mode banner */}
       {swapSelection && (() => {
         const selDonor = kesim.animalGroups[swapSelection.groupIdx]?.donations[swapSelection.donationIdx];
         return (
-          <div className="flex items-center gap-3 p-2 mb-3 bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg">
-            <ArrowLeftRight className="w-4 h-4 text-purple-600" />
-            <span className="text-sm text-purple-800 dark:text-purple-200">
+          <div className="flex items-center gap-3 px-3 py-2 my-3 bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800/60 rounded-lg">
+            <ArrowLeftRight className="w-4 h-4 text-purple-500 flex-shrink-0" />
+            <p className="text-xs text-purple-800 dark:text-purple-200 flex-1">
               <strong>Takas modu:</strong> Hayvan {kesim.animalGroups[swapSelection.groupIdx]?.animalNo}, Sıra {swapSelection.donationIdx + 1}
               {selDonor ? ` — ${selDonor.description || selDonor.name} (${selDonor.shareCount || 1} hisse)` : ""} seçildi. Başka bir gruptaki bağışçıya tıklayın.
-            </span>
-            <Button variant="ghost" size="sm" onClick={cancelSwap}>İptal</Button>
+            </p>
+            <Button variant="ghost" size="sm" className="h-7 text-xs flex-shrink-0" onClick={cancelSwap}>İptal</Button>
           </div>
         );
       })()}
 
       <GroupConflictPanel />
 
+      {/* Group list */}
       {kesim.animalGroups.length === 0 ? (
-        <Card className="p-8 text-center">
-          <Wand2 className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-          <p className="text-muted-foreground">Bağışçı listesini doldurup "Otomatik Grupla" butonuna tıklayın</p>
+        <Card className="p-10 text-center border-dashed">
+          <Wand2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">Bağışçı listesini doldurup "Otomatik Grupla" butonuna tıklayın</p>
         </Card>
       ) : (() => {
         const visibleItems = filteredGroupItems.slice(0, visibleGroupCount);
@@ -351,32 +519,21 @@ export function GroupListPanel() {
               </div>
             ))}
             {hasMore && (
-              <div className="flex justify-center gap-2 py-4">
-                <Button variant="outline" onClick={() => { setVisibleGroupCount(filteredGroupItems.length); setAllShown(true); }}>
-                  <ChevronDown className="w-4 h-4 mr-2" />
-                  Tüm Grupları Göster ({remaining} kaldı)
+              <div className="flex justify-center mt-2 mb-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setVisibleGroupCount(filteredGroupItems.length);
+                    setAllShown(true);
+                  }}
+                >
+                  <ChevronDown className="w-4 h-4 mr-1" />
+                  {remaining} grup daha göster
                 </Button>
               </div>
             )}
             <div ref={groupsListBottomRef} />
-            {allShown && (
-              <button
-                onClick={() => {
-                  if (atBottom) {
-                    groupsHeaderRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  } else {
-                    groupsListBottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-                  }
-                }}
-                className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-10 h-10 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all duration-200"
-                title={atBottom ? "En yukarıya git" : "En aşağıya git"}
-              >
-                {atBottom
-                  ? <ArrowUp className="w-5 h-5" />
-                  : <ArrowDown className="w-5 h-5" />
-                }
-              </button>
-            )}
           </>
         );
       })()}
