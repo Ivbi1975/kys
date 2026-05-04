@@ -98,13 +98,15 @@ curl -H "X-API-Key: my-vys-key" \
 {
   "items": [
     {
-      "id": "d1e2f3",
-      "name": "Ahmet Yılmaz",
-      "description": "Hisse 1",
-      "shareCount": 2,
-      "vekalet": "var",
-      "kesimAlaniId": "ka-001",
-      "kesimAlaniName": "A Alanı",
+      "id": "9ec662b1-f977-4e9f-ba7a-2c538740e231",
+      "name": "FİKRİ BAŞARAN",
+      "description": "NEJDET KARABULUT",
+      "shareCount": 1,
+      "vekalet": "466403",
+      "donationType": "Vacip",
+      "notes": "",
+      "kesimAlaniId": "328268b5-b70a-4c19-86b4-21ca1f644678",
+      "kesimAlaniName": "04.05 kesim listesi",
       "tags": [
         { "id": "tag-id-1", "name": "VIP" }
       ]
@@ -121,10 +123,12 @@ curl -H "X-API-Key: my-vys-key" \
 |------|-----|----------|
 | `items` | array | Bağışçı kayıtları |
 | `items[].id` | string | Bağışçı kimliği |
-| `items[].name` | string | Ad soyad |
-| `items[].description` | string | Açıklama |
+| `items[].name` | string | Adına kesilen kişi |
+| `items[].description` | string | Vekaleti veren kişi |
 | `items[].shareCount` | number | Hisse sayısı |
-| `items[].vekalet` | string | Vekalet bilgisi |
+| `items[].vekalet` | string | Vekalet numarası |
+| `items[].donationType` | string | Kurban cinsi (örn. `"Vacip"`, `"Adak"`) |
+| `items[].notes` | string | Bağışçı notu (boşsa `""`) |
 | `items[].kesimAlaniId` | string | Bağışçının ait olduğu kesim alanının kimliği |
 | `items[].kesimAlaniName` | string | Bağışçının ait olduğu kesim alanının adı |
 | `items[].tags` | object[] | Etiket listesi (`{ id, name }` nesneleri) |
@@ -209,26 +213,40 @@ curl -H "X-API-Key: my-vys-key" \
 [
   {
     "id": "ka-001",
-    "name": "A Alanı",
-    "capacity": 7,
+    "name": "04.05 kesim listesi",
+    "capacity": 200,
     "groups": [
       {
         "id": "group-1",
         "animalNo": 1,
-        "colorTag": "kırmızı",
-        "kesildi": true,
-        "kesildiAt": "2025-06-15T08:30:00.000Z",
-        "sortOrder": 1,
-        "assignedShares": 7
-      },
-      {
-        "id": "group-2",
-        "animalNo": 2,
-        "colorTag": "mavi",
+        "colorTag": null,
         "kesildi": false,
         "kesildiAt": null,
-        "sortOrder": 2,
-        "assignedShares": 5
+        "sortOrder": 1,
+        "notes": "",
+        "assignedShares": 4,
+        "donors": [
+          {
+            "sira": 1,
+            "id": "9ec662b1-...",
+            "name": "FİKRİ BAŞARAN",
+            "description": "NEJDET KARABULUT",
+            "vekalet": "466403",
+            "shareCount": 1,
+            "donationType": "Vacip",
+            "notes": ""
+          },
+          {
+            "sira": 2,
+            "id": "d1b3c2a0-...",
+            "name": "FİKRET BAŞARAN",
+            "description": "NEJDET KARABULUT",
+            "vekalet": "466397",
+            "shareCount": 1,
+            "donationType": "Vacip",
+            "notes": ""
+          }
+        ]
       }
     ]
   },
@@ -248,7 +266,7 @@ curl -H "X-API-Key: my-vys-key" \
 | `id` | string | Kesim alanı kimliği |
 | `name` | string | Kesim alanı adı |
 | `capacity` | number \| null | Maksimum hayvan kapasitesi (ayarlanmadıysa `null`) |
-| `groups` | array | Bu alana ait aktif hayvan grupları |
+| `groups` | array | Bu alana ait aktif hayvan grupları (donors dahil) |
 
 **Alan Tablosu — Hayvan Grubu (`groups[]`)**
 
@@ -256,11 +274,26 @@ curl -H "X-API-Key: my-vys-key" \
 |------|-----|----------|
 | `id` | string | Grup kimliği |
 | `animalNo` | number | Hayvan numarası |
-| `colorTag` | string \| null | Renk etiketi (örn. `"kırmızı"`, `"mavi"`) |
+| `colorTag` | string \| null | Renk etiketi (`null` = etiketsiz) |
 | `kesildi` | boolean | Kesildi mi? |
 | `kesildiAt` | ISO 8601 \| null | Kesim zamanı (kesilmediyse `null`) |
 | `sortOrder` | number | Sıralama değeri |
+| `notes` | string | Grup notu (boşsa `""`) |
 | `assignedShares` | number | Gruba atanmış toplam hisse sayısı |
+| `donors` | array | Bu gruptaki bağışçı listesi (sıralı) |
+
+**Alan Tablosu — Bağışçı (`groups[].donors[]`)**
+
+| Alan | Tür | Açıklama |
+|------|-----|----------|
+| `sira` | number | Grup içindeki sıra numarası (1'den başlar) |
+| `id` | string | Bağışçı kimliği |
+| `name` | string | Adına kesilen kişi |
+| `description` | string | Vekaleti veren kişi |
+| `vekalet` | string | Vekalet numarası |
+| `shareCount` | number | Hisse sayısı |
+| `donationType` | string | Kurban cinsi (örn. `"Vacip"`, `"Adak"`) |
+| `notes` | string | Bağışçı notu (boşsa `""`) |
 
 > Not: `__havuz__` kesim alanı bu yanıtta yer almaz. Henüz grubu olmayan kesim alanları boş `groups: []` dizisiyle döner.
 

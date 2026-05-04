@@ -76,6 +76,8 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
       description: donationsTable.description,
       shareCount: donationsTable.shareCount,
       vekalet: donationsTable.vekalet,
+      donationType: donationsTable.donationType,
+      notes: donationsTable.notes,
       kesimAlaniId: donationsTable.kesimAlaniId,
     }).from(donationsTable).where(whereClause)
       .orderBy(donationsTable.sortOrder, donationsTable.id)
@@ -108,6 +110,8 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     description: d.description,
     shareCount: d.shareCount,
     vekalet: d.vekalet,
+    donationType: d.donationType,
+    notes: d.notes,
     kesimAlaniId: d.kesimAlaniId,
     kesimAlaniName: kaNameById[d.kesimAlaniId],
     tags: tagsByDonation[d.id] || [],
@@ -261,28 +265,49 @@ router.get("/projects/:id/kesim-listesi", asyncHandler(async (req, res) => {
   }
 
   const kaIds = kesimAlanlari.map(k => k.id);
+  const kaIdList = sql.join(kaIds.map(id => sql`${id}`), sql`, `);
 
-  const groupRows = await db.execute(sql`
-    SELECT
-      ag.id,
-      ag.kesim_alani_id,
-      ag.animal_no,
-      ag.color_tag,
-      ag.kesildi,
-      ag.kesildi_at,
-      ag.sort_order,
-      COALESCE(
-        (SELECT SUM(d.share_count)
-         FROM animal_group_donations agd
-         JOIN donations d ON d.id = agd.donation_id AND d.deleted_at IS NULL
-         WHERE agd.group_id = ag.id
-        ), 0
-      )::int AS assigned_shares
-    FROM animal_groups ag
-    WHERE ag.kesim_alani_id IN (${sql.join(kaIds.map(id => sql`${id}`), sql`, `)})
-      AND ag.deleted_at IS NULL
-    ORDER BY ag.kesim_alani_id, ag.sort_order, ag.animal_no
-  `);
+  const [groupRows, donorRows] = await Promise.all([
+    db.execute(sql`
+      SELECT
+        ag.id,
+        ag.kesim_alani_id,
+        ag.animal_no,
+        ag.color_tag,
+        ag.kesildi,
+        ag.kesildi_at,
+        ag.sort_order,
+        ag.notes AS group_notes,
+        COALESCE(
+          (SELECT SUM(d.share_count)
+           FROM animal_group_donations agd
+           JOIN donations d ON d.id = agd.donation_id AND d.deleted_at IS NULL
+           WHERE agd.group_id = ag.id
+          ), 0
+        )::int AS assigned_shares
+      FROM animal_groups ag
+      WHERE ag.kesim_alani_id IN (${kaIdList})
+        AND ag.deleted_at IS NULL
+      ORDER BY ag.kesim_alani_id, ag.sort_order, ag.animal_no
+    `),
+    db.execute(sql`
+      SELECT
+        agd.group_id,
+        agd.sort_order AS donor_sort_order,
+        d.id,
+        d.name,
+        d.description,
+        d.vekalet,
+        d.share_count,
+        d.donation_type,
+        d.notes
+      FROM animal_group_donations agd
+      JOIN donations d ON d.id = agd.donation_id AND d.deleted_at IS NULL
+      JOIN animal_groups ag ON ag.id = agd.group_id AND ag.deleted_at IS NULL
+      WHERE ag.kesim_alani_id IN (${kaIdList})
+      ORDER BY agd.group_id, agd.sort_order, d.id
+    `),
+  ]);
 
   type GroupRow = {
     id: string;
@@ -292,8 +317,27 @@ router.get("/projects/:id/kesim-listesi", asyncHandler(async (req, res) => {
     kesildi: boolean;
     kesildi_at: string | null;
     sort_order: number;
+    group_notes: string;
     assigned_shares: number;
   };
+
+  type DonorRow = {
+    group_id: string;
+    donor_sort_order: number;
+    id: string;
+    name: string;
+    description: string;
+    vekalet: string;
+    share_count: number;
+    donation_type: string;
+    notes: string;
+  };
+
+  const donorsByGroup: Record<string, DonorRow[]> = {};
+  for (const row of donorRows.rows as DonorRow[]) {
+    if (!donorsByGroup[row.group_id]) donorsByGroup[row.group_id] = [];
+    donorsByGroup[row.group_id].push(row);
+  }
 
   const groupsByKa: Record<string, GroupRow[]> = {};
   for (const row of groupRows.rows as GroupRow[]) {
@@ -308,11 +352,22 @@ router.get("/projects/:id/kesim-listesi", asyncHandler(async (req, res) => {
     groups: (groupsByKa[ka.id] || []).map(g => ({
       id: g.id,
       animalNo: g.animal_no,
-      colorTag: g.color_tag,
+      colorTag: g.color_tag ?? null,
       kesildi: g.kesildi,
       kesildiAt: g.kesildi_at ?? null,
       sortOrder: g.sort_order,
+      notes: g.group_notes,
       assignedShares: Number(g.assigned_shares),
+      donors: (donorsByGroup[g.id] || []).map((d, idx) => ({
+        sira: idx + 1,
+        id: d.id,
+        name: d.name,
+        description: d.description,
+        vekalet: d.vekalet,
+        shareCount: Number(d.share_count),
+        donationType: d.donation_type,
+        notes: d.notes,
+      })),
     })),
   }));
 
