@@ -1122,11 +1122,13 @@ paths:
                     items:
                       type: object
                       properties:
-                        id: { type: string }
-                        name: { type: string }
-                        description: { type: string, nullable: true }
-                        shareCount: { type: integer }
-                        vekalet: { type: string, nullable: true }
+                        id: { type: string, description: "Donor ID" }
+                        name: { type: string, description: "Adına kesilen kişi (on whose behalf the animal is slaughtered)" }
+                        description: { type: string, nullable: true, description: "Vekaleti veren kişi (proxy giver)" }
+                        shareCount: { type: integer, description: "Number of shares" }
+                        vekalet: { type: string, description: "Proxy/vekalet number" }
+                        donationType: { type: string, description: "Kurban cinsi — e.g. Vacip, Adak, Mevta" }
+                        notes: { type: string, description: "Free-text donor note (empty string when none)" }
                         kesimAlaniId: { type: string, description: "ID of the kesim alanı this donor belongs to" }
                         kesimAlaniName: { type: string, description: "Name of the kesim alanı this donor belongs to" }
                         tags:
@@ -1137,7 +1139,7 @@ paths:
                               id: { type: string }
                               name: { type: string }
                             required: [id, name]
-                      required: [id, name, shareCount, kesimAlaniId, kesimAlaniName, tags]
+                      required: [id, name, shareCount, vekalet, donationType, notes, kesimAlaniId, kesimAlaniName, tags]
                   total: { type: integer }
                   page: { type: integer }
                   limit: { type: integer }
@@ -1287,28 +1289,46 @@ components:
     JsonArray:
       type: array
       items: { $ref: "#/components/schemas/JsonObject" }
+    VysDonorItem:
+      type: object
+      description: A single donor nested inside a VYS animal group (kesim-listesi endpoint).
+      properties:
+        sira: { type: integer, description: "Position within the group (1-based)" }
+        id: { type: string, description: "Donor ID" }
+        name: { type: string, description: "Adına kesilen kişi (on whose behalf the animal is slaughtered)" }
+        description: { type: string, description: "Vekaleti veren kişi (proxy giver)" }
+        vekalet: { type: string, description: "Proxy/vekalet number" }
+        shareCount: { type: integer, description: "Number of shares" }
+        donationType: { type: string, description: "Kurban cinsi — e.g. Vacip, Adak, Mevta" }
+        notes: { type: string, description: "Free-text donor note (empty string when none)" }
+      required: [sira, id, name, description, vekalet, shareCount, donationType, notes]
     VysAnimalGroup:
       type: object
-      description: A single animal group as returned by VYS endpoints.
+      description: A single animal group as returned by the kesim-listesi VYS endpoint.
       properties:
         id: { type: string, description: "Group ID" }
         animalNo: { type: integer, description: "Animal number within the area" }
-        colorTag: { type: string, nullable: true, description: "Color label (e.g. kırmızı, mavi)" }
+        colorTag: { type: string, nullable: true, description: "Color label (null = no tag)" }
         kesildi: { type: boolean, description: "Whether the animal has been slaughtered" }
         kesildiAt: { type: string, format: date-time, nullable: true, description: "Slaughter timestamp; null if not yet slaughtered" }
         sortOrder: { type: integer, description: "Display sort order" }
+        notes: { type: string, description: "Group-level note (empty string when none)" }
         assignedShares: { type: integer, description: "Total donation shares assigned to this group" }
-      required: [id, animalNo, kesildi, sortOrder, assignedShares]
+        donors:
+          type: array
+          description: Donors assigned to this group, ordered by position
+          items: { $ref: "#/components/schemas/VysDonorItem" }
+      required: [id, animalNo, kesildi, sortOrder, notes, assignedShares, donors]
     VysKesimAlaniWithGroups:
       type: object
-      description: A slaughter area with its animal groups nested inline.
+      description: A slaughter area with its animal groups and donors nested inline.
       properties:
         id: { type: string }
         name: { type: string }
         capacity: { type: integer, nullable: true, description: "Max animal capacity; null if unlimited" }
         groups:
           type: array
-          description: Active animal groups within this area (empty array if none)
+          description: Active animal groups within this area, each with its donor list (empty array if none)
           items: { $ref: "#/components/schemas/VysAnimalGroup" }
       required: [id, name, capacity, groups]
     VysKesimListesiResponse:
