@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem,
@@ -476,17 +475,18 @@ export function GroupListPanel() {
       <GroupBulkLockPopover open={lockDialogOpen} onOpenChange={setLockDialogOpen} />
 
       {/* Column settings popover (opened from ⋯ menu) */}
-      <Popover open={columnSettingsOpen} onOpenChange={setColumnSettingsOpen}>
-        <PopoverTrigger asChild><span /></PopoverTrigger>
-        <PopoverContent className="w-56 p-3" align="end">
-          <p className="text-xs font-semibold mb-2">Görünür Sütunlar</p>
-          <div className="space-y-1">
+      <Dialog open={columnSettingsOpen} onOpenChange={setColumnSettingsOpen}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Görünür Sütunlar</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1 pt-1">
             {workspace.prefs.columnOrder.map(key => {
               const col = ALL_GROUP_COLUMNS.find(c => c.key === key);
               if (!col) return null;
               const visible = !workspace.prefs.hiddenColumns.includes(key);
               return (
-                <div key={key} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted cursor-grab text-sm" draggable onDragStart={() => handleColumnDragStart(key)} onDragOver={(e) => handleColumnDragOver(e, key)} onDrop={() => handleColumnDrop(key)} onDragEnd={handleColumnDragEnd}>
+                <div key={key} className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted cursor-grab text-sm" draggable onDragStart={() => handleColumnDragStart(key)} onDragOver={(e) => handleColumnDragOver(e, key)} onDrop={() => handleColumnDrop(key)} onDragEnd={handleColumnDragEnd}>
                   <GripVertical className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                   <button className="flex items-center gap-2 flex-1 text-left" onClick={() => workspace.toggleColumn(key)} disabled={col.alwaysVisible}>
                     {col.alwaysVisible ? <Lock className="w-3 h-3 text-muted-foreground" /> : visible ? <Eye className="w-3 h-3 text-primary" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
@@ -496,8 +496,8 @@ export function GroupListPanel() {
               );
             })}
           </div>
-        </PopoverContent>
-      </Popover>
+        </DialogContent>
+      </Dialog>
 
       <GroupMinimap />
 
