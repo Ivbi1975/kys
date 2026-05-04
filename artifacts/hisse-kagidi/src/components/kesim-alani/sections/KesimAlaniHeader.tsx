@@ -20,7 +20,7 @@ export function KesimAlaniHeader() {
     setQrUrl, setQrModalOpen, setTrackingNotesOpen, setTrackingNotesLoading, setTrackingNotes,
     setNotificationLogsOpen, setNotificationLogsLoading, setNotificationLogs, setTeamDialogOpen,
     totalShares, requiredAnimals,
-    basketItems, basketOpen, setBasketOpen,
+    basketItems, setBasketOpen,
   } = useKesimAlaniContext();
 
   const [panelOpen, setPanelOpen] = useState(false);
@@ -35,7 +35,8 @@ export function KesimAlaniHeader() {
 
   return (
     <div className="mb-4">
-      <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-muted-foreground mb-2 flex-wrap">
+      {/* Breadcrumb */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-muted-foreground mb-1.5 flex-wrap">
         <button onClick={() => setLocation("/")} className="flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Ana Sayfa">
           <Home className="w-3 h-3" aria-hidden="true" />
           <span>Ana Sayfa</span>
@@ -52,15 +53,17 @@ export function KesimAlaniHeader() {
         <span className="text-foreground font-medium truncate max-w-[200px]">{kesim.name}</span>
       </nav>
 
-      <div className="flex items-center gap-2 mb-2">
+      {/* Single unified toolbar row */}
+      <div className="flex items-center gap-2">
+        {/* Left: Title + settings toggle */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">{kesim.name}</h1>
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-xl md:text-2xl font-bold text-foreground truncate leading-tight">{kesim.name}</h1>
             <button
               type="button"
               onClick={() => setPanelOpen(prev => !prev)}
               title={panelOpen ? "Ayarları Gizle" : "Çıktı Ayarları & Araçlar"}
-              className={`shrink-0 inline-flex items-center justify-center h-7 w-7 rounded-md border transition-colors ${
+              className={`shrink-0 inline-flex items-center justify-center h-6 w-6 rounded border transition-colors ${
                 panelOpen
                   ? "bg-primary text-primary-foreground border-primary"
                   : "border-input bg-background hover:bg-accent text-muted-foreground hover:text-foreground"
@@ -68,24 +71,98 @@ export function KesimAlaniHeader() {
               aria-label={panelOpen ? "Ayarları Gizle" : "Çıktı Ayarları & Araçlar"}
               aria-expanded={panelOpen}
             >
-              {panelOpen ? (
-                <ChevronDown className="w-3.5 h-3.5" />
-              ) : (
-                <Settings2 className="w-3.5 h-3.5" />
-              )}
+              {panelOpen ? <ChevronDown className="w-3 h-3" /> : <Settings2 className="w-3 h-3" />}
             </button>
           </div>
-          <p className="text-xs md:text-sm text-muted-foreground truncate mt-0.5">
-            {kesim.donations.length} bağışçı • {totalShares} hisse • {requiredAnimals} hayvan
-          </p>
+          {/* Subtitle: stats + save status inline */}
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <span className="text-xs text-muted-foreground">
+              {kesim.donations.length} bağışçı • {totalShares} hisse • {requiredAnimals} hayvan
+            </span>
+            {saveStatus === "saving" && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground animate-pulse">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                {saveProgress
+                  ? `Kaydediliyor... (${saveProgress.chunkIndex + 1}/${saveProgress.totalChunks})`
+                  : "Kaydediliyor..."}
+              </span>
+            )}
+            {saveStatus === "saved" && (
+              <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                <Save className="w-3 h-3" />
+                Kaydedildi
+              </span>
+            )}
+            {saveStatus === "error" && (
+              <span className="flex items-center gap-1 text-xs text-destructive">
+                ⚠ Kaydetme hatası
+              </span>
+            )}
+            {(saveStatus === "idle" || saveStatus === "saved") && lastSavedTime && (
+              <span className="text-xs text-muted-foreground">
+                Son kayıt: {lastSavedTime.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" })} {lastSavedTime.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Right: grouped action controls */}
+        <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+
+          {/* Group 1: Undo / Redo / History */}
+          <div className="flex items-center gap-0.5 border rounded-md px-0.5 h-8">
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleUndo} disabled={!history.canUndo} title="Geri Al (Ctrl+Z)" aria-label="Geri Al">
+              <Undo2 className="w-3.5 h-3.5" />
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleRedo} disabled={!history.canRedo} title="İleri Al (Ctrl+Y)" aria-label="İleri Al">
+              <Redo2 className="w-3.5 h-3.5" />
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setHistoryPanelOpen(!historyPanelOpen)} title="Geçmiş" aria-label="Geçmiş">
+              <History className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+
+          {/* Group 2: View utilities */}
+          <div className="hidden sm:flex items-center gap-0.5 border rounded-md px-0.5 h-8">
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShortcutHelpOpen(true)} title="Klavye Kısayolları (?)" aria-label="Klavye Kısayolları">
+              <Keyboard className="w-3.5 h-3.5" />
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={toggleFullscreen} title="Tam Ekran (F11)" aria-label={isFullscreen ? "Tam Ekrandan Çık" : "Tam Ekran"}>
+              {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
+            </Button>
+          </div>
+
+          {/* Group 3: Export actions */}
+          <div className="flex items-center gap-0.5 border rounded-md px-0.5 h-8">
+            <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={exportDonorsExcel} title="Bağışçı Listesi Excel" aria-label="Bağışçı Listesi Excel">
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+            </Button>
+            {kesim.animalGroups.length > 0 && (
+              <>
+                <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={exportGroupsExcel} disabled={excelExporting} title="Kesim Kağıdı Excel" aria-label="Kesim Kağıdı Excel">
+                  {excelExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
+                  <span className="hidden sm:inline ml-0.5 text-[11px]">{excelExporting ? "..." : "KK"}</span>
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={() => setLocation(`/not-duzenleme/${kesim.id}`)}>
+                  <Search className="w-3.5 h-3.5" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={() => setLocation(`/print/${kesim.id}`)}>
+                  <Printer className="w-3.5 h-3.5" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={handleExportKaCsv} disabled={csvExporting}>
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline ml-0.5 text-[11px]">{csvExporting ? "..." : "CSV"}</span>
+                </Button>
+              </>
+            )}
+          </div>
+
+          {/* Basket (contextual, only when items exist) */}
           {basketItems.length > 0 && (
             <Button
               size="sm"
               variant="outline"
-              className="relative shrink-0 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300"
+              className="relative h-8 w-8 p-0 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300"
               aria-label="Sepet"
               onClick={() => setBasketOpen(prev => !prev)}
             >
@@ -95,10 +172,14 @@ export function KesimAlaniHeader() {
               </span>
             </Button>
           )}
+
+          {/* Theme toggle */}
           <ThemeToggle className="h-8 w-8 p-0 shrink-0" />
+
+          {/* Primary CTA: Save */}
           <Button
             size="sm"
-            className="shrink-0"
+            className="h-8 shrink-0"
             onClick={() => saveToApi(kesim)}
             disabled={saveStatus === "saving"}
             aria-label="Kaydet"
@@ -113,8 +194,9 @@ export function KesimAlaniHeader() {
         </div>
       </div>
 
+      {/* Collapsible settings panel */}
       {panelOpen && (
-        <div className="mb-2 rounded-lg border bg-muted/20 p-3 space-y-3">
+        <div className="mt-2 rounded-lg border bg-muted/20 p-3 space-y-3">
           <div>
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Çıktı Ayarları</p>
             <div className="flex items-center gap-3 flex-wrap">
@@ -127,8 +209,7 @@ export function KesimAlaniHeader() {
                   value={kesim.kesimListeId || ""}
                   onChange={(e) => {
                     const val = e.target.value;
-                    const updated = { ...kesim, kesimListeId: val || null };
-                    save(updated, undefined, false);
+                    save({ ...kesim, kesimListeId: val || null }, undefined, false);
                   }}
                   onBlur={() => save(kesim, undefined, true)}
                 />
@@ -142,8 +223,7 @@ export function KesimAlaniHeader() {
                   value={kesim.yetkili || ""}
                   onChange={(e) => {
                     const val = e.target.value;
-                    const updated = { ...kesim, yetkili: val || null };
-                    save(updated, undefined, false);
+                    save({ ...kesim, yetkili: val || null }, undefined, false);
                   }}
                   onBlur={() => save(kesim, undefined, true)}
                 />
@@ -157,8 +237,7 @@ export function KesimAlaniHeader() {
                   value={kesim.displayName || ""}
                   onChange={(e) => {
                     const val = e.target.value;
-                    const updated = { ...kesim, displayName: val || null };
-                    save(updated, undefined, false);
+                    save({ ...kesim, displayName: val || null }, undefined, false);
                   }}
                   onBlur={() => save(kesim, undefined, true)}
                 />
@@ -184,8 +263,7 @@ export function KesimAlaniHeader() {
                   }
                 }}
               >
-                <Link2 className="w-4 h-4" />
-                <span className="ml-1">Takip Linki</span>
+                <Link2 className="w-4 h-4" /><span className="ml-1">Takip Linki</span>
               </Button>
               <Button
                 size="sm"
@@ -202,8 +280,7 @@ export function KesimAlaniHeader() {
                   }
                 }}
               >
-                <QrCode className="w-4 h-4" />
-                <span className="ml-1">QR Kod</span>
+                <QrCode className="w-4 h-4" /><span className="ml-1">QR Kod</span>
               </Button>
               <Button
                 size="sm"
@@ -220,17 +297,10 @@ export function KesimAlaniHeader() {
                   }
                 }}
               >
-                <MessageSquarePlus className="w-4 h-4" />
-                <span className="ml-1">Saha Notları</span>
+                <MessageSquarePlus className="w-4 h-4" /><span className="ml-1">Saha Notları</span>
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                aria-label="Ekipler"
-                onClick={() => setTeamDialogOpen(true)}
-              >
-                <UserCog className="w-4 h-4" />
-                <span className="ml-1">Ekipler</span>
+              <Button size="sm" variant="outline" aria-label="Ekipler" onClick={() => setTeamDialogOpen(true)}>
+                <UserCog className="w-4 h-4" /><span className="ml-1">Ekipler</span>
               </Button>
               <Button
                 size="sm"
@@ -249,87 +319,12 @@ export function KesimAlaniHeader() {
                   }
                 }}
               >
-                <Send className="w-4 h-4" />
-                <span className="ml-1">Bildirimler</span>
+                <Send className="w-4 h-4" /><span className="ml-1">Bildirimler</span>
               </Button>
             </div>
           </div>
         </div>
       )}
-
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          {saveStatus === "saving" && (
-            <span className="flex items-center gap-1 animate-pulse">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              {saveProgress
-                ? `Kaydediliyor... (${saveProgress.chunkIndex + 1}/${saveProgress.totalChunks})`
-                : "Kaydediliyor..."}
-            </span>
-          )}
-          {saveStatus === "saved" && (
-            <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
-              <Save className="w-3 h-3" />
-              Kaydedildi
-            </span>
-          )}
-          {saveStatus === "error" && (
-            <span className="flex items-center gap-1 text-destructive">
-              <span className="w-3 h-3">⚠</span>
-              Kaydetme hatası
-            </span>
-          )}
-          {(saveStatus === "idle" || saveStatus === "saved") && lastSavedTime && (
-            <span className="flex items-center gap-1">
-              <Save className="w-3 h-3" />
-              Son kayıt: {lastSavedTime.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" })} {lastSavedTime.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1 flex-wrap justify-end">
-          <div className="flex items-center gap-0.5 border rounded-md px-0.5">
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleUndo} disabled={!history.canUndo} title="Geri Al (Ctrl+Z)" aria-label="Geri Al">
-              <Undo2 className="w-3.5 h-3.5" />
-            </Button>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleRedo} disabled={!history.canRedo} title="İleri Al (Ctrl+Y)" aria-label="İleri Al">
-              <Redo2 className="w-3.5 h-3.5" />
-            </Button>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setHistoryPanelOpen(!historyPanelOpen)} title="Geçmiş" aria-label="Geçmiş">
-              <History className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hidden sm:flex" onClick={() => setShortcutHelpOpen(true)} title="Klavye Kısayolları (?)" aria-label="Klavye Kısayolları">
-            <Keyboard className="w-3.5 h-3.5" />
-          </Button>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hidden sm:flex" onClick={toggleFullscreen} title="Tam Ekran (F11)" aria-label={isFullscreen ? "Tam Ekrandan Çık" : "Tam Ekran"}>
-            {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
-          </Button>
-          <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={exportDonorsExcel} title="Bağışçı Listesi Excel" aria-label="Bağışçı Listesi Excel">
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-          </Button>
-          {kesim.animalGroups.length > 0 && (
-            <>
-              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={exportGroupsExcel} disabled={excelExporting} title="Kesim Kağıdı Excel" aria-label="Kesim Kağıdı Excel">
-                {excelExporting ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5 mr-1" />}
-                <span className="hidden sm:inline">{excelExporting ? "..." : "Excel"}</span>
-              </Button>
-              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setLocation(`/not-duzenleme/${kesim.id}`)}>
-                <Search className="w-3.5 h-3.5 mr-1" />
-                <span className="hidden sm:inline">Notlar</span>
-              </Button>
-              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setLocation(`/print/${kesim.id}`)}>
-                <Printer className="w-3.5 h-3.5 mr-1" />
-                <span className="hidden sm:inline">Yazdır</span>
-              </Button>
-              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={handleExportKaCsv} disabled={csvExporting}>
-                <Download className="w-3.5 h-3.5 mr-1" />
-                <span className="hidden sm:inline">{csvExporting ? "..." : "CSV"}</span>
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
