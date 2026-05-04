@@ -36,6 +36,13 @@ const updateProjectSchema = z.object({
 
 const PROJECTS_CACHE_KEY = "projects:list";
 const PROJECTS_TTL = 60_000;
+const WARNINGS_CACHE_KEY = "projects:warnings";
+const DELETED_PROJECTS_CACHE_KEY = "projects:deleted";
+const ARCHIVED_PROJECTS_CACHE_KEY = "projects:archived";
+
+function invalidateAllProjectCaches() {
+  cacheInvalidate(PROJECTS_CACHE_KEY, WARNINGS_CACHE_KEY, DELETED_PROJECTS_CACHE_KEY, ARCHIVED_PROJECTS_CACHE_KEY);
+}
 
 const router: IRouter = Router();
 
@@ -54,7 +61,7 @@ async function doRefresh() {
   refreshInProgress = true;
   try {
     await db.execute(sql`REFRESH MATERIALIZED VIEW CONCURRENTLY project_stats_view`);
-    cacheInvalidate(PROJECTS_CACHE_KEY);
+    invalidateAllProjectCaches();
     cacheInvalidatePrefix("dashboard:");
     lastRefreshTime = Date.now();
   } catch (err) {
@@ -181,7 +188,7 @@ router.put("/projects/:id", asyncHandler(async (req, res) => {
   if (!existing) { res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND }); return; }
 
   await db.update(projectsTable).set({ name }).where(eq(projectsTable.id, id));
-  cacheInvalidate(PROJECTS_CACHE_KEY);
+  invalidateAllProjectCaches();
   const [updated] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
   res.json({ ...updated, stats: emptyStats });
   auditLog({ action: "update", entityType: "project", entityId: id, entityName: name, oldValue: { name: existing.name }, newValue: { name }, req });
@@ -234,7 +241,7 @@ router.delete("/projects/:id", asyncHandler(async (req, res) => {
     });
 
     invalidateKACache();
-    cacheInvalidate(PROJECTS_CACHE_KEY);
+    invalidateAllProjectCaches();
     cacheInvalidatePrefix("kesim-alanlari");
     await refreshProjectStatsImmediate();
     res.json({ success: true });
@@ -245,6 +252,7 @@ router.delete("/projects/:id", asyncHandler(async (req, res) => {
       .set({ deletedAt: now })
       .where(and(eq(kesimAlanlariTable.projectId, id), isNull(kesimAlanlariTable.deletedAt)));
     invalidateKACache();
+    invalidateAllProjectCaches();
     cacheInvalidatePrefix("kesim-alanlari");
     await refreshProjectStatsImmediate();
     res.json({ success: true });
@@ -268,6 +276,7 @@ router.post("/projects/:id/restore", asyncHandler(async (req, res) => {
     .set({ deletedAt: null })
     .where(eq(kesimAlanlariTable.projectId, id));
   invalidateKACache();
+  invalidateAllProjectCaches();
   cacheInvalidatePrefix("kesim-alanlari");
   await refreshProjectStatsImmediate();
   const [restored] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
@@ -330,6 +339,7 @@ router.post("/projects/:id/archive", asyncHandler(async (req, res) => {
   });
 
   await refreshProjectStatsImmediate();
+  invalidateAllProjectCaches();
   cacheInvalidatePrefix("kesim-alanlari");
 
   res.json({ success: true, archivedAt: now });
@@ -364,6 +374,7 @@ router.post("/projects/:id/unarchive", asyncHandler(async (req, res) => {
   });
 
   await refreshProjectStatsImmediate();
+  invalidateAllProjectCaches();
   cacheInvalidatePrefix("kesim-alanlari");
 
   const [restored] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));

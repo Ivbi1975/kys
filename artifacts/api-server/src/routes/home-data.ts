@@ -18,6 +18,12 @@ const LOGO_CACHE_KEY = "settings:logo";
 const LOGO_TTL = 600_000;
 const PROJECTS_CACHE_KEY = "projects:list";
 const PROJECTS_TTL = 60_000;
+export const WARNINGS_CACHE_KEY = "projects:warnings";
+const WARNINGS_TTL = 30_000;
+export const DELETED_PROJECTS_CACHE_KEY = "projects:deleted";
+const DELETED_PROJECTS_TTL = 60_000;
+export const ARCHIVED_PROJECTS_CACHE_KEY = "projects:archived";
+const ARCHIVED_PROJECTS_TTL = 60_000;
 
 type ProjectRow = {
   id: string; name: string; description: string;
@@ -66,6 +72,9 @@ type ProjectWarnings = {
 };
 
 async function fetchProjectWarnings(): Promise<Record<string, ProjectWarnings>> {
+  const cached = cacheGet<Record<string, ProjectWarnings>>(WARNINGS_CACHE_KEY);
+  if (cached) return cached;
+
   const result = await db.execute(sql`
     WITH active_projects AS (
       SELECT id FROM projects WHERE deleted_at IS NULL AND archived_at IS NULL
@@ -153,6 +162,7 @@ async function fetchProjectWarnings(): Promise<Record<string, ProjectWarnings>> 
       missingVekalet: Number(row.missing_vekalet),
     };
   }
+  cacheSet(WARNINGS_CACHE_KEY, map, WARNINGS_TTL);
   return map;
 }
 
@@ -196,14 +206,24 @@ router.get("/home-data", asyncHandler(async (_req, res) => {
       cacheSet(PROJECTS_CACHE_KEY, result, PROJECTS_TTL);
       return result;
     })(),
-    db.select().from(projectsTable).where(isNotNull(projectsTable.deletedAt)),
     (async () => {
+      const cached = cacheGet<unknown[]>(DELETED_PROJECTS_CACHE_KEY);
+      if (cached) return cached;
+      const rows = await db.select().from(projectsTable).where(isNotNull(projectsTable.deletedAt));
+      cacheSet(DELETED_PROJECTS_CACHE_KEY, rows, DELETED_PROJECTS_TTL);
+      return rows;
+    })(),
+    (async () => {
+      const cached = cacheGet<ReturnType<typeof mapProjectRow>[]>(ARCHIVED_PROJECTS_CACHE_KEY);
+      if (cached) return cached;
       const rows = await db.execute(sql`
         ${projectsWithStatsQuery}
         WHERE p.archived_at IS NOT NULL AND p.deleted_at IS NULL
         ORDER BY p.archived_at DESC
       `);
-      return (rows.rows as ProjectRow[]).map(mapProjectRow);
+      const result = (rows.rows as ProjectRow[]).map(mapProjectRow);
+      cacheSet(ARCHIVED_PROJECTS_CACHE_KEY, result, ARCHIVED_PROJECTS_TTL);
+      return result;
     })(),
     fetchProjectWarnings().catch(() => ({} as Record<string, ProjectWarnings>)),
   ]);
