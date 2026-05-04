@@ -197,7 +197,7 @@ export default function ApiDokumantasyon() {
           title="Bağışçı / Hisse Listesi"
           method="GET"
           path="/api/vys/projects/:id/donations"
-          description="Bir projedeki tüm bağışçıları ve hisse bilgilerini döner. Sayfalama desteklenir (page, limit). Hassas alanlar (telefon, notlar, AI kategorileri) gizlidir."
+          description="Bir projedeki tüm bağışçıları sayfalı olarak döner. Kurban cinsi (donationType), vekalet numarası ve ait olduğu kesim alanı bilgisi dahildir."
         >
           <div className="space-y-1">
             <p className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Sorgu Parametreleri</p>
@@ -212,14 +212,16 @@ export default function ApiDokumantasyon() {
           <CodeBlock id="resp-2" code={`{
   "items": [
     {
-      "id": "d1e2f3",
-      "name": "Ahmet Yılmaz",
-      "description": "Hisse 1",
-      "shareCount": 2,
-      "vekalet": "var",
-      "tags": [
-        { "id": "tag-id-1", "name": "VIP" }
-      ]
+      "id": "9ec662b1-f977-4e9f-ba7a-2c538740e231",
+      "name": "FİKRİ BAŞARAN",
+      "description": "NEJDET KARABULUT",
+      "shareCount": 1,
+      "vekalet": "466403",
+      "donationType": "Vacip",
+      "notes": "",
+      "kesimAlaniId": "328268b5-...",
+      "kesimAlaniName": "04.05 kesim listesi",
+      "tags": [{ "id": "tag-id-1", "name": "VIP" }]
     }
   ],
   "total": 250,
@@ -229,10 +231,15 @@ export default function ApiDokumantasyon() {
 }`} />
           <FieldTable rows={[
             { alan: "items[].id", tur: "string", aciklama: "Bağışçı kimliği" },
-            { alan: "items[].name", tur: "string", aciklama: "Ad soyad" },
+            { alan: "items[].name", tur: "string", aciklama: "Adına kesilen kişi" },
+            { alan: "items[].description", tur: "string", aciklama: "Vekaleti veren kişi" },
             { alan: "items[].shareCount", tur: "number", aciklama: "Hisse sayısı" },
-            { alan: "items[].vekalet", tur: "string", aciklama: "Vekalet bilgisi" },
-            { alan: "items[].tags", tur: "object[]", aciklama: "{ id, name } nesneleri" },
+            { alan: "items[].vekalet", tur: "string", aciklama: "Vekalet numarası" },
+            { alan: "items[].donationType", tur: "string", aciklama: "Kurban cinsi (örn. Vacip, Adak, Mevta)" },
+            { alan: "items[].notes", tur: "string", aciklama: "Bağışçı notu (boşsa boş string)" },
+            { alan: "items[].kesimAlaniId", tur: "string", aciklama: "Ait olduğu kesim alanının kimliği" },
+            { alan: "items[].kesimAlaniName", tur: "string", aciklama: "Ait olduğu kesim alanının adı" },
+            { alan: "items[].tags", tur: "object[]", aciklama: "Etiketler — { id, name } nesneleri" },
             { alan: "total", tur: "number", aciklama: "Toplam kayıt sayısı" },
             { alan: "totalPages", tur: "number", aciklama: "Toplam sayfa sayısı" },
           ]} />
@@ -240,16 +247,97 @@ export default function ApiDokumantasyon() {
 
         {/* Endpoint 3 */}
         <Section
+          id="kesim-listesi"
+          title="Tüm Kesim Listesi (Bağışçılar Dahil) ✦ Önerilen"
+          method="GET"
+          path="/api/vys/projects/:id/kesim-listesi"
+          description="Tek istekte tüm kesim alanlarını, her alanın hayvan gruplarını ve her grubun bağışçı listesini döner. Kurban cinsi (Vacip / Adak / Mevta), vekalet numarası ve notlar dahildir."
+        >
+          <CodeBlock id="curl-3" code={`curl -H "X-API-Key: <VYS_API_KEY>" \\
+  ${BASE_URL}/projects/abc123/kesim-listesi`} />
+          <p className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Yanıt · 200 OK</p>
+          <CodeBlock id="resp-3" code={`[
+  {
+    "id": "ka-001",
+    "name": "04.05 kesim listesi",
+    "capacity": 200,
+    "groups": [
+      {
+        "id": "group-1",
+        "animalNo": 1,
+        "colorTag": null,
+        "kesildi": false,
+        "kesildiAt": null,
+        "sortOrder": 1,
+        "notes": "",
+        "assignedShares": 4,
+        "donors": [
+          {
+            "sira": 1,
+            "id": "9ec662b1-...",
+            "name": "FİKRİ BAŞARAN",
+            "description": "NEJDET KARABULUT",
+            "vekalet": "466403",
+            "shareCount": 1,
+            "donationType": "Vacip",
+            "notes": ""
+          },
+          {
+            "sira": 2,
+            "id": "d1b3c2a0-...",
+            "name": "FİKRET BAŞARAN",
+            "description": "NEJDET KARABULUT",
+            "vekalet": "466397",
+            "shareCount": 1,
+            "donationType": "Adak",
+            "notes": ""
+          }
+        ]
+      }
+    ]
+  }
+]`} />
+          <p className="text-[12px] text-white/40 font-semibold uppercase tracking-wider mt-2">Kesim Alanı Alanları</p>
+          <FieldTable rows={[
+            { alan: "id", tur: "string", aciklama: "Kesim alanı kimliği" },
+            { alan: "name", tur: "string", aciklama: "Kesim alanı adı" },
+            { alan: "capacity", tur: "number | null", aciklama: "Maksimum kapasite (ayarlanmadıysa null)" },
+            { alan: "groups", tur: "array", aciklama: "Aktif hayvan grupları (boş alan için [])" },
+          ]} />
+          <p className="text-[12px] text-white/40 font-semibold uppercase tracking-wider mt-2">Hayvan Grubu Alanları (groups[])</p>
+          <FieldTable rows={[
+            { alan: "animalNo", tur: "number", aciklama: "Hayvan numarası" },
+            { alan: "colorTag", tur: "string | null", aciklama: "Renk etiketi (null = etiketsiz)" },
+            { alan: "kesildi", tur: "boolean", aciklama: "Kesim tamamlandı mı?" },
+            { alan: "kesildiAt", tur: "ISO 8601 | null", aciklama: "Kesim zamanı" },
+            { alan: "notes", tur: "string", aciklama: "Grup notu (boşsa boş string)" },
+            { alan: "assignedShares", tur: "number", aciklama: "Gruba atanmış toplam hisse sayısı" },
+            { alan: "donors", tur: "array", aciklama: "Gruptaki bağışçılar (sıralı)" },
+          ]} />
+          <p className="text-[12px] text-white/40 font-semibold uppercase tracking-wider mt-2">Bağışçı Alanları (donors[])</p>
+          <FieldTable rows={[
+            { alan: "sira", tur: "number", aciklama: "Grup içindeki sıra (1'den başlar)" },
+            { alan: "name", tur: "string", aciklama: "Adına kesilen kişi" },
+            { alan: "description", tur: "string", aciklama: "Vekaleti veren kişi" },
+            { alan: "vekalet", tur: "string", aciklama: "Vekalet numarası" },
+            { alan: "shareCount", tur: "number", aciklama: "Hisse sayısı" },
+            { alan: "donationType", tur: "string", aciklama: "Kurban cinsi (Vacip, Adak, Mevta, …)" },
+            { alan: "notes", tur: "string", aciklama: "Bağışçı notu (boşsa boş string)" },
+          ]} />
+        </Section>
+
+        {/* Endpoint 4 */}
+        <Section
           id="kesim-alanlari"
           title="Kesim Alanı Listesi"
           method="GET"
           path="/api/vys/projects/:id/kesim-alanlari"
           description="Bir projedeki aktif kesim alanlarını listeler. Sistem dahili __havuz__ alanı bu listede yer almaz."
         >
-          <CodeBlock id="curl-3" code={`curl -H "X-API-Key: <VYS_API_KEY>" \\
+          <CodeBlock id="curl-4" code={`curl -H "X-API-Key: <VYS_API_KEY>" \\
   ${BASE_URL}/projects/abc123/kesim-alanlari`} />
           <p className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Yanıt · 200 OK</p>
-          <CodeBlock id="resp-3" code={`[
+          <CodeBlock id="resp-4" code={`[
   {
     "id": "ka-001",
     "name": "A Alanı",
@@ -265,25 +353,25 @@ export default function ApiDokumantasyon() {
           ]} />
         </Section>
 
-        {/* Endpoint 4 */}
+        {/* Endpoint 5 — Deprecated */}
         <Section
           id="groups"
           title="Hayvan Grupları ve Kesim Durumu"
           method="GET"
           path="/api/vys/projects/:id/kesim-alanlari/:kesimId/groups"
-          description="Belirli bir kesim alanındaki hayvan gruplarını ve her grubun kesim durumunu döner."
+          description="Belirli bir kesim alanındaki hayvan gruplarını döner. Bağışçı detayları içermez — bunun yerine /kesim-listesi kullanın."
         >
-          <CodeBlock id="curl-4" code={`curl -H "X-API-Key: <VYS_API_KEY>" \\
+          <CodeBlock id="curl-5b" code={`curl -H "X-API-Key: <VYS_API_KEY>" \\
   ${BASE_URL}/projects/abc123/kesim-alanlari/ka-001/groups`} />
           <p className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Yanıt · 200 OK</p>
-          <CodeBlock id="resp-4" code={`{
+          <CodeBlock id="resp-5b" code={`{
   "kesimAlaniId": "ka-001",
   "kesimAlaniName": "A Alanı",
   "items": [
     {
       "id": "group-1",
       "animalNo": 1,
-      "colorTag": "kırmızı",
+      "colorTag": null,
       "kesildi": true,
       "kesildiAt": "2025-06-15T08:30:00.000Z",
       "sortOrder": 1,
@@ -293,7 +381,7 @@ export default function ApiDokumantasyon() {
 }`} />
           <FieldTable rows={[
             { alan: "items[].animalNo", tur: "number", aciklama: "Hayvan numarası" },
-            { alan: "items[].colorTag", tur: "string", aciklama: "Renk etiketi" },
+            { alan: "items[].colorTag", tur: "string | null", aciklama: "Renk etiketi" },
             { alan: "items[].kesildi", tur: "boolean", aciklama: "Kesim tamamlandı mı?" },
             { alan: "items[].kesildiAt", tur: "ISO 8601 | null", aciklama: "Kesim zamanı" },
             { alan: "items[].assignedShares", tur: "number", aciklama: "Gruba atanmış hisse sayısı" },
