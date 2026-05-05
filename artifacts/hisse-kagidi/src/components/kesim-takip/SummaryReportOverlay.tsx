@@ -79,7 +79,13 @@ export function SummaryReportOverlay({
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => window.print()}
+              onClick={() => {
+                document.body.classList.add("printing-report");
+                window.addEventListener("afterprint", () => {
+                  document.body.classList.remove("printing-report");
+                }, { once: true });
+                window.print();
+              }}
               className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl font-semibold transition-all hover:opacity-80"
               style={{ background: "rgba(148,163,184,0.10)", color: "#94a3b8", border: "1px solid rgba(148,163,184,0.12)" }}
             >
