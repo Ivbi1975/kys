@@ -80,28 +80,31 @@ export function GroupListPanel() {
   } = ctx;
 
   const [groupSearchInput, setGroupSearchInput] = useState("");
-  const PAGE_SIZE = 5;
+  const PAGE_SIZE = 50;
   const [visibleGroupCount, setVisibleGroupCount] = useState(PAGE_SIZE);
-  const [allShown, setAllShown] = useState(false);
   const prevFilteredLengthRef = useRef(filteredGroupItems.length);
 
   useEffect(() => {
     if (prevFilteredLengthRef.current !== filteredGroupItems.length) {
       setVisibleGroupCount(PAGE_SIZE);
-      setAllShown(false);
       prevFilteredLengthRef.current = filteredGroupItems.length;
     }
   }, [filteredGroupItems.length]);
 
   useEffect(() => {
-    if (!allShown || !groupsListBottomRef.current) return;
+    if (!groupsListBottomRef.current) return;
     const observer = new IntersectionObserver(
-      ([entry]) => setAtBottom(entry.isIntersecting),
-      { threshold: 0, rootMargin: "80px 0px" }
+      ([entry]) => {
+        setAtBottom(entry.isIntersecting);
+        if (entry.isIntersecting) {
+          setVisibleGroupCount(prev => prev + PAGE_SIZE);
+        }
+      },
+      { threshold: 0, rootMargin: "200px 0px" }
     );
     observer.observe(groupsListBottomRef.current);
     return () => observer.disconnect();
-  }, [allShown]);
+  }, []);
 
   const handleGroupSearch = useCallback(() => {
     setGroupSearchQuery(groupSearchInput);
@@ -586,8 +589,6 @@ export function GroupListPanel() {
         for (let i = 0; i < visibleItems.length; i += effectiveColumnCount) {
           visibleRows.push(visibleItems.slice(i, i + effectiveColumnCount));
         }
-        const hasMore = filteredGroupItems.length > visibleGroupCount;
-        const remaining = filteredGroupItems.length - visibleGroupCount;
         return (
           <>
             {visibleRows.map((row, rowIdx) => (
@@ -595,13 +596,6 @@ export function GroupListPanel() {
                 {row.map(renderGroupCard)}
               </div>
             ))}
-            {hasMore && (
-              <div className="flex justify-center mt-2 mb-4">
-                <Button variant="outline" size="sm" onClick={() => { setVisibleGroupCount(filteredGroupItems.length); setAllShown(true); }}>
-                  <ChevronDown className="w-4 h-4 mr-1" />{remaining} grup daha göster
-                </Button>
-              </div>
-            )}
             <div ref={groupsListBottomRef} />
           </>
         );
