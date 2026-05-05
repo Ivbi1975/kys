@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { CheckCircle2, StickyNote, ChevronDown, ChevronUp, BarChart2, Printer } from "lucide-react";
+import { CheckCircle2, StickyNote, ChevronDown, ChevronUp } from "lucide-react";
 import { formatKesildiTime } from "@/lib/formatting";
 import { NoteType } from "@/lib/constants";
 import type { TrackingGroup, TrackingNote } from "@/lib/api";
@@ -77,56 +77,6 @@ export function RightPanel({
 
   return (
     <div className="space-y-4">
-      {/* Quick Actions */}
-      <div
-        className="rounded-2xl border p-5"
-        style={{ background: "#0b1a2b", borderColor: "rgba(148,163,184,0.14)" }}
-      >
-        <h3 className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: "#94a3b8" }}>
-          Hızlı İşlemler
-        </h3>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            className="flex flex-col items-center gap-2 p-3.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-40"
-            style={{ background: "rgba(0,201,134,0.14)", color: "#00c986" }}
-            onClick={onMarkNextPending}
-            disabled={pendingCount === 0}
-          >
-            <CheckCircle2 className="w-5 h-5" aria-hidden="true" />
-            <span>Kesildi İşaretle</span>
-            {pendingCount > 0 && (
-              <span className="text-[10px] opacity-70">({pendingCount} bekliyor)</span>
-            )}
-          </button>
-          <button
-            className="flex flex-col items-center gap-2 p-3.5 rounded-xl text-xs font-semibold transition-all hover:bg-white/5 disabled:opacity-40"
-            style={{ background: "rgba(148,163,184,0.08)", color: "#94a3b8" }}
-            onClick={onOpenNextNotes}
-            disabled={pendingCount === 0}
-          >
-            <StickyNote className="w-5 h-5" aria-hidden="true" />
-            <span>Not Ekle</span>
-          </button>
-          <button
-            className="flex flex-col items-center gap-2 p-3.5 rounded-xl text-xs font-semibold transition-all hover:bg-white/5"
-            style={{ background: "rgba(148,163,184,0.08)", color: "#94a3b8" }}
-            onClick={onShowReport}
-          >
-            <BarChart2 className="w-5 h-5" aria-hidden="true" />
-            <span>Rapor Oluştur</span>
-          </button>
-          <button
-            className="flex flex-col items-center gap-2 p-3.5 rounded-xl text-xs font-semibold transition-all hover:bg-white/5"
-            style={{ background: "rgba(148,163,184,0.08)", color: "#94a3b8" }}
-            onClick={() => window.print()}
-            aria-label="Sayfayı yazdır"
-          >
-            <Printer className="w-5 h-5" aria-hidden="true" />
-            <span>Yazdır</span>
-          </button>
-        </div>
-      </div>
-
       {/* Genel Notlar */}
       <div
         ref={notesRef}
