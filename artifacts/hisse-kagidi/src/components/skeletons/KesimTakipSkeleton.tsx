@@ -13,8 +13,8 @@ export function KesimTakipSkeleton() {
           </div>
         </div>
         <div className="flex-1 px-3 py-4 space-y-1">
-          {[80, 64, 72, 60, 76, 56, 68, 60, 64, 52].map((w, i) => (
-            <Skeleton key={i} className={`h-9 rounded-xl w-full`} style={{ background: "rgba(148,163,184,0.06)" }} />
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-9 rounded-xl w-full" style={{ background: i === 1 ? "rgba(0,201,134,0.12)" : "rgba(148,163,184,0.06)" }} />
           ))}
         </div>
       </aside>

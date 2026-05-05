@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { CheckCircle2, StickyNote, ChevronDown, ChevronUp, BarChart2 } from "lucide-react";
+import { useMemo, useState, useEffect, useRef } from "react";
+import { CheckCircle2, StickyNote, ChevronDown, ChevronUp, BarChart2, Printer } from "lucide-react";
 import { formatKesildiTime } from "@/lib/formatting";
 import { NoteType } from "@/lib/constants";
 import type { TrackingGroup, TrackingNote } from "@/lib/api";
@@ -17,15 +17,26 @@ interface RightPanelProps {
   onOpenNextNotes: () => void;
   onShowReport: () => void;
   pendingCount: number;
+  forceNotesOpen?: boolean;
   createNote?: (data: { animalGroupId?: string; type: string; content: string }) => Promise<TrackingNote | null>;
 }
 
 export function RightPanel({
   groups, notes, kesildiCount, totalGroups, token,
   onNoteAdded, onMarkNextPending, onOpenNextNotes, onShowReport,
-  pendingCount, createNote,
+  pendingCount, forceNotesOpen, createNote,
 }: RightPanelProps) {
   const [notesOpen, setNotesOpen] = useState(false);
+  const notesRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (forceNotesOpen) {
+      setNotesOpen(true);
+      setTimeout(() => {
+        notesRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 100);
+    }
+  }, [forceNotesOpen]);
 
   const activityItems = useMemo(() => {
     const items: { label: string; sub: string; time: string; type: "kesildi" | "note"; }[] = [];
@@ -107,18 +118,20 @@ export function RightPanel({
           <button
             className="flex flex-col items-center gap-2 p-3.5 rounded-xl text-xs font-semibold transition-all hover:bg-white/5"
             style={{ background: "rgba(148,163,184,0.08)", color: "#94a3b8" }}
-            onClick={onShowReport}
+            onClick={() => window.print()}
+            aria-label="Sayfayı yazdır"
           >
-            <BarChart2 className="w-5 h-5" aria-hidden="true" />
-            <span>Excel İndir</span>
+            <Printer className="w-5 h-5" aria-hidden="true" />
+            <span>Yazdır</span>
           </button>
         </div>
       </div>
 
       {/* Genel Notlar */}
       <div
+        ref={notesRef}
         className="rounded-2xl border overflow-hidden"
-        style={{ background: "#0b1a2b", borderColor: "rgba(148,163,184,0.14)" }}
+        style={{ background: "#0b1a2b", borderColor: notesOpen ? "rgba(0,201,134,0.25)" : "rgba(148,163,184,0.14)" }}
       >
         <button
           className="w-full flex items-center justify-between px-5 py-4 transition-colors hover:bg-white/5"

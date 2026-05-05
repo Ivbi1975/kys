@@ -33,6 +33,18 @@ export default function KesimTakipPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeNavAction, setActiveNavAction] = useState<"list" | "report" | "notes">("list");
+  const [forceNotesOpen, setForceNotesOpen] = useState(0);
+
+  const handleNavAction = useCallback((action: "list" | "report" | "notes") => {
+    setActiveNavAction(action);
+    if (action === "report") {
+      setShowSummaryReport(true);
+      setActiveNavAction("list");
+    } else if (action === "notes") {
+      setForceNotesOpen(n => n + 1);
+    }
+  }, []);
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
     typeof Notification !== "undefined" ? Notification.permission : "denied"
   );
@@ -170,7 +182,12 @@ export default function KesimTakipPage() {
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "#06111f", fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}>
-      <DashboardSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <DashboardSidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        activeAction={activeNavAction}
+        onNav={handleNavAction}
+      />
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <DashboardTopbar
@@ -243,6 +260,7 @@ export default function KesimTakipPage() {
                 onOpenNextNotes={handleOpenNextPendingNotes}
                 onShowReport={() => setShowSummaryReport(true)}
                 pendingCount={pendingGroups.length}
+                forceNotesOpen={forceNotesOpen > 0 ? forceNotesOpen : undefined}
                 createNote={handleCreateNote as any}
               />
             </div>
