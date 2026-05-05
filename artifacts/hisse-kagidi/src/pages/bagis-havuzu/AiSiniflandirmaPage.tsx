@@ -185,6 +185,17 @@ export default function AiSiniflandirmaPage() {
           stopPolling();
           setAiRunning(false);
           activeJobIdsRef.current = [];
+
+          let finalErrors = 0;
+          for (const e of jobErrorMap.values()) finalErrors += e;
+          if (finalErrors > 0) {
+            toast({
+              title: "Kısmi başarısızlık",
+              description: `${finalErrors} batch AI'dan eksik yanıt aldı ve yeniden denendi. Bazı bağışlar sınıflandırılamadı olarak işaretlendi.`,
+              variant: "destructive",
+            });
+          }
+
           if (allCollectedResults.length > 0) {
             try {
               const SAVE_CHUNK = 2000;

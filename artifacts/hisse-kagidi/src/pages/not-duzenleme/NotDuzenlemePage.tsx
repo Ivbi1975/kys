@@ -439,6 +439,16 @@ export default function NotDuzenlemePage() {
           setAiRunning(false);
           activeJobIdsRef.current = [];
 
+          let finalErrors = 0;
+          for (const e of jobErrorMap.values()) finalErrors += e;
+          if (finalErrors > 0) {
+            toast({
+              title: "Kısmi başarısızlık",
+              description: `${finalErrors} batch AI'dan eksik yanıt aldı ve yeniden denendi. Bazı bağışlar sınıflandırılamadı olarak işaretlendi.`,
+              variant: "destructive",
+            });
+          }
+
           const expectedTotal = Array.from(jobProgressMap.values()).reduce((s, p) => s + p.total, 0);
           if (allCollectedResults.length > 0 && allCollectedResults.length < expectedTotal) {
             console.warn(`[AI Reconciliation] Expected ${expectedTotal} results but got ${allCollectedResults.length} — ${expectedTotal - allCollectedResults.length} missing`);

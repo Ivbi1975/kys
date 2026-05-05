@@ -723,16 +723,16 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
   await db.transaction(async (tx) => {
     for (let i = 0; i < classifications.length; i += TX_BATCH_SIZE) {
       const chunk = classifications.slice(i, i + TX_BATCH_SIZE);
-      await Promise.all(chunk.map(c =>
-        tx.update(donationsTable)
+      for (const c of chunk) {
+        await tx.update(donationsTable)
           .set({
             aiCategories: JSON.stringify(c.categories),
             aiWarnings: c.warnings || null,
             aiRequests: c.requests || null,
             aiSummary: c.summary || null,
           })
-          .where(eq(donationsTable.id, c.donationId))
-      ));
+          .where(eq(donationsTable.id, c.donationId));
+      }
     }
   }, { isolationLevel: "repeatable read" });
 
@@ -759,15 +759,15 @@ router.put("/ai-notes/bulk-update", asyncHandler(async (req, res) => {
   await db.transaction(async (tx) => {
     for (let i = 0; i < updates.length; i += TX_BATCH_SIZE) {
       const chunk = updates.slice(i, i + TX_BATCH_SIZE);
-      await Promise.all(chunk.map(u => {
+      for (const u of chunk) {
         const setFields: Record<string, string> = {};
         if (u.notes !== undefined) setFields.notes = u.notes;
         if (u.description !== undefined) setFields.description = u.description;
-        if (Object.keys(setFields).length === 0) return Promise.resolve();
-        return tx.update(donationsTable)
+        if (Object.keys(setFields).length === 0) continue;
+        await tx.update(donationsTable)
           .set(setFields)
           .where(eq(donationsTable.id, u.donationId));
-      }));
+      }
     }
   }, { isolationLevel: "repeatable read" });
 
