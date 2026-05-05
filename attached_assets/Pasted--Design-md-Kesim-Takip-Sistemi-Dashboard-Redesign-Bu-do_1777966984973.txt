@@ -1,0 +1,965 @@
+# Design.md — Kesim Takip Sistemi Dashboard Redesign
+
+Bu doküman, mevcut dar ve dağınık “Kesim Listesi” ekranının tam genişlikte, modern, okunabilir ve profesyonel bir web dashboard’a dönüştürülmesi için hazırlanmıştır. Tasarım karanlık tema, yeşil/teal vurgu rengi ve SaaS panel mantığı üzerine kurulmalıdır.
+
+---
+
+## 1. Tasarım Amacı
+
+Mevcut ekran tek kolonlu, ortalanmış ve tüm sayfa alanını kullanmayan bir yapıya sahip. Yeni tasarımın amacı:
+
+- Sayfayı tüm desktop genişliğine yaymak
+- Kullanıcıya daha hızlı durum takibi sağlamak
+- Hayvan listesini daha okunabilir ve yönetilebilir hale getirmek
+- Rapor, not, filtre ve işlem aksiyonlarını daha erişilebilir yapmak
+- UI’ı daha modern, premium ve profesyonel göstermek
+- Mobilde de kullanılabilir, responsive bir yapı kurmak
+
+Bu tasarım bir **kesim takip / operasyon yönetim paneli** gibi hissettirmelidir.
+
+---
+
+## 2. Genel Görsel Stil
+
+### Tema
+
+- Ana tema: Dark SaaS Dashboard
+- Hissiyat: Premium, kurumsal, modern, net, operasyonel
+- Stil: Minimal ama boş değil; güçlü kart yapıları, net hiyerarşi, iyi spacing
+- UI dili: Rounded cards, soft borders, koyu yüzeyler, yeşil/teal accent
+
+### Renk Paleti
+
+```css
+:root {
+  --bg-main: #06111f;
+  --bg-sidebar: #071522;
+  --bg-card: #0b1a2b;
+  --bg-card-soft: #0d2033;
+  --bg-input: #071827;
+
+  --border-soft: rgba(148, 163, 184, 0.16);
+  --border-strong: rgba(148, 163, 184, 0.28);
+
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-soft: #cbd5e1;
+
+  --accent: #00c986;
+  --accent-hover: #00b879;
+  --accent-soft: rgba(0, 201, 134, 0.14);
+
+  --blue: #3b82f6;
+  --blue-soft: rgba(59, 130, 246, 0.14);
+
+  --warning: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.14);
+
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.14);
+}
+```
+
+### Tipografi
+
+Önerilen fontlar:
+
+- `Inter`
+- `Geist`
+- `Manrope`
+- `Plus Jakarta Sans`
+
+Kullanım:
+
+- Başlıklar: 600 / 700 font weight
+- Gövde: 400 / 500 font weight
+- Sayısal metrikler: 700 font weight
+- Küçük açıklamalar: muted color, 13–14px
+
+Örnek:
+
+```css
+body {
+  font-family: Inter, Geist, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+```
+
+---
+
+## 3. Ana Sayfa Yapısı
+
+Sayfa tek ekranlık bir dashboard gibi kurgulanmalıdır.
+
+```txt
+┌───────────────────────────────────────────────────────────────┐
+│ Sidebar │ Top Header                                          │
+│         ├─────────────────────────────────────────────────────┤
+│         │ KPI Cards                                           │
+│         │ Progress + Notes                       Right Panel   │
+│         │ Search / Filters                      Activity      │
+│         │ Main Animal Table                     Quick Actions │
+│         │ Pagination                            Report Summary│
+└───────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 4. Layout Ölçüleri
+
+### Desktop
+
+- Minimum genişlik hedefi: 1280px
+- Ideal genişlik: 1440px / 1600px
+- Sidebar genişliği: 260px
+- Sağ panel genişliği: 340px – 380px
+- Ana içerik: kalan tüm alan
+- Sayfa padding: 24px – 32px
+- Kart border radius: 16px – 20px
+- Kart iç padding: 20px – 24px
+- Grid gap: 16px – 20px
+
+Örnek grid:
+
+```css
+.app-shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+
+.dashboard-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+}
+```
+
+### Responsive
+
+- 1200px altı: Sağ panel alta taşınabilir
+- 900px altı: Sidebar collapsible olmalı
+- 768px altı: KPI kartları 2 kolon
+- 640px altı: KPI kartları tek kolon, tablo kart listeye dönüşmeli
+
+---
+
+## 5. Sidebar
+
+Sidebar, mevcut tasarımdaki üstteki dar navigasyon yerine kalıcı sol menü olarak tasarlanmalıdır.
+
+### İçerik
+
+Üst logo alanı:
+
+- Yuvarlak ikon
+- Başlık: `KESİM TAKİP`
+- Alt başlık: `SİSTEMİ`
+
+Menü item’ları:
+
+1. `Kesim Listesi` — aktif
+2. `Kontrol Paneli`
+3. `Projeler`
+4. `Hayvanlar`
+5. `Kesim İşlemleri`
+6. `Raporlar`
+7. `Notlar`
+8. `Takvim`
+9. `Kullanıcılar`
+10. `Ayarlar`
+
+Alt profil alanı:
+
+- Avatar: `HC`
+- Ad: `HC Çiftliği`
+- Rol: `Ekip Yöneticisi`
+- Dropdown icon
+
+### Aktif Menü Tasarımı
+
+Aktif menü item’ı:
+
+- Solunda 3px accent çizgi
+- Hafif yeşil transparan arka plan
+- Yeşil icon ve metin
+- Rounded 10–12px
+
+```css
+.sidebar-item.active {
+  background: linear-gradient(90deg, rgba(0, 201, 134, 0.16), rgba(0, 201, 134, 0.04));
+  color: var(--accent);
+  border-left: 3px solid var(--accent);
+}
+```
+
+---
+
+## 6. Top Header
+
+Header, kullanıcının proje ve tarihi hızlı değiştirebileceği, rapor ve yeni kayıt aksiyonlarına ulaşabileceği alan olmalıdır.
+
+### Sol Alan
+
+```txt
+04.05 Kesim Listesi
+Kesim Takip Paneli
+```
+
+- Başlık büyük ve net
+- Alt başlık muted
+- Yanında küçük info icon olabilir
+
+### Orta / Sağ Alan
+
+Kontroller:
+
+- Proje seçici: `Proje 04.05`
+- Tarih seçici: `04 Mayıs 2025`
+- Dark mode icon
+- Bildirim icon + badge `3`
+- Kullanıcı menüsü:
+  - Avatar: `HC`
+  - Ad: `Hasan Can`
+  - Rol: `Ekip Yöneticisi`
+
+### Sağ Aksiyonlar
+
+- Secondary button: `Durum Raporu`
+- Primary button: `+ Yeni Kesim Ekle`
+
+Primary buton net görünmeli, accent renk kullanılmalı.
+
+```css
+.primary-button {
+  background: var(--accent);
+  color: #02130d;
+  font-weight: 700;
+}
+```
+
+---
+
+## 7. KPI Kartları
+
+Header altında 4 adet özet kart bulunmalıdır.
+
+### Kartlar
+
+#### 1. Toplam Hayvan
+
+- Label: `Toplam Hayvan`
+- Değer: `55`
+- Açıklama: `Bu proje toplamı`
+- Icon: hayvan / cow icon
+
+#### 2. Kesilen
+
+- Label: `Kesilen`
+- Değer: `3`
+- Açıklama: `Bu proje toplamı`
+- Icon: check circle
+
+#### 3. Bekleyen
+
+- Label: `Bekleyen`
+- Değer: `52`
+- Açıklama: `İşlem bekleyen`
+- Icon: clock
+- Warning rengi kullanılabilir
+
+#### 4. Tamamlanma Oranı
+
+- Label: `Tamamlanma Oranı`
+- Değer: `%5`
+- Açıklama: `3 / 55 tamamlandı`
+- Circular progress indicator
+
+### UX Notları
+
+- Kartlar hızlı taranabilir olmalı
+- Büyük sayı en görünür eleman olmalı
+- Iconlar dekoratif ama anlamlı olmalı
+- Kartlar aynı yükseklikte olmalı
+
+---
+
+## 8. Kesim Durumu Kartı
+
+Bu kart operasyonun genel ilerlemesini göstermelidir.
+
+### İçerik
+
+Başlık:
+
+```txt
+Kesim Durumu
+```
+
+Ana değer:
+
+```txt
+3 / 55
+```
+
+Progress bar:
+
+- Dolu alan: accent green
+- Boş alan: koyu track
+- Alt açıklama: `%5 tamamlandı`
+
+Opsiyonel dekoratif çizim:
+
+- Çok düşük opacity ile cleaver / meat outline
+- Sadece görsel destek, bilgi alanını bozmamalı
+
+### Davranış
+
+- Yüzde değeri dinamik hesaplanmalı:
+  - `completed / total * 100`
+- Total sıfırsa hata vermemeli
+
+---
+
+## 9. Genel Notlar Kartı
+
+Notlar mevcut ekrandaki accordion yapısından çıkarılıp açık, okunabilir bir panele alınmalıdır.
+
+### İçerik
+
+Başlık:
+
+```txt
+Genel Notlar
+```
+
+Not listesi:
+
+```txt
+• Sabah kesimleri tamamlandı.
+• Et sevkiyatı 14:00’te yapılacak.
+• Soğuk hava deposu kontrol edildi.
+```
+
+Alt bilgi:
+
+```txt
+Son güncelleme: 04.05.2025 09:45
+```
+
+Aksiyon:
+
+```txt
+Not Ekle
+```
+
+### UX Notları
+
+- Notlar gizli olmamalı
+- Kullanıcı operasyon esnasında notları hızlı görmeli
+- `Not Ekle` butonu kartın sağ altında olmalı
+
+---
+
+## 10. Arama ve Filtre Alanı
+
+Hayvan listesi üzerinde güçlü bir toolbar bulunmalıdır.
+
+### Alanlar
+
+1. Search input:
+   - Placeholder: `Hayvan no, isim, vekalet arayın...`
+   - Sol icon: search
+   - Sağda temizleme iconu opsiyonel
+
+2. Segment tabs:
+   - `Tümü`
+   - `Bekleyen`
+   - `Kesildi`
+
+3. Görevli dropdown:
+   - `Tüm Görevliler`
+
+4. Filter button:
+   - `Filtrele`
+
+5. View/settings icon:
+   - kolon ayarları veya görünüm ayarı
+
+### UX
+
+- Aktif tab accent yeşil olmalı
+- Filtreler tek satırda hizalanmalı
+- Mobilde alt alta geçebilir
+
+---
+
+## 11. Hayvan Listesi
+
+Mevcut kart listesi yerine desktop’ta tablo benzeri, mobilde kart benzeri yapı kullanılmalıdır.
+
+### Desktop Table Kolonları
+
+```txt
+[checkbox] | # | Hayvan | Vekalet / Sahip | Görevliler | Kesim Zamanı | Durum | Menü
+```
+
+### Örnek Satırlar
+
+#### Hayvan 1
+
+- No: `1`
+- Ad: `Hayvan 1`
+- Tür: `Büyükbaş`
+- Vekalet badge: `Vekaletli`
+- Sahip: `ADNAN KARAKOÇ`
+- Görevliler: `AK`, `MK`, `+2`
+- Kesim zamanı: `10:20`
+- Durum: `Kesildi`
+
+#### Hayvan 2
+
+- No: `2`
+- Ad: `Hayvan 2`
+- Tür: `Büyükbaş`
+- Vekalet badge: `Vekaletli`
+- Sahip: `ADNAN KARAKOÇ`
+- Görevliler: `AK`, `MK`, `+2`
+- Kesim zamanı: `10:20`
+- Durum: `Kesildi`
+
+#### Hayvan 3
+
+- No: `3`
+- Ad: `Hayvan 3`
+- Tür: `Büyükbaş`
+- Vekalet badge: `Vekaletli`
+- Sahip: `ADNAN KARAKOÇ`
+- Görevliler: `AK`, `MK`, `+2`
+- Kesim zamanı: `10:20`
+- Durum: `Kesildi`
+
+#### Hayvan 4
+
+- No: `4`
+- Ad: `Hayvan 4`
+- Tür: `Büyükbaş`
+- Vekalet badge: `Vekaletli`
+- Sahip: `ADNAN KARAKOÇ`
+- Görevliler: `AK`, `MK`, `+2`
+- Kesim zamanı: `-`
+- Durum: `Bekliyor`
+
+### Status Chip Tasarımı
+
+```css
+.status-completed {
+  background: rgba(0, 201, 134, 0.14);
+  color: #00e59b;
+}
+
+.status-waiting {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fbbf24;
+}
+```
+
+### Satır Etkileşimi
+
+- Hover’da satır arka planı hafif açılmalı
+- Sol checkbox ile çoklu seçim yapılabilmeli
+- Satırdaki üç nokta menüsü şu işlemleri içerebilir:
+  - `Detay Görüntüle`
+  - `Kesildi İşaretle`
+  - `Not Ekle`
+  - `Düzenle`
+
+### Footer / Pagination
+
+Alt bilgi:
+
+```txt
+Toplam 55 hayvandan 1 - 4 arası gösteriliyor
+```
+
+Pagination:
+
+```txt
+< 1 2 ... 14 >
+```
+
+Page size:
+
+```txt
+10 / sayfa
+```
+
+---
+
+## 12. Sağ Panel
+
+Sağ panel operasyonel bilgi ve hızlı aksiyonlar için kullanılmalıdır.
+
+### 12.1 Güncel Aktivite
+
+Başlık:
+
+```txt
+Güncel Aktivite
+```
+
+Sağ link:
+
+```txt
+Tümü
+```
+
+Liste:
+
+```txt
+Hayvan 3 kesildi
+Adnan Karakoç tarafından
+10:20
+
+Hayvan 2 kesildi
+Adnan Karakoç tarafından
+10:20
+
+Hayvan 1 kesildi
+Adnan Karakoç tarafından
+10:20
+
+Genel not eklendi
+Hasan Can tarafından
+09:45
+
+Hayvan 4 listeye eklendi
+Hasan Can tarafından
+09:10
+```
+
+Icon kullanımı:
+
+- Kesildi: check icon, green
+- Not eklendi: document icon, blue
+- Listeye eklendi: plus icon, warning
+
+### 12.2 Hızlı İşlemler
+
+Başlık:
+
+```txt
+Hızlı İşlemler
+```
+
+Grid butonlar:
+
+1. `Kesildi İşaretle`
+2. `Not Ekle`
+3. `Rapor Oluştur`
+4. `Excel İndir`
+
+Butonlar 2x2 grid olmalı.
+
+### 12.3 Rapor Özeti
+
+Başlık:
+
+```txt
+Rapor Özeti
+```
+
+Mini istatistikler:
+
+```txt
+Bugün Kesilen: 3
+Bugün Eklenen: 1
+Ortalama Süre: 20 dk
+```
+
+Alt link:
+
+```txt
+Detaylı Raporu Görüntüle →
+```
+
+---
+
+## 13. Alt / Floating Aksiyon Alanı
+
+Mevcut ekrandaki alt sticky bar kaldırılabilir veya daha modern hale getirilebilir.
+
+Öneri:
+
+- Desktop’ta işlemler sağ panelde ve tablo seçimlerinde gösterilsin.
+- Eğer checkbox ile çoklu seçim yapılırsa ekranın altında minimal bir floating bulk action bar belirsin.
+
+Örnek:
+
+```txt
+4 hayvan seçildi     Kesildi İşaretle     Not Ekle     Rapor
+```
+
+UX:
+
+- Sadece seçim varken görünmeli
+- Sayfanın altını kapatmamalı
+- Rounded pill/card olarak tasarlanmalı
+
+---
+
+## 14. Component Listesi
+
+Kod tarafında şu component mimarisi önerilir:
+
+```txt
+/components
+  /layout
+    AppShell.tsx
+    Sidebar.tsx
+    Topbar.tsx
+
+  /dashboard
+    KpiCard.tsx
+    ProgressCard.tsx
+    NotesCard.tsx
+    ActivityPanel.tsx
+    QuickActions.tsx
+    ReportSummary.tsx
+
+  /animals
+    AnimalToolbar.tsx
+    AnimalTable.tsx
+    AnimalRow.tsx
+    StatusChip.tsx
+    AssigneeAvatarGroup.tsx
+    Pagination.tsx
+
+  /ui
+    Button.tsx
+    Card.tsx
+    Input.tsx
+    Badge.tsx
+    Dropdown.tsx
+    IconButton.tsx
+```
+
+---
+
+## 15. Örnek Data Model
+
+```ts
+type AnimalStatus = "completed" | "waiting";
+
+type Animal = {
+  id: number;
+  name: string;
+  type: string;
+  owner: string;
+  hasProxy: boolean;
+  assignees: string[];
+  cutTime?: string;
+  status: AnimalStatus;
+};
+
+const animals: Animal[] = [
+  {
+    id: 1,
+    name: "Hayvan 1",
+    type: "Büyükbaş",
+    owner: "ADNAN KARAKOÇ",
+    hasProxy: true,
+    assignees: ["AK", "MK", "+2"],
+    cutTime: "10:20",
+    status: "completed"
+  },
+  {
+    id: 2,
+    name: "Hayvan 2",
+    type: "Büyükbaş",
+    owner: "ADNAN KARAKOÇ",
+    hasProxy: true,
+    assignees: ["AK", "MK", "+2"],
+    cutTime: "10:20",
+    status: "completed"
+  },
+  {
+    id: 3,
+    name: "Hayvan 3",
+    type: "Büyükbaş",
+    owner: "ADNAN KARAKOÇ",
+    hasProxy: true,
+    assignees: ["AK", "MK", "+2"],
+    cutTime: "10:20",
+    status: "completed"
+  },
+  {
+    id: 4,
+    name: "Hayvan 4",
+    type: "Büyükbaş",
+    owner: "ADNAN KARAKOÇ",
+    hasProxy: true,
+    assignees: ["AK", "MK", "+2"],
+    status: "waiting"
+  }
+];
+```
+
+---
+
+## 16. State ve Filtre Mantığı
+
+Sayfada şu state’ler bulunmalı:
+
+```ts
+const [searchQuery, setSearchQuery] = useState("");
+const [activeStatus, setActiveStatus] = useState<"all" | "waiting" | "completed">("all");
+const [selectedAnimalIds, setSelectedAnimalIds] = useState<number[]>([]);
+const [selectedAssignee, setSelectedAssignee] = useState<string>("all");
+```
+
+Filtreleme:
+
+- Search query; hayvan adı, no, sahip adı içinde arama yapmalı
+- Status filtresi:
+  - `all`
+  - `waiting`
+  - `completed`
+- Görevli filtresi opsiyonel çalışabilir
+
+---
+
+## 17. UI/UX İyileştirme Kuralları
+
+Bu tasarımda özellikle şu problemler çözülmelidir:
+
+### Eski Problem
+
+- İçerik sayfanın ortasında dar bir alana sıkışıyor
+- Çok fazla boş yatay alan boşa gidiyor
+- Liste okunması zor
+- Notlar gizli accordion içinde kalıyor
+- Rapor ve aksiyonlar yeterince görünür değil
+- KPI bilgileri ayrı ayrı ve hızlı okunabilir değil
+- Alt sticky bar fazla baskın duruyor
+
+### Yeni Çözüm
+
+- Full-width dashboard layout
+- Sidebar ile net navigasyon
+- Header ile bağlam ve hızlı aksiyonlar
+- KPI kartları ile hızlı durum özeti
+- Açık not paneli
+- Güçlü search/filter toolbar
+- Desktop tablo, mobil kart görünümü
+- Sağ panelde aktivite ve hızlı işlemler
+- Çoklu seçimde contextual bulk action bar
+
+---
+
+## 18. Accessibility
+
+- Kontrast oranı yeterli olmalı
+- Butonlarda hover/focus state olmalı
+- Tüm icon button’larda `aria-label` bulunmalı
+- Tab / filtre butonları keyboard ile kullanılabilir olmalı
+- Status bilgisi sadece renkle anlatılmamalı; metin de bulunmalı
+- Search input label veya aria-label içermeli
+
+---
+
+## 19. Motion / Interaction
+
+Animasyonlar sade olmalı.
+
+Kullanılabilecek mikro etkileşimler:
+
+- Kart hover’da çok hafif border parlaması
+- Button hover’da opacity veya background değişimi
+- Sidebar active transition
+- Progress bar mount olurken yumuşak dolum
+- Bulk action bar selection sonrası aşağıdan yumuşak çıkabilir
+
+Abartılı glow, fazla neon, büyük animasyonlar kullanılmamalı.
+
+---
+
+## 20. Mobil Uyarlama
+
+Mobilde:
+
+- Sidebar hamburger menüye dönüşmeli
+- Header iki satıra ayrılabilir
+- KPI kartları tek kolon veya 2 kolon olmalı
+- Sağ panel ana listenin altına taşınmalı
+- Hayvan tablosu kart listeye dönüşmeli
+
+Mobil hayvan kartı örneği:
+
+```txt
+[✓] Hayvan 1                         Kesildi
+Büyükbaş
+Vekaletli · ADNAN KARAKOÇ
+Görevliler: AK MK +2
+Kesim zamanı: 10:20
+```
+
+---
+
+## 21. Empty / Loading / Error State
+
+### Empty State
+
+Filtre sonucunda hayvan yoksa:
+
+```txt
+Sonuç bulunamadı
+Arama veya filtre kriterlerini değiştirerek tekrar deneyin.
+```
+
+Aksiyon:
+
+```txt
+Filtreleri Temizle
+```
+
+### Loading State
+
+- KPI skeleton
+- Table row skeleton
+- Sağ panel activity skeleton
+
+### Error State
+
+```txt
+Veriler yüklenemedi
+Lütfen tekrar deneyin.
+```
+
+Aksiyon:
+
+```txt
+Yeniden Dene
+```
+
+---
+
+## 22. Sayfada Kullanılacak Metinler
+
+Ana metinler:
+
+```txt
+KESİM TAKİP
+SİSTEMİ
+04.05 Kesim Listesi
+Kesim Takip Paneli
+Proje 04.05
+04 Mayıs 2025
+Durum Raporu
+Yeni Kesim Ekle
+Toplam Hayvan
+Kesilen
+Bekleyen
+Tamamlanma Oranı
+Bu proje toplamı
+İşlem bekleyen
+Kesim Durumu
+Genel Notlar
+Not Ekle
+Hayvan no, isim, vekalet arayın...
+Tümü
+Bekleyen
+Kesildi
+Tüm Görevliler
+Filtrele
+Hayvan
+Vekalet / Sahip
+Görevliler
+Kesim Zamanı
+Durum
+Güncel Aktivite
+Hızlı İşlemler
+Kesildi İşaretle
+Rapor Oluştur
+Excel İndir
+Rapor Özeti
+Detaylı Raporu Görüntüle
+```
+
+---
+
+## 23. Teknik Öneri
+
+Eğer React + Tailwind kullanılacaksa:
+
+- Layout için CSS grid kullanılmalı
+- Component bazlı ilerlenmeli
+- `lucide-react` icon set önerilir
+- `shadcn/ui` bileşenleri kullanılabilir
+- `recharts` ile circular veya radial progress yapılabilir
+- Zustand veya React state yeterli olabilir
+- Tablo için basit custom table yeterlidir; büyük veri olacaksa TanStack Table tercih edilebilir
+
+---
+
+## 24. Tailwind Örnek Class Yaklaşımı
+
+Kart:
+
+```tsx
+<div className="rounded-2xl border border-slate-700/40 bg-slate-900/70 p-5 shadow-sm">
+  ...
+</div>
+```
+
+Primary button:
+
+```tsx
+<button className="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font700 text-slate-950 hover:bg-emerald-400">
+  Yeni Kesim Ekle
+</button>
+```
+
+Status chip:
+
+```tsx
+<span className="rounded-lg bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300">
+  Kesildi
+</span>
+```
+
+Search input:
+
+```tsx
+<input
+  className="h-11 w-full rounded-xl border border-slate-700/50 bg-slate-950/40 px-4 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:border-emerald-400/70"
+/>
+```
+
+---
+
+## 25. Kabul Kriterleri
+
+Tasarım tamamlandığında şu kriterleri karşılamalı:
+
+- Sayfa desktop’ta tam genişliği verimli kullanmalı
+- Sidebar, header, ana içerik ve sağ panel net ayrılmalı
+- KPI kartları ilk bakışta okunmalı
+- Kesim durumu ve tamamlanma yüzdesi açık olmalı
+- Genel notlar gizlenmeden görünmeli
+- Hayvan listesi tablo düzeninde, okunabilir olmalı
+- Durum chipleri net ayırt edilmeli
+- Arama ve filtreleme alanı kolay kullanılmalı
+- Sağ panelde aktivite, hızlı işlemler ve rapor özeti bulunmalı
+- Mobilde layout bozulmadan kullanılmalı
+- Gereksiz neon/glow efektlerinden kaçınılmalı
+- Tasarım profesyonel bir SaaS dashboard gibi görünmeli
+
+---
+
+## 26. Kısa Prompt Özeti
+
+Aşağıdaki kısa özet, kodlama veya görsel üretim yapan yapay zekaya direkt verilebilir:
+
+```txt
+Mevcut dar ve karmaşık Kesim Listesi ekranını full-width modern dark SaaS dashboard olarak yeniden tasarla. Sol sidebar, üst header, KPI kartları, kesim durumu progress kartı, açık genel notlar paneli, arama/filtre toolbarı, okunabilir hayvan tablosu ve sağ tarafta güncel aktivite + hızlı işlemler + rapor özeti paneli olsun. Renkler koyu lacivert yüzeyler ve yeşil/teal accent üzerine kurulsun. UI sade, premium, hizalı, bol spacingli ve responsive olmalı. Türkçe etiketler kullan: 04.05 Kesim Listesi, Proje 04.05, Kesim Durumu, Genel Notlar, Durum Raporu, Tümü, Bekleyen, Kesildi, Hayvan 1, Kesildi İşaretle, Not Ekle, Rapor. Mevcut ekranı kopyalama; bilgi mimarisini tamamen iyileştir.
+```
