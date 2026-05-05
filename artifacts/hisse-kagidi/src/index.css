@@ -1223,6 +1223,123 @@
     print-color-adjust: exact;
   }
 
+  /* Summary report overlay print */
+  .summary-report-print-root {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 99999 !important;
+    background: white !important;
+    color: #1e293b !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 24px 32px !important;
+    border-radius: 0 !important;
+    border: none !important;
+    display: block !important;
+  }
+
+  .summary-report-print-root * {
+    color: #1e293b !important;
+    background: transparent !important;
+    border-color: #e2e8f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .summary-report-print-root h1,
+  .summary-report-print-root h2,
+  .summary-report-print-root h3,
+  .summary-report-print-root h4 {
+    color: #0f172a !important;
+  }
+
+  .summary-report-print-root .print-accent-green {
+    color: #16a34a !important;
+  }
+
+  .summary-report-print-root .print-accent-amber {
+    color: #d97706 !important;
+  }
+
+  .summary-report-print-root .print-accent-blue {
+    color: #2563eb !important;
+  }
+
+  .summary-report-print-root .print-accent-red {
+    color: #dc2626 !important;
+  }
+
+  .summary-report-print-root .print-stat-card {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+
+  .summary-report-print-root .print-stat-green {
+    background: #f0fdf4 !important;
+    border: 1px solid #bbf7d0 !important;
+  }
+
+  .summary-report-print-root .print-stat-amber {
+    background: #fffbeb !important;
+    border: 1px solid #fde68a !important;
+  }
+
+  .summary-report-print-root .print-section {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+
+  .summary-report-print-root .print-progress-bar-track {
+    background: #e2e8f0 !important;
+  }
+
+  .summary-report-print-root .print-progress-green {
+    background: #16a34a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .summary-report-print-root .print-progress-amber {
+    background: #d97706 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .summary-report-print-root svg circle[stroke="#00c986"],
+  .summary-report-print-root svg circle[stroke="#f59e0b"] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .summary-report-print-root .print-hero {
+    background: #f0fdf4 !important;
+    border: 1px solid #bbf7d0 !important;
+  }
+
+  .summary-report-print-root .print-badge-green {
+    background: #dcfce7 !important;
+    color: #16a34a !important;
+  }
+
+  .summary-report-print-root .print-badge-blue {
+    background: #dbeafe !important;
+    color: #2563eb !important;
+  }
+
+  .summary-report-print-root .print-badge-muted {
+    background: #f1f5f9 !important;
+    color: #475569 !important;
+  }
+
+  .summary-report-print-root .print-badge-amber {
+    background: #fef3c7 !important;
+    color: #d97706 !important;
+  }
+
+  .summary-report-print-root .print-muted {
+    color: #64748b !important;
+  }
+
   .donor-list-print {
     position: fixed !important;
     inset: 0 !important;
