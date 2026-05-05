@@ -1,4 +1,4 @@
-import { FileText, Sun } from "lucide-react";
+import { FileText, Sun, Home } from "lucide-react";
 
 interface DashboardTopbarProps {
   kesimAlaniName: string;
@@ -24,6 +24,16 @@ export function DashboardTopbar({
         minHeight: 60,
       }}
     >
+
+      {/* Ana menü */}
+      <a
+        href="/"
+        className="flex items-center justify-center w-9 h-9 rounded-xl border shrink-0 transition-all hover:bg-white/5"
+        style={{ borderColor: "rgba(148,163,184,0.20)", color: "#94a3b8" }}
+        aria-label="Ana menüye dön"
+      >
+        <Home className="w-4 h-4" aria-hidden="true" />
+      </a>
 
       {/* Title */}
       <div className="flex-1 min-w-0">
