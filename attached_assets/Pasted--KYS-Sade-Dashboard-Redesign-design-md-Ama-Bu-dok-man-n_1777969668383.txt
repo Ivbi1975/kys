@@ -1,0 +1,796 @@
+# KYS Sade Dashboard Redesign — design.md
+
+## Amaç
+
+Bu dokümanın amacı, mevcut **KYS / Kurban Yönetim Sistemi** arayüzünü daha sade, daha anlaşılır, daha profesyonel ve kullanıcıyı korkutmayan bir tasarım diline dönüştürmektir.
+
+Bu çalışma **yeni bir demo dashboard üretmek için değildir**.  
+Mevcut sistemin gerçek iş akışları, route’ları, API çağrıları, verileri, kullanıcı rolleri ve mevcut logo/marka yapısı korunarak sadece UI/UX iyileştirmesi yapılacaktır.
+
+Tasarım dili modern, ferah, koyu lacivert temalı ve sade olacak; ancak sistemde bulunmayan hiçbir özellik, sahte istatistik, boş kart veya çalışmayan buton eklenmeyecektir.
+
+---
+
+## En Önemli Kural
+
+> Önce mevcut projeyi analiz et. Sonra sadece sistemde gerçekten bulunan işlevleri daha sade ve kullanılabilir bir arayüzle yeniden tasarla.
+
+Aşağıdaki kaynakları incelemeden tasarıma başlama:
+
+- Mevcut route yapısı
+- Sayfa componentleri
+- Layout/sidebar/header componentleri
+- Kullanılan logo ve marka varlıkları
+- API çağrıları
+- Database/schema alanları
+- Formlar
+- Butonların mevcut işlevleri
+- Kullanıcı rolleri ve yetki kontrolleri
+- Var olan sayfa akışları
+- Mevcut state yönetimi ve veri kaynakları
+
+Eğer bir veri veya işlem sistemde yoksa, sadece tasarım güzel görünsün diye ekleme.
+
+---
+
+## Yapılmayacaklar
+
+Aşağıdaki şeyleri kesinlikle yapma:
+
+- Yeni logo oluşturma.
+- Mevcut logoyu değiştirme.
+- Sistemde olmayan yeni modül ekleme.
+- Çalışmayan buton ekleme.
+- Demo amaçlı sahte istatistik kartları ekleme.
+- “Son aktiviteler”, “Notlar”, “Rapor özeti”, “Zaman çizelgesi” gibi modülleri sistemde yoksa uydurma.
+- Kullanılmayan ikon, grafik, chart veya süsleme ekleme.
+- Sırf dolu görünmesi için sağ/sol panellere gereksiz kartlar koyma.
+- Var olan API davranışlarını bozma.
+- Route isimlerini ve veri akışını gereksiz yere değiştirme.
+- Kullanıcıyı çok fazla seçenek, renk, buton ve panelle yorma.
+- Dashboard’u karmaşık, kalabalık veya teknik kullanıcıya özel hissettirme.
+
+---
+
+## Ana Tasarım Hedefi
+
+Mevcut sayfalar şu hissi vermeli:
+
+- Sade
+- Güven veren
+- Profesyonel
+- Temiz
+- Kullanımı kolay
+- Göz yormayan
+- Operasyonel olarak net
+- Yeni kullanıcı için anlaşılır
+- Mobil ve desktop için düzenli
+- Gereksiz kalabalıktan arındırılmış
+
+Arayüz, kullanıcının “ne yapmam gerekiyor?” sorusuna hızlı cevap vermeli.
+
+---
+
+## Tasarım Dili
+
+### Genel Stil
+
+Tasarım dili aşağıdaki yönde olmalı:
+
+- Modern SaaS dashboard görünümü
+- Koyu lacivert / soft dark tema
+- Yumuşak kontrast
+- Geniş boşluklar
+- Net kart ayrımları
+- Okunabilir metinler
+- Az ama anlamlı ikon kullanımı
+- Yuvarlatılmış köşeler
+- Sert neon efektlerinden uzak
+- Fazla parıltı, gradient ve süsleme olmadan premium görünüm
+
+### Renk Yaklaşımı
+
+Koyu tema korunmalı fakat kullanıcıyı yormamalı.
+
+Önerilen renk rolleri:
+
+```css
+--background-main: #07111f;
+--background-sidebar: #0b1626;
+--surface-card: #101f33;
+--surface-card-soft: #13243a;
+--border-soft: rgba(255, 255, 255, 0.08);
+
+--text-primary: #f8fafc;
+--text-secondary: #aab8cc;
+--text-muted: #6f8097;
+
+--primary-blue: #3b82f6;
+--primary-blue-soft: rgba(59, 130, 246, 0.14);
+
+--success-green: #22c55e;
+--success-green-soft: rgba(34, 197, 94, 0.14);
+
+--warning-amber: #f59e0b;
+--warning-amber-soft: rgba(245, 158, 11, 0.14);
+
+--danger-red: #ef4444;
+--danger-red-soft: rgba(239, 68, 68, 0.14);
+```
+
+Renk kullanımı şu şekilde olmalı:
+
+- Mavi: ana aksiyonlar, aktif menü, odak durumları
+- Yeşil: tamamlanan / başarılı durumlar
+- Amber: eksik bilgi / uyarı / dikkat isteyen durumlar
+- Kırmızı: sadece kritik hata veya silme işlemleri
+- Gri tonlar: pasif, ikincil ve destekleyici bilgiler
+
+Çok fazla farklı renk kullanılmamalı.
+
+---
+
+## Tipografi
+
+Tipografi sade ve okunabilir olmalı.
+
+Önerilen yaklaşım:
+
+- Font ailesi: mevcut projede kullanılan font korunmalı. Yoksa modern sans-serif kullanılmalı.
+- Başlıklar büyük ama abartısız olmalı.
+- Kart içi açıklamalar küçük ama okunabilir olmalı.
+- Sayılar net, büyük ve kolay taranabilir olmalı.
+- Tüm yazılar Türkçe karakterlerle uyumlu olmalı.
+
+Önerilen boyut sistemi:
+
+```css
+--text-xs: 12px;
+--text-sm: 14px;
+--text-base: 16px;
+--text-lg: 18px;
+--text-xl: 22px;
+--text-2xl: 28px;
+--text-3xl: 36px;
+```
+
+Başlık ve metin hiyerarşisi net olmalı:
+
+- Sayfa başlığı: en güçlü metin
+- Bölüm başlığı: net ama sakin
+- Kart sayısı/verisi: kolay fark edilir
+- Açıklamalar: ikinci planda
+- Yardımcı bilgiler: daha düşük kontrast
+
+---
+
+## Spacing ve Grid
+
+Arayüz sıkışık görünmemeli.  
+Her bölüm nefes almalı.
+
+Önerilen spacing sistemi:
+
+```css
+--space-1: 4px;
+--space-2: 8px;
+--space-3: 12px;
+--space-4: 16px;
+--space-5: 20px;
+--space-6: 24px;
+--space-8: 32px;
+--space-10: 40px;
+```
+
+Genel kurallar:
+
+- Ana içerik container’ı çok dar olmamalı.
+- Kartlar arasında yeterli boşluk olmalı.
+- Butonlar birbirine yapışmamalı.
+- Tablolarda satır yüksekliği rahat okunacak şekilde olmalı.
+- Mobil görünümde kartlar alt alta düzenlenmeli.
+- Desktop görünümde 2 veya 3 kolon kullanılabilir ama ekran kalabalıklaştırılmamalı.
+
+---
+
+## Layout Yaklaşımı
+
+### 1. Sidebar
+
+Sidebar mevcut logoyu kullanmalı.
+
+Kurallar:
+
+- Logo değiştirilmemeli.
+- Menü sade tutulmalı.
+- Sadece mevcut route’lar gösterilmeli.
+- Aktif sayfa net belli olmalı.
+- Menü ikonları küçük ve sade olmalı.
+- Gereksiz alt menü karmaşası yapılmamalı.
+- Eğer mevcut sistemde proje ağacı varsa, daha sade ve okunabilir hale getirilmeli.
+- Sidebar çok kalın ve görsel olarak baskın olmamalı.
+
+Önerilen sidebar yapısı:
+
+- Logo alanı
+- Ana menü
+- Projeler / Kesim Listeleri / Bağış Havuzu / Raporlar gibi mevcut gerçek sayfalar
+- Kullanıcı alanı
+- Gerekirse menüyü daraltma butonu
+
+Sistemde olmayan sayfa sidebar’a eklenmemeli.
+
+---
+
+### 2. Topbar / Header
+
+Topbar sade olmalı.
+
+İçerebileceği alanlar:
+
+- Geri dön butonu, mevcut akışta varsa
+- Sayfa başlığı veya breadcrumb
+- Arama, mevcut sistemde varsa
+- Tarih/proje seçici, mevcut sistemde varsa
+- Ana aksiyon butonu
+- Kullanıcı/tema/notification alanı, mevcut sistemde varsa
+
+Kurallar:
+
+- Header çok dolu olmamalı.
+- Sadece gerçek aksiyonlar gösterilmeli.
+- En önemli buton sağ üstte belirgin olmalı.
+- İkincil butonlar daha sakin görünmeli.
+- Silme gibi riskli işlemler ana header’da baskın durmamalı.
+
+---
+
+### 3. Sayfa Başlığı
+
+Her ana sayfada net bir başlık alanı olmalı.
+
+Örnek:
+
+```text
+Proje 04.05
+Projeye ait kesim alanları, hisse durumu ve güncel bilgiler
+```
+
+Kurallar:
+
+- Kullanıcı sayfanın ne işe yaradığını hemen anlamalı.
+- Başlığın yanında küçük bir durum etiketi olabilir.
+- Açıklama kısa ve sade olmalı.
+- Büyük görsel süslemeler kullanılmamalı.
+
+---
+
+### 4. Özet Kartları
+
+Özet kartları yalnızca mevcut sistemde gerçekten hesaplanabilen verilere göre oluşturulmalı.
+
+Eğer veri yoksa kart eklenmemeli.
+
+Özet kart sayısı ideal olarak 3–5 arasında kalmalı.
+
+Örnek gerçek veri kartları:
+
+- Toplam Kayıt
+- Toplam Hisse
+- Gereken Hayvan
+- Gruplandırılmış
+- Kesildi
+- Eksik Bilgi
+- Doluluk Oranı
+
+Kurallar:
+
+- Kullanıcıyı rakam bombardımanına tutma.
+- Her kart tek bir soruya cevap vermeli.
+- Kart metinleri kısa olmalı.
+- Kartlarda gereksiz trend yüzdeleri kullanılmamalı, sistemde gerçek veri yoksa eklenmemeli.
+- Kartlar sade ikon + başlık + değer + kısa açıklama şeklinde olmalı.
+
+---
+
+### 5. Ana İş Alanı
+
+Sayfanın merkezi, kullanıcının asıl işini yapacağı alan olmalı.
+
+Örnek olarak proje detay sayfasında ana iş alanı şunlardan biri olabilir:
+
+- Kesim alanları listesi
+- Kesim listesi detayları
+- Bağış havuzu kayıtları
+- Sorunlu kayıtlar
+- Gruplandırma tablosu
+- Taşıma kayıtları
+
+Hangi içerik gösterilecekse mevcut projedeki gerçek akışa göre belirle.
+
+Kurallar:
+
+- Ana tablo/kart alanı ekranın en önemli bölümü olmalı.
+- Kullanıcının en çok yaptığı işlem en kolay erişilebilir yerde olmalı.
+- Liste filtreleri sade olmalı.
+- Tablo kolonları gereksiz genişletilmemeli.
+- Her satırda yalnızca gerekli aksiyonlar görünmeli.
+- Daha az kullanılan aksiyonlar üç nokta menüsüne alınabilir.
+- Durum etiketleri tutarlı olmalı.
+
+---
+
+## Tablo ve Liste Tasarımı
+
+Tablolar kullanıcıyı korkutmamalı.
+
+Kurallar:
+
+- Satır yüksekliği rahat olmalı.
+- Kolon isimleri açık olmalı.
+- Karmaşık renkli hücreler kullanılmamalı.
+- Durum chip’leri sade ve anlaşılır olmalı.
+- Sayısal veriler hizalı olmalı.
+- Satır aksiyonları abartılı ikon kalabalığı yaratmamalı.
+- Mobilde tablo kart görünüme dönüşmeli.
+
+Örnek durum chip’leri:
+
+```text
+Hazır
+Devam Ediyor
+Eksik Bilgi
+Tamamlandı
+Bekliyor
+Sorunlu
+```
+
+Durum renkleri:
+
+- Hazır / Tamamlandı: yeşil
+- Devam Ediyor: mavi
+- Eksik Bilgi / Bekliyor: amber
+- Sorunlu: kırmızı veya amber, durumun ciddiyetine göre
+
+---
+
+## Form Tasarımı
+
+Formlar sade, adım adım ve anlaşılır olmalı.
+
+Kurallar:
+
+- Inputlar yeterli yükseklikte olmalı.
+- Label’lar net olmalı.
+- Placeholder tek başına label yerine kullanılmamalı.
+- Hata mesajları alanın altında gösterilmeli.
+- Zorunlu alanlar belli olmalı.
+- Form bölümleri mantıksal gruplara ayrılmalı.
+- Çok uzun formlar mümkünse bölümlendirilmeli.
+- Kaydet / İptal butonları net ayrılmalı.
+- Tehlikeli işlemler için onay kullanılmalı.
+
+---
+
+## Buton Sistemi
+
+Butonlar hiyerarşik olmalı.
+
+### Primary Button
+
+Ana işlem için kullanılır.
+
+Örnekler:
+
+- Yeni Kesim Alanı
+- Kaydet
+- Liste Oluştur
+- Aktar
+
+Görünüm:
+
+- Mavi arka plan
+- Beyaz metin
+- Orta/yuvarlatılmış köşe
+- Net hover/focus state
+
+### Secondary Button
+
+İkincil işlemler için kullanılır.
+
+Örnekler:
+
+- Detayları Gör
+- Filtrele
+- Geri Dön
+
+Görünüm:
+
+- Şeffaf veya koyu yüzey
+- İnce border
+- Açık renk metin
+
+### Danger Button
+
+Sadece silme veya geri alınamaz işlemler için kullanılır.
+
+Örnekler:
+
+- Sil
+- Kaydı Kaldır
+
+Görünüm:
+
+- Kırmızı vurgu
+- Gereksiz yerde kullanılmamalı
+- Mümkünse onay modalı ile desteklenmeli
+
+---
+
+## Kart Tasarımı
+
+Kartlar gereksiz süslü olmamalı.
+
+Kart kuralları:
+
+- Tek kart tek konu içermeli.
+- Kart başlığı kısa olmalı.
+- Kart içi bilgi kolay taranmalı.
+- Border yumuşak olmalı.
+- Shadow abartılmamalı.
+- Kartlar çok sıkışık dizilmemeli.
+- Süsleme için boş ikon veya boş chart eklenmemeli.
+
+Kart örnekleri:
+
+- Proje özeti
+- Kesim alanları
+- Eksik bilgiler
+- Aktarım durumu
+- Bağış havuzu özeti
+- Kesim listesi durumu
+
+Ancak bu kartlar sadece sistemde gerçek veri varsa kullanılmalı.
+
+---
+
+## Uyarı ve Hata UX’i
+
+Uyarılar kullanıcıyı korkutmamalı ama fark edilmeli.
+
+Kurallar:
+
+- Uyarı dili sakin ve çözüm odaklı olmalı.
+- “Hata oluştu” yerine mümkünse ne yapılması gerektiğini söyle.
+- Eksik bilgi varsa hangi alan eksik açıkça yazılmalı.
+- Kritik olmayan uyarılar kırmızı olmamalı.
+- Amber rengi bilgi eksikleri ve dikkat durumları için kullanılmalı.
+- Kırmızı yalnızca kritik hata veya silme/geri alınamaz durumlar için kullanılmalı.
+
+Örnek:
+
+```text
+Eksik bilgi var
+Bu kesim alanındaki bazı kayıtlar tamamlanmamış. Devam etmek için eksik alanları kontrol edin.
+```
+
+---
+
+## Kullanıcı Akışı Önceliği
+
+Her sayfa için şu sorulara cevap ver:
+
+1. Kullanıcı bu sayfaya neden geldi?
+2. Kullanıcının en önemli işi ne?
+3. Bu işi yapmak için hangi bilgiye ihtiyacı var?
+4. Hangi aksiyon en görünür olmalı?
+5. Hangi bilgiler ikincil kalmalı?
+6. Hangi bilgiler gizlenebilir veya detay sayfasına taşınabilir?
+
+Tasarım bu cevaplara göre yapılmalı.
+
+---
+
+## Mevcut İşlevleri Koruma
+
+Aşağıdaki konular korunmalı:
+
+- Mevcut routing
+- Mevcut API çağrıları
+- Mevcut form submit davranışları
+- Mevcut filtreleme/sıralama davranışları
+- Mevcut authentication/authorization yapısı
+- Mevcut kullanıcı rolleri
+- Mevcut hata yakalama mantığı
+- Mevcut loading state’leri
+- Mevcut data model
+- Mevcut logo ve marka adı
+
+Sadece component görünümü ve kullanıcı deneyimi iyileştirilmeli.
+
+Eğer component yapısı çok karmaşıksa, refactor yapılabilir; ancak işlevsel davranış değişmemeli.
+
+---
+
+## Sahte Veri Kullanımı
+
+Production sayfalarında sahte veri kullanılmamalı.
+
+Eğer geliştirme ortamında placeholder gerekiyorsa:
+
+- Açıkça mock/dev data olarak ayrılmalı.
+- Gerçek API geldiğinde otomatik olarak gerçek veriye bağlanmalı.
+- Kullanıcıya production’da sahte veri gösterilmemeli.
+
+Tasarımda görünen her metrik ve liste gerçek veri kaynağına bağlı olmalı.
+
+---
+
+## Empty State Tasarımı
+
+Boş ekranlar kullanıcıyı çaresiz bırakmamalı.
+
+Örnek:
+
+```text
+Henüz kesim alanı oluşturulmamış
+Bu proje için ilk kesim alanını oluşturarak başlayabilirsiniz.
+[Yeni Kesim Alanı Oluştur]
+```
+
+Kurallar:
+
+- Boş alanlarda sadece “veri yok” yazma.
+- Kullanıcıya bir sonraki adımı söyle.
+- Eğer kullanıcının yetkisi yoksa bunu açıkça belirt.
+- Eğer veri yükleniyorsa loading state göster.
+
+---
+
+## Loading State
+
+Veri yüklenirken ekran zıplamamalı.
+
+Kurallar:
+
+- Skeleton loader kullanılabilir.
+- Büyük spinner yerine alan bazlı loading tercih edilmeli.
+- Kullanıcıya hangi bölümün yüklendiği hissettirilmeli.
+- Loading state tasarımı sade olmalı.
+
+---
+
+## Responsive Tasarım
+
+Tasarım desktop, tablet ve mobil için uyumlu olmalı.
+
+### Desktop
+
+- Sidebar + ana içerik düzeni kullanılabilir.
+- Özet kartları yatay dizilebilir.
+- Ana tablo geniş gösterilebilir.
+
+### Tablet
+
+- Sidebar daraltılabilir.
+- Kartlar 2 kolon olabilir.
+- Tablo kolonları azaltılabilir.
+
+### Mobil
+
+- Sidebar drawer’a dönüşmeli.
+- Kartlar tek kolon olmalı.
+- Tablolar kart listesine dönüşmeli.
+- Ana aksiyon butonu kolay erişilebilir olmalı.
+- Gereksiz ikincil bilgiler gizlenmeli veya detay ekranına taşınmalı.
+
+---
+
+## Erişilebilirlik
+
+Arayüz erişilebilir olmalı.
+
+Kurallar:
+
+- Renk tek başına bilgi taşımamalı.
+- Durum chip’lerinde metin de bulunmalı.
+- Kontrast yeterli olmalı.
+- Klavye ile gezilebilir olmalı.
+- Focus state net görünmeli.
+- Butonların aria-label değerleri uygun olmalı.
+- İkon butonlarda tooltip veya erişilebilir label olmalı.
+- Form hata mesajları ekran okuyucularla uyumlu olmalı.
+
+---
+
+## Mikro Etkileşimler
+
+Mikro etkileşimler sade olmalı.
+
+Kullanılabilecekler:
+
+- Hover’da hafif yüzey aydınlanması
+- Focus’ta mavi border
+- Butonlarda yumuşak transition
+- Modal açılışında hafif fade/scale
+- Tab değişimlerinde hızlı ve sade geçiş
+
+Kaçınılacaklar:
+
+- Fazla animasyon
+- Göz alan glow efektleri
+- Sürekli hareket eden grafikler
+- Kullanıcıyı oyalayan geçişler
+
+---
+
+## Component Standartları
+
+Mümkünse mevcut design system veya component yapısı korunmalı.
+
+Tüm temel UI öğeleri tutarlı olmalı:
+
+- Button
+- Input
+- Select
+- Dialog/Modal
+- Card
+- Badge/Chip
+- Table
+- Tabs
+- Dropdown
+- Alert
+- Empty State
+- Loading Skeleton
+
+Her component’in hover, active, disabled, loading ve error halleri düşünülmeli.
+
+---
+
+## Sayfa Yeniden Tasarım Mantığı
+
+Her sayfayı yeniden tasarlarken şu sırayı takip et:
+
+1. Mevcut sayfanın görevini anla.
+2. Mevcut verileri ve işlevleri çıkar.
+3. Gereksiz görünen ama işlevsel olmayan UI’ları kaldır.
+4. En önemli bilgileri üstte grupla.
+5. Ana iş alanını merkeze al.
+6. Yardımcı aksiyonları ikincil hale getir.
+7. Mevcut işlevleri bozmadan componentleri sadeleştir.
+8. Responsive davranışı kontrol et.
+9. Loading, empty ve error state’leri ekle veya iyileştir.
+10. Görsel tutarlılığı tüm sayfalara uygula.
+
+---
+
+## Örnek Proje Detay Sayfası Yaklaşımı
+
+Eğer mevcut sayfa “Proje 04.05” gibi bir proje detay sayfasıysa, önerilen sade yapı:
+
+1. Sidebar
+2. Topbar
+3. Sayfa başlığı
+4. 3–5 adet gerçek özet kartı
+5. Ana iş alanı: kesim alanları veya mevcut ana liste
+6. Gerekirse tek bir yardımcı panel: eksik bilgiler / durum
+7. İkincil detaylar alt bölümde veya accordion içinde
+
+Önerilen görsel hiyerarşi:
+
+```text
+[Sidebar] [Topbar]
+
+Proje 04.05
+Kısa açıklama / durum
+
+[Toplam Kayıt] [Toplam Hisse] [Gereken Hayvan] [Kesildi]
+
+[Kesim Alanları / Ana Tablo]
+
+[Gerçek sistemde varsa: Eksik Bilgiler veya Son İşlemler]
+```
+
+Bu sadece bir örnektir. Gerçek sayfa yapısı mevcut sistem analizine göre belirlenmelidir.
+
+---
+
+## İçerik Dili
+
+Türkçe metinler sade ve anlaşılır olmalı.
+
+Kötü örnek:
+
+```text
+Operasyonel süreç aksiyonları tamamlanamadı.
+```
+
+İyi örnek:
+
+```text
+Bu işlem henüz tamamlanmadı.
+```
+
+Kötü örnek:
+
+```text
+Validation error.
+```
+
+İyi örnek:
+
+```text
+Lütfen zorunlu alanları doldurun.
+```
+
+Kötü örnek:
+
+```text
+Conflict detected.
+```
+
+İyi örnek:
+
+```text
+Bu kayıtta çakışma var. Detayları kontrol edin.
+```
+
+---
+
+## Kullanıcıyı Korkutmayan UX İlkeleri
+
+- Çok fazla kırmızı kullanma.
+- Kritik olmayan durumlara “hata” deme.
+- Kullanıcıya neyi düzeltmesi gerektiğini açıkça söyle.
+- Teknik terimleri azalt.
+- Aynı anda çok fazla kart gösterme.
+- Her sayfada tek bir ana aksiyon öne çıksın.
+- İkincil aksiyonlar daha sakin dursun.
+- Gereksiz metrikler yerine kullanıcının karar almasını sağlayan verileri göster.
+- Ekranı “kontrol paneli gibi karmaşık” değil, “işini kolaylaştıran araç” gibi hissettir.
+
+---
+
+## Kodlama ve Uygulama Notları
+
+- Mevcut framework ve kütüphaneleri kullan.
+- Yeni büyük UI kütüphanesi ekleme; gerekmedikçe dependency artırma.
+- Mevcut Tailwind/shadcn/Radix/component sistemi varsa onu kullan.
+- CSS değişkenleri veya tema tokenlarıyla tutarlı renk sistemi kur.
+- Ortak layout componentlerini merkezileştir.
+- Tekrarlanan kart/tablo/button stillerini component haline getir.
+- TypeScript tiplerini bozma.
+- API response yapılarını değiştirme.
+- Backend değişikliği gerekiyorsa sadece zorunlu durumlarda yap.
+- Mevcut testleri bozma.
+- UI değişikliklerinden sonra temel kullanıcı akışlarını test et.
+
+---
+
+## Kabul Kriterleri
+
+Redesign tamamlandığında aşağıdaki kriterler karşılanmalı:
+
+- Mevcut logo korunmuş olmalı.
+- Mevcut sistem işlevleri bozulmamış olmalı.
+- Sistemde olmayan sahte modüller eklenmemiş olmalı.
+- Sayfalar eskiye göre daha sade ve ferah görünmeli.
+- Kullanıcı ilk bakışta sayfanın amacını anlamalı.
+- Ana aksiyonlar net görünmeli.
+- Gereksiz kart ve metrik kalabalığı olmamalı.
+- Tablolar daha okunabilir olmalı.
+- Uyarılar daha anlaşılır ve sakin olmalı.
+- Mobil görünüm kullanılabilir olmalı.
+- Loading, empty ve error state’leri düzgün görünmeli.
+- Renkler ve componentler tüm sayfalarda tutarlı olmalı.
+
+---
+
+## Kısa Özet
+
+Bu redesign çalışmasında hedef:
+
+> Mevcut KYS sistemini değiştirmeden, sadece gerçek işlevlerini daha sade, daha temiz, daha güven veren ve kullanıcı dostu bir arayüzle sunmak.
+
+Tasarım güzel görünmeli ama boş olmamalı.  
+Her kart, her buton, her bilgi ve her ekran kullanıcının gerçek işine hizmet etmeli.
