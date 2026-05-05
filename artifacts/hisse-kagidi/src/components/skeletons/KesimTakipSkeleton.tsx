@@ -3,22 +3,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function KesimTakipSkeleton() {
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "#06111f" }}>
-      {/* Sidebar skeleton */}
-      <aside className="hidden lg:flex flex-col w-[260px] shrink-0 border-r" style={{ background: "#071522", borderColor: "rgba(148,163,184,0.10)" }}>
-        <div className="px-5 py-5 border-b flex items-center gap-3" style={{ borderColor: "rgba(148,163,184,0.10)" }}>
-          <Skeleton className="w-9 h-9 rounded-xl" style={{ background: "rgba(148,163,184,0.10)" }} />
-          <div className="space-y-1.5">
-            <Skeleton className="h-3 w-20" style={{ background: "rgba(148,163,184,0.10)" }} />
-            <Skeleton className="h-2.5 w-14" style={{ background: "rgba(148,163,184,0.08)" }} />
-          </div>
-        </div>
-        <div className="flex-1 px-3 py-4 space-y-1">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-9 rounded-xl w-full" style={{ background: i === 1 ? "rgba(0,201,134,0.12)" : "rgba(148,163,184,0.06)" }} />
-          ))}
-        </div>
-      </aside>
-
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Topbar */}

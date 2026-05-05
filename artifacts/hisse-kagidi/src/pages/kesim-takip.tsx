@@ -10,7 +10,6 @@ import { useOfflineSync } from "@/lib/useOfflineSync";
 import { AlertTriangle, WifiOff, RefreshCw, Bell, CheckCircle2, X } from "lucide-react";
 import { KesimKagidiOverlay } from "@/components/kesim-takip/KesimKagidiOverlay";
 import { SummaryReportOverlay } from "@/components/kesim-takip/SummaryReportOverlay";
-import { DashboardSidebar } from "@/components/kesim-takip/dashboard/DashboardSidebar";
 import { DashboardTopbar } from "@/components/kesim-takip/dashboard/DashboardTopbar";
 import { KpiCards } from "@/components/kesim-takip/dashboard/KpiCards";
 import { AnimalTable } from "@/components/kesim-takip/dashboard/AnimalTable";
@@ -32,19 +31,7 @@ export default function KesimTakipPage() {
   const [showSummaryReport, setShowSummaryReport] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeNavAction, setActiveNavAction] = useState<"list" | "report" | "notes">("list");
   const [forceNotesOpen, setForceNotesOpen] = useState(0);
-
-  const handleNavAction = useCallback((action: "list" | "report" | "notes") => {
-    setActiveNavAction(action);
-    if (action === "report") {
-      setShowSummaryReport(true);
-      setActiveNavAction("list");
-    } else if (action === "notes") {
-      setForceNotesOpen(n => n + 1);
-    }
-  }, []);
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
     typeof Notification !== "undefined" ? Notification.permission : "denied"
   );
@@ -182,13 +169,6 @@ export default function KesimTakipPage() {
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "#06111f", fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}>
-      <DashboardSidebar
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        activeAction={activeNavAction}
-        onNav={handleNavAction}
-      />
-
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <DashboardTopbar
           kesimAlaniName={data.kesimAlaniName}
@@ -196,7 +176,6 @@ export default function KesimTakipPage() {
           highContrast={highContrast}
           onToggleHighContrast={() => setHighContrast(h => !h)}
           onShowReport={() => setShowSummaryReport(true)}
-          onToggleSidebar={() => setSidebarOpen(o => !o)}
         />
 
         {/* Status banners */}

@@ -1,5 +1,4 @@
 import { FileText, Sun } from "lucide-react";
-import { SidebarToggle } from "./DashboardSidebar";
 
 interface DashboardTopbarProps {
   kesimAlaniName: string;
@@ -7,7 +6,6 @@ interface DashboardTopbarProps {
   highContrast: boolean;
   onToggleHighContrast: () => void;
   onShowReport: () => void;
-  onToggleSidebar: () => void;
 }
 
 export function DashboardTopbar({
@@ -16,7 +14,6 @@ export function DashboardTopbar({
   highContrast,
   onToggleHighContrast,
   onShowReport,
-  onToggleSidebar,
 }: DashboardTopbarProps) {
   return (
     <header
@@ -27,7 +24,6 @@ export function DashboardTopbar({
         minHeight: 60,
       }}
     >
-      <SidebarToggle onClick={onToggleSidebar} />
 
       {/* Title */}
       <div className="flex-1 min-w-0">
