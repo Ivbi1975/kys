@@ -1,9 +1,13 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { ChevronRight, Trash2, Calendar, Link2, ExternalLink, QrCode, MoveRight, Pencil } from "lucide-react";
 import type { KesimAlani } from "@/lib/types";
 import { getTotalShares, getRequiredAnimals } from "@/lib/grouping";
 import { formatDate, timeSince } from "@/lib/formatting";
+
+const CARD = "#0d1c2e";
+const BORDER = "rgba(255,255,255,0.07)";
+const TEXT = "#f8fafc";
+const MUTED = "#6f8097";
+const SEC = "#aab8cc";
 
 interface KesimCardProps {
   kesimAlani: KesimAlani;
@@ -43,140 +47,119 @@ export function KesimCard({
     .sort()
     .pop();
 
-  return (
-    <Card
-      key={k.id}
-      className="p-4 hover:bg-accent/50 transition-colors cursor-pointer"
-      onClick={() => onNavigate(k.id)}
+  const progressColor = kesildiPercent === 100 ? "#22c55e" : "#3b82f6";
+
+  const iconBtn = (
+    label: string,
+    icon: React.ReactNode,
+    onClick: (e: React.MouseEvent) => void,
+    danger = false
+  ) => (
+    <button
+      title={label}
+      aria-label={label}
+      onClick={e => { e.stopPropagation(); onClick(e); }}
+      className="w-7 h-7 flex items-center justify-center rounded-lg transition-all"
+      style={{
+        color: danger ? "#ef4444" : MUTED,
+        background: "transparent",
+      }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = danger ? "rgba(239,68,68,0.10)" : "rgba(255,255,255,0.06)"; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
     >
-      <div className="flex items-center justify-between mb-2">
+      {icon}
+    </button>
+  );
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden transition-all duration-200 group"
+      style={{ background: CARD, border: `1px solid ${BORDER}` }}
+    >
+      {/* Main row */}
+      <div
+        className="flex items-center gap-3 px-5 py-4 cursor-pointer hover:bg-white/[0.03] transition-colors"
+        onClick={() => onNavigate(k.id)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={e => e.key === "Enter" && onNavigate(k.id)}
+        aria-label={`${k.name} kesim alanına git`}
+      >
+        {/* Title + date */}
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-foreground">{k.name}</h3>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
+          <h3 className="text-sm font-bold truncate" style={{ color: TEXT }}>{k.name}</h3>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <Calendar className="w-3 h-3 shrink-0" style={{ color: MUTED }} aria-hidden="true" />
+            <span className="text-xs" style={{ color: MUTED }}>
               {formatDate(k.createdAt)}
-            </span>
-            <span className="text-[10px] text-muted-foreground/60">
-              ({timeSince(k.createdAt)})
+              <span className="ml-1.5 opacity-60">({timeSince(k.createdAt)})</span>
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            title="Takip linkini kopyala"
-            onClick={(e) => onCopyTrackingLink(e, k)}
-          >
-            <Link2 className="w-4 h-4 text-muted-foreground" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            title="Takip sayfasını aç"
-            onClick={(e) => onOpenTrackingPage(e, k)}
-          >
-            <ExternalLink className="w-4 h-4 text-muted-foreground" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            title="QR Kod"
-            onClick={(e) => onShowQrCode(e, k)}
-          >
-            <QrCode className="w-4 h-4 text-muted-foreground" />
-          </Button>
-          {onRename && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              title="Yeniden adlandır"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRename(k);
-              }}
-            >
-              <Pencil className="w-4 h-4 text-muted-foreground" />
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            title="Taşı"
-            onClick={(e) => {
-              e.stopPropagation();
-              onMove(k);
-            }}
-          >
-            <MoveRight className="w-4 h-4 text-muted-foreground" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(k.id);
-            }}
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+
+        {/* Action icons */}
+        <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+          {iconBtn("Takip linkini kopyala", <Link2 className="w-3.5 h-3.5" />, e => onCopyTrackingLink(e, k))}
+          {iconBtn("Takip sayfasını aç", <ExternalLink className="w-3.5 h-3.5" />, e => onOpenTrackingPage(e, k))}
+          {iconBtn("QR Kod", <QrCode className="w-3.5 h-3.5" />, e => onShowQrCode(e, k))}
+          {onRename && iconBtn("Yeniden adlandır", <Pencil className="w-3.5 h-3.5" />, () => onRename(k))}
+          {iconBtn("Taşı", <MoveRight className="w-3.5 h-3.5" />, () => onMove(k))}
+          {iconBtn("Sil", <Trash2 className="w-3.5 h-3.5" />, () => onDelete(k.id), true)}
         </div>
+
+        <ChevronRight className="w-4 h-4 shrink-0 transition-transform group-hover:translate-x-0.5" style={{ color: MUTED }} />
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-center">
-        <div>
-          <div className="text-sm font-bold text-primary">
-            {activeDonors}{k.maxVekalet ? <span className="text-muted-foreground font-normal">/{k.maxVekalet}</span> : null}
+
+      {/* Stats grid */}
+      <div
+        className="grid grid-cols-5 border-t"
+        style={{ borderColor: "rgba(255,255,255,0.05)" }}
+      >
+        {[
+          { val: `${activeDonors}${k.maxVekalet ? `/${k.maxVekalet}` : ""}`, label: "Bağışçı" },
+          { val: shares, label: "Hisse" },
+          { val: `${animals}${k.maxAnimal ? `/${k.maxAnimal}` : ""}`, label: "Hayvan" },
+          { val: k.animalGroups.length, label: "Grup" },
+          { val: `%${occupancy}`, label: "Doluluk" },
+        ].map(({ val, label }, i) => (
+          <div
+            key={label}
+            className="flex flex-col items-center py-3 text-center"
+            style={{ borderLeft: i > 0 ? "1px solid rgba(255,255,255,0.05)" : "none" }}
+          >
+            <span className="text-sm font-bold tabular-nums" style={{ color: "#3b82f6" }}>{val}</span>
+            <span className="text-[10px] mt-0.5" style={{ color: MUTED }}>{label}</span>
           </div>
-          <div className="text-[10px] text-muted-foreground">Bağışçı</div>
-        </div>
-        <div>
-          <div className="text-sm font-bold text-primary">{shares}</div>
-          <div className="text-[10px] text-muted-foreground">Hisse</div>
-        </div>
-        <div>
-          <div className="text-sm font-bold text-primary">
-            {animals}{k.maxAnimal ? <span className="text-muted-foreground font-normal">/{k.maxAnimal}</span> : null}
-          </div>
-          <div className="text-[10px] text-muted-foreground">Hayvan</div>
-        </div>
-        <div>
-          <div className="text-sm font-bold text-primary">{k.animalGroups.length}</div>
-          <div className="text-[10px] text-muted-foreground">Grup</div>
-        </div>
-        <div>
-          <div className="text-sm font-bold text-primary">%{occupancy}</div>
-          <div className="text-[10px] text-muted-foreground">Doluluk</div>
-        </div>
+        ))}
       </div>
+
+      {/* Kesim progress */}
       {totalGroups > 0 && (
-        <div className="mt-3 pt-2 border-t">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] text-muted-foreground font-medium">Kesim Durumu</span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold text-emerald-600">{kesildiCount}/{totalGroups}</span>
+        <div
+          className="px-5 py-3 border-t"
+          style={{ borderColor: "rgba(255,255,255,0.05)" }}
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-medium" style={{ color: MUTED }}>Kesim Durumu</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold tabular-nums" style={{ color: kesildiPercent === 100 ? "#22c55e" : TEXT }}>
+                {kesildiCount}/{totalGroups}
+              </span>
               {lastKesildiAt && (
-                <span className="text-[9px] text-muted-foreground">
-                  (son: {new Date(lastKesildiAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })})
+                <span className="text-[10px]" style={{ color: MUTED }}>
+                  son: {new Date(lastKesildiAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
                 </span>
               )}
             </div>
           </div>
-          <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+          <div className="w-full rounded-full overflow-hidden" style={{ height: 4, background: "rgba(255,255,255,0.07)" }}>
             <div
-              className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-              style={{ width: `${kesildiPercent}%` }}
+              className="h-full rounded-full transition-all duration-700"
+              style={{ width: `${kesildiPercent}%`, background: progressColor }}
             />
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
