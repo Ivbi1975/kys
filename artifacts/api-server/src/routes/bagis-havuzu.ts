@@ -503,115 +503,6 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
 
   const filterWhere = buildStatsFilterSQL(projectId, req.query as Record<string, unknown>);
 
-  const result = await db.execute(sql`
-    SELECT
-      COUNT(d.id)::int AS total,
-      COUNT(d.id) FILTER (WHERE d.excluded = false)::int AS active,
-      COUNT(d.id) FILTER (WHERE d.excluded = true)::int AS excluded,
-      COALESCE(SUM(d.share_count), 0)::int AS total_shares,
-      COUNT(DISTINCT d.birim) FILTER (WHERE d.birim != '')::int AS birim_count,
-      COUNT(DISTINCT d.temsilci) FILTER (WHERE d.temsilci != '')::int AS temsilci_count,
-      COUNT(DISTINCT d.donation_type) FILTER (WHERE d.donation_type != '')::int AS type_count,
-      COUNT(d.id) FILTER (WHERE d.donation_type IS NULL OR d.donation_type = '')::int AS empty_type_count,
-      COUNT(d.id) FILTER (WHERE d.birim IS NULL OR d.birim = '')::int AS empty_birim_count,
-      COUNT(d.id) FILTER (WHERE d.temsilci IS NULL OR d.temsilci = '')::int AS empty_temsilci_count,
-      COUNT(d.id) FILTER (WHERE d.ozellik IS NULL OR d.ozellik = '')::int AS empty_ozellik_count,
-      COUNT(d.id) FILTER (WHERE d.fiyat IS NULL OR d.fiyat = '')::int AS empty_fiyat_count,
-      COUNT(d.id) FILTER (WHERE d.yer_talebi IS NULL OR d.yer_talebi = '')::int AS empty_yer_talebi_count,
-      COUNT(d.id) FILTER (WHERE d.gun_talebi IS NULL OR d.gun_talebi = '')::int AS empty_gun_talebi_count,
-      COUNT(d.id) FILTER (WHERE d.ilk_hayvan IS NULL OR d.ilk_hayvan = '')::int AS empty_ilk_hayvan_count,
-      COUNT(d.id) FILTER (WHERE d.safi IS NULL OR d.safi = '')::int AS empty_safi_count
-    FROM donations d
-    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-    WHERE ${filterWhere}
-  `);
-
-  const stats = result.rows[0] || { total: 0, active: 0, excluded: 0, total_shares: 0 };
-
-  const birimDist = await db.execute(sql`
-    SELECT d.birim, COUNT(*)::int AS count, SUM(d.share_count)::int AS shares
-    FROM donations d
-    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-    WHERE ${filterWhere} AND d.birim != ''
-    GROUP BY d.birim ORDER BY count DESC LIMIT 50
-  `);
-
-  const temsilciDist = await db.execute(sql`
-    SELECT d.temsilci, COUNT(*)::int AS count, SUM(d.share_count)::int AS shares
-    FROM donations d
-    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-    WHERE ${filterWhere} AND d.temsilci != ''
-    GROUP BY d.temsilci ORDER BY count DESC LIMIT 50
-  `);
-
-  const typeDist = await db.execute(sql`
-    SELECT d.donation_type AS type, COUNT(*)::int AS count, SUM(d.share_count)::int AS shares
-    FROM donations d
-    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-    WHERE ${filterWhere} AND d.donation_type != ''
-    GROUP BY d.donation_type ORDER BY count DESC LIMIT 50
-  `);
-
-  const kaDist = await db.execute(sql`
-    SELECT ka.id, ka.name, COUNT(d.id)::int AS count, SUM(d.share_count)::int AS shares
-    FROM donations d
-    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-    WHERE ${filterWhere}
-    GROUP BY ka.id, ka.name ORDER BY ka.name
-  `);
-
-  const multiLocResult = await db.execute(sql`
-    SELECT d.vekalet, COUNT(DISTINCT d.kesim_alani_id)::int AS loc_count
-    FROM donations d
-    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-    WHERE ka.project_id = ${projectId}
-      AND ka.deleted_at IS NULL AND d.deleted_at IS NULL
-      AND ka.name != '__havuz__'
-      AND d.excluded = false AND d.vekalet IS NOT NULL AND d.vekalet != ''
-    GROUP BY d.vekalet
-    HAVING COUNT(DISTINCT d.kesim_alani_id) > 1
-  `);
-  const multiLocationVekalets = multiLocResult.rows.map((r: Record<string, unknown>) => String(r.vekalet));
-
-  const multiLocByNameResult = await db.execute(sql`
-    SELECT d.name, COUNT(DISTINCT d.kesim_alani_id)::int AS loc_count, array_agg(DISTINCT d.vekalet) AS vekalets
-    FROM donations d
-    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-    WHERE ka.project_id = ${projectId}
-      AND ka.deleted_at IS NULL AND d.deleted_at IS NULL
-      AND ka.name != '__havuz__'
-      AND d.excluded = false AND d.name IS NOT NULL AND d.name != ''
-    GROUP BY d.name
-    HAVING COUNT(DISTINCT d.kesim_alani_id) > 1
-    LIMIT 100
-  `);
-  const multiLocationNames = multiLocByNameResult.rows.map((r: Record<string, unknown>) => ({
-    name: String(r.name),
-    count: Number(r.loc_count),
-    vekalets: (r.vekalets as string[]) || [],
-  }));
-
-  const transferredCountResult = await db.execute(sql`
-    SELECT COUNT(DISTINCT d.id)::int AS transferred
-    FROM donations d
-    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-    JOIN animal_group_donations agd ON agd.donation_id = d.id
-    WHERE ka.project_id = ${projectId}
-      AND ka.deleted_at IS NULL AND d.deleted_at IS NULL
-      AND ka.name != '__havuz__'
-  `);
-  const transferredToLists = (transferredCountResult.rows[0] as Record<string, unknown>)?.transferred ?? 0;
-
-  const inGroupCountResult = await db.execute(sql`
-    SELECT COUNT(DISTINCT d.id)::int AS in_groups
-    FROM donations d
-    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-    JOIN animal_group_donations agd ON agd.donation_id = d.id
-    WHERE ka.project_id = ${projectId}
-      AND ka.deleted_at IS NULL AND d.deleted_at IS NULL
-  `);
-  const inGroups = (inGroupCountResult.rows[0] as Record<string, unknown>)?.in_groups ?? 0;
-
   const DIST_ALLOWED_COLS = new Set(["ozellik", "fiyat", "yer_talebi", "gun_talebi", "ilk_hayvan", "safi"]);
   const distQuery = (col: string) => {
     if (!DIST_ALLOWED_COLS.has(col)) throw new Error(`Invalid dist column: ${col}`);
@@ -624,25 +515,141 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
     `);
   };
 
-  const [ozellikDist, fiyatDist, yerTalebiDist, gunTalebiDist, ilkHayvanDist, safiDist] = await Promise.all([
+  const [
+    result,
+    birimDist,
+    temsilciDist,
+    typeDist,
+    kaDist,
+    multiLocResult,
+    multiLocByNameResult,
+    transferredCountResult,
+    inGroupCountResult,
+    ozellikDist,
+    fiyatDist,
+    yerTalebiDist,
+    gunTalebiDist,
+    ilkHayvanDist,
+    safiDist,
+    tagCountResult,
+  ] = await Promise.all([
+    db.execute(sql`
+      SELECT
+        COUNT(d.id)::int AS total,
+        COUNT(d.id) FILTER (WHERE d.excluded = false)::int AS active,
+        COUNT(d.id) FILTER (WHERE d.excluded = true)::int AS excluded,
+        COALESCE(SUM(d.share_count), 0)::int AS total_shares,
+        COUNT(DISTINCT d.birim) FILTER (WHERE d.birim != '')::int AS birim_count,
+        COUNT(DISTINCT d.temsilci) FILTER (WHERE d.temsilci != '')::int AS temsilci_count,
+        COUNT(DISTINCT d.donation_type) FILTER (WHERE d.donation_type != '')::int AS type_count,
+        COUNT(d.id) FILTER (WHERE d.donation_type IS NULL OR d.donation_type = '')::int AS empty_type_count,
+        COUNT(d.id) FILTER (WHERE d.birim IS NULL OR d.birim = '')::int AS empty_birim_count,
+        COUNT(d.id) FILTER (WHERE d.temsilci IS NULL OR d.temsilci = '')::int AS empty_temsilci_count,
+        COUNT(d.id) FILTER (WHERE d.ozellik IS NULL OR d.ozellik = '')::int AS empty_ozellik_count,
+        COUNT(d.id) FILTER (WHERE d.fiyat IS NULL OR d.fiyat = '')::int AS empty_fiyat_count,
+        COUNT(d.id) FILTER (WHERE d.yer_talebi IS NULL OR d.yer_talebi = '')::int AS empty_yer_talebi_count,
+        COUNT(d.id) FILTER (WHERE d.gun_talebi IS NULL OR d.gun_talebi = '')::int AS empty_gun_talebi_count,
+        COUNT(d.id) FILTER (WHERE d.ilk_hayvan IS NULL OR d.ilk_hayvan = '')::int AS empty_ilk_hayvan_count,
+        COUNT(d.id) FILTER (WHERE d.safi IS NULL OR d.safi = '')::int AS empty_safi_count
+      FROM donations d
+      JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+      WHERE ${filterWhere}
+    `),
+    db.execute(sql`
+      SELECT d.birim, COUNT(*)::int AS count, SUM(d.share_count)::int AS shares
+      FROM donations d
+      JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+      WHERE ${filterWhere} AND d.birim != ''
+      GROUP BY d.birim ORDER BY count DESC LIMIT 50
+    `),
+    db.execute(sql`
+      SELECT d.temsilci, COUNT(*)::int AS count, SUM(d.share_count)::int AS shares
+      FROM donations d
+      JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+      WHERE ${filterWhere} AND d.temsilci != ''
+      GROUP BY d.temsilci ORDER BY count DESC LIMIT 50
+    `),
+    db.execute(sql`
+      SELECT d.donation_type AS type, COUNT(*)::int AS count, SUM(d.share_count)::int AS shares
+      FROM donations d
+      JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+      WHERE ${filterWhere} AND d.donation_type != ''
+      GROUP BY d.donation_type ORDER BY count DESC LIMIT 50
+    `),
+    db.execute(sql`
+      SELECT ka.id, ka.name, COUNT(d.id)::int AS count, SUM(d.share_count)::int AS shares
+      FROM donations d
+      JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+      WHERE ${filterWhere}
+      GROUP BY ka.id, ka.name ORDER BY ka.name
+    `),
+    db.execute(sql`
+      SELECT d.vekalet, COUNT(DISTINCT d.kesim_alani_id)::int AS loc_count
+      FROM donations d
+      JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+      WHERE ka.project_id = ${projectId}
+        AND ka.deleted_at IS NULL AND d.deleted_at IS NULL
+        AND ka.name != '__havuz__'
+        AND d.excluded = false AND d.vekalet IS NOT NULL AND d.vekalet != ''
+      GROUP BY d.vekalet
+      HAVING COUNT(DISTINCT d.kesim_alani_id) > 1
+    `),
+    db.execute(sql`
+      SELECT d.name, COUNT(DISTINCT d.kesim_alani_id)::int AS loc_count, array_agg(DISTINCT d.vekalet) AS vekalets
+      FROM donations d
+      JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+      WHERE ka.project_id = ${projectId}
+        AND ka.deleted_at IS NULL AND d.deleted_at IS NULL
+        AND ka.name != '__havuz__'
+        AND d.excluded = false AND d.name IS NOT NULL AND d.name != ''
+      GROUP BY d.name
+      HAVING COUNT(DISTINCT d.kesim_alani_id) > 1
+      LIMIT 100
+    `),
+    db.execute(sql`
+      SELECT COUNT(DISTINCT d.id)::int AS transferred
+      FROM donations d
+      JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+      JOIN animal_group_donations agd ON agd.donation_id = d.id
+      WHERE ka.project_id = ${projectId}
+        AND ka.deleted_at IS NULL AND d.deleted_at IS NULL
+        AND ka.name != '__havuz__'
+    `),
+    db.execute(sql`
+      SELECT COUNT(DISTINCT d.id)::int AS in_groups
+      FROM donations d
+      JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+      JOIN animal_group_donations agd ON agd.donation_id = d.id
+      WHERE ka.project_id = ${projectId}
+        AND ka.deleted_at IS NULL AND d.deleted_at IS NULL
+    `),
     distQuery("ozellik"),
     distQuery("fiyat"),
     distQuery("yer_talebi"),
     distQuery("gun_talebi"),
     distQuery("ilk_hayvan"),
     distQuery("safi"),
+    db.execute(sql`
+      SELECT ct.id, ct.name, ct.color, COUNT(d.id)::int AS count
+      FROM donations d
+      JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+      JOIN donation_tags dt ON dt.donation_id = d.id
+      JOIN custom_tags ct ON ct.id = dt.tag_id
+      WHERE ${filterWhere}
+      GROUP BY ct.id, ct.name, ct.color
+      ORDER BY count DESC
+    `),
   ]);
 
-  const tagCountResult = await db.execute(sql`
-    SELECT ct.id, ct.name, ct.color, COUNT(d.id)::int AS count
-    FROM donations d
-    JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
-    JOIN donation_tags dt ON dt.donation_id = d.id
-    JOIN custom_tags ct ON ct.id = dt.tag_id
-    WHERE ${filterWhere}
-    GROUP BY ct.id, ct.name, ct.color
-    ORDER BY count DESC
-  `);
+  const stats = result.rows[0] || { total: 0, active: 0, excluded: 0, total_shares: 0 };
+  const multiLocationVekalets = multiLocResult.rows.map((r: Record<string, unknown>) => String(r.vekalet));
+  const multiLocationNames = multiLocByNameResult.rows.map((r: Record<string, unknown>) => ({
+    name: String(r.name),
+    count: Number(r.loc_count),
+    vekalets: (r.vekalets as string[]) || [],
+  }));
+  const transferredToLists = (transferredCountResult.rows[0] as Record<string, unknown>)?.transferred ?? 0;
+  const inGroups = (inGroupCountResult.rows[0] as Record<string, unknown>)?.in_groups ?? 0;
   const tagDistribution = tagCountResult.rows.map((r: Record<string, unknown>) => ({
     id: String(r.id),
     name: String(r.name),
@@ -1040,7 +1047,7 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
 
       alreadyInTarget += alreadyAssigned.size;
 
-      const COPY_CHUNK = 200;
+      const COPY_CHUNK = 500;
       for (let i = 0; i < toCopy.length; i += COPY_CHUNK) {
         const chunk = toCopy.slice(i, i + COPY_CHUNK);
         const sourceRows = await tx.select()
@@ -1050,23 +1057,26 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
             isNull(donationsTable.deletedAt),
           ));
 
-        for (const src of sourceRows) {
-          const newId = crypto.randomUUID();
-          await tx.execute(sql`
-            INSERT INTO donations (
-              id, kesim_alani_id, name, description, donation_type, share_count,
-              vekalet, notes, phone, excluded, sort_order, is_flagged, flag_reason,
-              birim, temsilci, ozellik, fiyat, yer_talebi, gun_talebi, ilk_hayvan, safi, updated_at
-            ) VALUES (
-              ${newId}, ${targetKesimAlaniId}, ${src.name}, ${src.description}, ${src.donationType}, ${src.shareCount},
-              ${src.vekalet}, ${normalizeNotes(src.notes)}, ${src.phone}, ${src.excluded}, ${nextSort}, ${src.isFlagged}, ${src.flagReason},
-              ${src.birim}, ${src.temsilci}, ${src.ozellik}, ${src.fiyat}, ${src.yerTalebi}, ${src.gunTalebi}, ${src.ilkHayvan}, ${src.safi}, NOW()
-            )
-          `);
-          copiedNewIds.push(newId);
-          nextSort++;
-          movedCount++;
-        }
+        if (sourceRows.length === 0) continue;
+
+        const newIds: string[] = sourceRows.map(() => crypto.randomUUID());
+        const valueFragments = sourceRows.map((src, idx) => sql`(
+          ${newIds[idx]}, ${targetKesimAlaniId}, ${src.name}, ${src.description}, ${src.donationType}, ${src.shareCount},
+          ${src.vekalet}, ${normalizeNotes(src.notes)}, ${src.phone}, ${src.excluded}, ${nextSort + idx}, ${src.isFlagged}, ${src.flagReason},
+          ${src.birim}, ${src.temsilci}, ${src.ozellik}, ${src.fiyat}, ${src.yerTalebi}, ${src.gunTalebi}, ${src.ilkHayvan}, ${src.safi}, NOW()
+        )`);
+
+        await tx.execute(sql`
+          INSERT INTO donations (
+            id, kesim_alani_id, name, description, donation_type, share_count,
+            vekalet, notes, phone, excluded, sort_order, is_flagged, flag_reason,
+            birim, temsilci, ozellik, fiyat, yer_talebi, gun_talebi, ilk_hayvan, safi, updated_at
+          ) VALUES ${sql.join(valueFragments, sql`, `)}
+        `);
+
+        copiedNewIds.push(...newIds);
+        nextSort += sourceRows.length;
+        movedCount += sourceRows.length;
       }
     }
 
