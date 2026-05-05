@@ -1,0 +1,677 @@
+# design.md — Kurban Hisse Kağıdı Login Sayfası
+
+## Amaç
+
+Mevcut login sayfasını daha modern, daha premium ve daha okunabilir bir tasarıma dönüştür.  
+Sayfa **karman çorman görünmemeli**, kullanıcıya güven vermeli ve tek odağı şifrelerle giriş yapma işlemi olmalı.
+
+Bu tasarım sadece görsel süsleme için yapılmayacak. Mevcut işlev korunacak:
+
+- Kullanıcı 2 farklı şifre girer.
+- Şifreleri göster/gizle ikonları çalışır.
+- `Giriş Yap` butonu mevcut login akışını tetikler.
+- Başlık, açıklama ve alttaki şiir korunur.
+- Gereksiz buton, link, menü, kart, istatistik, sahte özellik veya boş UI eklenmez.
+
+---
+
+## Genel Tasarım Dili
+
+Tasarım dili:
+
+- Dark theme
+- Premium
+- Sade
+- Kurumsal
+- Güven veren
+- Hafif glassmorphism
+- Yeşil / turkuaz vurgu renkleri
+- Fazla efekt kullanmadan modern görünüm
+
+Sayfa, dini/kurban temasıyla uyumlu şekilde ağırbaşlı ve sade görünmeli.  
+Ne çok oyunlaştırılmış, ne de çok kurumsal ve soğuk olmalı.
+
+---
+
+## Sayfa Yapısı
+
+Sayfa tek ekranlık bir login ekranı olmalı.
+
+Genel yapı:
+
+1. Tam ekran koyu arka plan
+2. Ortalanmış login kartı
+3. Kartın altında zarif şiir alanı
+4. Mobilde aynı yapı dikey olarak korunmalı
+
+Sayfa yatayda ve dikeyde dengeli görünmeli.  
+Login kartı ekranın tam ortasına yakın durmalı, şiir karttan kopuk ama onunla aynı tasarım dilinde olmalı.
+
+---
+
+## Korunacak Metinler
+
+Aşağıdaki metinler korunmalı.
+
+### Başlık
+
+```text
+Kurban Hisse Kağıdı
+```
+
+### Alt Başlık
+
+```text
+Devam etmek için şifreleri girin
+```
+
+### Form Label'ları
+
+```text
+1. Şifre
+2. Şifre
+```
+
+### Placeholder'lar
+
+```text
+1. şifreyi girin
+2. şifreyi girin
+```
+
+### Buton
+
+```text
+Giriş Yap
+```
+
+### Şiir
+
+```text
+Sözleri ibret olur, dolaşır dillerde,
+Murat Abi namı anılır her yerde,
+Bir dokunuşla açar düğümü en derinde,
+Meseleler bir bir delip geçer önünde.
+```
+
+---
+
+## Arka Plan
+
+Mevcut düz lacivert arka plan yerine daha derinlikli bir arka plan kullanılmalı.
+
+Önerilen arka plan:
+
+```css
+background:
+  radial-gradient(circle at 80% 15%, rgba(0, 255, 170, 0.16), transparent 28%),
+  radial-gradient(circle at 15% 85%, rgba(0, 190, 255, 0.10), transparent 32%),
+  linear-gradient(135deg, #07111f 0%, #101b2c 45%, #07101c 100%);
+```
+
+Arka plan kuralları:
+
+- Çok parlak olmamalı.
+- Kullanıcıyı yormamalı.
+- Form alanını öne çıkarmalı.
+- Hafif glow olabilir ama abartılmamalı.
+- Yıldız, partikül, grid gibi detaylar çok az ve düşük opaklıkla kullanılabilir.
+
+İsteğe bağlı olarak `::before` veya `::after` ile yumuşak blur ışıklar eklenebilir.
+
+---
+
+## Login Kartı
+
+Login kartı sayfanın ana odağıdır.
+
+### Kart Stili
+
+```css
+background: rgba(8, 17, 31, 0.72);
+border: 1px solid rgba(148, 163, 184, 0.22);
+box-shadow:
+  0 24px 80px rgba(0, 0, 0, 0.36),
+  inset 0 1px 0 rgba(255, 255, 255, 0.04);
+backdrop-filter: blur(18px);
+border-radius: 28px;
+```
+
+### Kart Ölçüleri
+
+Desktop:
+
+```css
+width: min(100%, 560px);
+padding: 48px 56px;
+```
+
+Tablet:
+
+```css
+width: min(100%, 520px);
+padding: 40px;
+```
+
+Mobil:
+
+```css
+width: calc(100% - 32px);
+padding: 28px 22px;
+border-radius: 22px;
+```
+
+### Kart İç Yerleşimi
+
+Kart içindeki elemanlar şu sırada olmalı:
+
+1. Küçük ikon/emblem alanı
+2. Başlık
+3. Alt başlık
+4. Zarif ayırıcı çizgi
+5. Form alanı
+6. Giriş butonu
+
+Elemanlar arasında yeterli boşluk bırakılmalı.  
+Form alanı başlığa fazla yakın olmamalı.
+
+---
+
+## Üst İkon / Emblem
+
+Kartın üstünde küçük bir ikon alanı kullanılabilir.
+
+Amaç: Sayfaya kimlik hissi vermek.
+
+Önerilen stil:
+
+```css
+width: 72px;
+height: 72px;
+border-radius: 999px;
+display: grid;
+place-items: center;
+margin: 0 auto 22px;
+background: rgba(16, 185, 129, 0.08);
+border: 1px solid rgba(16, 185, 129, 0.35);
+box-shadow: 0 0 32px rgba(16, 185, 129, 0.16);
+```
+
+İkon için:
+
+- Minimal çizgisel ikon kullanılmalı.
+- Kilit, yaprak, belge, mühür veya sade geometrik bir işaret olabilir.
+- İkon fazla dikkat çekmemeli.
+- Logo yoksa sahte marka logosu eklenmemeli.
+
+---
+
+## Tipografi
+
+Font önerileri:
+
+```css
+font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+```
+
+Başlık için daha karakterli bir font kullanılabilir:
+
+```css
+font-family: "Playfair Display", Georgia, serif;
+```
+
+Ama dış font eklenemiyorsa sistem fontlarıyla devam et.
+
+### Başlık
+
+```css
+font-size: clamp(32px, 4vw, 46px);
+line-height: 1.1;
+font-weight: 700;
+letter-spacing: -0.03em;
+color: #22e38f;
+text-align: center;
+```
+
+### Alt Başlık
+
+```css
+font-size: 16px;
+line-height: 1.6;
+color: #b8c4d6;
+text-align: center;
+margin-top: 10px;
+```
+
+### Label
+
+```css
+font-size: 15px;
+font-weight: 650;
+color: #e5edf7;
+margin-bottom: 10px;
+```
+
+### Placeholder
+
+```css
+color: #8ea0b8;
+```
+
+---
+
+## Renk Paleti
+
+Ana renkler:
+
+```css
+--bg-900: #07111f;
+--bg-800: #101b2c;
+--panel: rgba(8, 17, 31, 0.72);
+
+--text-main: #f4f7fb;
+--text-muted: #b8c4d6;
+--text-soft: #8ea0b8;
+
+--border-soft: rgba(148, 163, 184, 0.22);
+--border-active: rgba(34, 227, 143, 0.55);
+
+--green-main: #00d96f;
+--green-light: #22e38f;
+--green-dark: #00a957;
+
+--danger: #ef4444;
+```
+
+Renk kuralları:
+
+- Ana vurgu yeşil/turkuaz tonlarında olmalı.
+- Buton çok neon görünmemeli.
+- Metin kontrastı yüksek olmalı.
+- Placeholder metni okunabilir ama label kadar güçlü olmamalı.
+
+---
+
+## Form Alanları
+
+Input alanları mevcut tasarımdan daha premium ve okunabilir yapılmalı.
+
+### Input Wrapper
+
+```css
+position: relative;
+display: flex;
+align-items: center;
+height: 64px;
+border-radius: 14px;
+background: rgba(15, 27, 45, 0.82);
+border: 1px solid rgba(148, 163, 184, 0.28);
+transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+```
+
+### Focus Durumu
+
+```css
+border-color: rgba(34, 227, 143, 0.58);
+box-shadow: 0 0 0 4px rgba(34, 227, 143, 0.10);
+background: rgba(15, 27, 45, 0.96);
+```
+
+### Input
+
+```css
+width: 100%;
+height: 100%;
+background: transparent;
+border: 0;
+outline: 0;
+color: #f4f7fb;
+font-size: 17px;
+padding: 0 56px 0 52px;
+```
+
+### İkonlar
+
+Sol tarafta kilit ikonu:
+
+```css
+left: 18px;
+color: #9fb0c7;
+```
+
+Sağ tarafta göz ikonu:
+
+```css
+right: 18px;
+color: #9fb0c7;
+cursor: pointer;
+```
+
+İkon hover:
+
+```css
+color: #d7e2f1;
+```
+
+---
+
+## Buton
+
+Buton sayfanın ana aksiyonudur.
+
+### Normal Durum
+
+```css
+height: 64px;
+width: 100%;
+border: none;
+border-radius: 14px;
+background: linear-gradient(135deg, #00b956 0%, #00d96f 55%, #18e38a 100%);
+color: white;
+font-size: 17px;
+font-weight: 800;
+letter-spacing: -0.01em;
+box-shadow:
+  0 18px 36px rgba(0, 217, 111, 0.22),
+  inset 0 1px 0 rgba(255, 255, 255, 0.18);
+cursor: pointer;
+transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+```
+
+### Hover
+
+```css
+transform: translateY(-1px);
+filter: brightness(1.04);
+box-shadow:
+  0 22px 44px rgba(0, 217, 111, 0.28),
+  inset 0 1px 0 rgba(255, 255, 255, 0.22);
+```
+
+### Active
+
+```css
+transform: translateY(0);
+filter: brightness(0.98);
+```
+
+### Disabled / Loading
+
+Eğer giriş sırasında loading state varsa:
+
+```css
+opacity: 0.72;
+cursor: not-allowed;
+```
+
+Buton metni loading sırasında tercihen:
+
+```text
+Kontrol ediliyor...
+```
+
+Eğer mevcut projede loading state yoksa zorla ekleme; sadece altyapı uygunsa ekle.
+
+---
+
+## Şiir Alanı
+
+Şiir, mevcut tasarımda sayfaya karakter katıyor.  
+Bu alan korunmalı ama daha zarif ve okunabilir yapılmalı.
+
+### Yerleşim
+
+- Login kartının altında olmalı.
+- Kartla arasında `28px - 36px` boşluk olmalı.
+- Ortalanmış olmalı.
+- Maksimum genişlik login kartından küçük veya eşit olmalı.
+
+### Stil
+
+```css
+max-width: 520px;
+margin: 32px auto 0;
+text-align: center;
+color: rgba(34, 227, 143, 0.72);
+font-family: Georgia, "Times New Roman", serif;
+font-style: italic;
+font-size: 16px;
+line-height: 1.65;
+letter-spacing: 0.01em;
+```
+
+### Dekoratif Çizgiler
+
+Şiirin üstünde ve altında çok hafif bir çizgi/ornament olabilir.
+
+```css
+height: 1px;
+width: 240px;
+margin: 0 auto 14px;
+background: linear-gradient(90deg, transparent, rgba(34, 227, 143, 0.45), transparent);
+```
+
+Alt çizgi de aynı olabilir.
+
+Dikkat:
+
+- Şiir fazla parlak olmamalı.
+- Okunabilirlik korunmalı.
+- Büyük ikonlar veya fazla süsleme eklenmemeli.
+
+---
+
+## Responsive Davranış
+
+### Desktop
+
+- Kart ortada ve genişlik maksimum 560px.
+- Başlık büyük ve güçlü.
+- Inputlar geniş ve ferah.
+- Sayfa yüksekliği yeterliyse login kartı tam ortaya yakın durmalı.
+
+### Tablet
+
+- Kart genişliği 520px civarı.
+- Padding biraz azalmalı.
+- Elemanlar aynı sırayı korumalı.
+
+### Mobil
+
+Mobilde tasarım kesinlikle taşmamalı.
+
+```css
+min-height: 100svh;
+padding: 24px 16px;
+```
+
+Mobil kuralları:
+
+- Kart genişliği `100%`.
+- Başlık çok büyümemeli.
+- Input yüksekliği 58px civarına düşebilir.
+- Buton yüksekliği 58px olabilir.
+- Şiir fontu 14px - 15px arası olabilir.
+- Kart ve şiir arasında yeterli boşluk kalmalı.
+- Klavye açıldığında form kullanılabilir kalmalı.
+
+---
+
+## Boşluk Sistemi
+
+Tasarımda düzenli bir spacing sistemi kullanılmalı.
+
+Önerilen boşluklar:
+
+```css
+--space-xs: 6px;
+--space-sm: 10px;
+--space-md: 16px;
+--space-lg: 24px;
+--space-xl: 32px;
+--space-2xl: 48px;
+```
+
+Form içi:
+
+- Label ile input arası: `8px - 10px`
+- İki input grubu arası: `20px - 24px`
+- Son input ile buton arası: `28px - 32px`
+- Başlık alanı ile form arası: `34px - 42px`
+
+---
+
+## Etkileşimler
+
+Sayfa hafif ama kaliteli mikro etkileşimler içermeli.
+
+Kullanılabilecek animasyonlar:
+
+- Kart sayfa açılırken hafif yukarıdan gelip opacity ile görünür.
+- Input focus olduğunda border ve glow değişir.
+- Buton hover’da hafif yükselir.
+- Hata durumunda input kısa ve zarif bir şekilde vurgulanır.
+
+Animasyonlar abartılmamalı.
+
+```css
+transition: all 160ms ease;
+```
+
+Sayfa açılış animasyonu:
+
+```css
+@keyframes cardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+```
+
+---
+
+## Hata Durumu
+
+Eğer yanlış şifre hatası varsa tasarımda sade gösterilmeli.
+
+Örnek:
+
+```text
+Şifreler hatalı. Lütfen tekrar deneyin.
+```
+
+Hata stili:
+
+```css
+background: rgba(239, 68, 68, 0.10);
+border: 1px solid rgba(239, 68, 68, 0.28);
+color: #fecaca;
+border-radius: 12px;
+padding: 12px 14px;
+font-size: 14px;
+```
+
+Hata mesajı butonun üstünde veya formun altında olabilir.  
+Sayfayı bozacak büyük hata kutuları kullanılmamalı.
+
+---
+
+## Erişilebilirlik
+
+Tasarım görsel olarak güzel olduğu kadar kullanılabilir de olmalı.
+
+Kurallar:
+
+- Her input için label kullanılmalı.
+- Şifre göster/gizle butonlarında `aria-label` bulunmalı.
+- Focus state net görünmeli.
+- Renk kontrastı yeterli olmalı.
+- Form klavye ile kullanılabilir olmalı.
+- Enter tuşu ile giriş yapılabilmeli.
+- Sadece renk ile hata anlatılmamalı; hata metni de gösterilmeli.
+
+Örnek aria-label:
+
+```html
+<button aria-label="1. şifreyi göster veya gizle">
+```
+
+---
+
+## Yapılmaması Gerekenler
+
+Kesinlikle yapılmamalı:
+
+- Gereksiz navbar ekleme.
+- Footer linkleri ekleme.
+- Sosyal medya ile giriş ekleme.
+- “Şifremi unuttum” gibi sistemde olmayan akış ekleme.
+- Sahte logo veya marka ismi ekleme.
+- Çok fazla neon/glow kullanma.
+- Arka plana karmaşık görsel koyma.
+- Çok sayıda ikon veya dekoratif şekil ekleme.
+- Formu küçük ve sıkışık bırakma.
+- Mobilde taşan kart yapma.
+- Mevcut login logic’ini bozma.
+
+---
+
+## Uygulama Notları
+
+Kod üretirken:
+
+- Mevcut component yapısını koru.
+- Sadece login sayfasının tasarımını iyileştir.
+- Mevcut state, validation, submit ve route yapısını bozma.
+- Var olan şifre kontrol mekanizmasına dokunma.
+- Sadece gerekli class/style düzenlemelerini yap.
+- Eğer Tailwind kullanılıyorsa tasarımı Tailwind class’larıyla uygula.
+- Eğer CSS module veya global CSS kullanılıyorsa aynı tasarım değerlerini CSS’e aktar.
+
+---
+
+## Tailwind Yaklaşımı
+
+Eğer proje Tailwind kullanıyorsa genel yapı şu mantıkta olabilir:
+
+```tsx
+<main className="relative min-h-svh overflow-hidden bg-[#07111f] px-4 py-8 text-white">
+  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_15%,rgba(0,255,170,0.16),transparent_28%),radial-gradient(circle_at_15%_85%,rgba(0,190,255,0.10),transparent_32%)]" />
+
+  <section className="relative z-10 mx-auto flex min-h-[calc(100svh-64px)] max-w-2xl flex-col items-center justify-center">
+    <div className="w-full max-w-[560px] rounded-[28px] border border-slate-400/20 bg-slate-950/60 px-6 py-8 shadow-2xl backdrop-blur-xl sm:px-12 sm:py-12">
+      <!-- login content -->
+    </div>
+
+    <div className="mt-8 max-w-[520px] text-center font-serif italic leading-relaxed text-emerald-300/70">
+      <!-- poem -->
+    </div>
+  </section>
+</main>
+```
+
+Bu sadece yön gösteren bir örnektir.  
+Projeye göre component yapısı düzenlenebilir.
+
+---
+
+## Sonuç Hedefi
+
+Ortaya çıkacak login ekranı şu hissi vermeli:
+
+- Daha profesyonel
+- Daha okunabilir
+- Daha az karmaşık
+- Daha güven veren
+- Mobil uyumlu
+- Mevcut işlevi bozmayan
+- Dark premium tema ile uyumlu
+- Formu ve giriş aksiyonunu net şekilde öne çıkaran
+
+Tasarımın amacı kullanıcıyı etkilemek ama yormamak.  
+Ana odak her zaman iki şifre alanı ve `Giriş Yap` butonu olmalı.
