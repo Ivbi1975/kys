@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Search, LogOut, Plus, FolderPlus } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Search, LogOut } from "lucide-react";
 import { HomeSkeleton } from "@/components/skeletons/HomeSkeleton";
 import QrCodeModal from "@/components/QrCodeModal";
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
@@ -23,13 +25,6 @@ import { AuditLogViewer } from "@/components/home/AuditLogViewer";
 import { HomeDialogs } from "@/components/home/HomeDialogs";
 import { ArchiveSection } from "@/components/home/ArchiveSection";
 
-const BG = "#07111f";
-const CARD = "#0d1c2e";
-const BORDER = "rgba(255,255,255,0.07)";
-const TEXT = "#f8fafc";
-const MUTED = "#6f8097";
-const BLUE = "#3b82f6";
-
 export default function Home() {
   const state = useHomeState();
 
@@ -37,251 +32,172 @@ export default function Home() {
     return <HomeSkeleton />;
   }
 
-  const hasContent = state.kesimAlanlari.length > 0 || state.projects.length > 0;
-
   return (
-    <div style={{ background: BG, minHeight: "100vh", fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}>
-
-      {/* Topbar */}
-      <header style={{ background: "#07111f", borderBottom: `1px solid ${BORDER}`, position: "sticky", top: 0, zIndex: 20 }}>
-        <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 24px" }}>
-          <div className="flex items-center gap-4 py-3.5">
-            {/* Brand */}
-            <div className="flex items-center gap-3 min-w-0">
-              <div
-                className="flex items-center justify-center rounded-xl shrink-0"
-                style={{ width: 36, height: 36, background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.25)" }}
-              >
-                <img src="/kurban-logo.png" alt="" className="object-contain" style={{ width: 18, height: 18 }} />
-              </div>
-              <div className="min-w-0 hidden sm:block">
-                <h1 className="text-sm font-bold leading-none truncate" style={{ color: TEXT }}>Kurban Hisse Kağıdı</h1>
-                <p className="text-xs mt-0.5 truncate" style={{ color: MUTED }}>Kesim alanı yönetim sistemi</p>
-              </div>
-            </div>
-
-            {/* Right actions */}
-            <div className="ml-auto flex items-center gap-1.5">
-              <button
-                onClick={() => state.setGlobalSearchOpen(true)}
-                className="flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg transition-all hover:bg-white/5"
-                style={{ color: MUTED, border: `1px solid ${BORDER}` }}
-                title="Ara"
-              >
-                <Search className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Ara</span>
-              </button>
-
-              <ThemeToggle className="h-8 w-8 p-0 hover:bg-white/5 border" style={{ borderColor: BORDER, color: MUTED }} />
-
-              <AuditLogViewer />
-
-              <SettingsDialog
-                settingsOpen={state.settingsOpen}
-                setSettingsOpen={state.setSettingsOpen}
-                logoPreview={state.logoPreview}
-                logoInputRef={state.logoInputRef}
-                backupInputRef={state.backupInputRef}
-                themeMode={state.themeMode}
-                setThemeMode={state.setThemeMode}
-                globalTags={state.globalTags}
-                editingTagId={state.editingTagId}
-                editTagName={state.editTagName}
-                setEditTagName={state.setEditTagName}
-                editTagColor={state.editTagColor}
-                setEditTagColor={state.setEditTagColor}
-                newTagName={state.newTagName}
-                setNewTagName={state.setNewTagName}
-                newTagColor={state.newTagColor}
-                setNewTagColor={state.setNewTagColor}
-                csvExporting={state.csvExporting}
-                csvProgress={state.csvProgress}
-                integrityReport={state.integrityReport}
-                integrityChecking={state.integrityChecking}
-                integrityRepairing={state.integrityRepairing}
-                onLogoUpload={state.handleLogoUpload}
-                onDeleteLogo={state.handleDeleteLogo}
-                onExportBackup={state.handleExportBackup}
-                onImportBackup={state.handleImportBackup}
-                onExportCsv={state.handleExportCsv}
-                onAddTag={state.handleAddTag}
-                onDeleteTag={state.handleDeleteTag}
-                onStartEditTag={state.startEditTag}
-                onCommitEditTag={state.commitEditTag}
-                onIntegrityCheck={state.handleIntegrityCheck}
-                onIntegrityRepair={state.handleIntegrityRepair}
-                onNavigateAiSettings={() => { state.setSettingsOpen(false); state.setLocation("/ai-prompt-ayarlari"); }}
-              />
-
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <button
-                    className="flex items-center justify-center rounded-lg transition-all hover:bg-red-500/10"
-                    style={{ width: 32, height: 32, color: "#ef4444", border: `1px solid ${BORDER}` }}
-                    title="Çıkış Yap"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                  </button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Çıkış Yap</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Oturumunuz sonlandırılacak ve giriş ekranına yönlendirileceksiniz.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>İptal</AlertDialogCancel>
-                    <AlertDialogAction
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      onClick={() => {
-                        sessionStorage.removeItem("app_unlocked");
-                        sessionStorage.removeItem("app_session_token");
-                        window.location.reload();
-                      }}
-                    >
-                      Çıkış Yap
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Dialogs */}
-      <HomeDialogs
-        onBulkSuccess={state.refreshData}
-        importModeOpen={state.importModeOpen}
-        setImportModeOpen={state.setImportModeOpen}
-        pendingImportJson={state.pendingImportJson}
-        setPendingImportJson={state.setPendingImportJson}
-        kesimAlanlari={state.kesimAlanlari}
-        executeImport={state.executeImport}
-        projectDialogOpen={state.projectDialogOpen}
-        setProjectDialogOpen={state.setProjectDialogOpen}
-        newProjectName={state.newProjectName}
-        setNewProjectName={state.setNewProjectName}
-        handleCreateProject={state.handleCreateProject}
-        dialogOpen={state.dialogOpen}
-        setDialogOpen={state.setDialogOpen}
-        newName={state.newName}
-        setNewName={state.setNewName}
-        createProjectId={state.createProjectId}
-        setCreateProjectId={state.setCreateProjectId}
-        handleCreate={state.handleCreate}
-        projects={state.projects}
-        editProjectDialogOpen={state.editProjectDialogOpen}
-        setEditProjectDialogOpen={state.setEditProjectDialogOpen}
-        editingProject={state.editingProject}
-        setEditingProject={state.setEditingProject}
-        handleUpdateProject={state.handleUpdateProject}
-        renameKesimDialogOpen={state.renameKesimDialogOpen}
-        setRenameKesimDialogOpen={state.setRenameKesimDialogOpen}
-        editingKesim={state.editingKesim}
-        setEditingKesim={state.setEditingKesim}
-        handleRenameKesim={state.handleRenameKesim}
-        moveDialogOpen={state.moveDialogOpen}
-        setMoveDialogOpen={state.setMoveDialogOpen}
-        movingKesim={state.movingKesim}
-        setMovingKesim={state.setMovingKesim}
-        moveTargetProjectId={state.moveTargetProjectId}
-        setMoveTargetProjectId={state.setMoveTargetProjectId}
-        handleMoveKesimAlani={state.handleMoveKesimAlani}
-        deleteConfirm={state.deleteConfirm}
-        setDeleteConfirm={state.setDeleteConfirm}
-        executeDelete={state.executeDelete}
-        permanentDeleteConfirm={state.permanentDeleteConfirm}
-        setPermanentDeleteConfirm={state.setPermanentDeleteConfirm}
-        executePermanentDelete={state.executePermanentDelete}
-        permanentDeleteProjectConfirm={state.permanentDeleteProjectConfirm}
-        setPermanentDeleteProjectConfirm={state.setPermanentDeleteProjectConfirm}
-        executePermanentDeleteProject={state.executePermanentDeleteProject}
-        deleteProjectConfirm={state.deleteProjectConfirm}
-        setDeleteProjectConfirm={state.setDeleteProjectConfirm}
-        handleDeleteProject={state.handleDeleteProject}
-      />
-
-      {/* Main content */}
-      <main style={{ maxWidth: 960, margin: "0 auto", padding: "24px 24px 48px" }}>
-
-        {/* Migration alert */}
+    <div className="min-h-screen bg-background">
+      <div className="max-w-4xl mx-auto p-6">
         {state.migrationDone && (
-          <div
-            className="mb-5 px-4 py-3 rounded-xl text-sm flex items-center gap-2"
-            style={{ background: "rgba(34,197,94,0.10)", border: "1px solid rgba(34,197,94,0.20)", color: "#4ade80" }}
-          >
+          <div className="mb-4 p-3 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-lg text-sm text-green-800 dark:text-green-200">
             Mevcut verileriniz veritabanına başarıyla aktarıldı. Artık verileriniz kalıcı olarak saklanmaktadır.
           </div>
         )}
 
-        {/* Page title + actions row */}
-        <div className="flex items-center justify-between mb-6 gap-4">
-          <div>
-            <h2 className="text-lg font-bold" style={{ color: TEXT }}>Ana Sayfa</h2>
-            <p className="text-sm mt-0.5" style={{ color: MUTED }}>Projeler ve kesim alanları</p>
+        <div className="flex items-center gap-3 mb-6 sm:mb-8">
+          <img src="/kurban-logo.png" alt="Kurban Logo" className="w-16 h-16 shrink-0 object-contain invert dark:invert-0" />
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+              Kurban Hisse Kağıdı
+            </h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Kesim alanı oluşturun, bağışçıları ekleyin ve hisse kağıtlarını
+              yazdırın
+            </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => state.setProjectDialogOpen(true)}
-              className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl transition-all hover:bg-white/5"
-              style={{ color: MUTED, border: `1px solid ${BORDER}` }}
-            >
-              <FolderPlus className="w-4 h-4" />
-              <span className="hidden sm:inline">Yeni Proje</span>
-            </button>
-            <button
-              onClick={() => state.setDialogOpen(true)}
-              className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-all hover:opacity-90 active:scale-[0.98]"
-              style={{ background: BLUE, color: "#fff" }}
-            >
-              <Plus className="w-4 h-4" />
-              Yeni Kesim Alanı
-            </button>
-          </div>
+          <Button variant="outline" size="sm" onClick={() => state.setGlobalSearchOpen(true)} title="Global Arama">
+            <Search className="w-4 h-4 mr-1" />
+            Ara
+          </Button>
+          <ThemeToggle className="h-8 w-8 p-0" />
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" title="Çıkış Yap">
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Çıkış Yap</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Oturumunuz sonlandırılacak ve giriş ekranına yönlendirileceksiniz. Devam etmek istiyor musunuz?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>İptal</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => {
+                    sessionStorage.removeItem("app_unlocked");
+                    sessionStorage.removeItem("app_session_token");
+                    window.location.reload();
+                  }}
+                >
+                  Çıkış Yap
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <AuditLogViewer />
+          <SettingsDialog
+            settingsOpen={state.settingsOpen}
+            setSettingsOpen={state.setSettingsOpen}
+            logoPreview={state.logoPreview}
+            logoInputRef={state.logoInputRef}
+            backupInputRef={state.backupInputRef}
+            themeMode={state.themeMode}
+            setThemeMode={state.setThemeMode}
+            globalTags={state.globalTags}
+            editingTagId={state.editingTagId}
+            editTagName={state.editTagName}
+            setEditTagName={state.setEditTagName}
+            editTagColor={state.editTagColor}
+            setEditTagColor={state.setEditTagColor}
+            newTagName={state.newTagName}
+            setNewTagName={state.setNewTagName}
+            newTagColor={state.newTagColor}
+            setNewTagColor={state.setNewTagColor}
+            csvExporting={state.csvExporting}
+            csvProgress={state.csvProgress}
+            integrityReport={state.integrityReport}
+            integrityChecking={state.integrityChecking}
+            integrityRepairing={state.integrityRepairing}
+            onLogoUpload={state.handleLogoUpload}
+            onDeleteLogo={state.handleDeleteLogo}
+            onExportBackup={state.handleExportBackup}
+            onImportBackup={state.handleImportBackup}
+            onExportCsv={state.handleExportCsv}
+            onAddTag={state.handleAddTag}
+            onDeleteTag={state.handleDeleteTag}
+            onStartEditTag={state.startEditTag}
+            onCommitEditTag={state.commitEditTag}
+            onIntegrityCheck={state.handleIntegrityCheck}
+            onIntegrityRepair={state.handleIntegrityRepair}
+            onNavigateAiSettings={() => { state.setSettingsOpen(false); state.setLocation("/ai-prompt-ayarlari"); }}
+          />
         </div>
 
-        {/* Empty state */}
-        {!hasContent ? (
-          <div
-            className="rounded-2xl p-10 text-center"
-            style={{ background: CARD, border: `1px solid ${BORDER}` }}
-          >
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
-              style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.20)" }}
-            >
-              <img src="/kurban-logo.png" alt="" className="object-contain" style={{ width: 32, height: 32 }} />
+        <HomeDialogs
+          onBulkSuccess={state.refreshData}
+          importModeOpen={state.importModeOpen}
+          setImportModeOpen={state.setImportModeOpen}
+          pendingImportJson={state.pendingImportJson}
+          setPendingImportJson={state.setPendingImportJson}
+          kesimAlanlari={state.kesimAlanlari}
+          executeImport={state.executeImport}
+          projectDialogOpen={state.projectDialogOpen}
+          setProjectDialogOpen={state.setProjectDialogOpen}
+          newProjectName={state.newProjectName}
+          setNewProjectName={state.setNewProjectName}
+          handleCreateProject={state.handleCreateProject}
+          dialogOpen={state.dialogOpen}
+          setDialogOpen={state.setDialogOpen}
+          newName={state.newName}
+          setNewName={state.setNewName}
+          createProjectId={state.createProjectId}
+          setCreateProjectId={state.setCreateProjectId}
+          handleCreate={state.handleCreate}
+          projects={state.projects}
+          editProjectDialogOpen={state.editProjectDialogOpen}
+          setEditProjectDialogOpen={state.setEditProjectDialogOpen}
+          editingProject={state.editingProject}
+          setEditingProject={state.setEditingProject}
+          handleUpdateProject={state.handleUpdateProject}
+          renameKesimDialogOpen={state.renameKesimDialogOpen}
+          setRenameKesimDialogOpen={state.setRenameKesimDialogOpen}
+          editingKesim={state.editingKesim}
+          setEditingKesim={state.setEditingKesim}
+          handleRenameKesim={state.handleRenameKesim}
+          moveDialogOpen={state.moveDialogOpen}
+          setMoveDialogOpen={state.setMoveDialogOpen}
+          movingKesim={state.movingKesim}
+          setMovingKesim={state.setMovingKesim}
+          moveTargetProjectId={state.moveTargetProjectId}
+          setMoveTargetProjectId={state.setMoveTargetProjectId}
+          handleMoveKesimAlani={state.handleMoveKesimAlani}
+          deleteConfirm={state.deleteConfirm}
+          setDeleteConfirm={state.setDeleteConfirm}
+          executeDelete={state.executeDelete}
+          permanentDeleteConfirm={state.permanentDeleteConfirm}
+          setPermanentDeleteConfirm={state.setPermanentDeleteConfirm}
+          executePermanentDelete={state.executePermanentDelete}
+          permanentDeleteProjectConfirm={state.permanentDeleteProjectConfirm}
+          setPermanentDeleteProjectConfirm={state.setPermanentDeleteProjectConfirm}
+          executePermanentDeleteProject={state.executePermanentDeleteProject}
+          deleteProjectConfirm={state.deleteProjectConfirm}
+          setDeleteProjectConfirm={state.setDeleteProjectConfirm}
+          handleDeleteProject={state.handleDeleteProject}
+        />
+
+        {state.kesimAlanlari.length === 0 && state.projects.length === 0 ? (
+          <Card className="p-12 text-center">
+            <img src="/kurban-logo.png" alt="logo" className="w-28 h-14 mx-auto mb-4 opacity-50 object-contain invert dark:invert-0" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              Henüz proje veya kesim alanı yok
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              Bir proje veya kesim alanı oluşturarak başlayın
+            </p>
+            <div className="text-sm text-muted-foreground space-y-2 max-w-md mx-auto text-left">
+              <p className="font-medium text-foreground">Nasıl çalışır?</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Bir proje oluşturun (örn: "2025 Kurban")</li>
+                <li>Projenin içine kesim alanları ekleyin</li>
+                <li>Bağışçıları tek tek veya Excel'den toplu ekleyin</li>
+                <li>Otomatik gruplama ile hayvan gruplarını oluşturun</li>
+                <li>Kesim kağıtlarını yazdırın veya Excel'e aktarın</li>
+              </ol>
             </div>
-            <h3 className="text-base font-bold mb-2" style={{ color: TEXT }}>Henüz proje veya kesim alanı yok</h3>
-            <p className="text-sm mb-6" style={{ color: MUTED }}>Bir proje veya kesim alanı oluşturarak başlayın</p>
-            <div
-              className="text-sm space-y-2 max-w-sm mx-auto text-left rounded-xl p-4"
-              style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${BORDER}` }}
-            >
-              <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: MUTED }}>Nasıl çalışır?</p>
-              {[
-                "Bir proje oluşturun (örn: \"2025 Kurban\")",
-                "Projenin içine kesim alanları ekleyin",
-                "Bağışçıları tek tek veya Excel'den toplu ekleyin",
-                "Otomatik gruplama ile hayvan gruplarını oluşturun",
-                "Kesim kağıtlarını yazdırın veya Excel'e aktarın",
-              ].map((step, i) => (
-                <div key={i} className="flex items-start gap-3 text-xs" style={{ color: MUTED }}>
-                  <span
-                    className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold mt-0.5"
-                    style={{ background: "rgba(59,130,246,0.15)", color: BLUE }}
-                  >
-                    {i + 1}
-                  </span>
-                  {step}
-                </div>
-              ))}
-            </div>
-          </div>
+          </Card>
         ) : (
-          <div className="space-y-3">
+          <>
             {state.projects.map(project => (
               <ProjectCard
                 key={project.id}
@@ -296,14 +212,11 @@ export default function Home() {
             ))}
 
             {state.unassignedKesimAlanlari.length > 0 && (
-              <div>
+              <div className="mb-6">
                 {state.projects.length > 0 && (
-                  <div className="flex items-center gap-2 mt-6 mb-3">
-                    <div className="h-px flex-1" style={{ background: BORDER }} />
-                    <span className="text-xs font-semibold uppercase tracking-wider px-2" style={{ color: MUTED }}>
-                      Projesiz Kesim Alanları
-                    </span>
-                    <div className="h-px flex-1" style={{ background: BORDER }} />
+                  <div className="flex items-center gap-2 mb-3">
+                    <img src="/kurban-logo.png" alt="" className="w-4 h-4 object-contain opacity-60 invert dark:invert-0" />
+                    <h3 className="text-sm font-semibold text-muted-foreground">Projesiz Kesim Alanları</h3>
                   </div>
                 )}
                 <div className="space-y-3">
@@ -332,7 +245,7 @@ export default function Home() {
                 </div>
               </div>
             )}
-          </div>
+          </>
         )}
 
         <ArchiveSection
@@ -341,7 +254,7 @@ export default function Home() {
           setArchiveOpen={state.setArchiveOpen}
           onUnarchiveProject={state.handleUnarchiveProject}
         />
-      </main>
+      </div>
 
       <QrCodeModal
         open={state.qrModalOpen}
@@ -354,6 +267,7 @@ export default function Home() {
         open={state.globalSearchOpen}
         onOpenChange={state.setGlobalSearchOpen}
       />
+
     </div>
   );
 }

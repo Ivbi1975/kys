@@ -1,12 +1,8 @@
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { FolderOpen, ChevronRight, AlertTriangle, Info, Pencil } from "lucide-react";
 import type { KesimAlani, Project } from "@/lib/types";
 import { getTotalShares } from "@/lib/grouping";
-
-const CARD = "#0d1c2e";
-const BORDER = "rgba(255,255,255,0.07)";
-const TEXT = "#f8fafc";
-const MUTED = "#6f8097";
-const SEC = "#aab8cc";
 
 interface ProjectCardProps {
   project: Project;
@@ -33,9 +29,7 @@ export function ProjectCard({ project, kesimAlanlari, onNavigate, onEdit }: Proj
     };
   }, { donors: 0, shares: 0, areas: 0, groups: 0, kesildi: 0, kesildiTimes: [] as string[] });
 
-  const projKesildiPercent = projTotals.groups > 0
-    ? Math.round((projTotals.kesildi / projTotals.groups) * 100)
-    : 0;
+  const projKesildiPercent = projTotals.groups > 0 ? Math.round((projTotals.kesildi / projTotals.groups) * 100) : 0;
   const projLastKesildiAt = projTotals.kesildiTimes.sort().pop();
 
   const w = project.warnings;
@@ -49,117 +43,92 @@ export function ProjectCard({ project, kesimAlanlari, onNavigate, onEdit }: Proj
     if (w.missingVekalet > 0) infoWarnings.push({ label: "vekalet numarası eksik hisse", count: w.missingVekalet });
   }
 
-  const progressColor = projKesildiPercent === 100 ? "#22c55e" : "#3b82f6";
-
   return (
-    <div
-      className="rounded-2xl overflow-hidden transition-all duration-200 group"
-      style={{ background: CARD, border: `1px solid ${BORDER}` }}
-    >
-      {/* Main clickable row */}
-      <div
-        className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-white/[0.03] transition-colors"
-        onClick={() => onNavigate(project.id)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={e => e.key === "Enter" && onNavigate(project.id)}
-        aria-label={`${project.name} projesine git`}
-      >
+    <div className="mb-6">
+      <Card className="p-3 bg-muted/30 border-primary/10">
         <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.20)" }}
+          className="flex items-center gap-2 cursor-pointer"
+          onClick={() => onNavigate(project.id)}
         >
-          <FolderOpen className="w-4 h-4" style={{ color: "#3b82f6" }} aria-hidden="true" />
+          <FolderOpen className="w-5 h-5 text-primary" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="font-semibold text-foreground text-lg">{project.name}</h2>
+              {onEdit && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 shrink-0"
+                  title="Projeyi yeniden adlandır"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(project);
+                  }}
+                >
+                  <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                </Button>
+              )}
+            </div>
+            <div className="flex items-center gap-2.5 text-sm mt-1 flex-wrap">
+              <span className="flex items-center gap-1 font-medium text-foreground/80">
+                {projTotals.areas} kesim alanı
+              </span>
+              <span className="text-muted-foreground">·</span>
+              <span className="font-medium text-foreground/80">{projTotals.donors} bağışçı</span>
+              <span className="text-muted-foreground">·</span>
+              <span className="font-medium text-foreground/80">{projTotals.shares} hisse</span>
+              <span className="text-muted-foreground">·</span>
+              <span className="font-medium text-foreground/80">{projTotals.groups} grup</span>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold truncate" style={{ color: TEXT }}>{project.name}</h2>
-            {onEdit && (
-              <button
-                className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded-lg transition-all hover:bg-white/10"
-                title="Projeyi düzenle"
-                onClick={e => { e.stopPropagation(); onEdit(project); }}
-                aria-label="Projeyi düzenle"
+        {(criticalWarnings.length > 0 || infoWarnings.length > 0) && (
+          <div className="mt-2.5 pt-2.5 border-t flex flex-wrap gap-2">
+            {criticalWarnings.map(w => (
+              <span
+                key={w.label}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-destructive/15 text-destructive border border-destructive/30"
               >
-                <Pencil className="w-3 h-3" style={{ color: MUTED }} />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-3 mt-1 flex-wrap">
-            {[
-              { val: projTotals.areas, label: "kesim alanı" },
-              { val: projTotals.donors, label: "bağışçı" },
-              { val: projTotals.shares, label: "hisse" },
-              { val: projTotals.groups, label: "grup" },
-            ].map(({ val, label }) => (
-              <span key={label} className="text-xs" style={{ color: SEC }}>
-                <strong className="font-semibold" style={{ color: TEXT }}>{val}</strong>{" "}
-                {label}
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span><strong>{w.count}</strong> {w.label}</span>
+              </span>
+            ))}
+            {infoWarnings.map(w => (
+              <span
+                key={w.label}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30"
+              >
+                <Info className="w-3.5 h-3.5 shrink-0" />
+                <span><strong>{w.count}</strong> {w.label}</span>
               </span>
             ))}
           </div>
-        </div>
+        )}
 
-        <ChevronRight className="w-4 h-4 shrink-0 transition-transform group-hover:translate-x-0.5" style={{ color: MUTED }} />
-      </div>
-
-      {/* Warnings */}
-      {(criticalWarnings.length > 0 || infoWarnings.length > 0) && (
-        <div
-          className="flex flex-wrap gap-2 px-5 py-3 border-t"
-          style={{ borderColor: "rgba(255,255,255,0.05)" }}
-        >
-          {criticalWarnings.map(w => (
-            <span
-              key={w.label}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold"
-              style={{ background: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.20)" }}
-            >
-              <AlertTriangle className="w-3 h-3 shrink-0" aria-hidden="true" />
-              <strong>{w.count}</strong> {w.label}
-            </span>
-          ))}
-          {infoWarnings.map(w => (
-            <span
-              key={w.label}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold"
-              style={{ background: "rgba(245,158,11,0.10)", color: "#fbbf24", border: "1px solid rgba(245,158,11,0.20)" }}
-            >
-              <Info className="w-3 h-3 shrink-0" aria-hidden="true" />
-              <strong>{w.count}</strong> {w.label}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Progress */}
-      {projTotals.groups > 0 && (
-        <div
-          className="px-5 py-3 border-t"
-          style={{ borderColor: "rgba(255,255,255,0.05)" }}
-        >
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] font-medium" style={{ color: MUTED }}>Kesim Durumu</span>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold tabular-nums" style={{ color: projKesildiPercent === 100 ? "#22c55e" : TEXT }}>
-                {projTotals.kesildi}/{projTotals.groups} · %{projKesildiPercent}
-              </span>
-              {projLastKesildiAt && (
-                <span className="text-[10px]" style={{ color: MUTED }}>
-                  son: {new Date(projLastKesildiAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
-                </span>
-              )}
+        {projTotals.groups > 0 && (
+          <div className="mt-2 pt-2 border-t">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] text-muted-foreground font-medium">Kesim Durumu</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-emerald-600">{projTotals.kesildi}/{projTotals.groups} (%{projKesildiPercent})</span>
+                {projLastKesildiAt && (
+                  <span className="text-[9px] text-muted-foreground">
+                    (son: {new Date(projLastKesildiAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })})
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                style={{ width: `${projKesildiPercent}%` }}
+              />
             </div>
           </div>
-          <div className="w-full rounded-full overflow-hidden" style={{ height: 4, background: "rgba(255,255,255,0.07)" }}>
-            <div
-              className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${projKesildiPercent}%`, background: progressColor }}
-            />
-          </div>
-        </div>
-      )}
+        )}
+      </Card>
     </div>
   );
 }
