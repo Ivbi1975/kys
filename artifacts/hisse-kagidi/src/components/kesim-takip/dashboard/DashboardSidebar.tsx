@@ -88,10 +88,10 @@ export function DashboardSidebar({ open, onClose, activeAction, onNav }: Dashboa
           style={{ borderColor: "rgba(148,163,184,0.10)" }}
         >
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
             style={{ background: "rgba(0,201,134,0.16)" }}
           >
-            <Scissors className="w-4 h-4" style={{ color: "#00c986" }} aria-hidden />
+            <img src="/kurban-logo.png" alt="Logo" className="w-5 h-5 object-contain" style={{ filter: "invert(1) sepia(1) saturate(3) hue-rotate(110deg) brightness(1.1)" }} />
           </div>
           <div>
             <p className="text-xs font-bold tracking-widest" style={{ color: "#f8fafc" }}>KESİM TAKİP</p>
