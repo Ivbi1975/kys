@@ -1,6 +1,4 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { WifiOff, RefreshCw } from "lucide-react";
+import { WifiOff, RefreshCw, Bell } from "lucide-react";
 
 interface SyncState {
   isOnline: boolean;
@@ -23,68 +21,57 @@ export function StatusAlerts({
   onRequestPermission,
 }: StatusAlertsProps) {
   return (
-    <>
+    <div className="space-y-2 mb-3">
       {!syncState.isOnline && (
-        <Card className="p-3 mb-4 bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800">
-          <div className="flex items-center gap-2">
-            <WifiOff className="w-4 h-4 text-amber-600 shrink-0" />
-            <div className="flex-1">
-              <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
-                Çevrimdışı — değişiklikler kaydedilecek
-              </span>
-              {syncState.pendingCount > 0 && (
-                <span className="text-[10px] text-amber-600 dark:text-amber-400 block">
-                  {syncState.pendingCount} bekleyen değişiklik
-                </span>
-              )}
-            </div>
+        <div className="flex items-center gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs">
+          <WifiOff className="w-3.5 h-3.5 text-amber-500 shrink-0" aria-hidden="true" />
+          <div className="flex-1 min-w-0">
+            <span className="font-semibold text-amber-700">Çevrimdışı</span>
+            <span className="text-amber-600"> — değişiklikler bağlantı gelince gönderilecek</span>
+            {syncState.pendingCount > 0 && (
+              <span className="text-amber-500 ml-1">({syncState.pendingCount} bekliyor)</span>
+            )}
           </div>
-        </Card>
+        </div>
       )}
 
       {syncState.isOnline && syncState.pendingCount > 0 && (
-        <Card className="p-3 mb-4 bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <RefreshCw className={`w-4 h-4 text-blue-600 shrink-0 ${syncState.isSyncing ? "animate-spin" : ""}`} />
-              <span className="text-xs text-blue-700 dark:text-blue-300">
-                {syncState.isSyncing
-                  ? "Senkronize ediliyor..."
-                  : `${syncState.pendingCount} bekleyen değişiklik`}
-              </span>
-            </div>
-            {!syncState.isSyncing && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-100"
-                onClick={() => syncQueue()}
-              >
-                Şimdi Gönder
-              </Button>
-            )}
-          </div>
-          {syncState.lastSyncError && (
-            <p className="text-[10px] text-red-600 mt-1">{syncState.lastSyncError}</p>
+        <div className="flex items-center gap-2 px-3 py-2.5 bg-blue-50 border border-blue-100 rounded-xl text-xs">
+          <RefreshCw
+            className={`w-3.5 h-3.5 text-blue-500 shrink-0 ${syncState.isSyncing ? "animate-spin" : ""}`}
+            aria-hidden="true"
+          />
+          <span className="flex-1 text-blue-700">
+            {syncState.isSyncing
+              ? "Senkronize ediliyor..."
+              : `${syncState.pendingCount} bekleyen değişiklik`}
+          </span>
+          {!syncState.isSyncing && (
+            <button
+              className="text-blue-600 font-semibold hover:text-blue-800 transition-colors ml-2 min-h-[32px] px-2"
+              onClick={() => syncQueue()}
+            >
+              Gönder
+            </button>
           )}
-        </Card>
+          {syncState.lastSyncError && (
+            <span className="text-red-500 ml-1 truncate">{syncState.lastSyncError}</span>
+          )}
+        </div>
       )}
 
       {typeof Notification !== "undefined" && notifPermission === "default" && (
-        <Card className="p-3 mb-4 bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-blue-700 dark:text-blue-300">Kesim bildirimlerini almak ister misiniz?</span>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-100"
-              onClick={onRequestPermission}
-            >
-              Bildirimleri Aç
-            </Button>
-          </div>
-        </Card>
+        <div className="flex items-center gap-2 px-3 py-2.5 bg-stone-50 border border-stone-100 rounded-xl text-xs">
+          <Bell className="w-3.5 h-3.5 text-stone-400 shrink-0" aria-hidden="true" />
+          <span className="flex-1 text-stone-500">Kesim bildirimlerini almak ister misiniz?</span>
+          <button
+            className="text-teal-600 font-semibold hover:text-teal-700 transition-colors ml-2 min-h-[32px] px-2"
+            onClick={onRequestPermission}
+          >
+            Aç
+          </button>
+        </div>
       )}
-    </>
+    </div>
   );
 }

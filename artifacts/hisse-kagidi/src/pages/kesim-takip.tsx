@@ -8,13 +8,13 @@ import { KesimTakipSkeleton } from "@/components/skeletons/KesimTakipSkeleton";
 import { useMinLoadingTime } from "@/hooks/useMinLoadingTime";
 import type { TrackingGroup, TrackingNote } from "@/lib/api";
 import { useOfflineSync } from "@/lib/useOfflineSync";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  AlertTriangle, Beef,
+  AlertTriangle,
   CheckCircle2,
   ChevronDown, ChevronUp,
-  StickyNote, MessageSquarePlus, Sun,
+  StickyNote, MessageSquarePlus,
+  Sun, BarChart3,
 } from "lucide-react";
 import { NoteInput } from "@/components/kesim-takip/NoteInput";
 import { NotesList } from "@/components/kesim-takip/NotesList";
@@ -195,51 +195,57 @@ export default function KesimTakipPage() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-red-50 to-white dark:from-red-950 dark:to-background flex items-center justify-center p-4" role="alert">
-        <Card className="p-6 text-center max-w-sm">
-          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-3" aria-hidden="true" />
-          <h2 className="text-lg font-semibold mb-2">Takip Linki Bulunamadı</h2>
-          <p className="text-sm text-muted-foreground">{error || "Geçersiz veya süresi dolmuş link"}</p>
-        </Card>
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4" role="alert">
+        <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-8 text-center max-w-sm w-full">
+          <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-7 h-7 text-red-500" aria-hidden="true" />
+          </div>
+          <h2 className="text-base font-bold text-stone-800 mb-2">Takip Linki Bulunamadı</h2>
+          <p className="text-sm text-stone-500">{error || "Geçersiz veya süresi dolmuş link"}</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white dark:from-emerald-950 dark:to-background pb-20">
-      <div className="max-w-lg mx-auto p-4">
-        <div className="text-center mb-6 pt-4">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Beef className="w-10 h-10 text-emerald-600" aria-hidden="true" />
+    <div className="min-h-screen bg-stone-50 pb-24">
+      {/* Sticky Header */}
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-stone-100 shadow-sm">
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-sm font-bold text-stone-800 truncate">{data.kesimAlaniName}</h1>
+            {data.projectName && (
+              <p className="text-[11px] text-stone-400 truncate">{data.projectName}</p>
+            )}
           </div>
-          <h1 className="text-xl font-bold text-foreground">{data.kesimAlaniName}</h1>
-          {data.projectName && (
-            <p className="text-sm text-muted-foreground">{data.projectName}</p>
-          )}
-          <div className="flex items-center justify-center gap-2 mt-1">
-            <p className="text-xs text-muted-foreground">Kesim Takip Sayfası</p>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] text-stone-400 hidden sm:block">Kesim Takip</span>
             <button
               onClick={() => setHighContrast(!highContrast)}
-              className={`inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-full border transition-colors min-h-[48px] min-w-[48px] ${
+              className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1.5 rounded-full border font-semibold transition-all min-h-[36px] ${
                 highContrast
-                  ? "bg-yellow-400 text-black border-yellow-500 font-bold"
-                  : "bg-background border-border text-muted-foreground hover:bg-muted"
+                  ? "bg-yellow-400 text-black border-yellow-400"
+                  : "bg-stone-50 border-stone-200 text-stone-500 hover:border-stone-300"
               }`}
               aria-label={highContrast ? "Yüksek kontrast modunu kapat" : "Yüksek kontrast modunu aç"}
               aria-pressed={highContrast}
             >
-              <Sun className="w-4 h-4" aria-hidden="true" />
+              <Sun className="w-3.5 h-3.5" aria-hidden="true" />
               HC
             </button>
           </div>
         </div>
+      </header>
 
+      <div className="max-w-lg mx-auto px-4 pt-4">
+        {/* Progress */}
         <ProgressCard
           kesildiCount={data.kesildiCount}
           totalGroups={data.totalGroups}
           onShowReport={() => setShowSummaryReport(true)}
         />
 
+        {/* Status alerts */}
         <StatusAlerts
           syncState={syncState}
           syncQueue={syncQueue}
@@ -247,33 +253,45 @@ export default function KesimTakipPage() {
           onRequestPermission={() => Notification.requestPermission().then(perm => setNotifPermission(perm))}
         />
 
-        <Card className="p-3 mb-4">
+        {/* Notes section */}
+        <div className="bg-white rounded-2xl shadow-sm border border-stone-100 mb-3 overflow-hidden">
           <button
-            className="flex items-center justify-between w-full text-sm min-h-[48px]"
+            className="flex items-center justify-between w-full px-4 py-3.5 min-h-[52px] text-left"
             onClick={() => setShowGlobalNotes(!showGlobalNotes)}
             aria-expanded={showGlobalNotes}
             aria-label={`Genel Notlar${notes.length > 0 ? ` (${notes.length} not)` : ""}`}
           >
-            <span className="flex items-center gap-1.5 font-medium">
-              <StickyNote className="w-4 h-4 text-primary" aria-hidden="true" />
+            <span className="flex items-center gap-2 font-medium text-sm text-stone-700">
+              <StickyNote className="w-4 h-4 text-stone-400" aria-hidden="true" />
               Genel Notlar
               {notes.length > 0 && (
-                <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-semibold">{notes.length}</span>
+                <span className="text-[11px] bg-stone-100 text-stone-600 px-2 py-0.5 rounded-full font-semibold">
+                  {notes.length}
+                </span>
               )}
               {editRequestCount > 0 && (
-                <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold">{editRequestCount} talep</span>
+                <span className="text-[11px] bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full font-semibold">
+                  {editRequestCount} talep
+                </span>
               )}
             </span>
-            {showGlobalNotes ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
+            <span className={`w-6 h-6 flex items-center justify-center rounded-lg transition-colors ${showGlobalNotes ? "bg-stone-100" : ""}`}>
+              {showGlobalNotes
+                ? <ChevronUp className="w-4 h-4 text-stone-400" aria-hidden="true" />
+                : <ChevronDown className="w-4 h-4 text-stone-400" aria-hidden="true" />
+              }
+            </span>
           </button>
+
           {showGlobalNotes && (
-            <div className="mt-3 space-y-2">
+            <div className="px-4 pb-4 border-t border-stone-50 pt-3 space-y-3">
               <NoteInput token={params.token!} onNoteAdded={handleNoteAdded} createNote={handleCreateNote} />
               <NotesList notes={notes} />
             </div>
           )}
-        </Card>
+        </div>
 
+        {/* Search & Filter */}
         {filledGroups.length > 0 && (
           <SearchFilterBar
             searchQuery={searchQuery}
@@ -285,12 +303,13 @@ export default function KesimTakipPage() {
           />
         )}
 
+        {/* Group list */}
         {filteredGroups.length > 0 ? (
           <Virtuoso
             useWindowScroll
             data={filteredGroups}
-            defaultItemHeight={72}
-            overscan={200}
+            defaultItemHeight={76}
+            overscan={300}
             itemContent={(idx, group) => (
               <GroupCard
                 group={group}
@@ -304,52 +323,67 @@ export default function KesimTakipPage() {
             )}
           />
         ) : filledGroups.length === 0 ? (
-          <Card className="p-6 text-center">
-            <p className="text-muted-foreground">Henüz hayvan grubu oluşturulmamış</p>
-          </Card>
+          <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-10 text-center">
+            <div className="w-12 h-12 bg-stone-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <BarChart3 className="w-6 h-6 text-stone-300" aria-hidden="true" />
+            </div>
+            <p className="text-sm font-medium text-stone-500">Henüz hayvan grubu oluşturulmamış</p>
+          </div>
         ) : (
-          <Card className="p-6 text-center">
-            <p className="text-muted-foreground text-sm">Aramanızla eşleşen hayvan grubu bulunamadı</p>
-          </Card>
+          <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-8 text-center">
+            <p className="text-sm text-stone-400">Aramanızla eşleşen hayvan grubu bulunamadı</p>
+          </div>
         )}
 
-        <p className="text-[10px] text-muted-foreground text-center mt-6">
-          Bir hayvan grubuna tıklayarak kesim kağıdı detayını görüntüleyin • Sayfa her 30 saniyede otomatik güncellenir
+        <p className="text-[10px] text-stone-400 text-center mt-6 mb-2">
+          Bir hayvan grubuna tıklayarak kesim kağıdı detayını görüntüleyin · Sayfa her 30 saniyede güncellenir
         </p>
       </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t shadow-lg" aria-label="Hızlı eylemler">
-        <div className="max-w-lg mx-auto flex items-center gap-2 p-2">
+      {/* Bottom action bar */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-t border-stone-100 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]"
+        aria-label="Hızlı eylemler"
+      >
+        <div className="max-w-lg mx-auto flex items-center gap-2 px-4 py-3">
           {pendingGroups.length > 0 && (
-            <span className="text-[10px] text-muted-foreground shrink-0 hidden sm:block" aria-live="polite">
+            <span className="text-[11px] text-stone-400 shrink-0 hidden sm:block font-medium">
               #{pendingGroups[0].animalNo}
             </span>
           )}
           <Button
-            className="flex-1 h-12 min-h-[48px] text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+            className={`flex-1 h-12 min-h-[48px] text-sm font-semibold rounded-xl shadow-sm transition-all ${
+              pendingGroups.length === 0
+                ? "bg-stone-100 text-stone-400 shadow-none"
+                : "bg-teal-600 hover:bg-teal-700 text-white shadow-teal-200"
+            }`}
             onClick={handleMarkNextPendingDone}
             disabled={pendingGroups.length === 0 || (pendingGroups.length > 0 && toggling.has(pendingGroups[0].id))}
-            aria-label={pendingGroups.length > 0 ? `Hayvan ${pendingGroups[0].animalNo} kesildi olarak işaretle` : "Tüm hayvanlar kesildi"}
+            aria-label={pendingGroups.length > 0
+              ? `Hayvan ${pendingGroups[0].animalNo} kesildi olarak işaretle`
+              : "Tüm hayvanlar kesildi"}
           >
-            <CheckCircle2 className="w-5 h-5 mr-1.5 shrink-0" aria-hidden="true" />
+            <CheckCircle2 className="w-5 h-5 mr-2 shrink-0" aria-hidden="true" />
             {pendingGroups.length > 0
               ? `Kesildi İşaretle (${pendingGroups.length})`
-              : "Tümü Kesildi"
+              : "Tümü Kesildi ✓"
             }
           </Button>
           <Button
             variant="outline"
-            className="h-12 min-h-[48px] px-3 text-sm"
+            className="h-12 min-h-[48px] px-4 text-sm rounded-xl border-stone-200 text-stone-600 hover:bg-stone-50"
             onClick={handleOpenNextPendingNotes}
             disabled={pendingGroups.length === 0}
-            aria-label={pendingGroups.length > 0 ? `Hayvan ${pendingGroups[0].animalNo} için not ekle` : "Bekleyen hayvan yok"}
+            aria-label={pendingGroups.length > 0
+              ? `Hayvan ${pendingGroups[0].animalNo} için not ekle`
+              : "Bekleyen hayvan yok"}
           >
-            <MessageSquarePlus className="w-5 h-5 mr-1" aria-hidden="true" />
-            Not Ekle
+            <MessageSquarePlus className="w-4 h-4 mr-1" aria-hidden="true" />
+            Not
           </Button>
           <Button
             variant="ghost"
-            className="h-12 min-h-[48px] px-3 text-sm"
+            className="h-12 min-h-[48px] px-4 text-sm rounded-xl text-stone-500 hover:bg-stone-50"
             onClick={() => setShowSummaryReport(true)}
             aria-label="Durum raporunu görüntüle"
           >

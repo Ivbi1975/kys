@@ -1,5 +1,4 @@
-import { Button } from "@/components/ui/button";
-import { X, Printer } from "lucide-react";
+import { X, Printer, Clock, Users, StickyNote, Edit3 } from "lucide-react";
 import { formatKesildiTime } from "@/lib/formatting";
 import { NoteType, NoteStatus } from "@/lib/constants";
 import type { TrackingData, TrackingNote } from "@/lib/api";
@@ -43,114 +42,162 @@ export function SummaryReportOverlay({
   const editReqCount = notes.filter((n) => n.type === NoteType.EDIT_REQUEST).length;
   const pendingReqCount = notes.filter((n) => n.type === NoteType.EDIT_REQUEST && n.status === NoteStatus.PENDING).length;
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-filter backdrop-blur-sm flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-background rounded-xl max-w-md w-full max-h-[85vh] overflow-y-auto shadow-2xl">
-        <div className="no-print sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center justify-between rounded-t-xl">
-          <h2 className="font-semibold text-sm">Durum Raporu</h2>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handlePrint}>
-              <Printer className="w-3 h-3 mr-1" /> Yazdır
-            </Button>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onClose}>
-              <X className="w-4 h-4" />
-            </Button>
+    <div
+      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+        {/* Header */}
+        <div className="no-print sticky top-0 z-10 bg-white border-b border-stone-100 px-5 py-4 flex items-center justify-between rounded-t-2xl">
+          <h2 className="font-bold text-stone-800">Durum Raporu</h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl border border-stone-200 text-stone-600 hover:bg-stone-50 transition-colors font-medium min-h-[36px]"
+            >
+              <Printer className="w-3.5 h-3.5" aria-hidden="true" />
+              Yazdır
+            </button>
+            <button
+              onClick={onClose}
+              className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-stone-100 transition-colors"
+              aria-label="Kapat"
+            >
+              <X className="w-4 h-4 text-stone-500" />
+            </button>
           </div>
         </div>
 
-        <div className="p-4 space-y-4 rapor-summary-print">
-          <div className="text-center">
-            <h3 className="font-bold text-lg">{data.kesimAlaniName}</h3>
-            {data.projectName && <p className="text-xs text-muted-foreground">{data.projectName}</p>}
-            <p className="text-xs text-muted-foreground mt-1">{new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}</p>
+        <div className="p-5 space-y-5 rapor-summary-print">
+          {/* Title */}
+          <div className="text-center pb-2 border-b border-stone-50">
+            <h3 className="font-bold text-stone-800">{data.kesimAlaniName}</h3>
+            {data.projectName && <p className="text-xs text-stone-400 mt-0.5">{data.projectName}</p>}
+            <p className="text-xs text-stone-400 mt-1">
+              {new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}
+            </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="border rounded-lg p-2">
-              <div className="text-xl font-bold">{total}</div>
-              <div className="text-[10px] text-muted-foreground">Toplam</div>
+          {/* Big stats */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-stone-50 border border-stone-100 rounded-xl p-3 text-center">
+              <div className="text-2xl font-bold text-stone-700 tabular-nums">{total}</div>
+              <div className="text-[11px] text-stone-400 font-medium mt-0.5">Toplam</div>
             </div>
-            <div className="border rounded-lg p-2 bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800">
-              <div className="text-xl font-bold text-emerald-600">{completed}</div>
-              <div className="text-[10px] text-muted-foreground">Kesildi</div>
+            <div className="bg-teal-50 border border-teal-100 rounded-xl p-3 text-center">
+              <div className="text-2xl font-bold text-teal-600 tabular-nums">{completed}</div>
+              <div className="text-[11px] text-teal-500 font-medium mt-0.5">Kesildi</div>
             </div>
-            <div className="border rounded-lg p-2 bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800">
-              <div className="text-xl font-bold text-amber-600">{remaining}</div>
-              <div className="text-[10px] text-muted-foreground">Kalan</div>
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-center">
+              <div className="text-2xl font-bold text-amber-500 tabular-nums">{remaining}</div>
+              <div className="text-[11px] text-amber-400 font-medium mt-0.5">Kalan</div>
             </div>
           </div>
 
+          {/* Progress bar */}
           <div>
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-muted-foreground">İlerleme</span>
-              <span className="font-semibold">%{percentage}</span>
+            <div className="flex items-center justify-between text-xs text-stone-500 mb-2">
+              <span>İlerleme</span>
+              <span className="font-bold text-stone-700">%{percentage}</span>
             </div>
-            <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
-              <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${percentage}%` }} />
+            <div className="w-full bg-stone-100 rounded-full h-3 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full transition-all"
+                style={{ width: `${percentage}%` }}
+              />
             </div>
           </div>
 
+          {/* Time info */}
           {(firstKesildi || lastKesildi) && (
-            <div className="bg-muted/50 rounded-lg p-3">
-              <h4 className="text-xs font-semibold mb-2">Zaman Bilgisi</h4>
-              <div className="space-y-1 text-xs">
+            <div className="bg-stone-50 border border-stone-100 rounded-xl p-4">
+              <h4 className="text-xs font-bold text-stone-700 flex items-center gap-1.5 mb-3">
+                <Clock className="w-3.5 h-3.5 text-stone-400" aria-hidden="true" />
+                Zaman Bilgisi
+              </h4>
+              <div className="space-y-2 text-xs">
                 {firstKesildi && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">İlk kesim</span>
-                    <span className="font-medium">Hayvan {firstKesildi.animalNo} — {formatKesildiTime(firstKesildi.time.toISOString())}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-stone-400">İlk kesim</span>
+                    <span className="font-semibold text-stone-700">
+                      Hayvan {firstKesildi.animalNo} — {formatKesildiTime(firstKesildi.time.toISOString())}
+                    </span>
                   </div>
                 )}
-                {lastKesildi && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Son kesim</span>
-                    <span className="font-medium">Hayvan {lastKesildi.animalNo} — {formatKesildiTime(lastKesildi.time.toISOString())}</span>
+                {lastKesildi && lastKesildi.animalNo !== firstKesildi?.animalNo && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-stone-400">Son kesim</span>
+                    <span className="font-semibold text-stone-700">
+                      Hayvan {lastKesildi.animalNo} — {formatKesildiTime(lastKesildi.time.toISOString())}
+                    </span>
                   </div>
                 )}
               </div>
             </div>
           )}
 
+          {/* Team stats */}
           {teamStats.length > 0 && (
-            <div>
-              <h4 className="text-xs font-semibold mb-2">Ekip Durumu</h4>
-              <div className="space-y-1.5">
-                {teamStats.map((t) => (
-                  <div key={t.name} className="flex items-center gap-2 text-xs">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
-                    <span className="flex-1">{t.name}</span>
-                    <span className="font-semibold">{t.completed}/{t.total}</span>
-                    <span className="text-muted-foreground">%{t.total > 0 ? Math.round((t.completed / t.total) * 100) : 0}</span>
-                  </div>
-                ))}
+            <div className="bg-stone-50 border border-stone-100 rounded-xl p-4">
+              <h4 className="text-xs font-bold text-stone-700 flex items-center gap-1.5 mb-3">
+                <Users className="w-3.5 h-3.5 text-stone-400" aria-hidden="true" />
+                Ekip Durumu
+              </h4>
+              <div className="space-y-2.5">
+                {teamStats.map((t) => {
+                  const pct = t.total > 0 ? Math.round((t.completed / t.total) * 100) : 0;
+                  return (
+                    <div key={t.name} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                          <span className="font-medium text-stone-700">{t.name}</span>
+                        </div>
+                        <span className="font-semibold text-stone-600">{t.completed}/{t.total} · %{pct}</span>
+                      </div>
+                      <div className="w-full bg-stone-200 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: `${pct}%`, backgroundColor: t.color }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          <div className="bg-muted/50 rounded-lg p-3">
-            <h4 className="text-xs font-semibold mb-2">Notlar ve Talepler</h4>
-            <div className="space-y-1 text-xs">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Toplam not</span>
-                <span className="font-medium">{noteCount}</span>
+          {/* Notes summary */}
+          <div className="bg-stone-50 border border-stone-100 rounded-xl p-4">
+            <h4 className="text-xs font-bold text-stone-700 flex items-center gap-1.5 mb-3">
+              <StickyNote className="w-3.5 h-3.5 text-stone-400" aria-hidden="true" />
+              Notlar ve Talepler
+            </h4>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-stone-400 flex items-center gap-1">
+                  <StickyNote className="w-3 h-3" aria-hidden="true" /> Toplam not
+                </span>
+                <span className="font-semibold text-stone-700">{noteCount}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Düzenleme talebi</span>
-                <span className="font-medium">{editReqCount}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-stone-400 flex items-center gap-1">
+                  <Edit3 className="w-3 h-3" aria-hidden="true" /> Düzenleme talebi
+                </span>
+                <span className="font-semibold text-stone-700">{editReqCount}</span>
               </div>
               {pendingReqCount > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-amber-600">Bekleyen talepler</span>
-                  <span className="font-semibold text-amber-600">{pendingReqCount}</span>
+                <div className="flex justify-between items-center pt-1 border-t border-stone-200">
+                  <span className="text-amber-500 font-medium">Bekleyen talepler</span>
+                  <span className="font-bold text-amber-500">{pendingReqCount}</span>
                 </div>
               )}
             </div>
           </div>
 
-          <p className="text-[9px] text-muted-foreground text-center">
+          <p className="text-[10px] text-stone-400 text-center">
             {new Date().toLocaleDateString("tr-TR")} {new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} itibarıyla
           </p>
         </div>

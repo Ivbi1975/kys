@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Mic, MicOff, Send } from "lucide-react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { createTrackingNote } from "@/lib/api";
@@ -62,15 +60,15 @@ export function NoteInput({
   const displayText = speech.isListening ? speech.transcript : text;
 
   return (
-    <div className="flex gap-1.5 items-end">
+    <div className="flex gap-2 items-end">
       <div className="flex-1 relative">
-        <Textarea
+        <textarea
           placeholder="Not yazın..."
           value={displayText}
           onChange={(e) => {
             if (!speech.isListening) setText(e.target.value);
           }}
-          className="min-h-[40px] max-h-[100px] text-sm pr-10 resize-none"
+          className="w-full min-h-[40px] max-h-[100px] text-sm px-3 py-2 pr-8 bg-stone-50 border border-stone-200 rounded-xl resize-none outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 placeholder:text-stone-400 text-stone-800 transition-all"
           rows={1}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -80,27 +78,30 @@ export function NoteInput({
           }}
         />
         {speech.isListening && (
-          <span className="absolute right-2 top-2 text-[10px] text-red-500 font-semibold animate-pulse">REC</span>
+          <span className="absolute right-2 top-2 text-[9px] text-red-500 font-bold animate-pulse">REC</span>
         )}
       </div>
       {speech.isSupported && (
-        <Button
-          variant={speech.isListening ? "destructive" : "outline"}
-          size="sm"
-          className="h-9 w-9 p-0 shrink-0"
+        <button
+          className={`w-10 h-10 min-h-[40px] flex items-center justify-center rounded-xl border font-medium text-sm transition-all ${
+            speech.isListening
+              ? "bg-red-500 border-red-500 text-white"
+              : "bg-white border-stone-200 text-stone-500 hover:border-stone-300"
+          }`}
           onClick={handleMicToggle}
+          aria-label={speech.isListening ? "Kaydı durdur" : "Sesle not yaz"}
         >
           {speech.isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-        </Button>
+        </button>
       )}
-      <Button
-        size="sm"
-        className="h-9 w-9 p-0 shrink-0"
+      <button
+        className="w-10 h-10 min-h-[40px] flex items-center justify-center rounded-xl bg-teal-600 text-white transition-all hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed"
         onClick={handleSend}
         disabled={!displayText.trim() || sending}
+        aria-label="Notu gönder"
       >
         {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-      </Button>
+      </button>
     </div>
   );
 }
