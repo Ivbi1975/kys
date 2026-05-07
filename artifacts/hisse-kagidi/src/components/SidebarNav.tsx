@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import {
   ChevronDown, ChevronRight, FolderOpen,
   PanelLeftClose, Home, Trash2,
-  BookOpen, Layers, Scissors
+  BookOpen, Layers, Scissors, X
 } from "lucide-react";
 import { fetchHomeData } from "@/lib/api/projects";
 import type { HomeData } from "@/lib/api/projects";
@@ -22,9 +22,11 @@ function useHomeData() {
 interface SidebarNavProps {
   collapsed: boolean;
   onToggle: () => void;
+  isMobileDrawer?: boolean;
+  onMobileClose?: () => void;
 }
 
-export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
+export function SidebarNav({ collapsed, onToggle, isMobileDrawer, onMobileClose }: SidebarNavProps) {
   const homeData = useHomeData();
   const [location, navigate] = useLocation();
   const [openProjects, setOpenProjects] = useState<Set<string>>(new Set());
@@ -56,13 +58,17 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
     });
   };
 
-  const go = (path: string) => navigate(path);
+  const go = (path: string) => {
+    navigate(path);
+    onMobileClose?.();
+  };
 
   const sidebarBase = cn(
     "flex flex-col border-r flex-shrink-0 overflow-hidden",
-    "transition-[width] duration-300 ease-in-out",
     "bg-[hsl(222,47%,8%)] border-[hsl(222,40%,13%)]",
-    collapsed ? "w-[52px]" : "w-[220px]"
+    isMobileDrawer
+      ? "w-[260px] h-full"
+      : cn("transition-[width] duration-300 ease-in-out", collapsed ? "w-[52px]" : "w-[220px]")
   );
 
   const activeProjects = homeData?.projects.filter(p => !p.deletedAt && !p.archivedAt) ?? [];
@@ -72,7 +78,7 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
 
   return (
     <aside className={sidebarBase}>
-      <SidebarHeader collapsed={collapsed} onToggle={onToggle} />
+      <SidebarHeader collapsed={isMobileDrawer ? false : collapsed} onToggle={onToggle} isMobileDrawer={isMobileDrawer} onMobileClose={onMobileClose} />
 
       <nav className="flex-1 overflow-y-auto overflow-x-hidden thin-scrollbar flex flex-col py-2 gap-1">
 
@@ -203,7 +209,12 @@ export function SidebarNav({ collapsed, onToggle }: SidebarNavProps) {
   );
 }
 
-function SidebarHeader({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+function SidebarHeader({ collapsed, onToggle, isMobileDrawer, onMobileClose }: {
+  collapsed: boolean;
+  onToggle: () => void;
+  isMobileDrawer?: boolean;
+  onMobileClose?: () => void;
+}) {
   return (
     <div className={cn(
       "flex items-center h-[52px] flex-shrink-0 border-b border-[hsl(222,40%,13%)]",
@@ -228,10 +239,13 @@ function SidebarHeader({ collapsed, onToggle }: { collapsed: boolean; onToggle: 
             </div>
           </div>
           <button
-            onClick={onToggle}
+            onClick={isMobileDrawer ? onMobileClose : onToggle}
             className="h-7 w-7 rounded-md flex items-center justify-center text-white/22 hover:text-white/55 hover:bg-white/[0.06] transition-all duration-150 flex-shrink-0"
           >
-            <PanelLeftClose className="h-[14px] w-[14px]" />
+            {isMobileDrawer
+              ? <X className="h-[14px] w-[14px]" />
+              : <PanelLeftClose className="h-[14px] w-[14px]" />
+            }
           </button>
         </>
       )}

@@ -11,6 +11,7 @@ const ReloadPrompt = import.meta.env.PROD
   ? lazy(() => import("@/components/ReloadPrompt"))
   : () => null;
 import { SidebarNav } from "@/components/SidebarNav";
+import { Menu } from "lucide-react";
 
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -105,6 +106,7 @@ function ProtectedRouterInner() {
       return stored === null ? false : stored === "1";
     } catch { return true; }
   });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const hideSidebar = location.startsWith("/print/") || location.startsWith("/rapor/") || location.startsWith("/not-duzenleme/");
 
@@ -116,12 +118,52 @@ function ProtectedRouterInner() {
     });
   };
 
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location]);
+
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
+    <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden">
+
       {!hideSidebar && (
-        <SidebarNav collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+        <div className="md:hidden flex items-center h-12 px-4 border-b bg-[hsl(222,47%,8%)] border-[hsl(222,40%,13%)] flex-shrink-0 z-10">
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            className="w-9 h-9 flex items-center justify-center rounded-lg text-white/60 hover:text-white/90 hover:bg-white/[0.07] transition-all"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <div className="flex items-center gap-2 ml-2">
+            <img src="/kurban-logo.png" alt="" className="h-5 w-5 object-contain" />
+            <span className="text-[13px] font-semibold text-white/80">KYS</span>
+          </div>
+        </div>
       )}
-      <div className="flex-1 overflow-auto">
+
+      {!hideSidebar && (
+        <div className="hidden md:flex flex-shrink-0">
+          <SidebarNav collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+        </div>
+      )}
+
+      {!hideSidebar && mobileMenuOpen && (
+        <>
+          <div
+            className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <div className="md:hidden fixed inset-y-0 left-0 z-50 w-[260px] animate-in slide-in-from-left duration-200">
+            <SidebarNav
+              collapsed={false}
+              onToggle={() => setMobileMenuOpen(false)}
+              isMobileDrawer
+              onMobileClose={() => setMobileMenuOpen(false)}
+            />
+          </div>
+        </>
+      )}
+
+      <div className="flex-1 overflow-auto min-h-0">
         <ErrorBoundary>
           <Suspense fallback={<PageFallback />}>
             <Switch>

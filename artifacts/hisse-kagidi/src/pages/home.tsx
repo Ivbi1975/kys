@@ -34,30 +34,31 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="max-w-4xl mx-auto p-3 sm:p-6">
         {state.migrationDone && (
           <div className="mb-4 p-3 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-lg text-sm text-green-800 dark:text-green-200">
             Mevcut verileriniz veritabanına başarıyla aktarıldı. Artık verileriniz kalıcı olarak saklanmaktadır.
           </div>
         )}
 
-        <div className="flex items-center gap-3 mb-6 sm:mb-8">
-          <img src="/kurban-logo.png" alt="Kurban Logo" className="w-16 h-16 shrink-0 object-contain invert dark:invert-0" />
+        <div className="flex items-start gap-3 mb-6 sm:mb-8">
+          <img src="/kurban-logo.png" alt="Kurban Logo" className="w-12 h-12 sm:w-16 sm:h-16 shrink-0 object-contain invert dark:invert-0 mt-0.5" />
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+            <h1 className="text-xl sm:text-3xl font-bold text-foreground">
               Kurban Hisse Kağıdı
             </h1>
-            <p className="text-muted-foreground text-sm mt-1">
+            <p className="text-muted-foreground text-xs sm:text-sm mt-1 hidden sm:block">
               Kesim alanı oluşturun, bağışçıları ekleyin ve hisse kağıtlarını
               yazdırın
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => state.setGlobalSearchOpen(true)} title="Global Arama">
-            <Search className="w-4 h-4 mr-1" />
-            Ara
-          </Button>
-          <ThemeToggle className="h-8 w-8 p-0" />
-          <AlertDialog>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <Button variant="outline" size="sm" onClick={() => state.setGlobalSearchOpen(true)} title="Global Arama" className="h-8 px-2 sm:px-3">
+              <Search className="w-4 h-4" />
+              <span className="hidden sm:inline ml-1">Ara</span>
+            </Button>
+            <ThemeToggle className="h-8 w-8 p-0" />
+            <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" title="Çıkış Yap">
                 <LogOut className="w-4 h-4" />
@@ -122,6 +123,7 @@ export default function Home() {
             onIntegrityRepair={state.handleIntegrityRepair}
             onNavigateAiSettings={() => { state.setSettingsOpen(false); state.setLocation("/ai-prompt-ayarlari"); }}
           />
+          </div>
         </div>
 
         <HomeDialogs
