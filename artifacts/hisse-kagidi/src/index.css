@@ -253,6 +253,21 @@
   .print\:hidden {
     display: none !important;
   }
+
+  /* Tüm fixed/absolute konumlu elementleri ve UI kontrol elemanlarını gizle */
+  [id="replit-dev-banner"],
+  [class*="beacon-"],
+  [class*="replit-"],
+  input[type="checkbox"],
+  input[type="radio"],
+  select,
+  .animate-spin,
+  .fixed,
+  [style*="position: fixed"],
+  [style*="position:fixed"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
 }
 
 .print-pages {
