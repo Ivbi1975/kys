@@ -511,7 +511,7 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
       FROM donations d
       JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
       WHERE ${filterWhere} AND ${sql.raw(`d.${col}`)} != ''
-      GROUP BY ${sql.raw(`d.${col}`)} ORDER BY count DESC LIMIT 50
+      GROUP BY ${sql.raw(`d.${col}`)} ORDER BY count DESC LIMIT 500
     `);
   };
 
@@ -560,21 +560,21 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
       FROM donations d
       JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
       WHERE ${filterWhere} AND d.birim != ''
-      GROUP BY d.birim ORDER BY count DESC LIMIT 50
+      GROUP BY d.birim ORDER BY count DESC LIMIT 500
     `),
     db.execute(sql`
       SELECT d.temsilci, COUNT(*)::int AS count, SUM(d.share_count)::int AS shares
       FROM donations d
       JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
       WHERE ${filterWhere} AND d.temsilci != ''
-      GROUP BY d.temsilci ORDER BY count DESC LIMIT 50
+      GROUP BY d.temsilci ORDER BY count DESC LIMIT 500
     `),
     db.execute(sql`
       SELECT d.donation_type AS type, COUNT(*)::int AS count, SUM(d.share_count)::int AS shares
       FROM donations d
       JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
       WHERE ${filterWhere} AND d.donation_type != ''
-      GROUP BY d.donation_type ORDER BY count DESC LIMIT 50
+      GROUP BY d.donation_type ORDER BY count DESC LIMIT 500
     `),
     db.execute(sql`
       SELECT ka.id, ka.name, COUNT(d.id)::int AS count, SUM(d.share_count)::int AS shares
