@@ -49,7 +49,7 @@ Her bağışçı için JSON formatında yanıt ver:
   "summary": "Notun kısa ve anlaşılır özeti (1-2 cümle)"
 }
 
-Yanıtı JSON array olarak ver: [{...}, {...}]`;
+Yanıtı şu JSON object formatında ver: {"results": [{...}, {...}]}`;
 
 const DEFAULT_CATEGORIES = [
   "sabah_kesimi",
@@ -83,7 +83,7 @@ async function syncAiSettingsToDb(): Promise<void> {
     await db.insert(appSettingsTable)
       .values({ key: "ai_prompt", value: DEFAULT_PROMPT })
       .onConflictDoNothing();
-  } else if (!promptRow.value.includes("Kategori kuralları") || !promptRow.value.includes("ödeme_notu")) {
+  } else if (!promptRow.value.includes("Kategori kuralları") || !promptRow.value.includes("ödeme_notu") || !promptRow.value.includes("JSON object formatında")) {
     const categoryRulesSection = DEFAULT_PROMPT.substring(
       DEFAULT_PROMPT.indexOf("Kategori kuralları:")
     );
