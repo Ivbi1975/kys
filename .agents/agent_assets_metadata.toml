@@ -12,3 +12,9 @@ id = "uVLJaja8DzIG0ezhqs5js"
 uri = "file://.local/veritabani-dokumani.md"
 type = "text"
 title = "Kurban Hisse Sistemi - Veritabanı Dökümanı (Laravel için)"
+
+[[outputs]]
+id = "otkUd20ram8PeBrpKZEy4"
+uri = "file://sistem-raporu.md"
+type = "text"
+title = "Kurban Hisse Kağıdı — Sistem Raporu"
