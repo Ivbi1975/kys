@@ -11,6 +11,8 @@ import {
   Archive,
   Package,
   AlertTriangle,
+  ChevronRight,
+  Scissors,
 } from "lucide-react";
 import QrCodeModal from "@/components/QrCodeModal";
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
@@ -153,12 +155,6 @@ export default function ProjeDetayPage() {
           </div>
         </div>
 
-        <PoolSummaryCard
-          stats={poolStats}
-          loading={poolStatsLoading && !poolStats}
-          onNavigate={() => state.setLocation(`/bagis-havuzu/${state.project!.id}`)}
-        />
-
         <ProjectSummaryCard totals={state.totals} occupancy={state.occupancy} />
 
         <PendingEditRequestsCard
@@ -168,26 +164,75 @@ export default function ProjeDetayPage() {
           onNavigate={state.setLocation}
         />
 
-        <KesimAlaniList
-          kesimAlanlari={state.kesimAlanlari}
-          onNavigate={state.setLocation}
-          onCreateDialog={() => state.setDialogOpen(true)}
-          onCopyTrackingLink={state.handleCopyTrackingLink}
-          onOpenTrackingPage={state.handleOpenTrackingPage}
-          onShowQrCode={state.handleShowQrCode}
-          onDelete={state.requestDelete}
-          onSplit={state.openSplitModal}
-          onRename={(k) => {
-            state.setEditingKesim({
-              id: k.id,
-              name: k.name,
-              yetkili: k.yetkili ?? "",
-              displayName: k.displayName ?? "",
-              maxAnimal: k.maxAnimal != null ? String(k.maxAnimal) : "",
-            });
-            state.setRenameKesimDialogOpen(true);
-          }}
-        />
+        {/* Havuz Bölümü */}
+        <div className="mb-6 border rounded-xl overflow-hidden bg-muted/10">
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/30 border-b">
+            <Package className="w-4 h-4 text-primary flex-shrink-0" />
+            <h2 className="text-sm font-semibold">Havuz</h2>
+            {poolStats && (
+              <span className="text-xs text-muted-foreground">
+                ({poolStats.total} bağış)
+              </span>
+            )}
+            <button
+              className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => state.setLocation(`/bagis-havuzu/${state.project!.id}`)}
+            >
+              Havuza Git
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="p-4">
+            <PoolSummaryCard
+              stats={poolStats}
+              loading={poolStatsLoading && !poolStats}
+              onNavigate={() => state.setLocation(`/bagis-havuzu/${state.project!.id}`)}
+            />
+
+            <div className="pt-3 border-t">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium flex items-center gap-1.5">
+                  <Scissors className="w-3.5 h-3.5 text-muted-foreground" />
+                  Kesim Listeleri
+                  <span className="text-xs text-muted-foreground font-normal">
+                    ({state.kesimAlanlari.length})
+                  </span>
+                </h3>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  onClick={() => state.setDialogOpen(true)}
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  Yeni Liste
+                </Button>
+              </div>
+
+              <KesimAlaniList
+                kesimAlanlari={state.kesimAlanlari}
+                onNavigate={state.setLocation}
+                onCreateDialog={() => state.setDialogOpen(true)}
+                onCopyTrackingLink={state.handleCopyTrackingLink}
+                onOpenTrackingPage={state.handleOpenTrackingPage}
+                onShowQrCode={state.handleShowQrCode}
+                onDelete={state.requestDelete}
+                onSplit={state.openSplitModal}
+                onRename={(k) => {
+                  state.setEditingKesim({
+                    id: k.id,
+                    name: k.name,
+                    yetkili: k.yetkili ?? "",
+                    displayName: k.displayName ?? "",
+                    maxAnimal: k.maxAnimal != null ? String(k.maxAnimal) : "",
+                  });
+                  state.setRenameKesimDialogOpen(true);
+                }}
+              />
+            </div>
+          </div>
+        </div>
 
         <ConflictSection
           showConflicts={state.showConflicts}

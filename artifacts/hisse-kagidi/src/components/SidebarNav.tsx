@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import {
   ChevronDown, ChevronRight, FolderOpen,
   PanelLeftClose, Home, Trash2,
-  BookOpen, Layers, Scissors, X
+  BookOpen, Layers, Scissors, X, Package,
 } from "lucide-react";
 import { fetchHomeData } from "@/lib/api/projects";
 import type { HomeData } from "@/lib/api/projects";
@@ -73,7 +73,7 @@ export function SidebarNav({ collapsed, onToggle, isMobileDrawer, onMobileClose 
 
   const activeProjects = homeData?.projects.filter(p => !p.deletedAt && !p.archivedAt) ?? [];
   const getKesimForProject = (projectId: string) =>
-    homeData?.kesimAlanlari.filter(k => k.projectId === projectId && !k.deletedAt) ?? [];
+    homeData?.kesimAlanlari.filter(k => k.projectId === projectId && !k.deletedAt && k.name !== "__havuz__") ?? [];
   const orphanKesim = homeData?.kesimAlanlari.filter(k => !k.projectId && !k.deletedAt && k.name !== "__havuz__") ?? [];
 
   return (
@@ -131,27 +131,39 @@ export function SidebarNav({ collapsed, onToggle, isMobileDrawer, onMobileClose 
                       />
                     </div>
 
-                    {/* Expanded kesim list */}
+                    {/* Expanded: Havuz → Kesim Listeleri */}
                     {!collapsed && isOpen && (
                       <div className="ml-[22px] mt-0.5 mb-1 pl-3 border-l border-white/[0.07] space-y-0.5">
-                        {kesimList.map(ka => (
-                          <NavItem
-                            key={ka.id}
-                            collapsed={false}
-                            icon={
-                              <span className="h-[14px] w-[14px] flex-shrink-0 flex items-center justify-center">
-                                <img src="/kurban-logo.png" alt="" className="h-[13px] w-[13px] object-contain opacity-50" />
-                              </span>
-                            }
-                            label={ka.name}
-                            active={activeKesimId === ka.id}
-                            onClick={() => go(`/kesim/${ka.id}`)}
-                            small
-                          />
-                        ))}
-                        {kesimList.length === 0 && (
-                          <p className="text-[11px] text-white/18 px-2 py-1.5 italic">Kesim alanı yok</p>
-                        )}
+                        {/* Havuz node */}
+                        <NavItem
+                          collapsed={false}
+                          icon={<Package className="h-[14px] w-[14px] flex-shrink-0" />}
+                          label="Havuz"
+                          active={location.startsWith(`/bagis-havuzu/${project.id}`)}
+                          onClick={() => go(`/bagis-havuzu/${project.id}`)}
+                          small
+                        />
+                        {/* Kesim Listeleri — indented under Havuz */}
+                        <div className="ml-[20px] pl-2.5 border-l border-white/[0.05] space-y-0.5">
+                          {kesimList.map(ka => (
+                            <NavItem
+                              key={ka.id}
+                              collapsed={false}
+                              icon={
+                                <span className="h-[14px] w-[14px] flex-shrink-0 flex items-center justify-center">
+                                  <img src="/kurban-logo.png" alt="" className="h-[13px] w-[13px] object-contain opacity-50" />
+                                </span>
+                              }
+                              label={ka.name}
+                              active={activeKesimId === ka.id}
+                              onClick={() => go(`/kesim/${ka.id}`)}
+                              small
+                            />
+                          ))}
+                          {kesimList.length === 0 && (
+                            <p className="text-[11px] text-white/18 px-2 py-1.5 italic">Kesim listesi yok</p>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
