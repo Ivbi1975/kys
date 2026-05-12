@@ -168,7 +168,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
   if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
 
-  const limit = Math.min(Math.max(Number(req.query.limit) || 500, 1), 5000);
+  const limit = Math.min(Math.max(Number(req.query.limit) || 500, 1), 100000);
   const offset = Math.max(Number(req.query.offset) || 0, 0);
   const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
   const status = typeof req.query.status === "string" ? req.query.status : "";

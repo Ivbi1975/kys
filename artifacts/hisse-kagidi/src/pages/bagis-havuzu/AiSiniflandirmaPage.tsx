@@ -86,7 +86,7 @@ export default function AiSiniflandirmaPage() {
 
   const { data: donationsData, isLoading } = useQuery({
     queryKey: ["pool-donations-ai-page", projectId],
-    queryFn: () => fetchPoolDonations(projectId, { limit: 10000, offset: 0, sortBy: "sortOrder" }),
+    queryFn: () => fetchPoolDonations(projectId, { limit: 100000, offset: 0, sortBy: "sortOrder" }),
     enabled: !!projectId,
   });
 
