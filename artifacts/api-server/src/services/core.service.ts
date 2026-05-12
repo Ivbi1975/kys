@@ -4,6 +4,7 @@ import { eq, isNull, isNotNull, inArray, and, ne } from "drizzle-orm";
 import crypto from "crypto";
 import { serviceError, serviceOk, type ServiceResult } from "./result";
 import { cacheGet, cacheSet } from "../lib/cache";
+import { withQueryRetry } from "../lib/tx-retry";
 import {
   getFullKesimAlani,
   getFullKesimAlaniList,
@@ -31,9 +32,10 @@ export async function listKesimAlanlari(includeDeleted: boolean, projectId?: str
     const hidePool = ne(kesimAlanlariTable.name, "__havuz__");
     const whereClause = includeDeleted ? hidePool : and(isNull(kesimAlanlariTable.deletedAt), hidePool);
 
-    const rows = await db.select().from(kesimAlanlariTable)
-      .where(whereClause)
-      .orderBy(kesimAlanlariTable.createdAt);
+    const rows = await withQueryRetry(
+      () => db.select().from(kesimAlanlariTable).where(whereClause).orderBy(kesimAlanlariTable.createdAt),
+      "listKesimAlanlari:all",
+    );
 
     const results = await getFullKesimAlaniList(rows);
     setCachedKAList(cacheKey, results);
@@ -59,9 +61,10 @@ export async function listKesimAlanlari(includeDeleted: boolean, projectId?: str
     ? and(hidePool, projectFilter)
     : and(isNull(kesimAlanlariTable.deletedAt), hidePool, projectFilter);
 
-  const rows = await db.select().from(kesimAlanlariTable)
-    .where(whereClause)
-    .orderBy(kesimAlanlariTable.createdAt);
+  const rows = await withQueryRetry(
+    () => db.select().from(kesimAlanlariTable).where(whereClause).orderBy(kesimAlanlariTable.createdAt),
+    "listKesimAlanlari:project",
+  );
 
   const results = await getFullKesimAlaniList(rows);
   cacheSet(projCacheKey, results, KA_LIST_TTL);

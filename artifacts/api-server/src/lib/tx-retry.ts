@@ -13,6 +13,40 @@ function isSerializationError(err: unknown): boolean {
   );
 }
 
+const TRANSIENT_CODES = new Set(["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED", "EPIPE", "ENOTFOUND"]);
+const TRANSIENT_MESSAGES = ["Connection terminated", "connection timeout", "Connection ended unexpectedly"];
+
+export function isConnectionError(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const e = err as Record<string, unknown>;
+  if (typeof e["code"] === "string" && TRANSIENT_CODES.has(e["code"])) return true;
+  const msg = typeof e["message"] === "string" ? e["message"] : "";
+  return TRANSIENT_MESSAGES.some(t => msg.includes(t));
+}
+
+const QUERY_MAX_RETRIES = 3;
+const QUERY_BASE_DELAY_MS = 300;
+
+export async function withQueryRetry<T>(
+  operation: () => Promise<T>,
+  label: string,
+): Promise<T> {
+  for (let attempt = 1; attempt <= QUERY_MAX_RETRIES; attempt++) {
+    try {
+      return await operation();
+    } catch (err) {
+      if (isConnectionError(err) && attempt < QUERY_MAX_RETRIES) {
+        const delay = QUERY_BASE_DELAY_MS * attempt;
+        logger.warn({ attempt, label, delay }, "DB bağlantı hatası, yeniden deneniyor...");
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("Unreachable");
+}
+
 export async function withSerializationRetry<T>(
   operation: () => Promise<T>,
   label: string,
