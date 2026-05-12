@@ -62,3 +62,13 @@ function gracefulShutdown(signal: string) {
 
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
+process.on("uncaughtException", (err: NodeJS.ErrnoException) => {
+  const transient = ["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED", "EPIPE", "ENOTFOUND"];
+  if (transient.includes(err.code ?? "")) {
+    logger.warn({ err }, "DB/network bağlantı hatası (geçici) — sunucu çalışmaya devam ediyor");
+    return;
+  }
+  logger.error({ err }, "Yakalanmayan hata — sunucu kapatılıyor");
+  process.exit(1);
+});
