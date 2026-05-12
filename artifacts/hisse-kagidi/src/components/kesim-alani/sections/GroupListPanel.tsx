@@ -59,6 +59,7 @@ export function GroupListPanel() {
     handleColumnDragOver, handleColumnDragStart, handleColumnDrop,
     handleDragEnd, handleDragLeave, handleDragOver, handleDragOverCard,
     handleDragStart, handleDrop, handleGroupCellTab, handleSelectAllGroupDonations,
+    groupCardDragState, handleGroupCardDragStart, handleGroupCardDragOver, handleGroupCardDrop, handleGroupCardDragEnd,
     handleSetGroupColorTag, handleSwapSelect, handleToggleBasketItem,
     handleViewPhotos, highlightIncomplete, isMobile, jumpInputRef,
     mergeSelectedGroups, moveGroupDown, moveGroupUp,
@@ -153,6 +154,11 @@ export function GroupListPanel() {
         onSelectAllGroupDonations={handleSelectAllGroupDonations}
         onBasketDrop={placeBasketItemInGroup}
         onFlagDonation={handleFlagDonation} onUnflagDonation={handleUnflagDonation}
+        groupCardDragState={groupCardDragState}
+        onGroupCardDragStart={handleGroupCardDragStart}
+        onGroupCardDragOver={handleGroupCardDragOver}
+        onGroupCardDrop={handleGroupCardDrop}
+        onGroupCardDragEnd={handleGroupCardDragEnd}
         columnHeaderLabel={columnHeaderLabel} columnHeaderWidth={columnHeaderWidth}
       />
     );
@@ -165,7 +171,9 @@ export function GroupListPanel() {
     handleAssignTeam, handleViewPhotos, updateGroupDonation, handleGroupCellTab,
     handleToggleBasketItem, handleSwapSelect, enhancedRemoveFromGroup, updateGroupNotes,
     handleDragStart, handleDragOver, handleDrop, handleDragEnd, handleDragOverCard, handleDragLeave,
-    toggleGroupDonationSelect, handleSelectAllGroupDonations, placeBasketItemInGroup, handleFlagDonation, handleUnflagDonation, columnHeaderLabel, columnHeaderWidth,
+    toggleGroupDonationSelect, handleSelectAllGroupDonations, placeBasketItemInGroup, handleFlagDonation, handleUnflagDonation,
+    groupCardDragState, handleGroupCardDragStart, handleGroupCardDragOver, handleGroupCardDrop, handleGroupCardDragEnd,
+    columnHeaderLabel, columnHeaderWidth,
   ]);
 
   if (!kesim) return null;

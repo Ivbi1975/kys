@@ -543,6 +543,52 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
     save(updated, `Hayvan ${animalNo} aşağı taşındı`, false, "groups");
   }
 
+  function swapGroups(fromIdx: number, toIdx: number) {
+    if (!kesim || fromIdx === toIdx) return;
+    if (fromIdx < 0 || toIdx < 0 || fromIdx >= kesim.animalGroups.length || toIdx >= kesim.animalGroups.length) return;
+    const fromNo = kesim.animalGroups[fromIdx].animalNo;
+    const toNo = kesim.animalGroups[toIdx].animalNo;
+    const updated = produce(kesim, (draft) => {
+      const temp = draft.animalGroups[fromIdx];
+      draft.animalGroups[fromIdx] = draft.animalGroups[toIdx];
+      draft.animalGroups[toIdx] = temp;
+      for (let i = 0; i < draft.animalGroups.length; i++) {
+        draft.animalGroups[i].animalNo = i + 1;
+      }
+    });
+    save(updated, `Hayvan ${fromNo} ve ${toNo} yer değiştirildi`, false, "groups");
+  }
+
+  const [groupCardDragState, setGroupCardDragState] = useState<{ dragIdx: number | null; overIdx: number | null }>({ dragIdx: null, overIdx: null });
+
+  function handleGroupCardDragStart(e: React.DragEvent, groupIdx: number) {
+    setGroupCardDragState({ dragIdx: groupIdx, overIdx: null });
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("application/group-card-drag", String(groupIdx));
+  }
+
+  function handleGroupCardDragOver(e: React.DragEvent, groupIdx: number) {
+    if (!e.dataTransfer.types.includes("application/group-card-drag")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setGroupCardDragState(prev => prev.overIdx === groupIdx ? prev : { ...prev, overIdx: groupIdx });
+  }
+
+  function handleGroupCardDrop(e: React.DragEvent, toIdx: number) {
+    const fromIdxStr = e.dataTransfer.getData("application/group-card-drag");
+    if (!fromIdxStr) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const fromIdx = parseInt(fromIdxStr, 10);
+    setGroupCardDragState({ dragIdx: null, overIdx: null });
+    if (isNaN(fromIdx) || fromIdx === toIdx) return;
+    swapGroups(fromIdx, toIdx);
+  }
+
+  function handleGroupCardDragEnd() {
+    setGroupCardDragState({ dragIdx: null, overIdx: null });
+  }
+
   const EDITABLE_COLUMN_KEYS: ColumnKey[] = ["vekalet", "description", "name", "donationType", "notes"];
   const editableVisibleColumns = workspace.visibleColumns.filter((k) => EDITABLE_COLUMN_KEYS.includes(k));
 
@@ -788,6 +834,12 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
     cleanEmptyGroups,
     moveGroupUp,
     moveGroupDown,
+    swapGroups,
+    groupCardDragState,
+    handleGroupCardDragStart,
+    handleGroupCardDragOver,
+    handleGroupCardDrop,
+    handleGroupCardDragEnd,
     handleGroupCellTab,
     collapseAll,
     expandAll,

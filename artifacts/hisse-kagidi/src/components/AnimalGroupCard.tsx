@@ -80,6 +80,12 @@ interface AnimalGroupCardProps {
   onFlagDonation?: (id: string, reason: string) => void;
   onUnflagDonation?: (id: string) => void;
 
+  groupCardDragState?: { dragIdx: number | null; overIdx: number | null };
+  onGroupCardDragStart?: (e: React.DragEvent, groupIdx: number) => void;
+  onGroupCardDragOver?: (e: React.DragEvent, groupIdx: number) => void;
+  onGroupCardDrop?: (e: React.DragEvent, toIdx: number) => void;
+  onGroupCardDragEnd?: () => void;
+
   columnHeaderLabel: (key: ColumnKey) => string;
   columnHeaderWidth: (key: ColumnKey) => string;
 }
@@ -543,9 +549,20 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
     onDragLeaveCard,
     onToggleGroupDonationSelect,
     onSelectAllGroupDonations,
+    groupCardDragState,
+    onGroupCardDragStart,
+    onGroupCardDragOver,
+    onGroupCardDrop,
+    onGroupCardDragEnd,
     columnHeaderLabel,
     columnHeaderWidth,
   } = props;
+
+  const isGroupCardBeingDragged = groupCardDragState?.dragIdx === groupIdx;
+  const isGroupCardDropTarget = groupCardDragState != null &&
+    groupCardDragState.dragIdx !== null &&
+    groupCardDragState.dragIdx !== groupIdx &&
+    groupCardDragState.overIdx === groupIdx;
 
   const filledCount = useMemo(() => group.donations.filter(d => d.name.trim() !== "").length, [group.donations]);
   const isIncomplete = filledCount < 7;
@@ -580,11 +597,22 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
   return (
     <Card
       id={`animal-group-${group.animalNo}`}
-      className={`overflow-hidden transition-all ${swapSelection?.groupIdx === groupIdx ? "ring-2 ring-purple-400" : ""} ${highlightIncomplete && isIncomplete ? "ring-2 ring-orange-400" : ""} ${dragItem && dragItem.groupIdx !== groupIdx && dragOverGroup === groupIdx ? (filledCount >= 7 ? "ring-2 ring-red-500 shadow-lg scale-[1.01] bg-red-50/50 dark:bg-red-950/30" : "ring-2 ring-primary shadow-lg scale-[1.01]") : ""} ${dragItem && dragItem.groupIdx !== groupIdx && !isLocked ? "border-dashed border-2 border-primary/30" : ""}`}
+      className={`overflow-hidden transition-all ${isGroupCardBeingDragged ? "opacity-40 scale-[0.98]" : ""} ${isGroupCardDropTarget ? "ring-2 ring-indigo-500 shadow-xl scale-[1.01]" : ""} ${swapSelection?.groupIdx === groupIdx ? "ring-2 ring-purple-400" : ""} ${highlightIncomplete && isIncomplete ? "ring-2 ring-orange-400" : ""} ${dragItem && dragItem.groupIdx !== groupIdx && dragOverGroup === groupIdx ? (filledCount >= 7 ? "ring-2 ring-red-500 shadow-lg scale-[1.01] bg-red-50/50 dark:bg-red-950/30" : "ring-2 ring-primary shadow-lg scale-[1.01]") : ""} ${dragItem && dragItem.groupIdx !== groupIdx && !isLocked ? "border-dashed border-2 border-primary/30" : ""}`}
       style={group.colorTag ? { borderLeft: `4px solid ${COLOR_MAP[group.colorTag]}` } : (highlightIncomplete && isIncomplete ? { borderLeft: "4px solid #f97316" } : {})}
-      onDragOver={(e) => { e.preventDefault(); onDragOverCard(e, groupIdx); }}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("application/group-card-drag") && onGroupCardDragOver) {
+          onGroupCardDragOver(e, groupIdx);
+        } else {
+          e.preventDefault();
+          onDragOverCard(e, groupIdx);
+        }
+      }}
       onDragLeave={(e) => onDragLeaveCard(e, groupIdx)}
       onDrop={(e) => {
+        if (e.dataTransfer.types.includes("application/group-card-drag") && onGroupCardDrop) {
+          onGroupCardDrop(e, groupIdx);
+          return;
+        }
         const basketData = e.dataTransfer.getData("application/basket-item");
         if (basketData && props.onBasketDrop) {
           e.preventDefault();
@@ -606,6 +634,18 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
         aria-label={`Hayvan ${group.animalNo} grubunu ${isCollapsed ? "genişlet" : "daralt"}`}
       >
         <div className="flex items-center gap-2">
+          {onGroupCardDragStart && (
+            <div
+              className="cursor-grab active:cursor-grabbing flex-shrink-0 text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors -ml-0.5"
+              draggable
+              onDragStart={(e) => { e.stopPropagation(); onGroupCardDragStart(e, groupIdx); }}
+              onDragEnd={(e) => { e.stopPropagation(); onGroupCardDragEnd?.(); }}
+              onClick={(e) => e.stopPropagation()}
+              title="Grubu sürükleyerek yeniden sırala"
+            >
+              <GripVertical className={compact ? "w-3 h-3" : "w-4 h-4"} />
+            </div>
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); if (!group.locked) onToggleSelect(group.id); }}
             className={`flex-shrink-0 ${group.locked ? "opacity-30 cursor-not-allowed" : ""}`}
