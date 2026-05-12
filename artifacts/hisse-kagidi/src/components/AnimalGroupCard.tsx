@@ -11,8 +11,6 @@ import type { ColumnKey } from "@/lib/useWorkspacePreferences";
 import { GroupFlagPopover } from "@/components/animal-group/GroupFlagPopover";
 import {
   GripVertical,
-  ArrowUp,
-  ArrowDown,
   ChevronUp,
   ChevronDown,
   Lock,
@@ -52,8 +50,6 @@ interface AnimalGroupCardProps {
   onToggleCollapse: (groupId: string) => void;
   onToggleSelect: (groupId: string) => void;
   onSetColorTag: (groupIdx: number, tag: ColorTag) => void;
-  onMoveUp: (groupIdx: number) => void;
-  onMoveDown: (groupIdx: number) => void;
   onSplit: (groupIdx: number) => void;
   onAddGroupToBasket: (groupIdx: number) => void;
   onAddWholeAnimalToBasket: (groupIdx: number) => void;
@@ -372,7 +368,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
 
 const GroupOverflowMenu = memo(function GroupOverflowMenu({
   group, groupIdx, compact, filledCount, totalGroupCount, teams,
-  basketAnimalGroupIds, onMoveUp, onMoveDown, onSplit,
+  basketAnimalGroupIds, onSplit,
   onAddWholeAnimalToBasket, onAssignTeam, onSetColorTag, onDelete,
 }: {
   group: AnimalGroup;
@@ -382,8 +378,6 @@ const GroupOverflowMenu = memo(function GroupOverflowMenu({
   totalGroupCount: number;
   teams: Team[];
   basketAnimalGroupIds: Set<string>;
-  onMoveUp: (groupIdx: number) => void;
-  onMoveDown: (groupIdx: number) => void;
   onSplit: (groupIdx: number) => void;
   onAddWholeAnimalToBasket: (groupIdx: number) => void;
   onAssignTeam: (groupId: string, teamId: string | null) => void;
@@ -404,23 +398,6 @@ const GroupOverflowMenu = memo(function GroupOverflowMenu({
       </PopoverTrigger>
       <PopoverContent className="w-52 p-1" align="end" side="bottom">
         <div className="space-y-0.5">
-          <button
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            onClick={() => { onMoveUp(groupIdx); setOpen(false); }}
-            disabled={groupIdx <= 0}
-          >
-            <ArrowUp className="w-3.5 h-3.5" />
-            Yukarı Taşı
-          </button>
-          <button
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            onClick={() => { onMoveDown(groupIdx); setOpen(false); }}
-            disabled={groupIdx >= totalGroupCount - 1}
-          >
-            <ArrowDown className="w-3.5 h-3.5" />
-            Aşağı Taşı
-          </button>
-
           <div className="h-px bg-border my-1" />
 
           <button
@@ -525,8 +502,6 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
     onToggleCollapse,
     onToggleSelect,
     onSetColorTag,
-    onMoveUp,
-    onMoveDown,
     onSplit,
     onAddGroupToBasket,
     onAddWholeAnimalToBasket,
@@ -747,8 +722,6 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
             totalGroupCount={totalGroupCount}
             teams={teams}
             basketAnimalGroupIds={basketAnimalGroupIds}
-            onMoveUp={onMoveUp}
-            onMoveDown={onMoveDown}
             onSplit={onSplit}
             onAddWholeAnimalToBasket={onAddWholeAnimalToBasket}
             onAssignTeam={onAssignTeam}

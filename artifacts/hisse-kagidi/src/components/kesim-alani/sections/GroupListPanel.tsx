@@ -62,7 +62,7 @@ export function GroupListPanel() {
     groupCardDragState, handleGroupCardDragStart, handleGroupCardDragOver, handleGroupCardDrop, handleGroupCardDragEnd,
     handleSetGroupColorTag, handleSwapSelect, handleToggleBasketItem,
     handleViewPhotos, highlightIncomplete, isMobile, jumpInputRef,
-    mergeSelectedGroups, moveGroupDown, moveGroupUp,
+    mergeSelectedGroups,
     openSplitGroupDialog, photoCounts,
     scrollToAnimalGroup, selectedGroupDonations,
     selectedGroupIds, setBulkGroupEditField, setBulkGroupEditOpen,
@@ -140,7 +140,7 @@ export function GroupListPanel() {
         dragOverGroup={dragOverGroup} dragOverItem={dragOverItem}
         groupSearchQuery={groupSearchQuery}
         onToggleCollapse={toggleGroupCollapse} onToggleSelect={toggleGroupSelect}
-        onSetColorTag={handleSetGroupColorTag} onMoveUp={moveGroupUp} onMoveDown={moveGroupDown}
+        onSetColorTag={handleSetGroupColorTag}
         onSplit={openSplitGroupDialog} onAddGroupToBasket={addGroupToBasket}
         onAddWholeAnimalToBasket={addWholeAnimalToBasket} basketAnimalGroupIds={basketAnimalGroupIds}
         onToggleLock={toggleGroupLock} onDelete={deleteAnimalGroup}
@@ -166,7 +166,7 @@ export function GroupListPanel() {
     kesim, collapsedGroups, selectedGroupIds, workspace.prefs.compactMode, workspace.visibleColumns,
     photoCounts, basketItemIds, selectedGroupDonations, swapSelection, highlightIncomplete,
     dragItem, dragOverGroup, dragOverItem, groupSearchQuery,
-    toggleGroupCollapse, toggleGroupSelect, handleSetGroupColorTag, moveGroupUp, moveGroupDown,
+    toggleGroupCollapse, toggleGroupSelect, handleSetGroupColorTag,
     openSplitGroupDialog, addGroupToBasket, addWholeAnimalToBasket, basketAnimalGroupIds, toggleGroupLock, deleteAnimalGroup,
     handleAssignTeam, handleViewPhotos, updateGroupDonation, handleGroupCellTab,
     handleToggleBasketItem, handleSwapSelect, enhancedRemoveFromGroup, updateGroupNotes,
