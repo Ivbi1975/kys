@@ -1,6 +1,6 @@
 import type { BasketItem } from "../hooks/types";
 
-export type BasketTab = "contents" | "place" | "transfer";
+export type BasketTab = "contents" | "place";
 export type GroupByCriterion = "cins" | "share" | "source";
 
 export const ITEMS_PER_PAGE = 50;

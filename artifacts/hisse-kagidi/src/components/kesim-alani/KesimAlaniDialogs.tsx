@@ -39,16 +39,12 @@ export function KesimAlaniDialogs(props: KesimAlaniStateReturn) {
     photoViewGroup, setPhotoViewGroup, photoViewPhotos, photoViewLoading,
     teamDialogOpen, setTeamDialogOpen, teamName, setTeamName, teamEditId, setTeamEditId, teamColor, setTeamColor, teamSaving, handleSaveTeam, handleDeleteTeam,
     basketOpen, setBasketOpen, basketItems, localBasketItems, foreignBasketItems, basketItemIds,
-    basketCrossKATarget, setBasketCrossKATarget, basketTransferTarget, setBasketTransferTarget,
-    addToBasket, removeFromBasket, clearBasket, addDonorToBasket, transferBasketToGroup, autoDistributeBasket,
-    crossKATransferring, transferBasketToOtherKA, transferForeignToCurrentDonorList,
-    emptyGroupsAfterTransfer, cleanupEmptyGroups, dismissEmptyGroupsCleanup,
-    siblingKesimAlanlari, sortedDonorList, totalShares, filterTeam, setFilterTeam,
+    addToBasket, removeFromBasket, clearBasket, addDonorToBasket, autoDistributeBasket,
+    sortedDonorList, totalShares, filterTeam, setFilterTeam,
     jumpDialogOpen, setJumpDialogOpen,
     donorListReportOpen, setDonorListReportOpen, fullscreenMode, showScrollTop,
     qrModalOpen, setQrModalOpen, qrUrl,
-    transferToDonorListConfirm, setTransferToDonorListConfirm, transferToDonorListRemoving,
-    returnSelectedToDonorList, returnSelectedToSource, transferSelectedToGroup, sendSelectedToPool, addEmptyGroup,
+    returnSelectedToDonorList, returnSelectedToSource, transferSelectedToGroup, addEmptyGroup,
     updateGroupDonation,
     handleAssignTeam,
   } = props;
@@ -173,26 +169,10 @@ export function KesimAlaniDialogs(props: KesimAlaniStateReturn) {
         setBasketOpen={setBasketOpen}
         removeFromBasket={removeFromBasket}
         clearBasket={clearBasket}
-        basketTransferTarget={basketTransferTarget}
-        setBasketTransferTarget={setBasketTransferTarget}
-        transferBasketToGroup={transferBasketToGroup}
         autoDistributeBasket={autoDistributeBasket}
-        basketCrossKATarget={basketCrossKATarget}
-        setBasketCrossKATarget={setBasketCrossKATarget}
-        crossKATransferring={crossKATransferring}
-        transferBasketToOtherKA={transferBasketToOtherKA}
-        siblingKesimAlanlari={siblingKesimAlanlari}
-        transferToDonorListConfirm={transferToDonorListConfirm}
-        setTransferToDonorListConfirm={setTransferToDonorListConfirm}
-        transferToDonorListRemoving={transferToDonorListRemoving}
-        transferForeignToCurrentDonorList={transferForeignToCurrentDonorList}
-        emptyGroupsAfterTransfer={emptyGroupsAfterTransfer}
-        cleanupEmptyGroups={cleanupEmptyGroups}
-        dismissEmptyGroupsCleanup={dismissEmptyGroupsCleanup}
         returnSelectedToDonorList={returnSelectedToDonorList}
         returnSelectedToSource={returnSelectedToSource}
         transferSelectedToGroup={transferSelectedToGroup}
-        sendSelectedToPool={sendSelectedToPool}
         addEmptyGroup={addEmptyGroup}
       />
 

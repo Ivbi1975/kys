@@ -1,28 +1,19 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { produce } from "immer";
 import type { Donation, AnimalGroup, KesimAlani } from "@/lib/types";
-import { moveDonationsToKesimAlani, moveAnimalGroupToKesimAlani, fetchKesimAlani, createDonationTransfers, apiDeleteAnimalGroup, apiUpdateBulkAnimalGroups } from "@/lib/api";
-import type { DonationTransferEntry } from "@/lib/api";
 import { MAX_SHARES_PER_ANIMAL } from "@/lib/constants";
 import { generateId, loadBasketFromStorage, saveBasketToStorage } from "./types";
 import type { BasketItem, SaveFn, KesimDeps, ReturnToSourceResult } from "./types";
 
 interface UseBasketDeps extends KesimDeps {
   isGroupLocked: (groupIdx: number) => boolean;
-  siblingKesimAlanlari: { id: string; name: string }[];
 }
 
-export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked, siblingKesimAlanlari }: UseBasketDeps) {
+export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked }: UseBasketDeps) {
   const [basketItems, setBasketItems] = useState<BasketItem[]>(() => {
     return loadBasketFromStorage(kesim?.projectId);
   });
-  const [basketTransferTarget, setBasketTransferTarget] = useState<number>(-1);
-  const [basketCrossKATarget, setBasketCrossKATarget] = useState<string>("");
   const [basketOpen, setBasketOpen] = useState(true);
-  const [crossKATransferring, setCrossKATransferring] = useState(false);
-  const [emptyGroupsAfterTransfer, setEmptyGroupsAfterTransfer] = useState<Array<{ id: string; animalNo: number }>>([]);
-  const [transferToDonorListConfirm, setTransferToDonorListConfirm] = useState(false);
-  const [transferToDonorListRemoving, setTransferToDonorListRemoving] = useState(false);
 
   const broadcastRef = useRef<BroadcastChannel | null>(null);
   const isReceivingBroadcast = useRef(false);
@@ -165,7 +156,7 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
       toast({ title: "Bu hayvan komple olarak zaten sepette", variant: "destructive" });
       return;
     }
-    const filled = group.donations.filter((d) => d.name.trim());
+    const filled = group.donations.filter((d) => d.name.trim() && !d.excluded);
     if (filled.length === 0) return;
     const addedIds: string[] = [];
     setBasketItems((prev) => {
@@ -173,7 +164,7 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
       const newItems = [...prev];
       for (let di = 0; di < group.donations.length; di++) {
         const d = group.donations[di];
-        if (!d.name.trim()) continue;
+        if (!d.name.trim() || d.excluded) continue;
         if (!existingIds.has(d.id)) {
           const item = makeBasketItem(d);
           item.sourceGroupId = group.id;
@@ -296,113 +287,6 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
       title: "Sepete Eklendi",
       description: `${selectedIds.size} bağışçı sepete eklendi.`,
     });
-  }
-
-  function transferBasketToGroup(targetGroupIdx: number) {
-    if (!kesim || localBasketItems.length === 0 || targetGroupIdx < 0 || targetGroupIdx >= kesim.animalGroups.length)
-      return;
-    if (isGroupLocked(targetGroupIdx)) return;
-    const groups = kesim.animalGroups.map((g) => ({
-      ...g,
-      donations: g.donations.map((d) => ({ ...d })),
-    }));
-    const emptySlots = groups[targetGroupIdx].donations.filter((d) => !d.name.trim()).length;
-    if (emptySlots === 0) {
-      toast({ title: "Hedef grupta boş slot yok.", variant: "destructive" });
-      return;
-    }
-    const localIds = new Set(localBasketItems.map((b) => b.donationId));
-    const groupedBasketIds = new Set<string>();
-    const lockedBasketIds = new Set<string>();
-    const ungroupedBasketDonors: Donation[] = [];
-    for (let gi = 0; gi < groups.length; gi++) {
-      for (const d of groups[gi].donations) {
-        if (!localIds.has(d.id) || !d.name.trim()) continue;
-        if (isGroupLocked(gi)) {
-          lockedBasketIds.add(d.id);
-        } else if (gi !== targetGroupIdx) {
-          groupedBasketIds.add(d.id);
-        }
-      }
-    }
-    const basketShareMap = new Map(localBasketItems.map(b => [b.donationId, b.donorShareCount || 1]));
-    let ungroupedSlots = 0;
-    for (const b of localBasketItems) {
-      if (groupedBasketIds.has(b.donationId) || lockedBasketIds.has(b.donationId)) continue;
-      const donor = kesim.donations.find((d) => d.id === b.donationId);
-      if (donor && !donor.excluded) {
-        const slots = basketShareMap.get(b.donationId) || donor.shareCount || 1;
-        ungroupedBasketDonors.push(donor);
-        ungroupedSlots += slots;
-      }
-    }
-    const totalSlotsNeeded = groupedBasketIds.size + ungroupedSlots;
-    if (totalSlotsNeeded > emptySlots) {
-      toast({
-        title: "Yetersiz Alan",
-        description: `Sepetteki bağışçılar ${totalSlotsNeeded} slot gerektiriyor, ancak hedef grupta sadece ${emptySlots} boş slot var.`,
-        variant: "destructive",
-      });
-      return;
-    }
-    const itemsToMove: Donation[] = [];
-    for (let gi = 0; gi < groups.length; gi++) {
-      if (isGroupLocked(gi) || gi === targetGroupIdx) continue;
-      for (let di = groups[gi].donations.length - 1; di >= 0; di--) {
-        const d = groups[gi].donations[di];
-        if (localIds.has(d.id)) {
-          itemsToMove.push(d);
-          groups[gi].donations[di] = {
-            id: generateId(),
-            name: "",
-            description: "",
-            donationType: "",
-            shareCount: 1,
-            vekalet: "",
-            notes: "",
-          };
-        }
-      }
-    }
-    for (const donor of ungroupedBasketDonors) {
-      const slots = basketShareMap.get(donor.id) || donor.shareCount || 1;
-      for (let s = 0; s < slots; s++) {
-        itemsToMove.push({ ...donor, id: s === 0 ? donor.id : generateId() });
-      }
-    }
-    const transferredIds = new Set<string>();
-    for (const item of itemsToMove) {
-      const emptyIdx = groups[targetGroupIdx].donations.findIndex((d) => !d.name.trim());
-      if (emptyIdx >= 0) {
-        groups[targetGroupIdx].donations[emptyIdx] = item;
-        transferredIds.add(item.id);
-      }
-    }
-    if (transferredIds.size === 0) {
-      toast({ title: "Aktarım yapılamadı.", variant: "destructive" });
-      return;
-    }
-    const movedDonorCount = groupedBasketIds.size + ungroupedBasketDonors.length;
-    const updated = produce(kesim, (draft) => {
-      draft.animalGroups = groups;
-    });
-    save(
-      updated,
-      `Sepetten ${movedDonorCount} bağışçı (${transferredIds.size} slot) Hayvan ${groups[targetGroupIdx].animalNo}'e aktarıldı`,
-      false,
-      "groups"
-    );
-    setBasketItems((prev) =>
-      prev.filter((b) => !transferredIds.has(b.donationId) && !groupedBasketIds.has(b.donationId))
-    );
-    setBasketTransferTarget(-1);
-    const skipped = lockedBasketIds.size;
-    if (skipped > 0) {
-      toast({
-        title: "Kısmi Aktarım",
-        description: `${movedDonorCount} bağışçı aktarıldı. ${skipped} tanesi kilitli grupta, sepette kaldı.`,
-      });
-    }
   }
 
   function autoDistributeBasket() {
@@ -540,333 +424,6 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
         ? `${placed} slot dağıtıldı. ${skippedCount} tanesi kilitli grupta, sepette kaldı.`
         : `${placed} slot gruplara dağıtıldı.`;
     toast({ title: "Otomatik Dağıtım", description: desc });
-  }
-
-  async function transferBasketToOtherKA(targetKAId: string) {
-    if (!kesim || basketItems.length === 0 || !targetKAId) return;
-    const itemsToTransfer = basketItems.filter((b) => b.kesimAlaniId === kesim.id);
-    if (itemsToTransfer.length === 0) {
-      toast({ title: "Bu kesim alanından sepette öğe yok.", variant: "destructive" });
-      return;
-    }
-
-    const preTransferNonEmptyGroupIds = new Set(
-      kesim.animalGroups
-        .filter(g => !g.locked && !g.kesildi && g.donations.filter(d => d.name.trim()).length > 0)
-        .map(g => g.id)
-    );
-
-    const donationItems = itemsToTransfer.filter((b) => b.type !== "animalGroup");
-    const animalGroupItems = itemsToTransfer.filter((b) => b.type === "animalGroup");
-
-    setCrossKATransferring(true);
-    try {
-      const successfulDonationIds: string[] = [];
-      const successfulAnimalGroupIds: string[] = [];
-
-      if (donationItems.length > 0) {
-        const moveResult = await moveDonationsToKesimAlani(
-          donationItems.map((b) => b.donationId),
-          kesim.id,
-          targetKAId
-        );
-        if (moveResult.movedIds) {
-          successfulDonationIds.push(...moveResult.movedIds);
-        } else {
-          successfulDonationIds.push(...donationItems.map((b) => b.donationId));
-        }
-        if (moveResult.skipped > 0) {
-          toast({
-            title: `${moveResult.skipped} bağışçı aktarılamadı`,
-            description: "Kilitli veya kesilmiş gruba ait bağışçılar atlandı",
-            variant: "destructive",
-          });
-        }
-      }
-
-      for (const agItem of animalGroupItems) {
-        try {
-          if (agItem.donationSnapshots && agItem.donationSnapshots.length > 0 && agItem.animalGroupId) {
-            const groupIdx = kesim.animalGroups.findIndex(g => g.id === agItem.animalGroupId);
-            if (groupIdx >= 0) {
-              const restoredGroups = produce(kesim.animalGroups, (draft) => {
-                const group = draft[groupIdx];
-                let slotIdx = 0;
-                for (const snap of agItem.donationSnapshots!) {
-                  while (slotIdx < group.donations.length && group.donations[slotIdx].name.trim()) {
-                    slotIdx++;
-                  }
-                  if (slotIdx < group.donations.length) {
-                    group.donations[slotIdx] = {
-                      id: snap.id,
-                      name: snap.name,
-                      description: snap.description,
-                      donationType: snap.donationType,
-                      shareCount: snap.shareCount,
-                      vekalet: snap.vekalet,
-                      notes: snap.notes || "",
-                    };
-                    slotIdx++;
-                  }
-                }
-              });
-              await apiUpdateBulkAnimalGroups(kesim.id, restoredGroups);
-            }
-          }
-
-          await moveAnimalGroupToKesimAlani(
-            agItem.animalGroupId!,
-            kesim.id,
-            targetKAId,
-            agItem.groupUpdatedAt
-          );
-          successfulAnimalGroupIds.push(agItem.animalGroupId!);
-        } catch (agErr) {
-          toast({
-            title: `Hayvan ${agItem.animalNo} aktarılamadı`,
-            description: agErr instanceof Error ? agErr.message : "Bilinmeyen hata",
-            variant: "destructive",
-          });
-        }
-      }
-
-      const targetName = siblingKesimAlanlari.find((ka) => ka.id === targetKAId)?.name || targetKAId;
-
-      if (kesim.projectId && (successfulDonationIds.length > 0 || successfulAnimalGroupIds.length > 0)) {
-        const transferEntries: DonationTransferEntry[] = [];
-
-        for (const b of donationItems) {
-          if (successfulDonationIds.includes(b.donationId)) {
-            transferEntries.push({
-              id: crypto.randomUUID(),
-              projectId: kesim.projectId!,
-              donationId: b.donationId,
-              donorName: b.name,
-              donorDescription: b.description,
-              fromKesimAlaniId: kesim.id,
-              fromKesimAlaniName: kesim.name,
-              toKesimAlaniId: targetKAId,
-              toKesimAlaniName: targetName,
-              removedFromSource: true,
-              shareCount: 1,
-              transferType: "donation",
-              createdAt: new Date().toISOString(),
-            });
-          }
-        }
-
-        for (const b of animalGroupItems) {
-          if (successfulAnimalGroupIds.includes(b.animalGroupId!)) {
-            transferEntries.push({
-              id: crypto.randomUUID(),
-              projectId: kesim.projectId!,
-              donationId: b.animalGroupId || "",
-              donorName: b.name,
-              donorDescription: `Komple hayvan - ${b.filledCount} bağışçı`,
-              fromKesimAlaniId: kesim.id,
-              fromKesimAlaniName: kesim.name,
-              toKesimAlaniId: targetKAId,
-              toKesimAlaniName: targetName,
-              removedFromSource: true,
-              shareCount: b.filledCount || 1,
-              transferType: "animalGroup",
-              animalGroupId: b.animalGroupId,
-              animalNo: b.animalNo,
-              createdAt: new Date().toISOString(),
-            });
-          }
-        }
-
-        if (transferEntries.length > 0) {
-          try {
-            await createDonationTransfers(transferEntries);
-          } catch {
-            // non-critical
-          }
-        }
-      }
-
-      const transferredIds = new Set([
-        ...successfulDonationIds,
-        ...successfulAnimalGroupIds,
-      ]);
-      setBasketItems((prev) => prev.filter((b) =>
-        b.kesimAlaniId !== kesim.id || !transferredIds.has(b.type === "animalGroup" ? b.animalGroupId! : b.donationId)
-      ));
-
-      const data = await fetchKesimAlani(kesim.id);
-      if (data) {
-        setKesim(data);
-        history.initialize(data);
-
-        const newlyEmptiedGroups = data.animalGroups.filter(g =>
-          !g.locked && !g.kesildi &&
-          g.donations.filter(d => d.name.trim()).length === 0 &&
-          preTransferNonEmptyGroupIds.has(g.id)
-        );
-        if (newlyEmptiedGroups.length > 0) {
-          setEmptyGroupsAfterTransfer(newlyEmptiedGroups.map(g => ({ id: g.id, animalNo: g.animalNo })));
-        }
-      }
-
-      const parts: string[] = [];
-      if (successfulDonationIds.length > 0) parts.push(`${successfulDonationIds.length} bağışçı`);
-      if (successfulAnimalGroupIds.length > 0) parts.push(`${successfulAnimalGroupIds.length} komple hayvan`);
-
-      const failedCount = animalGroupItems.length - successfulAnimalGroupIds.length;
-      if (parts.length > 0) {
-        toast({
-          title: `${parts.join(" ve ")} ${targetName} kesim alanına aktarıldı`,
-          description: failedCount > 0 ? `${failedCount} hayvan aktarılamadı, sepette kaldı.` : undefined,
-        });
-      }
-      if (transferredIds.size === itemsToTransfer.length) {
-        setBasketCrossKATarget("");
-      }
-    } catch (err) {
-      toast({
-        title: "Aktarım başarısız",
-        description: err instanceof Error ? err.message : "Bilinmeyen hata",
-        variant: "destructive",
-      });
-      const data = await fetchKesimAlani(kesim.id);
-      if (data) {
-        setKesim(data);
-        history.initialize(data);
-      }
-    } finally {
-      setCrossKATransferring(false);
-    }
-  }
-
-  async function transferForeignToCurrentDonorList(removeFromSource: boolean) {
-    if (!kesim) return;
-    const foreignItems = basketItems.filter((b) => b.kesimAlaniId !== kesim.id);
-    if (foreignItems.length === 0) return;
-    setTransferToDonorListRemoving(true);
-    try {
-      const foreignDonationItems = foreignItems.filter(b => b.type !== "animalGroup");
-      const foreignAnimalGroupItems = foreignItems.filter(b => b.type === "animalGroup");
-
-      const sourceKAIds = [...new Set(foreignDonationItems.map((b) => b.kesimAlaniId))];
-      for (const sourceKAId of sourceKAIds) {
-        const itemsFromSource = foreignDonationItems.filter((b) => b.kesimAlaniId === sourceKAId);
-        await moveDonationsToKesimAlani(
-          itemsFromSource.map((b) => b.donationId),
-          sourceKAId,
-          kesim.id
-        );
-      }
-
-      for (const agItem of foreignAnimalGroupItems) {
-        await moveAnimalGroupToKesimAlani(
-          agItem.animalGroupId!,
-          agItem.kesimAlaniId,
-          kesim.id,
-          agItem.groupUpdatedAt
-        );
-      }
-
-      if (kesim.projectId) {
-        const transferEntries: DonationTransferEntry[] = [];
-        for (const b of foreignDonationItems) {
-          transferEntries.push({
-            id: crypto.randomUUID(),
-            projectId: kesim.projectId!,
-            donationId: b.donationId,
-            donorName: b.name,
-            donorDescription: b.description,
-            fromKesimAlaniId: b.kesimAlaniId,
-            fromKesimAlaniName: b.kesimAlaniName,
-            toKesimAlaniId: kesim.id,
-            toKesimAlaniName: kesim.name,
-            removedFromSource: removeFromSource,
-            shareCount: 1,
-            transferType: "donation",
-            createdAt: new Date().toISOString(),
-          });
-        }
-        for (const b of foreignAnimalGroupItems) {
-          transferEntries.push({
-            id: crypto.randomUUID(),
-            projectId: kesim.projectId!,
-            donationId: b.animalGroupId || "",
-            donorName: b.name,
-            donorDescription: `Komple hayvan - ${b.filledCount} bağışçı`,
-            fromKesimAlaniId: b.kesimAlaniId,
-            fromKesimAlaniName: b.kesimAlaniName,
-            toKesimAlaniId: kesim.id,
-            toKesimAlaniName: kesim.name,
-            removedFromSource: removeFromSource,
-            shareCount: b.filledCount || 1,
-            transferType: "animalGroup",
-            animalGroupId: b.animalGroupId,
-            animalNo: b.animalNo,
-            createdAt: new Date().toISOString(),
-          });
-        }
-        try {
-          if (transferEntries.length > 0) {
-            await createDonationTransfers(transferEntries);
-          }
-        } catch {
-          toast({
-            title: "Uyarı",
-            description: "Aktarım logu kaydedilemedi, ancak bağışçılar başarıyla aktarıldı.",
-            variant: "destructive",
-          });
-        }
-      }
-      const foreignItemIds = new Set(foreignItems.map(b => b.donationId));
-      setBasketItems((prev) => prev.filter((b) => !foreignItemIds.has(b.donationId)));
-      const data = await fetchKesimAlani(kesim.id);
-      if (data) {
-        setKesim(data);
-        history.initialize(data);
-      }
-      const parts: string[] = [];
-      if (foreignDonationItems.length > 0) parts.push(`${foreignDonationItems.length} bağışçı`);
-      if (foreignAnimalGroupItems.length > 0) parts.push(`${foreignAnimalGroupItems.length} komple hayvan`);
-      toast({ title: `${parts.join(" ve ")} bu kesim alanının listesine eklendi` });
-    } catch (err) {
-      toast({
-        title: "Aktarım başarısız",
-        description: err instanceof Error ? err.message : "Bilinmeyen hata",
-        variant: "destructive",
-      });
-    } finally {
-      setTransferToDonorListRemoving(false);
-      setTransferToDonorListConfirm(false);
-    }
-  }
-
-  async function cleanupEmptyGroups() {
-    if (!kesim || emptyGroupsAfterTransfer.length === 0) {
-      setEmptyGroupsAfterTransfer([]);
-      return;
-    }
-    let deletedCount = 0;
-    for (const g of emptyGroupsAfterTransfer) {
-      try {
-        await apiDeleteAnimalGroup(kesim.id, g.id);
-        deletedCount++;
-      } catch {
-        toast({ title: `Hayvan ${g.animalNo} silinemedi`, variant: "destructive" });
-      }
-    }
-    const data = await fetchKesimAlani(kesim.id);
-    if (data) {
-      setKesim(data);
-      history.initialize(data);
-    }
-    setEmptyGroupsAfterTransfer([]);
-    if (deletedCount > 0) {
-      toast({ title: `${deletedCount} boş hayvan grubu temizlendi` });
-    }
-  }
-
-  function dismissEmptyGroupsCleanup() {
-    setEmptyGroupsAfterTransfer([]);
   }
 
   function returnSelectedToDonorList(selectedDonationIds: Set<string>): boolean {
@@ -1208,27 +765,6 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
     return true;
   }
 
-  function sendSelectedToPool(selectedDonationIds: Set<string>): boolean {
-    if (!kesim || selectedDonationIds.size === 0) return false;
-    const itemsToSend = basketItems.filter(
-      b => b.kesimAlaniId === kesim.id && selectedDonationIds.has(b.donationId) && b.type !== "animalGroup"
-    );
-    if (itemsToSend.length === 0) return false;
-
-    const idsToExclude = new Set(itemsToSend.map(b => b.donationId));
-    const updated = produce(kesim, (draft) => {
-      for (const d of draft.donations) {
-        if (idsToExclude.has(d.id)) {
-          d.excluded = true;
-        }
-      }
-    });
-    save(updated, `${itemsToSend.length} bağışçı havuza gönderildi (hariç tutuldu)`, false, "donations");
-    setBasketItems(prev => prev.filter(b => !idsToExclude.has(b.donationId)));
-    toast({ title: `${itemsToSend.length} bağışçı bağış havuzuna gönderildi` });
-    return true;
-  }
-
   const handleToggleBasketItem = useCallback(
     (groupIdx: number, dIdx: number, donationId: string, isInBasket: boolean) => {
       if (isInBasket) {
@@ -1300,21 +836,8 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
   return {
     basketItems,
     setBasketItems,
-    basketTransferTarget,
-    setBasketTransferTarget,
-    basketCrossKATarget,
-    setBasketCrossKATarget,
     basketOpen,
     setBasketOpen,
-    crossKATransferring,
-    setCrossKATransferring,
-    emptyGroupsAfterTransfer,
-    cleanupEmptyGroups,
-    dismissEmptyGroupsCleanup,
-    transferToDonorListConfirm,
-    setTransferToDonorListConfirm,
-    transferToDonorListRemoving,
-    setTransferToDonorListRemoving,
     basketItemIds,
     basketAnimalGroupIds,
     localBasketItems,
@@ -1327,15 +850,11 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
     removeFromBasket,
     clearBasket,
     addSelectedToBasket,
-    transferBasketToGroup,
     autoDistributeBasket,
-    transferBasketToOtherKA,
-    transferForeignToCurrentDonorList,
     handleToggleBasketItem,
     returnSelectedToDonorList,
     returnSelectedToSource,
     transferSelectedToGroup,
-    sendSelectedToPool,
     placeBasketItemInGroup,
   };
 }

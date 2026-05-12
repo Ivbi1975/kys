@@ -255,7 +255,6 @@ export function useKesimAlaniState() {
     history,
     toast,
     isGroupLocked,
-    siblingKesimAlanlari,
   });
 
   addSelectedToBasketRef.current = basket.addSelectedToBasket;
