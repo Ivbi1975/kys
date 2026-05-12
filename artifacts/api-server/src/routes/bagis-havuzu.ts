@@ -129,6 +129,10 @@ function buildStatsFilterSQL(projectId: string, query: Record<string, unknown>) 
     }
   }
 
+  const flagFilter = typeof query.flagFilter === "string" ? query.flagFilter.trim() : "";
+  if (flagFilter === "flagged") parts.push(sql`d.is_flagged = true`);
+  else if (flagFilter === "unflagged") parts.push(sql`d.is_flagged = false`);
+
   const dateField = typeof query.dateField === "string" ? query.dateField.trim() : "updatedAt";
   const dateFrom = typeof query.dateFrom === "string" ? query.dateFrom.trim() : "";
   const dateTo = typeof query.dateTo === "string" ? query.dateTo.trim() : "";
@@ -185,6 +189,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   const safiValues = parseMultiValue(req.query.safi);
   const tagIdValues = parseMultiValue(req.query.tagIds);
   const notesFilter = typeof req.query.notesFilter === "string" ? req.query.notesFilter.trim() : "";
+  const flagFilter = typeof req.query.flagFilter === "string" ? req.query.flagFilter.trim() : "";
   const sortByRaw = typeof req.query.sortBy === "string" ? req.query.sortBy : "sortOrder";
   const sortDir = typeof req.query.sortDir === "string" && req.query.sortDir === "desc" ? "desc" : "asc";
 
@@ -366,6 +371,9 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     }
   }
 
+  if (flagFilter === "flagged") conditions.push(eq(donationsTable.isFlagged, true));
+  else if (flagFilter === "unflagged") conditions.push(eq(donationsTable.isFlagged, false));
+
   const whereClause = and(...conditions)!;
 
   const sortColumnMap: Record<string, string> = {
@@ -399,10 +407,22 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     const col = sortColumnMap[level.key];
     if (col && !usedCols.has(col)) {
       usedCols.add(col);
-      sortParts.push(level.dir === "desc"
-        ? sql`${sql.raw(`"${col}"`)} DESC NULLS LAST`
-        : sql`${sql.raw(`"${col}"`)} ASC NULLS LAST`
-      );
+      if (col === "kesim_alani_id") {
+        sortParts.push(level.dir === "desc"
+          ? sql`(SELECT name FROM kesim_alanlari WHERE id = ${sql.raw('"kesim_alani_id"')}) DESC NULLS LAST`
+          : sql`(SELECT name FROM kesim_alanlari WHERE id = ${sql.raw('"kesim_alani_id"')}) ASC NULLS LAST`
+        );
+      } else if (col === "fiyat" || col === "gun_talebi") {
+        sortParts.push(level.dir === "desc"
+          ? sql`NULLIF(${sql.raw(`"${col}"`)}, '')::numeric DESC NULLS LAST`
+          : sql`NULLIF(${sql.raw(`"${col}"`)}, '')::numeric ASC NULLS LAST`
+        );
+      } else {
+        sortParts.push(level.dir === "desc"
+          ? sql`${sql.raw(`"${col}"`)} DESC NULLS LAST`
+          : sql`${sql.raw(`"${col}"`)} ASC NULLS LAST`
+        );
+      }
     }
   }
   if (!usedCols.has("sort_order")) {

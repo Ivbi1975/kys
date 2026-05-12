@@ -73,7 +73,12 @@ export default function BagisHavuzuPage() {
   const [donationTypeFilter, setDonationTypeFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("type")));
   const [birimFilter, setBirimFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("birim")));
   const [temsilciFilter, setTemsilciFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("temsilci")));
-  const [kesimAlaniFilter, setKesimAlaniFilter] = useState(() => urlParams.get("ka") || "none");
+  const [kesimAlaniFilter, setKesimAlaniFilter] = useState(() => {
+    const ka = urlParams.get("ka");
+    if (ka === "all") return "";
+    return ka || "none";
+  });
+  const [flagFilter, setFlagFilter] = useState(() => urlParams.get("flag") || "");
   const [aiCategoryFilter, setAiCategoryFilter] = useState(() => urlParams.get("ai") || "");
   const [ozellikFilter, setOzellikFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("ozellik")));
   const [fiyatFilter, setFiyatFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("fiyat")));
@@ -199,7 +204,12 @@ export default function BagisHavuzuPage() {
     if (donationTypeFilter.length) p.set("type", serializeMulti(donationTypeFilter));
     if (birimFilter.length) p.set("birim", serializeMulti(birimFilter));
     if (temsilciFilter.length) p.set("temsilci", serializeMulti(temsilciFilter));
-    if (kesimAlaniFilter) p.set("ka", kesimAlaniFilter);
+    if (kesimAlaniFilter === "") {
+      p.set("ka", "all");
+    } else if (kesimAlaniFilter) {
+      p.set("ka", kesimAlaniFilter);
+    }
+    if (flagFilter) p.set("flag", flagFilter);
     if (aiCategoryFilter) p.set("ai", aiCategoryFilter);
     if (ozellikFilter.length) p.set("ozellik", serializeMulti(ozellikFilter));
     if (fiyatFilter.length) p.set("fiyat", serializeMulti(fiyatFilter));
@@ -225,7 +235,7 @@ export default function BagisHavuzuPage() {
     const qs = p.toString();
     const newUrl = `/bagis-havuzu/${projectId}${qs ? `?${qs}` : ""}`;
     window.history.replaceState(null, "", import.meta.env.BASE_URL.replace(/\/$/, "") + newUrl);
-  }, [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter, notesFilter, sortBy, sortDir, sortBy2, sortDir2, sortBy3, sortDir3, shareCountMin, shareCountMax, excludeFields, dateField, dateFrom, dateTo, page, projectId]);
+  }, [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, flagFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter, notesFilter, sortBy, sortDir, sortBy2, sortDir2, sortBy3, sortDir3, shareCountMin, shareCountMax, excludeFields, dateField, dateFrom, dateTo, page, projectId]);
 
   const toggleExcludeField = useCallback((field: string) => {
     setExcludeFields(prev => {
@@ -236,9 +246,10 @@ export default function BagisHavuzuPage() {
   }, []);
 
   const activeFilterCount = [
-    debouncedSearch, statusFilter, kesimAlaniFilter !== "none" ? kesimAlaniFilter : null, aiCategoryFilter, notesFilter, shareCountMin, shareCountMax, dateFrom, dateTo,
+    debouncedSearch, statusFilter, kesimAlaniFilter !== "none" ? kesimAlaniFilter : null, aiCategoryFilter, notesFilter, shareCountMin, shareCountMax, dateFrom, dateTo, flagFilter,
   ].filter(Boolean).length
-  + [donationTypeFilter, birimFilter, temsilciFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter].filter(a => a.length > 0).length;
+  + [donationTypeFilter, birimFilter, temsilciFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter].filter(a => a.length > 0).length
+  + (excludeFields.size > 0 ? 1 : 0);
 
   const excludeFieldsStr = useMemo(() => [...excludeFields].join(","), [excludeFields]);
 
@@ -264,7 +275,8 @@ export default function BagisHavuzuPage() {
     dateField: dateField !== "updatedAt" ? dateField : undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
-  }), [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter, notesFilter, shareCountMin, shareCountMax, excludeFieldsStr, dateField, dateFrom, dateTo]);
+    flagFilter: flagFilter || undefined,
+  }), [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, flagFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter, notesFilter, shareCountMin, shareCountMax, excludeFieldsStr, dateField, dateFrom, dateTo]);
 
   const filters = useMemo(() => ({
     ...statsFilters,
@@ -408,7 +420,8 @@ export default function BagisHavuzuPage() {
     setDonationTypeFilter([]);
     setBirimFilter([]);
     setTemsilciFilter([]);
-    setKesimAlaniFilter("");
+    setKesimAlaniFilter("none");
+    setFlagFilter("");
     setAiCategoryFilter("");
     setOzellikFilter([]);
     setFiyatFilter([]);
@@ -1143,6 +1156,7 @@ export default function BagisHavuzuPage() {
             ilkHayvanFilter={ilkHayvanFilter} setIlkHayvanFilter={v => { setIlkHayvanFilter(v); setPage(0); }}
             safiFilter={safiFilter} setSafiFilter={v => { setSafiFilter(v); setPage(0); }}
             tagFilter={tagFilter} setTagFilter={v => { setTagFilter(v); setPage(0); }}
+            flagFilter={flagFilter} setFlagFilter={v => { setFlagFilter(v); setPage(0); }}
             notesFilter={notesFilter} setNotesFilter={v => { setNotesFilter(v); setPage(0); }}
             sortBy={sortBy} setSortBy={v => { setSortBy(v); setPage(0); }}
             sortDir={sortDir} setSortDir={setSortDir}

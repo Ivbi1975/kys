@@ -33,6 +33,8 @@ interface PoolFiltersProps {
   setSafiFilter: (v: string[]) => void;
   tagFilter: string[];
   setTagFilter: (v: string[]) => void;
+  flagFilter: string;
+  setFlagFilter: (v: string) => void;
   notesFilter: string;
   setNotesFilter: (v: string) => void;
   sortBy: string;
@@ -332,6 +334,7 @@ export function PoolFilters({
   ilkHayvanFilter, setIlkHayvanFilter,
   safiFilter, setSafiFilter,
   tagFilter, setTagFilter,
+  flagFilter, setFlagFilter,
   notesFilter, setNotesFilter,
   sortBy, setSortBy,
   sortDir, setSortDir,
@@ -410,6 +413,17 @@ export function PoolFilters({
                     </SelectItem>
                   );
                 })}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="min-w-[130px] flex-1 max-w-[180px]">
+            <span className="block text-[10px] text-muted-foreground mb-0.5">İşaret Durumu</span>
+            <Select value={flagFilter || "all"} onValueChange={v => setFlagFilter(v === "all" ? "" : v)}>
+              <SelectTrigger className="h-8 text-xs bg-background"><SelectValue placeholder="İşaret" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tümü</SelectItem>
+                <SelectItem value="flagged">⚑ Sorunlu</SelectItem>
+                <SelectItem value="unflagged">Normal</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -585,7 +599,7 @@ export function PoolFilters({
 
             {globalTags.length > 0 && (
               <div>
-                <span className="block text-[10px] text-muted-foreground mb-0.5">Etiket</span>
+                <span className="block text-[10px] text-muted-foreground mb-0.5">Etiket <span className="opacity-50">(herhangi)</span></span>
                 <MultiSelectDropdown
                   label="Etiket"
                   options={globalTags.map(t => ({

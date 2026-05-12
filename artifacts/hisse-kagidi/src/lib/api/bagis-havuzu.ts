@@ -39,6 +39,7 @@ export interface PoolFilters {
   dateField?: string;
   dateFrom?: string;
   dateTo?: string;
+  flagFilter?: string;
 }
 
 export async function fetchPoolDonations(projectId: string, filters: PoolFilters = {}): Promise<PoolDonationsResponse> {
@@ -72,6 +73,7 @@ export async function fetchPoolDonations(projectId: string, filters: PoolFilters
   if (filters.dateField) params.set("dateField", filters.dateField);
   if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
   if (filters.dateTo) params.set("dateTo", filters.dateTo);
+  if (filters.flagFilter) params.set("flagFilter", filters.flagFilter);
   const qs = params.toString();
   return apiFetch<PoolDonationsResponse>(`/projects/${projectId}/donations${qs ? `?${qs}` : ""}`);
 }
@@ -101,6 +103,7 @@ export async function fetchPoolStats(projectId: string, filters: StatsFilters = 
   if (filters.dateField) params.set("dateField", filters.dateField);
   if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
   if (filters.dateTo) params.set("dateTo", filters.dateTo);
+  if (filters.flagFilter) params.set("flagFilter", filters.flagFilter);
   const qs = params.toString();
   return apiFetch<PoolStats>(`/projects/${projectId}/donations/stats${qs ? `?${qs}` : ""}`);
 }
