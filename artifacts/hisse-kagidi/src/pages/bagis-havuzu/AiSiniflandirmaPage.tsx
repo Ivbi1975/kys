@@ -165,7 +165,15 @@ export default function AiSiniflandirmaPage() {
             }
             if (status.status === "cancelled") setAiStopped(true);
             if (status.status === "failed") {
-              toast({ title: "AI İşlemi Başarısız", description: status.error || "Bilinmeyen hata", variant: "destructive" });
+              const isTimeout = status.error?.startsWith("Zaman aşımı");
+              toast({
+                title: isTimeout ? "Süre Doldu — Kısmi Sonuç Kaydedildi" : "AI İşlemi Başarısız",
+                description: isTimeout
+                  ? `${status.error} Aşağıdaki "Kaldığı Yerden Devam" butonu ile kalan notları işleyebilirsiniz.`
+                  : (status.error || "Bilinmeyen hata"),
+                variant: "destructive",
+              });
+              if (isTimeout) setAiStopped(true);
             }
           }
         }
@@ -216,7 +224,13 @@ export default function AiSiniflandirmaPage() {
 
   const handleStart = useCallback(async (resume = false) => {
     let toProcess = itemsWithNotes;
-    if (resume) toProcess = toProcess.filter(d => !aiResults.has(d.id));
+    if (resume) {
+      if (aiResults.size > 0) {
+        toProcess = toProcess.filter(d => !aiResults.has(d.id));
+      } else {
+        toProcess = toProcess.filter(d => !d.aiCategories || d.aiCategories.length === 0);
+      }
+    }
     if (skipClassified) toProcess = toProcess.filter(d => !d.aiCategories || d.aiCategories.length === 0);
 
     if (toProcess.length === 0) {

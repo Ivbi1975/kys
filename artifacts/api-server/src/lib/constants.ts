@@ -28,7 +28,7 @@ export type AiJobStatus = (typeof AiJobStatus)[keyof typeof AiJobStatus];
 
 export const STALE_JOB_CUTOFF_MS = 24 * 60 * 60 * 1000;
 export const STALE_JOB_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
-export const AI_JOB_TTL_MS = 15 * 60 * 1000;
+export const AI_JOB_TTL_MS = 60 * 60 * 1000;
 export const AI_JOB_EXPIRY_CHECK_INTERVAL_MS = 60 * 1000;
 export const SOFT_DELETE_PURGE_DAYS = 90;
 export const SOFT_DELETE_PURGE_INTERVAL_MS = 24 * 60 * 60 * 1000;

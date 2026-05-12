@@ -250,9 +250,10 @@ router.post("/ai-notes/classify", asyncHandler(async (req, res) => {
     not: d.notes,
   }));
 
+  const dynamicTokens = Math.min(donations.length * 700 + 2000, 32768);
   const response = await openai.chat.completions.create({
     model: "gpt-5-mini",
-    max_completion_tokens: 16384,
+    max_completion_tokens: dynamicTokens,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: JSON.stringify(userContent) },
@@ -309,13 +310,19 @@ const CHUNK_SIZE = 25;
 const PARALLEL_CHUNKS = 5;
 
 async function isJobCancelledOrExpired(jobId: string): Promise<boolean> {
-  const [job] = await db.select({ status: aiJobsTable.status, expiresAt: aiJobsTable.expiresAt }).from(aiJobsTable).where(eq(aiJobsTable.id, jobId));
+  const [job] = await db.select({
+    status: aiJobsTable.status,
+    expiresAt: aiJobsTable.expiresAt,
+    processedDonations: aiJobsTable.processedDonations,
+    totalDonations: aiJobsTable.totalDonations,
+  }).from(aiJobsTable).where(eq(aiJobsTable.id, jobId));
   if (!job || job.status === AiJobStatus.CANCELLED) return true;
   if (job.expiresAt && new Date() > job.expiresAt) {
+    const errMsg = `Zaman aşımı — ${job.processedDonations ?? 0}/${job.totalDonations ?? 0} not işlendi. Kaldığı yerden devam edebilirsiniz.`;
     await db.update(aiJobsTable)
-      .set({ status: AiJobStatus.FAILED, error: ERROR_MESSAGES.AI_JOB_EXPIRED, updatedAt: new Date() })
+      .set({ status: AiJobStatus.FAILED, error: errMsg, updatedAt: new Date() })
       .where(eq(aiJobsTable.id, jobId));
-    logger.warn({ jobId }, "AI job expired during processing");
+    logger.warn({ jobId, processed: job.processedDonations, total: job.totalDonations }, "AI job expired during processing");
     return true;
   }
   return false;
@@ -338,9 +345,10 @@ async function callAiForDonations(
   let retries = 3;
   while (retries > 0) {
     try {
+      const dynamicTokens = Math.min(items.length * 700 + 2000, 32768);
       const response = await openai.chat.completions.create({
         model: "gpt-5-mini",
-        max_completion_tokens: 16384,
+        max_completion_tokens: dynamicTokens,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: JSON.stringify(userContent) },
