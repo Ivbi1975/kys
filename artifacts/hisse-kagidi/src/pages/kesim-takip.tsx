@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { turkishNormalize } from "@/lib/utils";
 import { useParams } from "wouter";
 import { NoteType, NoteStatus } from "@/lib/constants";
-import { assignTeamTracking, fetchTrackingNotificationLogs } from "@/lib/api";
+import { assignTeamTracking, fetchTrackingNotificationLogs, reorderGroups } from "@/lib/api";
 import { KesimTakipSkeleton } from "@/components/skeletons/KesimTakipSkeleton";
 import { useMinLoadingTime } from "@/hooks/useMinLoadingTime";
 import type { TrackingGroup, TrackingNote } from "@/lib/api";
@@ -114,6 +114,19 @@ export default function KesimTakipPage() {
 
   const handleSelectGroup = useCallback((idx: number) => setOverlayIndex(idx), []);
 
+  const handleReorder = useCallback(async (orderedIds: string[]) => {
+    if (!params.token) return;
+    setData(prev => {
+      if (!prev) return prev;
+      const idToGroup = new Map(prev.groups.map(g => [g.id, g]));
+      const reordered = orderedIds.map(id => idToGroup.get(id)).filter(Boolean) as TrackingGroup[];
+      const reorderedSet = new Set(orderedIds);
+      const others = prev.groups.filter(g => !reorderedSet.has(g.id));
+      return { ...prev, groups: [...reordered, ...others] };
+    });
+    try { await reorderGroups(params.token, orderedIds); } catch {}
+  }, [params.token, setData]);
+
   async function handleTeamAssign(groupId: string, teamId: string | null) {
     if (!params.token) return;
     try {
@@ -219,6 +232,8 @@ export default function KesimTakipPage() {
                 onSelect={handleSelectGroup}
                 emptyState={emptyState}
                 onClearFilter={() => { setSearchQuery(""); setFilterMode("all"); }}
+                onReorder={handleReorder}
+                isDragEnabled={filterMode === "all" && !searchQuery.trim()}
               />
 
               <p className="text-[10px] text-center mt-4" style={{ color: "#94a3b8" }}>

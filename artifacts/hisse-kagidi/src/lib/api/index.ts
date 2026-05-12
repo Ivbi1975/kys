@@ -65,6 +65,7 @@ export {
   getGroupPhotoUrl,
   uploadGroupPhoto,
   deleteGroupPhoto,
+  reorderGroups,
   assignTeamTracking,
   fetchTrackingNotificationLogs,
 } from "./tracking";

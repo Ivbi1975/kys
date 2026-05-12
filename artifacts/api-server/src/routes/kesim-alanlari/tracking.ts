@@ -15,6 +15,7 @@ import {
   getTrackingNotes,
   createTrackingNote,
   approveEditRequest,
+  reorderGroups,
 } from "../../services/tracking.service";
 import { auditLog } from "../../services/audit-log.service";
 
@@ -109,6 +110,25 @@ router.get("/kesim-alanlari/:id/dashboard", asyncHandler(async (req, res) => {
   }
   const result = await getDashboard(req.params.id);
   res.json(result.data);
+}));
+
+router.put("/tracking/:token/reorder", asyncHandler(async (req, res) => {
+  const { orderedIds } = req.body as { orderedIds?: unknown };
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0 || !orderedIds.every(id => typeof id === "string")) {
+    res.status(400).json({ error: "orderedIds gerekli (string dizisi)." });
+    return;
+  }
+
+  const result = await reorderGroups(req.params.token, orderedIds as string[]);
+  if (!result.ok) {
+    const errorMap: Record<string, string> = {
+      not_found: ERROR_MESSAGES.TRACKING_LINK_NOT_FOUND,
+      token_expired: ERROR_MESSAGES.TRACKING_TOKEN_EXPIRED,
+    };
+    res.status(result.status).json({ error: errorMap[result.error] || result.error, expired: result.error === "token_expired" });
+    return;
+  }
+  res.json({ success: true });
 }));
 
 router.get("/tracking/:token/notes", asyncHandler(async (req, res) => {

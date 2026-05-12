@@ -113,6 +113,13 @@ export async function deleteGroupPhoto(token: string, groupId: string, photoId: 
   });
 }
 
+export async function reorderGroups(token: string, orderedIds: string[]): Promise<void> {
+  await apiFetch(`/tracking/${token}/reorder`, {
+    method: "PUT",
+    body: JSON.stringify({ orderedIds }),
+  });
+}
+
 export async function assignTeamTracking(token: string, groupId: string, teamId: string | null): Promise<void> {
   await apiFetch(`/tracking/${token}/group/${groupId}/team`, {
     method: "PUT",

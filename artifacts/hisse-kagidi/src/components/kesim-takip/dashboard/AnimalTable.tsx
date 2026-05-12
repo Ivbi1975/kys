@@ -1,5 +1,5 @@
-import { memo } from "react";
-import { CheckCircle2, Circle, Loader2, MessageSquarePlus, MoreHorizontal, Clock } from "lucide-react";
+import { memo, useState, useCallback } from "react";
+import { GripVertical, CheckCircle2, Circle, Loader2, MessageSquarePlus, Clock } from "lucide-react";
 import { formatKesildiTime } from "@/lib/formatting";
 import { COLOR_MAP } from "@/lib/constants";
 import type { TrackingGroup, TrackingTeam } from "@/lib/api";
@@ -13,6 +13,8 @@ interface AnimalTableProps {
   onSelect: (index: number) => void;
   emptyState: "no-data" | "no-match";
   onClearFilter?: () => void;
+  onReorder?: (orderedIds: string[]) => void;
+  isDragEnabled?: boolean;
 }
 
 export function AnimalTable({
@@ -24,7 +26,64 @@ export function AnimalTable({
   onSelect,
   emptyState,
   onClearFilter,
+  onReorder,
+  isDragEnabled = false,
 }: AnimalTableProps) {
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState<{ id: string; position: "before" | "after" } | null>(null);
+
+  const handleDragStart = useCallback((e: React.DragEvent, group: TrackingGroup) => {
+    setDragId(group.id);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", group.id);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, group: TrackingGroup) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const position: "before" | "after" = e.clientY < rect.top + rect.height / 2 ? "before" : "after";
+    setDragOver(prev =>
+      prev?.id === group.id && prev.position === position ? prev : { id: group.id, position }
+    );
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    setDragId(null);
+    setDragOver(null);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent, targetGroup: TrackingGroup) => {
+    e.preventDefault();
+    if (!dragId || dragId === targetGroup.id || !onReorder) {
+      setDragId(null);
+      setDragOver(null);
+      return;
+    }
+
+    const fromIdx = groups.findIndex(g => g.id === dragId);
+    const targetIdx = groups.findIndex(g => g.id === targetGroup.id);
+    if (fromIdx === -1 || targetIdx === -1) {
+      setDragId(null);
+      setDragOver(null);
+      return;
+    }
+
+    const position = dragOver?.position ?? "after";
+    const newGroups = [...groups];
+    const [moved] = newGroups.splice(fromIdx, 1);
+    let insertAt: number;
+    if (fromIdx < targetIdx) {
+      insertAt = position === "before" ? targetIdx - 1 : targetIdx;
+    } else {
+      insertAt = position === "before" ? targetIdx : targetIdx + 1;
+    }
+    newGroups.splice(insertAt, 0, moved);
+    onReorder(newGroups.map(g => g.id));
+    setDragId(null);
+    setDragOver(null);
+  }, [dragId, dragOver, groups, onReorder]);
+
   if (groups.length === 0) {
     return (
       <div
@@ -58,6 +117,10 @@ export function AnimalTable({
     );
   }
 
+  const headerCols = isDragEnabled
+    ? ["", "#", "Hayvan", "Vekalet / Sahip", "Ekip", "Kesim Zamanı", "Durum", ""]
+    : ["#", "Hayvan", "Vekalet / Sahip", "Ekip", "Kesim Zamanı", "Durum", ""];
+
   return (
     <>
       {/* Desktop table */}
@@ -69,11 +132,11 @@ export function AnimalTable({
           <table className="w-full">
             <thead>
               <tr style={{ borderBottom: "1px solid rgba(148,163,184,0.10)" }}>
-                {["#", "Hayvan", "Vekalet / Sahip", "Ekip", "Kesim Zamanı", "Durum", ""].map(h => (
+                {headerCols.map((h, i) => (
                   <th
-                    key={h}
+                    key={i}
                     className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap"
-                    style={{ color: "#94a3b8" }}
+                    style={{ color: "#94a3b8", ...(isDragEnabled && i === 0 ? { width: "32px", paddingRight: 0 } : {}) }}
                   >
                     {h}
                   </th>
@@ -81,18 +144,29 @@ export function AnimalTable({
               </tr>
             </thead>
             <tbody>
-              {groups.map((group, idx) => (
-                <AnimalRow
-                  key={group.id}
-                  group={group}
-                  index={idx}
-                  isToggling={toggling.has(group.id)}
-                  noteCount={noteCountByGroup[group.id] || 0}
-                  teams={teams}
-                  onToggle={onToggle}
-                  onSelect={onSelect}
-                />
-              ))}
+              {groups.map((group, idx) => {
+                const isDragging = dragId === group.id;
+                const isDropTarget = dragOver?.id === group.id;
+                return (
+                  <AnimalRow
+                    key={group.id}
+                    group={group}
+                    index={idx}
+                    isToggling={toggling.has(group.id)}
+                    noteCount={noteCountByGroup[group.id] || 0}
+                    teams={teams}
+                    onToggle={onToggle}
+                    onSelect={onSelect}
+                    isDragEnabled={isDragEnabled}
+                    isDragging={isDragging}
+                    dropPosition={isDropTarget ? dragOver!.position : null}
+                    onDragStart={handleDragStart}
+                    onDragOver={handleDragOver}
+                    onDragEnd={handleDragEnd}
+                    onDrop={handleDrop}
+                  />
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -103,6 +177,9 @@ export function AnimalTable({
           style={{ borderColor: "rgba(148,163,184,0.10)", color: "#94a3b8" }}
         >
           <span>Toplam {groups.length} hayvan</span>
+          {isDragEnabled && (
+            <span style={{ color: "rgba(148,163,184,0.5)" }}>Sürükleyerek sıralayabilirsiniz</span>
+          )}
         </div>
       </div>
 
@@ -127,26 +204,62 @@ export function AnimalTable({
 
 const AnimalRow = memo(function AnimalRow({
   group, index, isToggling, noteCount, teams, onToggle, onSelect,
+  isDragEnabled, isDragging, dropPosition, onDragStart, onDragOver, onDragEnd, onDrop,
 }: {
   group: TrackingGroup; index: number; isToggling: boolean;
   noteCount: number; teams: TrackingTeam[];
   onToggle: (g: TrackingGroup) => void; onSelect: (i: number) => void;
+  isDragEnabled: boolean; isDragging: boolean;
+  dropPosition: "before" | "after" | null;
+  onDragStart: (e: React.DragEvent, g: TrackingGroup) => void;
+  onDragOver: (e: React.DragEvent, g: TrackingGroup) => void;
+  onDragEnd: () => void;
+  onDrop: (e: React.DragEvent, g: TrackingGroup) => void;
 }) {
   const team = group.teamId ? teams.find(t => t.id === group.teamId) : null;
   const colorBorder = group.colorTag && COLOR_MAP[group.colorTag] ? COLOR_MAP[group.colorTag] : null;
 
+  const rowStyle: React.CSSProperties = {
+    borderBottom: dropPosition === "after"
+      ? "2px solid rgba(0,201,134,0.7)"
+      : "1px solid rgba(148,163,184,0.06)",
+    borderTop: dropPosition === "before" ? "2px solid rgba(0,201,134,0.7)" : undefined,
+    opacity: isDragging ? 0.35 : 1,
+    transition: "opacity 0.15s",
+    cursor: isDragEnabled ? "grab" : "pointer",
+    userSelect: isDragEnabled ? "none" : undefined,
+  };
+
   return (
     <tr
-      className="cursor-pointer transition-colors group"
-      style={{ borderBottom: "1px solid rgba(148,163,184,0.06)" }}
+      className="transition-colors group"
+      style={rowStyle}
+      draggable={isDragEnabled}
+      onDragStart={isDragEnabled ? (e) => onDragStart(e, group) : undefined}
+      onDragOver={isDragEnabled ? (e) => onDragOver(e, group) : undefined}
+      onDragEnd={isDragEnabled ? onDragEnd : undefined}
+      onDrop={isDragEnabled ? (e) => onDrop(e, group) : undefined}
       onClick={() => onSelect(index)}
       role="button"
       tabIndex={0}
       aria-label={`Hayvan ${group.animalNo}${group.kesildi ? ", kesildi" : ", bekliyor"}`}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(index); } }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(148,163,184,0.04)"; }}
+      onMouseEnter={(e) => { if (!isDragging) (e.currentTarget as HTMLElement).style.background = "rgba(148,163,184,0.04)"; }}
       onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
     >
+      {/* Drag handle */}
+      {isDragEnabled && (
+        <td className="pl-3 pr-0 py-3.5" style={{ width: "32px" }}>
+          <div
+            className="flex items-center justify-center w-5 h-5"
+            style={{ color: "rgba(148,163,184,0.35)" }}
+            aria-hidden="true"
+          >
+            <GripVertical className="w-4 h-4" />
+          </div>
+        </td>
+      )}
+
       {/* # */}
       <td className="px-4 py-3.5">
         <div className="flex items-center gap-2">

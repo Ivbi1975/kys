@@ -385,3 +385,28 @@ export async function approveEditRequest(kesimAlaniId: string, noteId: string, s
   }
   return serviceOk({ success: true as const });
 }
+
+export async function reorderGroups(token: string, orderedIds: string[]) {
+  const [ka] = await db.select({
+    id: kesimAlanlariTable.id,
+    trackingTokenExpiresAt: kesimAlanlariTable.trackingTokenExpiresAt,
+    deletedAt: kesimAlanlariTable.deletedAt,
+  }).from(kesimAlanlariTable).where(eq(kesimAlanlariTable.trackingToken, token));
+
+  if (!ka || ka.deletedAt) return serviceError("not_found", 404);
+  const expError = checkTokenExpiration(ka);
+  if (expError) return expError;
+
+  if (orderedIds.length > 0) {
+    const caseParts = orderedIds.map((id, i) => sql`WHEN ${id}::uuid THEN ${i}`);
+    await db.execute(sql`
+      UPDATE animal_groups
+      SET sort_order = CASE id ${sql.join(caseParts, sql` `)} END
+      WHERE id IN (${sql.join(orderedIds.map(id => sql`${id}::uuid`), sql`, `)})
+        AND kesim_alani_id = ${ka.id}
+        AND deleted_at IS NULL
+    `);
+  }
+
+  return serviceOk({ success: true as const });
+}
