@@ -185,7 +185,7 @@ export default function KesimTakipPage() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <DashboardTopbar
           kesimAlaniName={data.kesimAlaniName}
-          projectName={data.projectName}
+          projectName={data.projectName ?? undefined}
           highContrast={highContrast}
           onToggleHighContrast={() => setHighContrast(h => !h)}
           onShowReport={() => setShowSummaryReport(true)}

@@ -41,7 +41,7 @@ export default defineConfig({
               navigateFallbackAllowlist: [/^\/takip\//],
               runtimeCaching: [
                 {
-                  urlPattern: /\/api\/tracking\/.+/,
+                  urlPattern: /\/(?:api\/)?tracking\/.+/,
                   handler: "NetworkFirst",
                   options: {
                     cacheName: "tracking-api-cache",

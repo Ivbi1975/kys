@@ -1,6 +1,4 @@
-const API_BASE = import.meta.env.BASE_URL
-  ? `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/").replace(/\/$/, "")
-  : "/api";
+import { API_BASE } from "@/lib/api-base";
 
 interface ApiError {
   error: string;

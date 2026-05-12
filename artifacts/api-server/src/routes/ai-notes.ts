@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { appSettingsTable, donationsTable, aiJobsTable } from "@workspace/db/schema";
 import { eq, lt, or, desc, and } from "drizzle-orm";
 import { z } from "zod";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { assertOpenAiConfigured, openai } from "@workspace/integrations-openai-ai-server";
 import crypto from "crypto";
 import { asyncHandler } from "../middleware/error-handler";
 import { logger } from "../lib/logger";
@@ -231,6 +231,13 @@ router.put("/ai-notes/settings", asyncHandler(async (req, res) => {
 }));
 
 router.post("/ai-notes/classify", asyncHandler(async (req, res) => {
+  try {
+    assertOpenAiConfigured();
+  } catch {
+    res.status(503).json({ error: "AI entegrasyonu yapılandırılmamış." });
+    return;
+  }
+
   const parsed = classifySchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
@@ -280,6 +287,13 @@ const classifyAsyncSchema = z.object({
 });
 
 router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
+  try {
+    assertOpenAiConfigured();
+  } catch {
+    res.status(503).json({ error: "AI entegrasyonu yapılandırılmamış." });
+    return;
+  }
+
   const parsed = classifyAsyncSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });

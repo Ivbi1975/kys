@@ -39,6 +39,7 @@ ALLOWED_ORIGINS = "https://kys.gelecekvadisi.org,https://liste.gelecekvadisi.org
 [[ports]]
 localPort = 8080
 externalPort = 80
+exposeLocalhost = true
 
 [[ports]]
 localPort = 8081

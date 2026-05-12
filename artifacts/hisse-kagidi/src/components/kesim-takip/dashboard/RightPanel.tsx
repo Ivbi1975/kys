@@ -17,7 +17,7 @@ interface RightPanelProps {
   onOpenNextNotes: () => void;
   onShowReport: () => void;
   pendingCount: number;
-  forceNotesOpen?: boolean;
+  forceNotesOpen?: number;
   createNote?: (data: { animalGroupId?: string; type: string; content: string }) => Promise<TrackingNote | null>;
 }
 

@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchPhotoToken } from "@/lib/api";
-
-const API_BASE = import.meta.env.BASE_URL
-  ? `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/").replace(/\/$/, "")
-  : "/api";
+import { API_BASE } from "@/lib/api-base";
 
 const DORTLUKLER = [
   "Hâtırası gönüllerde yaşar, ismi dillerde,\nMurat Abi namı gezer her bir mecliste,\nKadrini bilmeyen kalır daim müşkilde,\nHürmet etmeyen kalır kahvesiz elde.",
