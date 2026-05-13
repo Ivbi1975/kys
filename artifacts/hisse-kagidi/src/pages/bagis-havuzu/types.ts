@@ -41,8 +41,8 @@ export const POOL_COLUMN_KEYWORDS: Record<Exclude<ColumnMapping, "skip">, string
 
 export const ALL_TABLE_COLUMNS: { key: TableColumnKey; label: string; defaultVisible: boolean }[] = [
   { key: "vekalet", label: "Vekalet", defaultVisible: true },
-  { key: "name", label: "Adına Kesilen", defaultVisible: true },
   { key: "description", label: "Vekaleti Veren", defaultVisible: true },
+  { key: "name", label: "Adına Kesilen", defaultVisible: true },
   { key: "donationType", label: "Cinsi", defaultVisible: true },
   { key: "birim", label: "Birim", defaultVisible: true },
   { key: "temsilci", label: "Temsilci", defaultVisible: true },

@@ -385,6 +385,31 @@ export function PoolFilters({
   const showSafi = !!(optStats && ((optStats.safiDistribution && optStats.safiDistribution.length > 0) || (optStats.empty_safi_count ?? 0) > 0 || safiFilter.length > 0));
   const hasFacets = showCinsi || showBirim || showTemsilci || showOzellik || showFiyat || showYer || showGun || showIlkHayvan || showSafi || globalTags.length > 0;
 
+  const isStandardType = useCallback((type: string) => {
+    const n = type.toLocaleLowerCase("tr").replace(/[^a-zçğıöşü]/g, "");
+    return n === "vacip" || n === "adak" || n === "şükür" || n === "sukur" || n === "vakıp" || n === "vakip";
+  }, []);
+
+  const nonStandardTypeValues = useMemo(() =>
+    (optStats?.typeDistribution || []).map(t => t.type).filter(t => !isStandardType(t)),
+    [optStats, isStandardType]
+  );
+
+  const isNonStandardActive = useMemo(() => {
+    if (nonStandardTypeValues.length === 0 || donationTypeFilter.length === 0) return false;
+    const filterSet = new Set(donationTypeFilter);
+    return nonStandardTypeValues.every(t => filterSet.has(t)) &&
+      donationTypeFilter.every(t => nonStandardTypeValues.includes(t));
+  }, [donationTypeFilter, nonStandardTypeValues]);
+
+  const toggleNonStandard = useCallback(() => {
+    if (isNonStandardActive) {
+      setDonationTypeFilter([]);
+    } else {
+      setDonationTypeFilter(nonStandardTypeValues);
+    }
+  }, [isNonStandardActive, nonStandardTypeValues, setDonationTypeFilter]);
+
   return (
     <div className="mb-3 border rounded-lg bg-muted/20 overflow-hidden">
 
@@ -440,6 +465,21 @@ export function PoolFilters({
         <div className="px-3 py-2.5 border-b">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Çoklu Filtreler</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+            {showCinsi && nonStandardTypeValues.length > 0 && (
+              <div className="flex flex-col justify-end">
+                <span className="block text-[10px] text-muted-foreground mb-0.5">Tür Filtresi</span>
+                <button
+                  type="button"
+                  onClick={toggleNonStandard}
+                  className={`flex items-center gap-2 h-8 px-3 text-xs rounded border w-full text-left transition-colors ${isNonStandardActive ? "bg-primary/10 border-primary text-primary font-medium" : "bg-background border-input text-foreground hover:bg-muted/50"}`}
+                >
+                  <span className={`flex-shrink-0 w-4 h-4 border rounded flex items-center justify-center ${isNonStandardActive ? "bg-primary border-primary text-primary-foreground" : "border-input"}`}>
+                    {isNonStandardActive && <Check className="w-3 h-3" />}
+                  </span>
+                  <span className="truncate">Diğer Türler</span>
+                </button>
+              </div>
+            )}
             {showCinsi && (
               <div>
                 <span className="block text-[10px] text-muted-foreground mb-0.5">Cinsi</span>
