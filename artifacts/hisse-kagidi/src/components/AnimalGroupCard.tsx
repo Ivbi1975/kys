@@ -28,6 +28,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  StickyNote,
 } from "lucide-react";
 
 const SORTABLE_COLUMNS: ColumnKey[] = ["vekalet", "description", "temsilci", "name", "donationType"];
@@ -146,6 +147,8 @@ const GroupDonationRow = memo(function GroupDonationRow({
   onUnflagDonation?: (id: string) => void;
 }) {
   const d = donation;
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteValue, setNoteValue] = useState(d.notes || "");
   const cellPad = compact ? "p-0.5" : "p-1.5";
   const inputH = compact ? "h-5 text-[10px]" : "h-6 text-xs";
   const inputClass = `${inputH} border-0 bg-transparent p-0 focus:bg-primary/5 focus:ring-1 focus:ring-primary/30 rounded transition-colors`;
@@ -212,18 +215,10 @@ const GroupDonationRow = memo(function GroupDonationRow({
         );
       case "notes":
         return (
-          <td key={colKey} className={cellPad} data-group-cell={`${groupIdx}-${dIdx}-notes`}>
-            <div className={compact ? "flex flex-col gap-0.5" : "flex flex-row items-center gap-1.5"}>
-              <LocalInput
-                className={`${inputClass} ${!compact ? "flex-1 min-w-0" : ""}`}
-                value={d.notes || ""}
-                onCommit={(v) => handleCommit("notes", v)}
-                onKeyDown={handleKeyDown("notes")}
-                placeholder="—"
-                aria-label={`Satır ${dIdx + 1} Notlar`}
-              />
-              {!compact && ((d.aiCategories && d.aiCategories.length > 0) || (d.aiWarnings && d.aiWarnings.trim())) && (
-                <div className="flex gap-0.5 flex-wrap flex-shrink-0">
+          <td key={colKey} className={cellPad}>
+            <div className="flex gap-0.5 flex-wrap items-center min-h-[1.25rem]">
+              {(d.aiCategories && d.aiCategories.length > 0) || (d.aiWarnings && d.aiWarnings.trim()) ? (
+                <>
                   {(d.aiCategories || []).map(cat => (
                     <CategoryBadge key={cat} cat={cat} size="sm" />
                   ))}
@@ -232,7 +227,9 @@ const GroupDonationRow = memo(function GroupDonationRow({
                       ⚠
                     </span>
                   )}
-                </div>
+                </>
+              ) : (
+                <span className="text-muted-foreground text-[10px]">—</span>
               )}
             </div>
           </td>
@@ -241,6 +238,34 @@ const GroupDonationRow = memo(function GroupDonationRow({
         return (
           <td key={colKey} className={cellPad}>
             <div className="flex gap-0.5">
+              <Popover open={noteOpen} onOpenChange={(o) => { setNoteOpen(o); if (o) setNoteValue(d.notes || ""); }}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`${compact ? "h-4 w-4" : "h-5 w-5"} p-0 ${d.notes ? "text-amber-500" : "text-muted-foreground"}`}
+                    title={d.notes ? `Not: ${d.notes}` : "Not ekle"}
+                    aria-label="Not düzenle"
+                  >
+                    <StickyNote className={compact ? "w-2.5 h-2.5" : "w-3 h-3"} />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-2" side="left" align="start">
+                  <p className="text-xs font-medium mb-1.5 text-muted-foreground">Not</p>
+                  <textarea
+                    className="w-full text-xs border rounded p-1.5 resize-none bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+                    rows={3}
+                    value={noteValue}
+                    onChange={(e) => setNoteValue(e.target.value)}
+                    placeholder="Not girin..."
+                    autoFocus
+                  />
+                  <div className="flex gap-1 mt-1.5 justify-end">
+                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setNoteOpen(false)}>İptal</Button>
+                    <Button size="sm" className="h-6 px-2 text-xs" onClick={() => { handleCommit("notes", noteValue); setNoteOpen(false); }}>Kaydet</Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
               {d.name.trim() && (
                 <>
                   <Button

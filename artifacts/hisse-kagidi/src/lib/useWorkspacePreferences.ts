@@ -10,7 +10,7 @@ export const ALL_GROUP_COLUMNS: { key: ColumnKey; label: string; alwaysVisible?:
   { key: "temsilci", label: "Vekaleti Alan" },
   { key: "name", label: "Adına Kesilen" },
   { key: "donationType", label: "Cinsi" },
-  { key: "notes", label: "Notlar" },
+  { key: "notes", label: "AI Etiketleri" },
   { key: "actions", label: "İşlemler" },
 ];
 
