@@ -561,11 +561,12 @@ export function VirtualizedDonationTable({
                       <ColGroup cols={cols} />
                       <tbody>
                         <tr
-                          className={`border-b hover:bg-muted/30 transition-colors ${d.isFlagged ? "bg-amber-50/50 dark:bg-amber-950/20" : isAssigned ? "bg-green-300/80 dark:bg-green-600/50" : isSelected ? "bg-primary/5" : ""}`}
+                          className={`border-b hover:bg-muted/30 transition-colors cursor-pointer ${d.isFlagged ? "bg-amber-50/50 dark:bg-amber-950/20" : isAssigned ? "bg-green-300/80 dark:bg-green-600/50" : isSelected ? "bg-primary/5" : ""}`}
                           style={!d.isFlagged && !isAssigned && !isSelected && kesimAlaniColorMap?.[d.kesimAlaniId] ? { backgroundColor: kesimAlaniColorMap[d.kesimAlaniId] } : undefined}
+                          onClick={() => toggleSelect(d.id)}
                         >
                           <td className="p-2 text-center">
-                            <button onClick={() => toggleSelect(d.id)} className="text-muted-foreground hover:text-foreground">
+                            <button onClick={(e) => { e.stopPropagation(); toggleSelect(d.id); }} className="text-muted-foreground hover:text-foreground">
                               {isSelected ? <CheckSquare className="w-4 h-4 text-primary" /> : <Square className="w-4 h-4" />}
                             </button>
                           </td>
