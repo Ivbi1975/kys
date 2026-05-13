@@ -25,7 +25,7 @@ function Warning({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Step({ no, title, children }: { no: number; title: string; children: React.ReactNode }) {
+function Step({ no, title, children }: { no: number; title: string; children?: React.ReactNode }) {
   return (
     <div className="flex gap-3 mt-3">
       <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/15 border border-primary/25 flex items-center justify-center text-[11px] font-bold text-primary mt-0.5">
