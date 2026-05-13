@@ -170,7 +170,7 @@ export default function ApiDokumantasyon() {
           id="projects"
           title="Proje Listesi"
           method="GET"
-          path="/api/vys/projects"
+          path="/projects"
           description="Aktif (silinmemiş ve arşivlenmemiş) projeleri listeler."
         >
           <CodeBlock id="curl-1" code={`curl -H "X-API-Key: <VYS_API_KEY>" \\
@@ -197,7 +197,7 @@ export default function ApiDokumantasyon() {
           id="donations"
           title="Bağışçı / Hisse Listesi"
           method="GET"
-          path="/api/vys/projects/:id/donations"
+          path="/projects/:id/donations"
           description="Bir projedeki tüm bağışçıları sayfalı olarak döner. Kurban cinsi (donationType), vekalet numarası ve ait olduğu kesim alanı bilgisi dahildir."
         >
           <div className="space-y-1">
@@ -251,7 +251,7 @@ export default function ApiDokumantasyon() {
           id="kesim-listesi"
           title="Tüm Kesim Listesi (Bağışçılar Dahil) ✦ Önerilen"
           method="GET"
-          path="/api/vys/projects/:id/kesim-listesi"
+          path="/projects/:id/kesim-listesi"
           description="Tek istekte tüm kesim alanlarını, her alanın hayvan gruplarını ve her grubun bağışçı listesini döner. Kurban cinsi (Vacip / Adak / Mevta), vekalet numarası ve notlar dahildir."
         >
           <CodeBlock id="curl-3" code={`curl -H "X-API-Key: <VYS_API_KEY>" \\
@@ -335,7 +335,7 @@ export default function ApiDokumantasyon() {
           id="kesim-alanlari"
           title="Kesim Alanı Listesi"
           method="GET"
-          path="/api/vys/projects/:id/kesim-alanlari"
+          path="/projects/:id/kesim-alanlari"
           description="Bir projedeki aktif kesim alanlarını listeler. Sistem dahili __havuz__ alanı bu listede yer almaz."
         >
           <CodeBlock id="curl-4" code={`curl -H "X-API-Key: <VYS_API_KEY>" \\
@@ -362,7 +362,7 @@ export default function ApiDokumantasyon() {
           id="groups"
           title="Hayvan Grupları ve Kesim Durumu"
           method="GET"
-          path="/api/vys/projects/:id/kesim-alanlari/:kesimId/groups"
+          path="/projects/:id/kesim-alanlari/:kesimId/groups"
           description="Belirli bir kesim alanındaki hayvan gruplarını döner. Bağışçı detayları içermez — tüm listeye ihtiyaç duyulduğunda /kesim-listesi tercih edilmelidir."
         >
           <CodeBlock id="curl-5b" code={`curl -H "X-API-Key: <VYS_API_KEY>" \\
@@ -401,7 +401,7 @@ export default function ApiDokumantasyon() {
           id="summary"
           title="Proje Özeti"
           method="GET"
-          path="/api/vys/projects/:id/summary"
+          path="/projects/:id/summary"
           description="Bir proje için özet istatistikler döner: toplam/atanmış/bekleyen hisseler ve kesim durumu. Dışlanan (excluded) bağışçılar toplam hisse hesabına dahil edilmez."
         >
           <CodeBlock id="curl-6" code={`curl -H "X-API-Key: <VYS_API_KEY>" \\
