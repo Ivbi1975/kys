@@ -99,10 +99,22 @@ export default function AiSiniflandirmaPage() {
   const confirmNoteEdit = async (kesimAlaniId: string) => {
     if (!pendingNote) return;
     setSavingNote(true);
+    const { donationId, value } = pendingNote;
     try {
-      await bulkUpdateNotes(kesimAlaniId, [{ donationId: pendingNote.donationId, notes: pendingNote.value }]);
-      queryClient.invalidateQueries({ queryKey: ["pool-donations-ai-page", projectId] });
-      queryClient.invalidateQueries({ queryKey: ["pool-all-descriptions", projectId] });
+      await bulkUpdateNotes(kesimAlaniId, [{ donationId, notes: value }]);
+
+      const updateItems = (old: { items: PoolDonation[]; total: number } | undefined) => {
+        if (!old) return old;
+        return {
+          ...old,
+          items: old.items.map(item =>
+            item.id === donationId ? { ...item, notes: value } : item
+          ),
+        };
+      };
+      queryClient.setQueryData(["pool-donations-ai-page", projectId], updateItems);
+      queryClient.setQueryData(["pool-all-descriptions", projectId], updateItems);
+
       toast({ title: "Not güncellendi", duration: 2000 });
     } catch {
       toast({ title: "Kayıt başarısız", variant: "destructive", duration: 3000 });
