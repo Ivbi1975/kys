@@ -66,6 +66,32 @@ export default function AiSiniflandirmaPage() {
     });
   };
 
+  const [colWidths, setColWidths] = useState<Record<string, number>>({
+    checkbox: 32, vekalet: 144, name: 144, cinsi: 80, ozellik: 96, kategoriler: 180, ozet: 224, istekler: 176, uyarilar: 176,
+  });
+  const resizingRef = useRef<{ col: string; startX: number; startW: number } | null>(null);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = e.clientX - resizingRef.current.startX;
+      const newW = Math.max(60, resizingRef.current.startW + delta);
+      setColWidths(prev => ({ ...prev, [resizingRef.current!.col]: newW }));
+    };
+    const onUp = () => { resizingRef.current = null; document.body.style.cursor = ""; document.body.style.userSelect = ""; };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+  }, []);
+
+  const startResize = (col: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    resizingRef.current = { col, startX: e.clientX, startW: colWidths[col] };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
+
   const [editingNote, setEditingNote] = useState<{ donationId: string; value: string } | null>(null);
   const [pendingNote, setPendingNote] = useState<{ donationId: string; value: string } | null>(null);
   const [savingNote, setSavingNote] = useState(false);
@@ -690,18 +716,39 @@ export default function AiSiniflandirmaPage() {
                 <span className="text-xs text-muted-foreground">{filteredResults.length} kayıt</span>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="text-sm" style={{ tableLayout: "fixed", width: Object.values(colWidths).reduce((a, b) => a + b, 0) }}>
+                  <colgroup>
+                    {(["checkbox","vekalet","name","cinsi","ozellik","kategoriler","ozet","istekler","uyarilar"] as const).map(col => (
+                      <col key={col} style={{ width: colWidths[col] }} />
+                    ))}
+                  </colgroup>
                   <thead className="bg-muted/50 text-xs text-muted-foreground">
                     <tr>
-                      <th className="w-8 px-2 py-2"></th>
-                      <th className="text-left px-3 py-2 font-medium w-36">Vekaleti Veren</th>
-                      <th className="text-left px-3 py-2 font-medium w-36">Adına Kesilen</th>
-                      <th className="text-left px-3 py-2 font-medium w-20">Cinsi</th>
-                      <th className="text-left px-3 py-2 font-medium w-24">Özellik</th>
-                      <th className="text-left px-3 py-2 font-medium">Kategoriler</th>
-                      <th className="text-left px-3 py-2 font-medium w-56">Özet / Notlar</th>
-                      <th className="text-left px-3 py-2 font-medium w-44">Özel İstekler</th>
-                      <th className="text-left px-3 py-2 font-medium w-44">Uyarılar</th>
+                      {([
+                        { key: "checkbox", label: "" },
+                        { key: "vekalet", label: "Vekaleti Veren" },
+                        { key: "name", label: "Adına Kesilen" },
+                        { key: "cinsi", label: "Cinsi" },
+                        { key: "ozellik", label: "Özellik" },
+                        { key: "kategoriler", label: "Kategoriler" },
+                        { key: "ozet", label: "Özet / Notlar" },
+                        { key: "istekler", label: "Özel İstekler" },
+                        { key: "uyarilar", label: "Uyarılar" },
+                      ] as const).map(({ key, label }) => (
+                        <th
+                          key={key}
+                          className="text-left px-3 py-2 font-medium relative select-none overflow-hidden"
+                          style={{ width: colWidths[key] }}
+                        >
+                          <span className="truncate block pr-2">{label}</span>
+                          <div
+                            onMouseDown={startResize(key)}
+                            className="absolute right-0 top-0 bottom-0 w-3 flex items-center justify-center cursor-col-resize group z-10"
+                          >
+                            <div className="w-px h-4 bg-border group-hover:bg-primary group-hover:w-0.5 transition-all" />
+                          </div>
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y">
