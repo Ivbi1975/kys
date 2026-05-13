@@ -326,7 +326,7 @@ function CreateKesimAlaniDialog({
   const [displayName, setDisplayName] = useState("");
   const [maxAnimalStr, setMaxAnimalStr] = useState("");
   const [baseName, setBaseName] = useState("Kesim Alanı");
-  const [count, setCount] = useState(3);
+  const [count, setCount] = useState(2);
   const [bulkItems, setBulkItems] = useState<BulkItem[]>([]);
   const [bulkLoading, setBulkLoading] = useState(false);
   const { toast } = useToast();
@@ -343,7 +343,7 @@ function CreateKesimAlaniDialog({
           const wasAuto = existing.name === existing.autoName;
           result.push({ ...existing, autoName, name: wasAuto ? autoName : existing.name });
         } else {
-          result.push({ id: crypto.randomUUID(), name: autoName, autoName, displayName: "", maxAnimalStr: "", expanded: false });
+          result.push({ id: crypto.randomUUID(), name: autoName, autoName, displayName: "", maxAnimalStr: "", expanded: true });
         }
       }
       return result;
@@ -408,12 +408,12 @@ function CreateKesimAlaniDialog({
 
   return (
     <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setCreateProjectId(null); reset(); } }}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className={mode === "bulk" ? "max-w-full w-screen h-screen m-0 rounded-none flex flex-col gap-0 p-0" : "max-w-lg"}>
+        <DialogHeader className={mode === "bulk" ? "px-6 pt-5 pb-3 border-b shrink-0" : ""}>
           <DialogTitle>Yeni Kesim Alanı</DialogTitle>
         </DialogHeader>
 
-        <div className="flex rounded-lg border p-1 bg-muted/30 gap-1">
+        <div className={`flex rounded-lg border p-1 bg-muted/30 gap-1 ${mode === "bulk" ? "mx-6 mt-4 shrink-0" : ""}`}>
           <button
             type="button"
             onClick={() => setMode("single")}
@@ -474,8 +474,8 @@ function CreateKesimAlaniDialog({
             </Button>
           </div>
         ) : (
-          <div className="space-y-3">
-            <div className="flex gap-2">
+          <div className="flex flex-col flex-1 min-h-0 px-6 pb-6 gap-3 mt-4">
+            <div className="flex gap-2 shrink-0">
               <Input
                 className="flex-1"
                 placeholder="Temel ad (örn: Kesim Alanı)"
@@ -495,7 +495,7 @@ function CreateKesimAlaniDialog({
             </div>
 
             {projects.length > 0 && (
-              <div>
+              <div className="shrink-0">
                 <label className="text-sm text-muted-foreground mb-1 block">Proje (isteğe bağlı) — tümüne uygulanır</label>
                 <Select value={createProjectId || "__none__"} onValueChange={(v) => setCreateProjectId(v === "__none__" ? null : v)}>
                   <SelectTrigger>
@@ -511,7 +511,7 @@ function CreateKesimAlaniDialog({
               </div>
             )}
 
-            <div className="max-h-64 overflow-y-auto space-y-2 pr-0.5">
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
               {bulkItems.map((item, idx) => (
                 <div key={item.id} className="rounded-lg border bg-muted/20 overflow-hidden">
                   <div className="flex items-center gap-2 px-3 py-2">
@@ -534,13 +534,13 @@ function CreateKesimAlaniDialog({
                   {item.expanded && (
                     <div className="px-3 pb-3 space-y-2 border-t pt-2 bg-muted/10">
                       <Input
-                        className="h-7 text-xs"
+                        className="h-8"
                         placeholder="Çıktıda görünecek isim (isteğe bağlı)"
                         value={item.displayName}
                         onChange={(e) => updateBulkItem(item.id, { displayName: e.target.value })}
                       />
                       <Input
-                        className="h-7 text-xs"
+                        className="h-8"
                         type="number"
                         min={1}
                         placeholder="Maks. hayvan sayısı (isteğe bağlı)"
@@ -555,7 +555,7 @@ function CreateKesimAlaniDialog({
 
             <Button
               onClick={doBulkCreate}
-              className="w-full"
+              className="w-full shrink-0"
               disabled={bulkItems.length === 0 || bulkItems.every(i => !i.name.trim()) || bulkLoading}
             >
               {bulkLoading ? (
