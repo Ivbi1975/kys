@@ -552,11 +552,8 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
       const temp = draft.animalGroups[fromIdx];
       draft.animalGroups[fromIdx] = draft.animalGroups[toIdx];
       draft.animalGroups[toIdx] = temp;
-      for (let i = 0; i < draft.animalGroups.length; i++) {
-        draft.animalGroups[i].animalNo = i + 1;
-      }
     });
-    save(updated, `Hayvan ${fromNo} ve ${toNo} yer değiştirildi`, false, "groups");
+    save(updated, `Hayvan ${fromNo} ve ${toNo} sırası değiştirildi`, false, "groups");
   }
 
   const [groupCardDragState, setGroupCardDragState] = useState<{ dragIdx: number | null; overIdx: number | null }>({ dragIdx: null, overIdx: null });
