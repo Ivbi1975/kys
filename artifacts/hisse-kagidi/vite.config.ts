@@ -24,6 +24,16 @@ if (rawPort) {
 
 const basePath = process.env.BASE_PATH || "/";
 
+const externalApiTarget = (() => {
+  const raw = process.env.VITE_API_BASE_URL?.trim() || "https://api.kys.gelecekvadisi.org";
+  try {
+    const u = new URL(raw);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return "https://api.kys.gelecekvadisi.org";
+  }
+})();
+
 export default defineConfig({
   base: basePath,
   plugins: [
@@ -142,6 +152,13 @@ export default defineConfig({
     fs: {
       strict: true,
       deny: ["**/.*"],
+    },
+    proxy: {
+      "/api": {
+        target: externalApiTarget,
+        changeOrigin: true,
+        secure: true,
+      },
     },
   },
   preview: {
