@@ -61,6 +61,7 @@ const BagisHavuzuPage = lazy(() => import("@/pages/bagis-havuzu"));
 const AiSiniflandirmaPage = lazy(() => import("@/pages/bagis-havuzu/AiSiniflandirmaPage"));
 const SorunluBagislarPage = lazy(() => import("@/pages/sorunlu-bagislar"));
 const ApiDokumantasyonPage = lazy(() => import("@/pages/api-dokumantasyon"));
+const KullanimKilavuzuPage = lazy(() => import("@/pages/kullanim-kilavuzu"));
 
 function usePrefetchAdjacentRoutes() {
   const [location] = useLocation();
@@ -177,6 +178,7 @@ function ProtectedRouterInner() {
               <Route path="/bagis-havuzu/:id/ai" component={AiSiniflandirmaPage} />
               <Route path="/bagis-havuzu/:id" component={BagisHavuzuPage} />
               <Route path="/sorunlu-bagislar/:id" component={SorunluBagislarPage} />
+              <Route path="/kullanim-kilavuzu" component={KullanimKilavuzuPage} />
               <Route path="/cop-kutusu" component={CopKutusuPage} />
               <Route path="/api-dokumantasyon" component={ApiDokumantasyonPage} />
               <Route component={NotFound} />

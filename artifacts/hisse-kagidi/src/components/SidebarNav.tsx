@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import {
   ChevronDown, ChevronRight, FolderOpen,
   PanelLeftClose, Home, Trash2,
-  BookOpen, Layers, Scissors, X, Package,
+  BookOpen, Layers, Scissors, X, Package, HelpCircle,
 } from "lucide-react";
 import { fetchHomeData } from "@/lib/api/projects";
 import type { HomeData } from "@/lib/api/projects";
@@ -198,6 +198,14 @@ export function SidebarNav({ collapsed, onToggle, isMobileDrawer, onMobileClose 
         <div className="px-2 pb-2">
           <div className="h-px bg-white/[0.06] mb-2" />
           <div className="space-y-0.5">
+            <NavItem
+              collapsed={collapsed}
+              icon={<HelpCircle className="h-[15px] w-[15px]" />}
+              label="Kullanım Kılavuzu"
+              active={location === "/kullanim-kilavuzu"}
+              onClick={() => go("/kullanim-kilavuzu")}
+              muted
+            />
             <NavItem
               collapsed={collapsed}
               icon={<BookOpen className="h-[15px] w-[15px]" />}
