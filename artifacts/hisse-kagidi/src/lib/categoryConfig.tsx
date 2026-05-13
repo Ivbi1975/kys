@@ -3,7 +3,7 @@ import {
   FaLock, FaMosque, FaHourglass, FaCalendarDay, FaCloud,
   FaSkull, FaWallet, FaHeart, FaCommentDots, FaBell,
   FaPrayingHands, FaSun, FaStar, FaChild, FaCrown,
-  FaExclamationCircle, FaCut, FaHorse, FaDrumstickBite,
+  FaExclamationCircle, FaCut, FaHorse, FaDrumstickBite, FaLink,
 } from "react-icons/fa";
 
 interface CategoryEntry {
@@ -32,6 +32,7 @@ export const CATEGORY_CONFIG: Record<string, CategoryEntry> = {
   ilk_hayvan:      { Icon: FaCrown,              bg: "bg-sky-700"      },
   acil:            { Icon: FaExclamationCircle,  bg: "bg-red-600"      },
   özel_kesim:      { Icon: FaCut,                 bg: "bg-amber-600"    },
+  aynı_hayvan:     { Icon: FaLink,               bg: "bg-blue-700"     },
 };
 
 const FALLBACK_BG = "bg-gray-600";

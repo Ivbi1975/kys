@@ -44,7 +44,7 @@ Kategori kuralları:
 - "çad": Notta "Çad" geçiyorsa ata.
 - "afganistan": Notta "Afganistan" geçiyorsa ata.
 - "hindistan": Notta "Hindistan" geçiyorsa ata.
-- "aynı_hayvan": "aynı hayvan", "aynı kurbanda", "birlikte kesilsin", "[kişi] ile aynı", "aynı hayvandan", "beraber kesilsin" gibi ifadeler varsa ata.
+- "aynı_hayvan": Birden fazla kişinin aynı hayvandan hisse aldığı veya birinin başka biriyle aynı hayvana dahil olmak istediği durumlarda ata. Şu kalıplar varsa ata: "aynı hayvan", "aynı kurbanda", "birlikte kesilsin", "[kişi adı] ile aynı", "aynı hayvandan", "beraber kesilsin", "[kişi] ile beraber", "aynı kurbana", "aynı hayvana eklensin", "aynı kurbana bağla", "birlikte tek hayvan", "tek hayvanda birlikte", "[sayı] vekalet sahibi birlikte", "ortak hayvan", "aynı bağışa ekle". Özellikle not içinde başka bir bağışçının adı geçiyorsa ve "aynı", "birlikte", "beraber" ifadelerinden biri varsa mutlaka ata. warnings alanına "Aynı hayvan talebi — koordinasyon gerekiyor" yaz.
 - "koç": Notta "koç" geçiyorsa ata (hayvan türü olarak belirtilmişse).
 - "koyun": Notta "koyun" geçiyorsa ata (hayvan türü olarak belirtilmişse).
 - "ödeme_notu": Ödeme bilgisi içeriyorsa ata — banka kartı, havale, taksit, garanti kartı, ödeme nerede yapıldığı gibi bilgiler.
