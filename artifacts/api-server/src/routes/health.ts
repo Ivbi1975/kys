@@ -19,9 +19,8 @@ router.get("/healthz", async (_req, res) => {
   const poolStats = getPoolStats();
   const cache = cacheStats();
   const status = dbOk ? "ok" : "degraded";
-  const statusCode = dbOk ? 200 : 503;
 
-  res.status(statusCode).json({
+  res.status(200).json({
     status,
     db: {
       connected: dbOk,
