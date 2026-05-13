@@ -10,6 +10,7 @@ import { ALL_TABLE_COLUMNS, getStatusLabel, type TableColumnKey } from "./types"
 import { turkishTitleCase } from "@/lib/formatting";
 import { fetchDonationSiblings } from "@/lib/api";
 import type { DonorSiblings } from "@/lib/api/bagis-havuzu";
+import { CategoryBadge } from "@/lib/categoryConfig";
 
 const SORT_KEY_MAP: Partial<Record<TableColumnKey, string>> = {
   vekalet: "vekalet",
@@ -223,18 +224,18 @@ function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
     }
     case "aiEtiket":
       return (
-        <>
+        <div className="flex flex-wrap gap-0.5">
           {d.aiCategories && d.aiCategories.length > 0
             ? d.aiCategories.map((c: string) => (
-              <Badge key={c} variant="secondary" className="text-xs mr-0.5 mb-0.5">{c}</Badge>
+              <CategoryBadge key={c} cat={c} size="sm" />
             ))
-            : "—"}
+            : <span className="text-muted-foreground">—</span>}
           {d.aiWarnings && (
             <span className="text-orange-500 text-xs ml-1" title={d.aiWarnings}>
               <AlertTriangle className="w-3 h-3 inline" />
             </span>
           )}
-        </>
+        </div>
       );
     default: return <span>{turkishTitleCase(getFieldValue(d, key)) || "—"}</span>;
   }

@@ -20,6 +20,7 @@ import {
 } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { AiClassificationResult } from "@/lib/api";
+import { CategoryBadge } from "@/lib/categoryConfig";
 
 interface AiResult extends AiClassificationResult {
   donationType?: string;
@@ -27,40 +28,6 @@ interface AiResult extends AiClassificationResult {
 }
 
 const AI_FAIL_MESSAGES = new Set(["AI bu bağışı sınıflandıramadı", "AI işlemi başarısız oldu", "AI sonuç eşleşmesi bulunamadı"]);
-
-const CATEGORY_COLORS: Record<string, string> = {
-  "erken_kesim": "bg-orange-100 text-orange-800 border-orange-200",
-  "özel_kesim": "bg-amber-100 text-amber-800 border-amber-200",
-  "2.gün": "bg-yellow-100 text-yellow-800 border-yellow-200",
-  "3.gün": "bg-lime-100 text-lime-800 border-lime-200",
-  "Şafi": "bg-red-100 text-red-800 border-red-200",
-  "mevta_kurbani": "bg-slate-100 text-slate-700 border-slate-200",
-  "adak": "bg-purple-100 text-purple-800 border-purple-200",
-  "akika": "bg-pink-100 text-pink-800 border-pink-200",
-  "vacip": "bg-blue-100 text-blue-800 border-blue-200",
-  "nafile": "bg-cyan-100 text-cyan-800 border-cyan-200",
-  "sünnet": "bg-teal-100 text-teal-800 border-teal-200",
-  "ulke_talebi": "bg-indigo-100 text-indigo-800 border-indigo-200",
-  "sabah_kesimi": "bg-rose-100 text-rose-800 border-rose-200",
-  "ödeme_notu": "bg-emerald-100 text-emerald-800 border-emerald-200",
-  "iletişim_talebi": "bg-violet-100 text-violet-800 border-violet-200",
-  "et_talebi": "bg-green-100 text-green-800 border-green-200",
-  "hayvan_tercihi": "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200",
-  "ilk_hayvan": "bg-sky-100 text-sky-800 border-sky-200",
-  "acil": "bg-red-200 text-red-900 border-red-300",
-};
-
-function CategoryBadge({ cat, onClick, active }: { cat: string; onClick?: () => void; active?: boolean }) {
-  const colorClass = CATEGORY_COLORS[cat] ?? "bg-muted text-muted-foreground border-border";
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium cursor-pointer select-none transition-all ${colorClass} ${active ? "ring-2 ring-primary ring-offset-1" : "hover:opacity-80"}`}
-      onClick={onClick}
-    >
-      {cat.replace(/_/g, " ")}
-    </span>
-  );
-}
 
 export default function AiSiniflandirmaPage() {
   const params = useParams<{ id: string }>();
@@ -522,14 +489,13 @@ export default function AiSiniflandirmaPage() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {categoryDistribution.map(([cat, count]) => (
-                  <button
+                  <CategoryBadge
                     key={cat}
+                    cat={cat}
+                    count={count}
+                    active={categoryFilter === cat}
                     onClick={() => setCategoryFilter(prev => prev === cat ? null : cat)}
-                    className="flex items-center gap-1.5 group"
-                  >
-                    <CategoryBadge cat={cat} active={categoryFilter === cat} />
-                    <span className="text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">{count}</span>
-                  </button>
+                  />
                 ))}
               </div>
             </Card>

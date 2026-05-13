@@ -8,6 +8,7 @@ import type { Donation, AnimalGroup, KesimAlani, ColorTag, Team } from "@/lib/ty
 import { COLOR_MAP } from "@/lib/constants";
 import { turkishTitleCase } from "@/lib/formatting";
 import type { ColumnKey } from "@/lib/useWorkspacePreferences";
+import { CategoryBadge } from "@/lib/categoryConfig";
 import { GroupFlagPopover } from "@/components/animal-group/GroupFlagPopover";
 import {
   GripVertical,
@@ -224,12 +225,10 @@ const GroupDonationRow = memo(function GroupDonationRow({
               {!compact && ((d.aiCategories && d.aiCategories.length > 0) || (d.aiWarnings && d.aiWarnings.trim())) && (
                 <div className="flex gap-0.5 flex-wrap flex-shrink-0">
                   {(d.aiCategories || []).map(cat => (
-                    <span key={cat} className="px-1 py-0 rounded-full text-[8px] font-medium bg-violet-100 dark:bg-violet-900 text-violet-600 dark:text-violet-400 border border-violet-200/50 dark:border-violet-800/50 opacity-70">
-                      {cat}
-                    </span>
+                    <CategoryBadge key={cat} cat={cat} size="sm" />
                   ))}
                   {d.aiWarnings && d.aiWarnings.trim() && (
-                    <span className="px-1 py-0 rounded-full text-[8px] font-medium bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-800/50 opacity-70 flex items-center gap-0.5" title={d.aiWarnings}>
+                    <span className="px-1 py-0 rounded text-[10px] font-medium bg-red-600 text-white flex items-center gap-0.5" title={d.aiWarnings}>
                       ⚠
                     </span>
                   )}

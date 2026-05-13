@@ -24,6 +24,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { LocalDonation, AiResult } from "./types";
+import { CategoryBadge } from "@/lib/categoryConfig";
 
 interface AiReportStats {
   totalProcessed: number;
@@ -203,16 +204,15 @@ export function AiClassification({
           </div>
           <div className="flex flex-wrap gap-1.5">
             {aiReportStats.categoryDistribution.map(([cat, count]) => (
-              <Badge
+              <CategoryBadge
                 key={cat}
-                variant={aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr") ? "default" : "secondary"}
-                className="text-xs cursor-pointer hover:opacity-80 transition-opacity"
+                cat={cat}
+                count={count}
+                active={!!(aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr"))}
                 onClick={() => setAiCategoryFilter(
                   aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr") ? null : cat
                 )}
-              >
-                {cat.replace(/_/g, " ")} <span className="ml-1 font-bold">{count}</span>
-              </Badge>
+              />
             ))}
           </div>
         </Card>
@@ -262,16 +262,15 @@ export function AiClassification({
                   <h3 className="text-xs font-semibold text-muted-foreground mb-2">Kategori Dağılımı</h3>
                   <div className="flex flex-wrap gap-1.5">
                     {aiReportStats.categoryDistribution.map(([cat, count]) => (
-                      <Badge
+                      <CategoryBadge
                         key={cat}
-                        variant={aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr") ? "default" : "secondary"}
-                        className="text-xs cursor-pointer hover:opacity-80 transition-opacity"
+                        cat={cat}
+                        count={count}
+                        active={!!(aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr"))}
                         onClick={() => setAiCategoryFilter(
                           aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr") ? null : cat
                         )}
-                      >
-                        {cat.replace(/_/g, " ")} <span className="ml-1 font-bold">{count}</span>
-                      </Badge>
+                      />
                     ))}
                   </div>
                 </div>
