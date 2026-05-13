@@ -24,3 +24,9 @@ id = "V--5HAmMCDbBYbr-T1_WV"
 uri = "file://.local/kys-test-plani.md"
 type = "text"
 title = "KYS Test Planı"
+
+[[outputs]]
+id = "xVcVyAbrZa4S3NlWY7xI_"
+uri = "file://.local/kys-test-raporu.md"
+type = "text"
+title = "KYS Test Raporu"

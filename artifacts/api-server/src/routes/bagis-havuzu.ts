@@ -957,7 +957,14 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
       isNull(kesimAlanlariTable.deletedAt),
     ));
   if (!targetKA) {
-    res.status(404).json({ error: ERROR_MESSAGES.TARGET_KESIM_NOT_FOUND });
+    const [existsElsewhere] = await db.select({ id: kesimAlanlariTable.id })
+      .from(kesimAlanlariTable)
+      .where(and(eq(kesimAlanlariTable.id, targetKesimAlaniId), isNull(kesimAlanlariTable.deletedAt)));
+    if (existsElsewhere) {
+      res.status(400).json({ error: ERROR_MESSAGES.MUST_BE_SAME_PROJECT });
+    } else {
+      res.status(404).json({ error: ERROR_MESSAGES.TARGET_KESIM_NOT_FOUND });
+    }
     return;
   }
 
