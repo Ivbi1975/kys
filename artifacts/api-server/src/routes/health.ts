@@ -9,7 +9,12 @@ router.get("/healthz", async (_req, res) => {
   let dbLatencyMs = -1;
   try {
     const start = Date.now();
-    await pool.query("SELECT 1");
+    await Promise.race([
+      pool.query("SELECT 1"),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("DB health check timeout")), 2000),
+      ),
+    ]);
     dbLatencyMs = Date.now() - start;
     dbOk = true;
   } catch {
