@@ -92,15 +92,6 @@ export default function ProjeDetayPage() {
               Sorunlu
             </Button>
             <Button
-              variant="outline"
-              size="sm"
-              title="Yeni Kesim Alanı Ekle"
-              onClick={() => state.setDialogOpen(true)}
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              Yeni Kesim Alanı
-            </Button>
-            <Button
               variant="ghost"
               size="sm"
               className="h-8 w-8 p-0"

@@ -283,10 +283,6 @@ export function KesimAlaniList({
         <img src="/kurban-logo.png" alt="logo" className="w-28 h-14 mx-auto mb-4 opacity-50 object-contain invert dark:invert-0" />
         <h2 className="text-lg font-semibold text-foreground mb-2">Henüz kesim alanı yok</h2>
         <p className="text-muted-foreground mb-4">Bu projeye yeni bir kesim alanı ekleyin.</p>
-        <Button onClick={onCreateDialog}>
-          <Plus className="w-4 h-4 mr-1" />
-          Yeni Kesim Alanı
-        </Button>
       </Card>
     );
   }

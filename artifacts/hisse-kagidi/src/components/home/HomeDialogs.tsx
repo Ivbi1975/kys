@@ -408,12 +408,6 @@ function CreateKesimAlaniDialog({
 
   return (
     <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setCreateProjectId(null); reset(); } }}>
-      <DialogTrigger asChild>
-        <Button size="default">
-          <Plus className="w-4 h-4 mr-2" />
-          Yeni Kesim Alanı
-        </Button>
-      </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Yeni Kesim Alanı</DialogTitle>
