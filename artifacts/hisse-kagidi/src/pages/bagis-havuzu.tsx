@@ -79,7 +79,7 @@ export default function BagisHavuzuPage() {
     return ka || "none";
   });
   const [flagFilter, setFlagFilter] = useState(() => urlParams.get("flag") || "");
-  const [aiCategoryFilter, setAiCategoryFilter] = useState(() => urlParams.get("ai") || "");
+  const [aiCategoryFilter, setAiCategoryFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("ai")));
   const [ozellikFilter, setOzellikFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("ozellik")));
   const [fiyatFilter, setFiyatFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("fiyat")));
   const [yerTalebiFilter, setYerTalebiFilter] = useState<string[]>(() => parseUrlMulti(urlParams.get("yer")));
@@ -211,7 +211,7 @@ export default function BagisHavuzuPage() {
       p.set("ka", kesimAlaniFilter);
     }
     if (flagFilter) p.set("flag", flagFilter);
-    if (aiCategoryFilter) p.set("ai", aiCategoryFilter);
+    if (aiCategoryFilter.length) p.set("ai", serializeMulti(aiCategoryFilter));
     if (ozellikFilter.length) p.set("ozellik", serializeMulti(ozellikFilter));
     if (fiyatFilter.length) p.set("fiyat", serializeMulti(fiyatFilter));
     if (yerTalebiFilter.length) p.set("yer", serializeMulti(yerTalebiFilter));
@@ -247,9 +247,9 @@ export default function BagisHavuzuPage() {
   }, []);
 
   const activeFilterCount = [
-    debouncedSearch, statusFilter, kesimAlaniFilter !== "none" ? kesimAlaniFilter : null, aiCategoryFilter, notesFilter, shareCountMin, shareCountMax, dateFrom, dateTo, flagFilter,
+    debouncedSearch, statusFilter, kesimAlaniFilter !== "none" ? kesimAlaniFilter : null, notesFilter, shareCountMin, shareCountMax, dateFrom, dateTo, flagFilter,
   ].filter(Boolean).length
-  + [donationTypeFilter, birimFilter, temsilciFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter].filter(a => a.length > 0).length
+  + [donationTypeFilter, birimFilter, temsilciFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter, aiCategoryFilter].filter(a => a.length > 0).length
   + (descriptionShareCountFilter.length > 0 ? 1 : 0)
   + (excludeFields.size > 0 ? 1 : 0);
 
@@ -262,7 +262,7 @@ export default function BagisHavuzuPage() {
     birim: birimFilter.length ? serializeMulti(birimFilter) : undefined,
     temsilci: temsilciFilter.length ? serializeMulti(temsilciFilter) : undefined,
     kesimAlaniId: kesimAlaniFilter || undefined,
-    aiCategory: aiCategoryFilter || undefined,
+    aiCategory: aiCategoryFilter.length ? serializeMulti(aiCategoryFilter) : undefined,
     ozellik: ozellikFilter.length ? serializeMulti(ozellikFilter) : undefined,
     fiyat: fiyatFilter.length ? serializeMulti(fiyatFilter) : undefined,
     yerTalebi: yerTalebiFilter.length ? serializeMulti(yerTalebiFilter) : undefined,
@@ -390,6 +390,20 @@ export default function BagisHavuzuPage() {
       if (key) map[key] = (map[key] || 0) + 1;
     }
     return map;
+  }, [allDescData]);
+
+  const aiCategoryDistribution = useMemo(() => {
+    const allItems = allDescData?.items || [];
+    const map: Record<string, number> = {};
+    for (const item of allItems) {
+      const cats: string[] = (item as { aiCategories?: string[] }).aiCategories || [];
+      for (const cat of cats) {
+        if (cat) map[cat] = (map[cat] || 0) + 1;
+      }
+    }
+    return Object.entries(map)
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count);
   }, [allDescData]);
 
   const descriptionCountMap = useMemo(() => {
@@ -1173,14 +1187,6 @@ export default function BagisHavuzuPage() {
           </div>
         )}
 
-        {aiCategoryFilter && (
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs text-muted-foreground">AI Kategori:</span>
-            <Badge variant="default" className="text-xs cursor-pointer" onClick={() => { setAiCategoryFilter(""); setPage(0); }}>
-              {aiCategoryFilter.replace(/_/g, " ")} <X className="w-3 h-3 ml-1" />
-            </Badge>
-          </div>
-        )}
 
 
         {showFilters && (
@@ -1191,6 +1197,7 @@ export default function BagisHavuzuPage() {
             birimFilter={birimFilter} setBirimFilter={v => { setBirimFilter(v); setPage(0); }}
             temsilciFilter={temsilciFilter} setTemsilciFilter={v => { setTemsilciFilter(v); setPage(0); }}
             aiCategoryFilter={aiCategoryFilter} setAiCategoryFilter={v => { setAiCategoryFilter(v); setPage(0); }}
+            aiCategoryDistribution={aiCategoryDistribution}
             ozellikFilter={ozellikFilter} setOzellikFilter={v => { setOzellikFilter(v); setPage(0); }}
             fiyatFilter={fiyatFilter} setFiyatFilter={v => { setFiyatFilter(v); setPage(0); }}
             yerTalebiFilter={yerTalebiFilter} setYerTalebiFilter={v => { setYerTalebiFilter(v); setPage(0); }}

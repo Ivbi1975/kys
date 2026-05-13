@@ -17,8 +17,9 @@ interface PoolFiltersProps {
   setBirimFilter: (v: string[]) => void;
   temsilciFilter: string[];
   setTemsilciFilter: (v: string[]) => void;
-  aiCategoryFilter: string;
-  setAiCategoryFilter: (v: string) => void;
+  aiCategoryFilter: string[];
+  setAiCategoryFilter: (v: string[]) => void;
+  aiCategoryDistribution: { category: string; count: number }[];
   ozellikFilter: string[];
   setOzellikFilter: (v: string[]) => void;
   fiyatFilter: string[];
@@ -315,7 +316,7 @@ export function PoolFilters({
   donationTypeFilter, setDonationTypeFilter,
   birimFilter, setBirimFilter,
   temsilciFilter, setTemsilciFilter,
-  aiCategoryFilter, setAiCategoryFilter,
+  aiCategoryFilter, setAiCategoryFilter, aiCategoryDistribution,
   ozellikFilter, setOzellikFilter,
   fiyatFilter, setFiyatFilter,
   yerTalebiFilter, setYerTalebiFilter,
@@ -370,7 +371,8 @@ export function PoolFilters({
   const showGun = !!(optStats && ((optStats.gunTalebiDistribution && optStats.gunTalebiDistribution.length > 0) || (optStats.empty_gun_talebi_count ?? 0) > 0 || gunTalebiFilter.length > 0));
   const showIlkHayvan = !!(optStats && ((optStats.ilkHayvanDistribution && optStats.ilkHayvanDistribution.length > 0) || (optStats.empty_ilk_hayvan_count ?? 0) > 0 || ilkHayvanFilter.length > 0));
   const showSafi = !!(optStats && ((optStats.safiDistribution && optStats.safiDistribution.length > 0) || (optStats.empty_safi_count ?? 0) > 0 || safiFilter.length > 0));
-  const hasFacets = showCinsi || showBirim || showTemsilci || showOzellik || showFiyat || showYer || showGun || showIlkHayvan || showSafi || globalTags.length > 0;
+  const showAiCategory = aiCategoryDistribution.length > 0 || aiCategoryFilter.length > 0;
+  const hasFacets = showCinsi || showBirim || showTemsilci || showOzellik || showFiyat || showYer || showGun || showIlkHayvan || showSafi || globalTags.length > 0 || showAiCategory;
 
   const descriptionCountOptions = useMemo(() => {
     const countFreq = new Map<number, number>();
@@ -675,26 +677,23 @@ export function PoolFilters({
               </div>
             )}
 
-            <div>
-              <span className="block text-[10px] text-muted-foreground mb-0.5">AI Etiketi</span>
-              <div className="flex gap-0.5">
-                <Input
-                  placeholder="AI Etiketi..."
-                  value={aiCategoryFilter}
-                  onChange={e => setAiCategoryFilter(e.target.value)}
-                  className={`h-8 text-xs flex-1 ${aiCategoryFilter && excludeFields.has("aiCategory") ? "border-destructive/50 ring-1 ring-destructive/20" : ""}`}
+            {showAiCategory && (
+              <div>
+                <span className="block text-[10px] text-muted-foreground mb-0.5">AI Etiketi</span>
+                <MultiSelectDropdown
+                  label="AI Etiketi"
+                  options={aiCategoryDistribution.map(d => ({
+                    value: d.category,
+                    label: d.category.replace(/_/g, " "),
+                    count: d.count,
+                  }))}
+                  selected={aiCategoryFilter}
+                  onChange={setAiCategoryFilter}
+                  excluded={excludeFields.has("aiCategory")}
+                  onToggleExclude={() => toggleExcludeField("aiCategory")}
                 />
-                {aiCategoryFilter && (
-                  <button
-                    onClick={() => toggleExcludeField("aiCategory")}
-                    title={excludeFields.has("aiCategory") ? "Dahil et moduna geç" : "Hariç tut moduna geç"}
-                    className={`h-8 w-7 flex items-center justify-center rounded-md border text-xs transition-colors ${excludeFields.has("aiCategory") ? "bg-destructive/10 border-destructive/30 text-destructive hover:bg-destructive/20" : "bg-muted/30 border-input text-muted-foreground hover:bg-muted/50 hover:text-foreground"}`}
-                  >
-                    <Ban className="w-3.5 h-3.5" />
-                  </button>
-                )}
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -703,26 +702,6 @@ export function PoolFilters({
       <div className="px-3 py-2.5 border-b">
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Aralık Filtreleri</p>
         <div className="flex flex-wrap gap-x-4 gap-y-2 items-end">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground whitespace-nowrap">Hisse:</span>
-            <Input
-              type="number"
-              min={1}
-              placeholder="Min"
-              value={shareCountMin}
-              onChange={e => setShareCountMin(e.target.value)}
-              className="h-7 text-xs w-16"
-            />
-            <span className="text-xs text-muted-foreground">–</span>
-            <Input
-              type="number"
-              min={1}
-              placeholder="Max"
-              value={shareCountMax}
-              onChange={e => setShareCountMax(e.target.value)}
-              className="h-7 text-xs w-16"
-            />
-          </div>
           <div className="flex items-center gap-1.5 flex-wrap">
             <Select value={dateField || "updatedAt"} onValueChange={v => setDateField(v)}>
               <SelectTrigger className="h-7 text-[10px] w-auto min-w-[120px] bg-background"><SelectValue /></SelectTrigger>
