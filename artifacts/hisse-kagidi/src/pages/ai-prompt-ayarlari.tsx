@@ -32,18 +32,28 @@ Kategoriler:
 Kategori kuralları:
 - "3.gün": "üçüncü gün", "3.gün", "seferi olacağım üçüncü gün kesilsin" gibi ifadeler varsa ata.
 - "2.gün": "2.gün", "ikinci gün", "mutlaka 2.gün kesilecek" gibi ifadeler varsa ata.
+- "1.gün": "1.gün", "birinci gün", "ilk gün", "erken_kesim" ile örtüşüyorsa da ata; "sabah erken", "sabah kesimi", "sabah kesilsin", "ilk bıçak" gibi ifadeler varsa ata.
 - "erken_kesim": "ilk hayvanda", "birinci hayvan", "erken kesim", "erkenden", "yola çıkacağım", "öğleden önce kesilsin", "sabah erken", "seferi" gibi zaman hassasiyeti olan ifadeler varsa ata.
 - "özel_kesim": Belirli saat belirtiliyorsa (ör: "saat 10'da", "14:00'te") veya "öğleden sonra", "akşama doğru" gibi özel zaman talebi varsa ata.
 - "Şafi": "şafi", "şafii", "şafi mezhebi", "safi" gibi ifadeler varsa ata VE warnings alanına "Şafi mezhebine göre kesim gerekiyor" yaz. Bu kritik bir uyarıdır.
 - "sünnet": "sünnet", "sunnet" ifadesi geçerse ata. Bu bir bağış cinsidir.
 - "mevta_kurbani": "merhum", "merhume", "ruhuna", "mevta", "vefat etmiş" gibi ifadeler varsa ata.
 - "ulke_talebi": Belirli bir ülkede kesilmesi isteniyorsa ata (ör: "Suriye'de kesilsin", "Afrika'da dağıtılsın").
+- "uganda": Notta "Uganda" geçiyorsa ata.
+- "somali": Notta "Somali" geçiyorsa ata.
+- "çad": Notta "Çad" geçiyorsa ata.
+- "afganistan": Notta "Afganistan" geçiyorsa ata.
+- "hindistan": Notta "Hindistan" geçiyorsa ata.
+- "aynı_hayvan": "aynı hayvan", "aynı kurbanda", "birlikte kesilsin", "[kişi] ile aynı", "aynı hayvandan", "beraber kesilsin" gibi ifadeler varsa ata.
+- "koç": Notta "koç" geçiyorsa ata (hayvan türü olarak belirtilmişse).
+- "koyun": Notta "koyun" geçiyorsa ata (hayvan türü olarak belirtilmişse).
 - "ödeme_notu": Ödeme bilgisi içeriyorsa ata — banka kartı, havale, taksit, garanti kartı, ödeme nerede yapıldığı gibi bilgiler.
 - "iletişim_talebi": "arayın", "bildirim yapın", "SMS gönderin", "haberdar edin", "fotoğraf isteği", "video isteği", "haber verin" gibi iletişim/bildirim talepleri varsa ata.
 - "et_talebi": "eti bize gelsin", "et teslim", "eti dağıtılsın", "bize getirin", "et paylaşım" gibi et teslimatı veya dağıtım talebi varsa ata.
-- "hayvan_tercihi": Belirli bir hayvan özelliği talep ediliyorsa ata (ör: "dişi olsun", "iri hayvan", "koyun", "koç", "büyükbaş olsun").
+- "hayvan_tercihi": Belirli bir hayvan özelliği talep ediliyorsa ata (ör: "dişi olsun", "iri hayvan", "büyükbaş olsun").
 - "ilk_hayvan": "ilk hayvan", "birinci hayvan", "seferi ilk hayvanda" gibi ifadeler varsa ata.
 - "acil": "acil", "mutlaka", "kesinlikle", "çok önemli" gibi aciliyet/öncelik belirten ifadeler veya kritik özel durum varsa ata.
+- Birden fazla ülke geçiyorsa her ülke kategorisi ayrı ayrı atanmalıdır.
 
 Her bağışçı için JSON formatında yanıt ver:
 {
@@ -66,6 +76,7 @@ const DEFAULT_CATEGORIES = [
   "nafile",
   "3.gün",
   "2.gün",
+  "1.gün",
   "erken_kesim",
   "özel_kesim",
   "Şafi",
@@ -76,6 +87,14 @@ const DEFAULT_CATEGORIES = [
   "hayvan_tercihi",
   "ilk_hayvan",
   "acil",
+  "aynı_hayvan",
+  "uganda",
+  "somali",
+  "çad",
+  "afganistan",
+  "hindistan",
+  "koç",
+  "koyun",
 ];
 
 export default function AiPromptAyarlariPage() {

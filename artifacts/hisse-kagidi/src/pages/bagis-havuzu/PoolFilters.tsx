@@ -602,12 +602,15 @@ export function PoolFilters({
                 <span className="block text-[10px] text-muted-foreground mb-0.5">Etiket <span className="opacity-50">(herhangi)</span></span>
                 <MultiSelectDropdown
                   label="Etiket"
-                  options={globalTags.map(t => ({
-                    value: t.id,
-                    count: tagCountMap.get(t.id) ?? undefined,
-                    label: t.name,
-                    color: t.color,
-                  }))}
+                  options={[
+                    ...globalTags.map(t => ({
+                      value: t.id,
+                      count: tagCountMap.get(t.id) ?? undefined,
+                      label: t.name,
+                      color: t.color,
+                    })),
+                    { value: "__no_tag__", label: "(Etiketsiz)", color: undefined },
+                  ]}
                   selected={tagFilter}
                   onChange={setTagFilter}
                   excluded={excludeFields.has("tags")}

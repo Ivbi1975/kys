@@ -21,6 +21,7 @@ import { ERROR_MESSAGES, MATERIALIZED_VIEW_DEBOUNCE_MS } from "../lib/constants"
 import { logger } from "../lib/logger";
 import { invalidateKACache } from "../services/kesim-alani.service";
 import { auditLog } from "../services/audit-log.service";
+import { seedRulesForProject } from "../services/seed.service";
 
 const idParamSchema = z.object({
   id: z.string().min(1),
@@ -168,6 +169,7 @@ router.post("/projects", asyncHandler(async (req, res) => {
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
   res.status(201).json({ ...project, stats: emptyStats });
   auditLog({ action: "create", entityType: "project", entityId: id, entityName: name, req });
+  seedRulesForProject(id).catch(err => logger.error({ err, projectId: id }, "Failed to seed rules for new project"));
 }));
 
 router.put("/projects/:id", asyncHandler(async (req, res) => {

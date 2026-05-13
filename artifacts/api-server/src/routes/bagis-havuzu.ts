@@ -99,11 +99,28 @@ function buildStatsFilterSQL(projectId: string, query: Record<string, unknown>) 
 
   const tagIdValues = parseMultiValue(query.tagIds);
   if (tagIdValues.length > 0) {
-    const tagSub = sql`d.id IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id IN (${sql.join(tagIdValues.map(t => sql`${t}`), sql`, `)}))`;
+    const hasNoTag = tagIdValues.includes("__no_tag__");
+    const realTagIds = tagIdValues.filter(t => t !== "__no_tag__");
     if (excludeSet.has("tags")) {
-      parts.push(sql`NOT (${tagSub})`);
+      if (hasNoTag && realTagIds.length > 0) {
+        const tagSub = sql`d.id IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id IN (${sql.join(realTagIds.map(t => sql`${t}`), sql`, `)}))`;
+        parts.push(sql`(d.id IN (SELECT dt2.donation_id FROM donation_tags dt2) AND NOT (${tagSub}))`);
+      } else if (hasNoTag) {
+        parts.push(sql`d.id IN (SELECT dt2.donation_id FROM donation_tags dt2)`);
+      } else {
+        const tagSub = sql`d.id IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id IN (${sql.join(realTagIds.map(t => sql`${t}`), sql`, `)}))`;
+        parts.push(sql`NOT (${tagSub})`);
+      }
     } else {
-      parts.push(tagSub);
+      if (hasNoTag && realTagIds.length > 0) {
+        const tagSub = sql`d.id IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id IN (${sql.join(realTagIds.map(t => sql`${t}`), sql`, `)}))`;
+        parts.push(sql`(d.id NOT IN (SELECT dt2.donation_id FROM donation_tags dt2) OR (${tagSub}))`);
+      } else if (hasNoTag) {
+        parts.push(sql`d.id NOT IN (SELECT dt2.donation_id FROM donation_tags dt2)`);
+      } else {
+        const tagSub = sql`d.id IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id IN (${sql.join(realTagIds.map(t => sql`${t}`), sql`, `)}))`;
+        parts.push(tagSub);
+      }
     }
   }
 
@@ -290,14 +307,30 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   }
 
   if (tagIdValues.length > 0) {
-    const tagSql = sql`${donationsTable.id} IN (
-      SELECT dt.donation_id FROM donation_tags dt
-      WHERE dt.tag_id IN (${sql.join(tagIdValues.map(t => sql`${t}`), sql`, `)})
-    )`;
+    const hasNoTag = tagIdValues.includes("__no_tag__");
+    const realTagIds = tagIdValues.filter(t => t !== "__no_tag__");
+    const noTagSql = sql`${donationsTable.id} NOT IN (SELECT dt2.donation_id FROM donation_tags dt2)`;
+    const hasSomeSql = sql`${donationsTable.id} IN (SELECT dt2.donation_id FROM donation_tags dt2)`;
     if (excludeSet.has("tags")) {
-      conditions.push(not(tagSql));
+      if (hasNoTag && realTagIds.length > 0) {
+        const tagSql = sql`${donationsTable.id} IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id IN (${sql.join(realTagIds.map(t => sql`${t}`), sql`, `)}))`;
+        conditions.push(and(hasSomeSql, not(tagSql))!);
+      } else if (hasNoTag) {
+        conditions.push(hasSomeSql);
+      } else {
+        const tagSql = sql`${donationsTable.id} IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id IN (${sql.join(realTagIds.map(t => sql`${t}`), sql`, `)}))`;
+        conditions.push(not(tagSql));
+      }
     } else {
-      conditions.push(tagSql);
+      if (hasNoTag && realTagIds.length > 0) {
+        const tagSql = sql`${donationsTable.id} IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id IN (${sql.join(realTagIds.map(t => sql`${t}`), sql`, `)}))`;
+        conditions.push(or(noTagSql, tagSql)!);
+      } else if (hasNoTag) {
+        conditions.push(noTagSql);
+      } else {
+        const tagSql = sql`${donationsTable.id} IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id IN (${sql.join(realTagIds.map(t => sql`${t}`), sql`, `)}))`;
+        conditions.push(tagSql);
+      }
     }
   }
 
@@ -1806,7 +1839,7 @@ const ALLOWED_RULE_FIELDS = [
   "birim", "temsilci", "donationType", "ozellik", "fiyat",
   "yerTalebi", "gunTalebi", "ilkHayvan", "safi", "name",
   "description", "vekalet", "notes", "phone", "kesimAlaniId",
-  "shareCount", "tags", "aiCategories",
+  "shareCount", "tags", "aiCategories", "aiWarnings",
 ] as const;
 
 const ALLOWED_RULE_OPERATORS = [
@@ -1818,7 +1851,7 @@ const ALLOWED_RULE_OPERATORS = [
 const ruleConditionSchema = z.object({
   field: z.enum(ALLOWED_RULE_FIELDS),
   operator: z.enum(ALLOWED_RULE_OPERATORS),
-  value: z.union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))]),
+  value: z.union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))]).optional(),
 });
 
 const conditionGroupSchema = z.object({
@@ -1836,15 +1869,25 @@ const conditionsFieldSchema = z.union([
   compoundConditionsSchema,
 ]);
 
+const baseRuleActionSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("transfer_to_ka"), targetKesimAlaniId: z.string().min(1) }),
+  z.object({ type: z.literal("add_tag"), tagId: z.string().min(1) }),
+  z.object({ type: z.literal("flag"), flagReason: z.string().optional() }),
+  z.object({ type: z.literal("exclude") }),
+]);
+
+const ruleActionSchema: z.ZodType<unknown> = z.union([
+  baseRuleActionSchema,
+  z.object({
+    type: z.literal("compound"),
+    actions: z.array(baseRuleActionSchema).min(1),
+  }),
+]);
+
 const automationRuleSchema = z.object({
   name: z.string().min(1).max(200),
   conditions: conditionsFieldSchema,
-  action: z.discriminatedUnion("type", [
-    z.object({ type: z.literal("transfer_to_ka"), targetKesimAlaniId: z.string().min(1) }),
-    z.object({ type: z.literal("add_tag"), tagId: z.string().min(1) }),
-    z.object({ type: z.literal("flag"), flagReason: z.string().optional() }),
-    z.object({ type: z.literal("exclude") }),
-  ]),
+  action: ruleActionSchema,
   priority: z.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
 });
@@ -1911,12 +1954,7 @@ router.put("/projects/:id/automation-rules/:ruleId", asyncHandler(async (req, re
   const updateSchema = z.object({
     name: z.string().min(1).max(200).optional(),
     conditions: conditionsFieldSchema.optional(),
-    action: z.discriminatedUnion("type", [
-      z.object({ type: z.literal("transfer_to_ka"), targetKesimAlaniId: z.string().min(1) }),
-      z.object({ type: z.literal("add_tag"), tagId: z.string().min(1) }),
-      z.object({ type: z.literal("flag"), flagReason: z.string().optional() }),
-      z.object({ type: z.literal("exclude") }),
-    ]).optional(),
+    action: ruleActionSchema.optional(),
     priority: z.number().int().min(0).optional(),
     isActive: z.boolean().optional(),
   });

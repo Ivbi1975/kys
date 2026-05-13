@@ -4,6 +4,7 @@ import { startPoolMonitoring, shutdownPool } from "@workspace/db";
 import { syncAiSettingsToDb } from "./routes/ai-notes";
 import { startPurgeScheduler } from "./services/purge.service";
 import { startAuditLogPurgeScheduler } from "./services/audit-log.service";
+import { seedTagsAndRules } from "./services/seed.service";
 import type { Server } from "http";
 
 const rawPort = process.env["PORT"];
@@ -36,6 +37,9 @@ const server: Server = app.listen({ port, host }, (err) => {
   syncAiSettingsToDb()
     .then(() => logger.info("AI settings synced to DB"))
     .catch((err) => logger.error({ err }, "Failed to sync AI settings to DB"));
+  seedTagsAndRules()
+    .then(() => logger.info("Tags and rules seeded"))
+    .catch((err) => logger.error({ err }, "Failed to seed tags and rules"));
 });
 
 function gracefulShutdown(signal: string) {

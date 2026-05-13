@@ -24,10 +24,11 @@ export interface CompoundConditions {
 }
 
 export interface RuleAction {
-  type: "transfer_to_ka" | "add_tag" | "flag" | "exclude";
+  type: "transfer_to_ka" | "add_tag" | "flag" | "exclude" | "compound";
   targetKesimAlaniId?: string;
   tagId?: string;
   flagReason?: string;
+  actions?: RuleAction[];
 }
 
 export interface ExecutionSummaryItem {
@@ -61,6 +62,7 @@ function getFieldValue(donation: Record<string, unknown>, field: string): string
     phone: "phone",
     kesimAlaniId: "kesimAlaniId",
     aiCategories: "aiCategories",
+    aiWarnings: "aiWarnings",
   };
   const key = fieldMap[field] || field;
   const val = donation[key];
@@ -234,8 +236,17 @@ export async function executeRules(projectId: string): Promise<ExecutionResult> 
     tagsByDonation[t.donationId].push(t.tagId);
   }
 
-  const processedIds = new Set<string>();
+  const exclusiveProcessedIds = new Set<string>();
+  const allAffectedIds = new Set<string>();
   const ruleResults: ExecutionSummaryItem[] = [];
+
+  function isExclusiveAction(action: RuleAction): boolean {
+    if (action.type === "transfer_to_ka" || action.type === "exclude") return true;
+    if (action.type === "compound" && Array.isArray(action.actions)) {
+      return action.actions.some(a => a.type === "transfer_to_ka" || a.type === "exclude");
+    }
+    return false;
+  }
 
   for (const rule of rules) {
     const rawConditions = rule.conditions as RuleCondition[] | CompoundConditions;
@@ -245,8 +256,10 @@ export async function executeRules(projectId: string): Promise<ExecutionResult> 
     if (Array.isArray(rawConditions) && rawConditions.length === 0) continue;
     if (!action || !action.type) continue;
 
+    const exclusive = isExclusiveAction(action);
+
     const matchedDonations = donations.filter(d => {
-      if (processedIds.has(d.id)) return false;
+      if (exclusive && exclusiveProcessedIds.has(d.id)) return false;
       return matchesRule(d as unknown as Record<string, unknown>, rawConditions, tagsByDonation[d.id] || []);
     });
 
@@ -263,9 +276,12 @@ export async function executeRules(projectId: string): Promise<ExecutionResult> 
 
     const matchedIds = matchedDonations.map(d => d.id);
 
-    const actuallyAffected = await applyAction(action, matchedIds, kaIds);
+    const actuallyAffected = await applyActions(action, matchedIds, kaIds);
 
-    for (const id of actuallyAffected) processedIds.add(id);
+    if (exclusive) {
+      for (const id of actuallyAffected) exclusiveProcessedIds.add(id);
+    }
+    for (const id of actuallyAffected) allAffectedIds.add(id);
 
     ruleResults.push({
       ruleId: rule.id,
@@ -277,9 +293,23 @@ export async function executeRules(projectId: string): Promise<ExecutionResult> 
   }
 
   return {
-    totalAffected: processedIds.size,
+    totalAffected: allAffectedIds.size,
     ruleResults,
   };
+}
+
+async function applyActions(action: RuleAction, donationIds: string[], projectKaIds: string[]): Promise<string[]> {
+  if (action.type === "compound" && Array.isArray(action.actions) && action.actions.length > 0) {
+    const affectedSets: Set<string>[] = [];
+    for (const subAction of action.actions) {
+      const ids = await applyAction(subAction, donationIds, projectKaIds);
+      affectedSets.push(new Set(ids));
+    }
+    const union = new Set<string>();
+    for (const s of affectedSets) for (const id of s) union.add(id);
+    return Array.from(union);
+  }
+  return applyAction(action, donationIds, projectKaIds);
 }
 
 async function applyAction(action: RuleAction, donationIds: string[], projectKaIds: string[]): Promise<string[]> {

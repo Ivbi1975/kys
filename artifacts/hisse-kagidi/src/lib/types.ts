@@ -138,7 +138,7 @@ export interface Project {
 export interface RuleCondition {
   field: string;
   operator: string;
-  value: string | string[] | number | [number, number];
+  value?: string | string[] | number | [number, number];
 }
 
 export interface ConditionGroup {
@@ -152,10 +152,11 @@ export interface CompoundConditions {
 }
 
 export interface RuleAction {
-  type: "transfer_to_ka" | "add_tag" | "flag" | "exclude";
+  type: "transfer_to_ka" | "add_tag" | "flag" | "exclude" | "compound";
   targetKesimAlaniId?: string;
   tagId?: string;
   flagReason?: string;
+  actions?: Omit<RuleAction, "actions">[];
 }
 
 export interface AutomationRule {

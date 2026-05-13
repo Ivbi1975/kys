@@ -36,6 +36,7 @@ const FIELD_OPTIONS = [
   { value: "shareCount", label: "Hisse Sayısı" },
   { value: "tags", label: "Etiket" },
   { value: "aiCategories", label: "AI Kategorisi" },
+  { value: "aiWarnings", label: "AI Uyarıları" },
   { value: "kesimAlaniId", label: "Kesim Listesi" },
 ];
 
@@ -75,6 +76,7 @@ function getOperatorType(field: string): string {
   if (field === "shareCount") return "number";
   if (field === "tags") return "tags";
   if (field === "aiCategories") return "aiCategories";
+  if (field === "aiWarnings") return "text";
   return "text";
 }
 
@@ -87,6 +89,7 @@ const ACTION_LABELS: Record<string, string> = {
   add_tag: "Etiket Ekle",
   flag: "Sorunlu İşaretle",
   exclude: "Sepetten Çıkar",
+  compound: "Birleşik Eylem",
 };
 
 interface AutomationRulesPanelProps {
@@ -473,6 +476,7 @@ function getActionIcon(type: string) {
     case "add_tag": return <Tag className="w-3.5 h-3.5" />;
     case "flag": return <AlertTriangle className="w-3.5 h-3.5" />;
     case "exclude": return <EyeOff className="w-3.5 h-3.5" />;
+    case "compound": return <AlertTriangle className="w-3.5 h-3.5" />;
     default: return null;
   }
 }
@@ -491,6 +495,12 @@ function getActionDescription(action: RuleAction, kesimAlanlari: { id: string; n
       return action.flagReason ? `Sorunlu işaretle: ${action.flagReason}` : "Sorunlu işaretle";
     case "exclude":
       return "Sepetten çıkar";
+    case "compound": {
+      if (Array.isArray(action.actions) && action.actions.length > 0) {
+        return action.actions.map(a => getActionDescription(a as RuleAction, kesimAlanlari, globalTags)).join(" + ");
+      }
+      return "Birleşik eylem";
+    }
     default:
       return "Bilinmeyen eylem";
   }
