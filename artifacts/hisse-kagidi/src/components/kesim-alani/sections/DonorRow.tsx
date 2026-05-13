@@ -248,17 +248,31 @@ function DonorRowInner({
           onChange={(e) => onSetEditDraft(e.target.value)} onBlur={() => onCommitEdit()}
           onKeyDown={(e) => onKeyDown(e, d.id, "notes")} autoFocus />
       ) : (
-        <div className="flex flex-col gap-0.5">
-          <span className="cursor-text block px-1 py-0.5 rounded hover:bg-muted/50 transition-colors"
-            onClick={() => onStartEditing(d.id, "notes")}>{d.notes || "—"}</span>
+        <div className="flex items-start gap-1.5 min-w-0">
+          <span
+            className="cursor-text shrink-0 max-w-[90px] truncate px-1 py-0.5 rounded text-xs hover:bg-muted/50 transition-colors text-muted-foreground"
+            title={d.notes || undefined}
+            onClick={() => onStartEditing(d.id, "notes")}
+          >
+            {d.notes || "—"}
+          </span>
           {((d.aiCategories && d.aiCategories.length > 0) || (d.aiWarnings && d.aiWarnings.trim())) && (
-            <div className="flex gap-0.5 flex-wrap px-1">
+            <div className="flex gap-0.5 flex-wrap min-w-0 pt-0.5">
               {(d.aiCategories || []).map(cat => (
-                <span key={cat} className="px-1.5 py-0 rounded-full text-[9px] font-medium bg-violet-100 dark:bg-violet-900 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">{cat}</span>
+                <span
+                  key={cat}
+                  className="shrink-0 px-1.5 leading-4 rounded text-[9px] font-medium bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 whitespace-nowrap"
+                  title={cat}
+                >
+                  {cat}
+                </span>
               ))}
               {d.aiWarnings && d.aiWarnings.trim() && (
-                <span className="px-1.5 py-0 rounded-full text-[9px] font-medium bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 flex items-center gap-0.5" title={d.aiWarnings}>
-                  <AlertTriangle className="w-2.5 h-2.5" /> uyarı
+                <span
+                  className="shrink-0 leading-4 px-1 rounded text-[9px] font-medium bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700 flex items-center gap-0.5"
+                  title={d.aiWarnings}
+                >
+                  <AlertTriangle className="w-2.5 h-2.5" />
                 </span>
               )}
             </div>
