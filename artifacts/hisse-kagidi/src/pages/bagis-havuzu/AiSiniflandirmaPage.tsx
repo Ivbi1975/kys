@@ -688,7 +688,12 @@ export default function AiSiniflandirmaPage() {
                               )}
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 text-xs text-muted-foreground">{r.summary || "—"}</td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                            {donor?.notes?.trim() && (
+                              <p className="mb-1 text-foreground/70 italic border-b border-border/40 pb-1">{donor.notes.trim()}</p>
+                            )}
+                            {r.summary || (!donor?.notes?.trim() ? "—" : null)}
+                          </td>
                           <td className="px-3 py-2.5 text-xs">
                             {r.requests?.trim() ? (
                               <span className="flex items-start gap-1">
