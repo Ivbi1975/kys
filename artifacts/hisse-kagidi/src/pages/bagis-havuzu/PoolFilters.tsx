@@ -61,6 +61,9 @@ interface PoolFiltersProps {
   setDateFrom: (v: string) => void;
   dateTo: string;
   setDateTo: (v: string) => void;
+  descriptionCountMap: Record<string, number>;
+  descriptionShareCountFilter: number[];
+  setDescriptionShareCountFilter: (v: number[]) => void;
   stats: PoolStats | undefined;
   baseStats?: PoolStats;
   kesimAlanlari: { id: string; name: string }[];
@@ -353,6 +356,9 @@ export function PoolFilters({
   dateField, setDateField,
   dateFrom, setDateFrom,
   dateTo, setDateTo,
+  descriptionCountMap,
+  descriptionShareCountFilter,
+  setDescriptionShareCountFilter,
   stats,
   baseStats,
   kesimAlanlari,
@@ -384,6 +390,18 @@ export function PoolFilters({
   const showIlkHayvan = !!(optStats && ((optStats.ilkHayvanDistribution && optStats.ilkHayvanDistribution.length > 0) || (optStats.empty_ilk_hayvan_count ?? 0) > 0 || ilkHayvanFilter.length > 0));
   const showSafi = !!(optStats && ((optStats.safiDistribution && optStats.safiDistribution.length > 0) || (optStats.empty_safi_count ?? 0) > 0 || safiFilter.length > 0));
   const hasFacets = showCinsi || showBirim || showTemsilci || showOzellik || showFiyat || showYer || showGun || showIlkHayvan || showSafi || globalTags.length > 0;
+
+  const descriptionCountOptions = useMemo(() => {
+    const countFreq = new Map<number, number>();
+    for (const cnt of Object.values(descriptionCountMap)) {
+      countFreq.set(cnt, (countFreq.get(cnt) || 0) + 1);
+    }
+    return [...countFreq.entries()]
+      .map(([cnt, freq]) => ({ value: String(cnt), count: freq * cnt, label: `${cnt} hisse` }))
+      .sort((a, b) => Number(a.value) - Number(b.value));
+  }, [descriptionCountMap]);
+
+  const showDescriptionCount = descriptionCountOptions.length > 1 || descriptionShareCountFilter.length > 0;
 
   const isStandardType = useCallback((type: string) => {
     const n = type.toLocaleLowerCase("tr").replace(/[^a-zçğıöşü]/g, "");
@@ -638,6 +656,18 @@ export function PoolFilters({
                   onChange={setSafiFilter}
                   excluded={excludeFields.has("safi")}
                   onToggleExclude={() => toggleExcludeField("safi")}
+                />
+              </div>
+            )}
+
+            {showDescriptionCount && (
+              <div>
+                <span className="block text-[10px] text-muted-foreground mb-0.5">Hisse (Vekalet Veren)</span>
+                <MultiSelectDropdown
+                  label="Hisse Sayısı"
+                  options={descriptionCountOptions}
+                  selected={descriptionShareCountFilter.map(String)}
+                  onChange={v => setDescriptionShareCountFilter(v.map(Number))}
                 />
               </div>
             )}

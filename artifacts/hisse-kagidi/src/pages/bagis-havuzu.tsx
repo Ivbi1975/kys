@@ -101,6 +101,7 @@ export default function BagisHavuzuPage() {
   const [sortDir3, setSortDir3] = useState<"asc" | "desc">(() => (urlParams.get("dir3") === "desc" ? "desc" : "asc"));
   const [shareCountMin, setShareCountMin] = useState(() => urlParams.get("scMin") || "");
   const [shareCountMax, setShareCountMax] = useState(() => urlParams.get("scMax") || "");
+  const [descriptionShareCountFilter, setDescriptionShareCountFilter] = useState<number[]>([]);
   const [excludeFields, setExcludeFields] = useState<Set<string>>(() => {
     const v = urlParams.get("excl");
     return v ? new Set(v.split(",").filter(Boolean)) : new Set();
@@ -249,6 +250,7 @@ export default function BagisHavuzuPage() {
     debouncedSearch, statusFilter, kesimAlaniFilter !== "none" ? kesimAlaniFilter : null, aiCategoryFilter, notesFilter, shareCountMin, shareCountMax, dateFrom, dateTo, flagFilter,
   ].filter(Boolean).length
   + [donationTypeFilter, birimFilter, temsilciFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter].filter(a => a.length > 0).length
+  + (descriptionShareCountFilter.length > 0 ? 1 : 0)
   + (excludeFields.size > 0 ? 1 : 0);
 
   const excludeFieldsStr = useMemo(() => [...excludeFields].join(","), [excludeFields]);
@@ -381,6 +383,16 @@ export default function BagisHavuzuPage() {
     return map;
   }, [items]);
 
+  const filteredItems = useMemo(() => {
+    if (descriptionShareCountFilter.length === 0) return items;
+    const filterSet = new Set(descriptionShareCountFilter);
+    return items.filter(item => {
+      const key = (item.description || "").trim().toLocaleLowerCase("tr");
+      const cnt = key ? (descriptionCountMap[key] ?? 1) : 1;
+      return filterSet.has(cnt);
+    });
+  }, [items, descriptionShareCountFilter, descriptionCountMap]);
+
   const effectiveSelectedIds = useMemo(() => {
     if (selectAllPages && allFilteredIds.length > 0) {
       return new Set(allFilteredIds);
@@ -442,6 +454,7 @@ export default function BagisHavuzuPage() {
     setNotesFilter("");
     setShareCountMin("");
     setShareCountMax("");
+    setDescriptionShareCountFilter([]);
     setExcludeFields(new Set());
     setDateFrom("");
     setDateTo("");
@@ -1179,6 +1192,9 @@ export default function BagisHavuzuPage() {
             dateField={dateField} setDateField={v => { setDateField(v); setPage(0); }}
             dateFrom={dateFrom} setDateFrom={v => { setDateFrom(v); setPage(0); }}
             dateTo={dateTo} setDateTo={v => { setDateTo(v); setPage(0); }}
+            descriptionCountMap={descriptionCountMap}
+            descriptionShareCountFilter={descriptionShareCountFilter}
+            setDescriptionShareCountFilter={setDescriptionShareCountFilter}
             stats={stats}
             baseStats={baseStats}
             kesimAlanlari={kesimAlanlari}
@@ -1245,7 +1261,7 @@ export default function BagisHavuzuPage() {
         )}
 
         <VirtualizedDonationTable
-          items={items}
+          items={filteredItems}
           isLoading={isLoading}
           activeFilterCount={activeFilterCount}
           selectedIds={effectiveSelectedIds}
