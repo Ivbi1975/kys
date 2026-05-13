@@ -408,12 +408,12 @@ function CreateKesimAlaniDialog({
 
   return (
     <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setCreateProjectId(null); reset(); } }}>
-      <DialogContent className={mode === "bulk" ? "max-w-full w-screen h-screen m-0 rounded-none flex flex-col gap-0 p-0" : "max-w-lg"}>
-        <DialogHeader className={mode === "bulk" ? "px-6 pt-5 pb-3 border-b shrink-0" : ""}>
+      <DialogContent className={mode === "bulk" ? "max-w-5xl w-full flex flex-col gap-0" : "max-w-lg"}>
+        <DialogHeader>
           <DialogTitle>Yeni Kesim Alanı</DialogTitle>
         </DialogHeader>
 
-        <div className={`flex rounded-lg border p-1 bg-muted/30 gap-1 ${mode === "bulk" ? "mx-6 mt-4 shrink-0" : ""}`}>
+        <div className="flex rounded-lg border p-1 bg-muted/30 gap-1">
           <button
             type="button"
             onClick={() => setMode("single")}
@@ -474,7 +474,7 @@ function CreateKesimAlaniDialog({
             </Button>
           </div>
         ) : (
-          <div className="flex flex-col flex-1 min-h-0 px-6 pb-6 gap-3 mt-4">
+          <div className="flex flex-col gap-3 mt-3">
             <div className="flex gap-2 shrink-0">
               <Input
                 className="flex-1"
@@ -511,7 +511,7 @@ function CreateKesimAlaniDialog({
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+            <div className="grid grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto pr-1">
               {bulkItems.map((item, idx) => (
                 <div key={item.id} className="rounded-lg border bg-muted/20 overflow-hidden">
                   <div className="flex items-center gap-2 px-3 py-2">
