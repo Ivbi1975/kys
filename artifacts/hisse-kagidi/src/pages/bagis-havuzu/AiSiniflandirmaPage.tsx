@@ -67,6 +67,29 @@ export default function AiSiniflandirmaPage() {
     [allItems],
   );
 
+  useEffect(() => {
+    if (allItems.length === 0) return;
+    setAiResults(prev => {
+      if (prev.size > 0) return prev;
+      const preloaded = new Map<string, AiResult>();
+      for (const d of allItems) {
+        if (d.aiCategories && d.aiCategories.length > 0) {
+          preloaded.set(d.id, {
+            donationId: d.id,
+            categories: d.aiCategories,
+            warnings: d.aiWarnings || "",
+            requests: "",
+            summary: "",
+            donationType: d.donationType || "",
+            donorName: d.description || d.name || d.id,
+          });
+        }
+      }
+      if (preloaded.size > 0) aiResultsRef.current = preloaded;
+      return preloaded.size > 0 ? preloaded : prev;
+    });
+  }, [allItems]);
+
   const stopPolling = useCallback(() => {
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current);
