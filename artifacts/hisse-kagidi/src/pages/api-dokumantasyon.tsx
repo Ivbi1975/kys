@@ -91,7 +91,7 @@ function Section({
   );
 }
 
-const BASE_URL = "https://<sunucu>/api/vys";
+const BASE_URL = "https://api.kys.gelecekvadisi.org/api/vys";
 
 export default function ApiDokumantasyon() {
   return (
@@ -128,7 +128,7 @@ export default function ApiDokumantasyon() {
             <div className="flex items-center gap-2 text-white/35 text-[11px]">
               <Globe className="h-3.5 w-3.5" /> Temel URL
             </div>
-            <p className="font-mono text-[12px] text-white/70">/api/vys</p>
+            <p className="font-mono text-[11px] text-white/70 break-all">api.kys.gelecekvadisi.org/api/vys</p>
           </div>
           <div className="rounded-xl border border-white/8 bg-white/2 px-4 py-3 space-y-1">
             <div className="flex items-center gap-2 text-white/35 text-[11px]">
@@ -140,7 +140,7 @@ export default function ApiDokumantasyon() {
             <div className="flex items-center gap-2 text-white/35 text-[11px]">
               <Zap className="h-3.5 w-3.5" /> Hız Sınırı
             </div>
-            <p className="font-mono text-[12px] text-white/70">Sınır yok</p>
+            <p className="font-mono text-[12px] text-white/70">200 istek / dakika</p>
           </div>
         </div>
 
@@ -148,16 +148,17 @@ export default function ApiDokumantasyon() {
         <Section
           id="auth"
           title="Kimlik Doğrulama"
-          description="Tüm VYS endpoint'leri X-API-Key başlığıyla kimlik doğrulaması gerektirir. Bu anahtar yalnızca /api/vys/* rotalarında geçerlidir; mevcut API_KEY ve ADMIN_KEY'den bağımsızdır."
+          description="Tüm VYS endpoint'leri X-API-Key başlığıyla kimlik doğrulaması gerektirir. Bu anahtar yalnızca /api/vys/* rotalarında geçerlidir; ana API_KEY'den tamamen bağımsız olarak VYS_API_KEY ortam değişkeninden okunur."
         >
           <div className="space-y-3">
             <CodeBlock id="auth-header" code={`X-API-Key: <VYS_API_KEY>`} />
             <div className="flex flex-col gap-2">
               <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/8 border border-yellow-500/15">
                 <AlertCircle className="h-4 w-4 text-yellow-400 flex-shrink-0 mt-0.5" />
-                <div className="text-[12.5px] text-white/60 space-y-1">
-                  <p><span className="text-yellow-400 font-semibold">401</span> — X-API-Key başlığı eksik veya geçersiz</p>
-                  <p><span className="text-red-400 font-semibold">503</span> — VYS_API_KEY ortam değişkeni sunucuda ayarlanmamış</p>
+                <div className="text-[12.5px] text-white/60 space-y-1.5">
+                  <p><span className="text-yellow-400 font-semibold">401</span> — <span className="font-mono">X-API-Key</span> başlığı eksik: <span className="italic text-white/40">"Kimlik doğrulama gerekli. X-API-Key header eksik."</span></p>
+                  <p><span className="text-yellow-400 font-semibold">401</span> — Geçersiz anahtar: <span className="italic text-white/40">"Geçersiz VYS API anahtarı."</span></p>
+                  <p><span className="text-red-400 font-semibold">503</span> — Sunucuda <span className="font-mono">VYS_API_KEY</span> ayarlanmamış: <span className="italic text-white/40">"Sunucu yapılandırma hatası. VYS_API_KEY ayarlanmamış."</span></p>
                 </div>
               </div>
             </div>
@@ -306,10 +307,12 @@ export default function ApiDokumantasyon() {
           ]} />
           <p className="text-[12px] text-white/40 font-semibold uppercase tracking-wider mt-2">Hayvan Grubu Alanları (groups[])</p>
           <FieldTable rows={[
+            { alan: "id", tur: "string", aciklama: "Grup kimliği" },
             { alan: "animalNo", tur: "number", aciklama: "Hayvan numarası" },
             { alan: "colorTag", tur: "string | null", aciklama: "Renk etiketi (null = etiketsiz)" },
             { alan: "kesildi", tur: "boolean", aciklama: "Kesim tamamlandı mı?" },
             { alan: "kesildiAt", tur: "ISO 8601 | null", aciklama: "Kesim zamanı" },
+            { alan: "sortOrder", tur: "number", aciklama: "Sıralama değeri" },
             { alan: "notes", tur: "string", aciklama: "Grup notu (boşsa boş string)" },
             { alan: "assignedShares", tur: "number", aciklama: "Gruba atanmış toplam hisse sayısı" },
             { alan: "donors", tur: "array", aciklama: "Gruptaki bağışçılar (sıralı)" },
@@ -317,6 +320,7 @@ export default function ApiDokumantasyon() {
           <p className="text-[12px] text-white/40 font-semibold uppercase tracking-wider mt-2">Bağışçı Alanları (donors[])</p>
           <FieldTable rows={[
             { alan: "sira", tur: "number", aciklama: "Grup içindeki sıra (1'den başlar)" },
+            { alan: "id", tur: "string", aciklama: "Bağışçı kimliği" },
             { alan: "name", tur: "string", aciklama: "Adına kesilen kişi" },
             { alan: "description", tur: "string", aciklama: "Vekaleti veren kişi" },
             { alan: "vekalet", tur: "string", aciklama: "Vekalet numarası" },
@@ -353,13 +357,13 @@ export default function ApiDokumantasyon() {
           ]} />
         </Section>
 
-        {/* Endpoint 5 — Deprecated */}
+        {/* Endpoint 5 */}
         <Section
           id="groups"
           title="Hayvan Grupları ve Kesim Durumu"
           method="GET"
           path="/api/vys/projects/:id/kesim-alanlari/:kesimId/groups"
-          description="Belirli bir kesim alanındaki hayvan gruplarını döner. Bağışçı detayları içermez — bunun yerine /kesim-listesi kullanın."
+          description="Belirli bir kesim alanındaki hayvan gruplarını döner. Bağışçı detayları içermez — tüm listeye ihtiyaç duyulduğunda /kesim-listesi tercih edilmelidir."
         >
           <CodeBlock id="curl-5b" code={`curl -H "X-API-Key: <VYS_API_KEY>" \\
   ${BASE_URL}/projects/abc123/kesim-alanlari/ka-001/groups`} />
@@ -380,26 +384,30 @@ export default function ApiDokumantasyon() {
   ]
 }`} />
           <FieldTable rows={[
+            { alan: "kesimAlaniId", tur: "string", aciklama: "Kesim alanı kimliği" },
+            { alan: "kesimAlaniName", tur: "string", aciklama: "Kesim alanı adı" },
+            { alan: "items[].id", tur: "string", aciklama: "Grup kimliği" },
             { alan: "items[].animalNo", tur: "number", aciklama: "Hayvan numarası" },
             { alan: "items[].colorTag", tur: "string | null", aciklama: "Renk etiketi" },
             { alan: "items[].kesildi", tur: "boolean", aciklama: "Kesim tamamlandı mı?" },
             { alan: "items[].kesildiAt", tur: "ISO 8601 | null", aciklama: "Kesim zamanı" },
+            { alan: "items[].sortOrder", tur: "number", aciklama: "Sıralama değeri" },
             { alan: "items[].assignedShares", tur: "number", aciklama: "Gruba atanmış hisse sayısı" },
           ]} />
         </Section>
 
-        {/* Endpoint 5 */}
+        {/* Endpoint 6 */}
         <Section
           id="summary"
           title="Proje Özeti"
           method="GET"
           path="/api/vys/projects/:id/summary"
-          description="Bir proje için özet istatistikler döner: toplam/atanmış/bekleyen hisseler ve kesim durumu."
+          description="Bir proje için özet istatistikler döner: toplam/atanmış/bekleyen hisseler ve kesim durumu. Dışlanan (excluded) bağışçılar toplam hisse hesabına dahil edilmez."
         >
-          <CodeBlock id="curl-5" code={`curl -H "X-API-Key: <VYS_API_KEY>" \\
+          <CodeBlock id="curl-6" code={`curl -H "X-API-Key: <VYS_API_KEY>" \\
   ${BASE_URL}/projects/abc123/summary`} />
           <p className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Yanıt · 200 OK</p>
-          <CodeBlock id="resp-5" code={`{
+          <CodeBlock id="resp-6" code={`{
   "projectId": "abc123",
   "projectName": "2025 Kurban Organizasyonu",
   "totalShares": 350,
@@ -410,23 +418,40 @@ export default function ApiDokumantasyon() {
   "remainingGroups": 30
 }`} />
           <FieldTable rows={[
+            { alan: "projectId", tur: "string", aciklama: "Proje kimliği" },
+            { alan: "projectName", tur: "string", aciklama: "Proje adı" },
             { alan: "totalShares", tur: "number", aciklama: "Toplam hisse sayısı (dışlananlar hariç)" },
             { alan: "assignedShares", tur: "number", aciklama: "Gruba atanmış hisse sayısı" },
             { alan: "unassignedShares", tur: "number", aciklama: "Henüz atanmamış hisse sayısı" },
+            { alan: "totalGroups", tur: "number", aciklama: "Toplam hayvan grubu sayısı" },
             { alan: "kesildiGroups", tur: "number", aciklama: "Kesimi tamamlanmış grup sayısı" },
             { alan: "remainingGroups", tur: "number", aciklama: "Bekleyen (kesilmemiş) grup sayısı" },
+          ]} />
+        </Section>
+
+        {/* Ortak Hata Yanıtları */}
+        <Section
+          id="errors"
+          title="Ortak Hata Yanıtları"
+          description="Tüm endpoint'lerde geçerli olan standart HTTP hata kodları."
+        >
+          <FieldTable rows={[
+            { alan: "401", tur: "Unauthorized", aciklama: "X-API-Key eksik veya geçersiz" },
+            { alan: "404", tur: "Not Found", aciklama: "Proje veya kesim alanı bulunamadı" },
+            { alan: "429", tur: "Too Many Requests", aciklama: "Dakikada 200 istek sınırı aşıldı" },
+            { alan: "503", tur: "Service Unavailable", aciklama: "VYS_API_KEY sunucuda yapılandırılmamış" },
           ]} />
         </Section>
 
         {/* Ortam Değişkenleri */}
         <Section
           id="env"
-          title="Ortam Değişkenleri"
-          description="Sunucuda yapılandırılabilecek VYS ilgili değişkenler."
+          title="Sunucu Ortam Değişkenleri"
+          description="API sunucusunda yapılandırılması gereken VYS ilgili değişkenler."
         >
           <FieldTable rows={[
-            { alan: "VYS_API_KEY", tur: "string (zorunlu)", aciklama: "VYS erişim anahtarı — ayarlanmazsa 503 döner" },
-            { alan: "GLOBAL_RATE_LIMIT", tur: "number (varsayılan: 200)", aciklama: "Tüm rotalar için genel sunucu limiti" },
+            { alan: "VYS_API_KEY", tur: "string (zorunlu)", aciklama: "VYS erişim anahtarı — ayarlanmazsa tüm /api/vys/* istekleri 503 döner" },
+            { alan: "GLOBAL_RATE_LIMIT", tur: "number (varsayılan: 200)", aciklama: "Tüm rotalar için genel istek limiti (istek/dakika)" },
           ]} />
         </Section>
 
