@@ -807,10 +807,11 @@ export default function AiSiniflandirmaPage() {
                                 <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">Değişikliği kaydetmek istiyor musunuz?</p>
                                 <div className="flex gap-1">
                                   <button
+                                    autoFocus
                                     disabled={savingNote}
                                     onMouseDown={e => e.preventDefault()}
                                     onClick={() => confirmNoteEdit(projectId)}
-                                    className="text-[10px] px-2 py-0.5 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                                    className="text-[10px] px-2 py-0.5 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-400"
                                   >
                                     {savingNote ? "Kaydediliyor…" : "✓ Evet, kaydet"}
                                   </button>
