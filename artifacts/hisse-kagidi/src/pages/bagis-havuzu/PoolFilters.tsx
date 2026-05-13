@@ -158,33 +158,37 @@ function MultiSelectDropdown({
               />
             </div>
           )}
-          <div className="max-h-48 overflow-auto px-1 pt-1">
-            {filtered.length === 0 && (
-              <p className="text-xs text-muted-foreground p-2 text-center">Sonuç yok</p>
+          <div className="relative">
+            <div className="max-h-48 overflow-y-auto px-1 pt-1 pb-6">
+              {filtered.length === 0 && (
+                <p className="text-xs text-muted-foreground p-2 text-center">Sonuç yok</p>
+              )}
+              {filtered.map(opt => {
+                const isChecked = selected.includes(opt.value);
+                const displayText = opt.label || opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => toggle(opt.value)}
+                    className={`flex items-center gap-2 w-full px-2 py-1.5 text-xs rounded hover:bg-muted/50 text-left ${isChecked ? "bg-primary/5" : ""}`}
+                  >
+                    <span className={`flex-shrink-0 w-4 h-4 border rounded flex items-center justify-center ${isChecked ? "bg-primary border-primary text-primary-foreground" : "border-input"}`}>
+                      {isChecked && <Check className="w-3 h-3" />}
+                    </span>
+                    {opt.color && (
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: opt.color }} />
+                    )}
+                    <span className="truncate flex-1">{displayText}</span>
+                    {opt.count !== undefined && (
+                      <span className="text-muted-foreground ml-1 flex-shrink-0">({opt.count})</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {filtered.length > 5 && (
+              <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent rounded-b-lg" />
             )}
-            {filtered.map(opt => {
-              const isChecked = selected.includes(opt.value);
-              const displayText = opt.label || opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  onClick={() => toggle(opt.value)}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-xs rounded hover:bg-muted/50 text-left ${isChecked ? "bg-primary/5" : ""}`}
-                >
-                  <span className={`flex-shrink-0 w-4 h-4 border rounded flex items-center justify-center ${isChecked ? "bg-primary border-primary text-primary-foreground" : "border-input"}`}>
-                    {isChecked && <Check className="w-3 h-3" />}
-                  </span>
-                  {opt.color && (
-                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: opt.color }} />
-                  )}
-                  <span className="truncate flex-1">{displayText}</span>
-                  {opt.count !== undefined && (
-                    <span className="text-muted-foreground ml-1 flex-shrink-0">({opt.count})</span>
-                  )}
-                </button>
-              );
-            })}
-            <div className="h-1" />
           </div>
           {selected.length > 0 && (
             <div className="border-t p-1">
