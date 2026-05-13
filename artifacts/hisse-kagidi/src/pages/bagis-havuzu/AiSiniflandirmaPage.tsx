@@ -45,6 +45,7 @@ export default function AiSiniflandirmaPage() {
   const [aiErrorBatches, setAiErrorBatches] = useState(0);
   const [aiTotalBatches, setAiTotalBatches] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [resultTypeFilter, setResultTypeFilter] = useState<"warnings" | "failed" | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -296,10 +297,12 @@ export default function AiSiniflandirmaPage() {
   );
 
   const filteredResults = useMemo(() => {
-    const all = Array.from(aiResults.values());
-    if (!categoryFilter) return all;
-    return all.filter(r => r.categories.some(c => c.toLocaleLowerCase("tr") === categoryFilter.toLocaleLowerCase("tr")));
-  }, [aiResults, categoryFilter]);
+    let all = Array.from(aiResults.values());
+    if (resultTypeFilter === "warnings") return all.filter(r => r.warnings && r.warnings.trim() && !AI_FAIL_MESSAGES.has(r.warnings));
+    if (resultTypeFilter === "failed") return all.filter(r => AI_FAIL_MESSAGES.has(r.warnings));
+    if (categoryFilter) return all.filter(r => r.categories.some(c => c.toLocaleLowerCase("tr") === categoryFilter.toLocaleLowerCase("tr")));
+    return all;
+  }, [aiResults, categoryFilter, resultTypeFilter]);
 
   const progressPct = aiProgress.total > 0 ? Math.round((aiProgress.done / aiProgress.total) * 100) : 0;
 
@@ -439,10 +442,14 @@ export default function AiSiniflandirmaPage() {
                   <div className="text-lg font-bold text-primary">{aiResults.size}</div>
                   <div className="text-[10px] text-muted-foreground">İşlenen</div>
                 </div>
-                <div className={`rounded-lg p-2.5 text-center ${warningResults.length > 0 ? "bg-destructive/10" : "bg-muted/50"}`}>
+                <button
+                  className={`rounded-lg p-2.5 text-center transition-all ${warningResults.length > 0 ? "bg-destructive/10 hover:bg-destructive/20 cursor-pointer" : "bg-muted/50 cursor-default"} ${resultTypeFilter === "warnings" ? "ring-2 ring-destructive" : ""}`}
+                  onClick={() => warningResults.length > 0 && setResultTypeFilter(prev => prev === "warnings" ? null : "warnings")}
+                  disabled={warningResults.length === 0}
+                >
                   <div className={`text-lg font-bold ${warningResults.length > 0 ? "text-destructive" : "text-muted-foreground"}`}>{warningResults.length}</div>
-                  <div className="text-[10px] text-muted-foreground">Uyarı</div>
-                </div>
+                  <div className="text-[10px] text-muted-foreground">{resultTypeFilter === "warnings" ? "↑ Filtrelendi" : "Uyarı"}</div>
+                </button>
                 <div className="bg-muted/50 rounded-lg p-2.5 text-center">
                   <div className="text-lg font-bold text-blue-600">{requestResults.length}</div>
                   <div className="text-[10px] text-muted-foreground">Özel İstek</div>
@@ -452,10 +459,13 @@ export default function AiSiniflandirmaPage() {
                   <div className="text-[10px] text-muted-foreground">Kategori</div>
                 </div>
                 {permanentlyFailedResults.length > 0 && (
-                  <div className="col-span-2 bg-red-50 dark:bg-red-950/20 rounded-lg p-2.5 text-center border border-red-200 dark:border-red-900">
+                  <button
+                    className={`col-span-2 rounded-lg p-2.5 text-center transition-all border cursor-pointer hover:brightness-110 ${resultTypeFilter === "failed" ? "bg-red-200 dark:bg-red-900/40 border-red-400 dark:border-red-700 ring-2 ring-red-500" : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900"}`}
+                    onClick={() => setResultTypeFilter(prev => prev === "failed" ? null : "failed")}
+                  >
                     <div className="text-lg font-bold text-destructive">{permanentlyFailedResults.length}</div>
-                    <div className="text-[10px] text-destructive/80">AI işleyemedi</div>
-                  </div>
+                    <div className="text-[10px] text-destructive/80">{resultTypeFilter === "failed" ? "↑ Filtrelendi" : "AI işleyemedi"}</div>
+                  </button>
                 )}
               </div>
             </div>
@@ -507,8 +517,20 @@ export default function AiSiniflandirmaPage() {
                 <h2 className="text-sm font-semibold flex items-center gap-1.5">
                   <FileText className="w-4 h-4 text-primary" />
                   Sonuçlar
-                  {categoryFilter && (
-                    <Badge variant="outline" className="text-xs ml-1">{categoryFilter.replace(/_/g, " ")} filtresi</Badge>
+                  {resultTypeFilter === "warnings" && (
+                    <Badge variant="destructive" className="text-xs ml-1 cursor-pointer" onClick={() => setResultTypeFilter(null)}>
+                      Uyarılılar <X className="w-2.5 h-2.5 ml-0.5" />
+                    </Badge>
+                  )}
+                  {resultTypeFilter === "failed" && (
+                    <Badge variant="destructive" className="text-xs ml-1 cursor-pointer" onClick={() => setResultTypeFilter(null)}>
+                      AI işleyemedi <X className="w-2.5 h-2.5 ml-0.5" />
+                    </Badge>
+                  )}
+                  {!resultTypeFilter && categoryFilter && (
+                    <Badge variant="outline" className="text-xs ml-1 cursor-pointer" onClick={() => setCategoryFilter(null)}>
+                      {categoryFilter.replace(/_/g, " ")} <X className="w-2.5 h-2.5 ml-0.5" />
+                    </Badge>
                   )}
                 </h2>
                 <span className="text-xs text-muted-foreground">{filteredResults.length} kayıt</span>
