@@ -8,7 +8,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Brain, ArrowLeft, Play, Square, FastForward, RotateCcw,
+  Brain, ArrowLeft, Play, Square, CheckSquare, FastForward, RotateCcw,
   AlertTriangle, Loader2, X, Sparkles, CheckCircle2,
   MessageSquare, FileText, Tag, Settings2, BarChart3,
 } from "lucide-react";
@@ -49,6 +49,21 @@ export default function AiSiniflandirmaPage() {
   const [resultTypeFilter, setResultTypeFilter] = useState<"warnings" | "failed" | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [selectedResultIds, setSelectedResultIds] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(`ai-selected-${projectId}`);
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  const toggleResultSelect = (id: string) => {
+    setSelectedResultIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      try { localStorage.setItem(`ai-selected-${projectId}`, JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
 
   const activeJobIdsRef = useRef<string[]>([]);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -657,12 +672,15 @@ export default function AiSiniflandirmaPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 text-xs text-muted-foreground">
                     <tr>
-                      <th className="text-left px-3 py-2 font-medium w-40">Bağışçı</th>
-                      <th className="text-left px-3 py-2 font-medium w-24">Cinsi</th>
+                      <th className="w-8 px-2 py-2"></th>
+                      <th className="text-left px-3 py-2 font-medium w-36">Vekaleti Veren</th>
+                      <th className="text-left px-3 py-2 font-medium w-36">Adına Kesilen</th>
+                      <th className="text-left px-3 py-2 font-medium w-20">Cinsi</th>
+                      <th className="text-left px-3 py-2 font-medium w-24">Özellik</th>
                       <th className="text-left px-3 py-2 font-medium">Kategoriler</th>
-                      <th className="text-left px-3 py-2 font-medium w-52">Özet</th>
-                      <th className="text-left px-3 py-2 font-medium w-52">Özel İstekler</th>
-                      <th className="text-left px-3 py-2 font-medium w-52">Uyarılar</th>
+                      <th className="text-left px-3 py-2 font-medium w-56">Özet / Notlar</th>
+                      <th className="text-left px-3 py-2 font-medium w-44">Özel İstekler</th>
+                      <th className="text-left px-3 py-2 font-medium w-44">Uyarılar</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -670,18 +688,32 @@ export default function AiSiniflandirmaPage() {
                       const donor = allItems.find(d => d.id === r.donationId);
                       const hasWarning = r.warnings && r.warnings.trim();
                       const isAiFailed = AI_FAIL_MESSAGES.has(r.warnings);
+                      const isSelected = selectedResultIds.has(r.donationId);
                       return (
-                        <tr key={r.donationId} className={`${isAiFailed ? "bg-red-50 dark:bg-red-950/20" : idx % 2 === 0 ? "bg-background" : "bg-muted/20"} ${hasWarning ? "border-l-2 border-l-destructive" : ""}`}>
-                          <td className="px-3 py-2.5 font-medium text-xs truncate max-w-[160px]" title={donor?.description || donor?.name || r.donationId}>
-                            {donor?.description || donor?.name || r.donationId}
+                        <tr
+                          key={r.donationId}
+                          className={`cursor-pointer transition-colors ${isSelected ? "bg-green-100/80 dark:bg-green-900/40" : isAiFailed ? "bg-red-50 dark:bg-red-950/20" : idx % 2 === 0 ? "bg-background" : "bg-muted/20"} ${hasWarning && !isSelected ? "border-l-2 border-l-destructive" : ""}`}
+                          onClick={() => toggleResultSelect(r.donationId)}
+                        >
+                          <td className="px-2 py-2.5 text-center" onClick={e => e.stopPropagation()}>
+                            <button onClick={() => toggleResultSelect(r.donationId)} className="text-muted-foreground hover:text-foreground">
+                              {isSelected
+                                ? <CheckSquare className="w-4 h-4 text-green-600" />
+                                : <Square className="w-4 h-4" />}
+                            </button>
+                          </td>
+                          <td className="px-3 py-2.5 font-medium text-xs truncate max-w-[144px]" title={donor?.description || r.donationId}>
+                            {donor?.description || r.donationId}
                             {isAiFailed && <span className="ml-1 text-[10px] text-destructive font-semibold">[hata]</span>}
                           </td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground truncate max-w-[144px]" title={donor?.name || ""}>{donor?.name || "—"}</td>
                           <td className="px-3 py-2.5 text-xs text-muted-foreground">{donor?.donationType || "—"}</td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground">{donor?.ozellik || donor?.birim || "—"}</td>
                           <td className="px-3 py-2.5">
                             <div className="flex flex-wrap gap-1">
                               {r.categories.length > 0 ? (
                                 r.categories.map(cat => (
-                                  <CategoryBadge key={cat} cat={cat} onClick={() => setCategoryFilter(prev => prev === cat ? null : cat)} />
+                                  <CategoryBadge key={cat} cat={cat} onClick={e => { e.stopPropagation(); setCategoryFilter(prev => prev === cat ? null : cat); }} />
                                 ))
                               ) : (
                                 <span className="text-xs text-muted-foreground/50">—</span>
