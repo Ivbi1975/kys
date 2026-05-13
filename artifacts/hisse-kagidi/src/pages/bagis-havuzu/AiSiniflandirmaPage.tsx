@@ -791,50 +791,72 @@ export default function AiSiniflandirmaPage() {
                           <td className="px-3 py-2.5 text-xs text-muted-foreground" onClick={e => e.stopPropagation()}>
                             {pendingNote?.donationId === r.donationId ? (
                               <div className="space-y-1.5">
-                                <p className="text-[11px] italic text-foreground/60 bg-muted/30 rounded px-2 py-1 border">{pendingNote.value || "(boş)"}</p>
-                                <p className="text-[10px] text-muted-foreground">Bu notu kaydetmek istiyor musunuz?</p>
+                                <p className="text-[11px] italic text-foreground/60 bg-muted/30 rounded px-2 py-1 border whitespace-pre-wrap">{pendingNote.value || "(boş)"}</p>
+                                <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">Değişikliği kaydetmek istiyor musunuz?</p>
                                 <div className="flex gap-1">
                                   <button
                                     disabled={savingNote}
+                                    onMouseDown={e => e.preventDefault()}
                                     onClick={() => confirmNoteEdit(projectId)}
                                     className="text-[10px] px-2 py-0.5 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
                                   >
-                                    {savingNote ? "Kaydediliyor…" : "Kaydet"}
+                                    {savingNote ? "Kaydediliyor…" : "✓ Evet, kaydet"}
                                   </button>
                                   <button
                                     disabled={savingNote}
-                                    onClick={() => setPendingNote(null)}
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => { setPendingNote(null); setEditingNote({ donationId: r.donationId, value: pendingNote.value }); }}
                                     className="text-[10px] px-2 py-0.5 rounded bg-muted border hover:bg-muted/70 disabled:opacity-50"
+                                  >
+                                    Geri dön
+                                  </button>
+                                  <button
+                                    disabled={savingNote}
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => setPendingNote(null)}
+                                    className="text-[10px] px-2 py-0.5 rounded text-muted-foreground hover:text-foreground disabled:opacity-50"
                                   >
                                     İptal
                                   </button>
                                 </div>
                               </div>
                             ) : editingNote?.donationId === r.donationId ? (
-                              <textarea
-                                autoFocus
-                                value={editingNote.value}
-                                onChange={e => setEditingNote({ donationId: r.donationId, value: e.target.value })}
-                                onKeyDown={e => {
-                                  if (e.key === "Escape") { setEditingNote(null); }
-                                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                                    const orig = donor?.notes?.trim() || "";
-                                    if (editingNote.value !== orig) {
+                              <div className="space-y-1">
+                                <textarea
+                                  autoFocus
+                                  value={editingNote.value}
+                                  onChange={e => setEditingNote({ donationId: r.donationId, value: e.target.value })}
+                                  onKeyDown={e => {
+                                    if (e.key === "Escape") { setEditingNote(null); }
+                                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                                       setPendingNote({ donationId: r.donationId, value: editingNote.value });
+                                      setEditingNote(null);
                                     }
-                                    setEditingNote(null);
-                                  }
-                                }}
-                                onBlur={() => {
-                                  const orig = donor?.notes?.trim() || "";
-                                  if (editingNote.value !== orig) {
-                                    setPendingNote({ donationId: r.donationId, value: editingNote.value });
-                                  }
-                                  setEditingNote(null);
-                                }}
-                                rows={3}
-                                className="w-full text-xs border rounded px-2 py-1 bg-background resize-none focus:outline-none focus:ring-1 focus:ring-primary"
-                              />
+                                  }}
+                                  rows={3}
+                                  className="w-full text-xs border rounded px-2 py-1 bg-background resize-y focus:outline-none focus:ring-1 focus:ring-primary"
+                                />
+                                <div className="flex gap-1">
+                                  <button
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => {
+                                      setPendingNote({ donationId: r.donationId, value: editingNote.value });
+                                      setEditingNote(null);
+                                    }}
+                                    className="text-[10px] px-2 py-0.5 rounded bg-primary text-primary-foreground hover:bg-primary/90"
+                                  >
+                                    Onayla
+                                  </button>
+                                  <button
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => setEditingNote(null)}
+                                    className="text-[10px] px-2 py-0.5 rounded bg-muted border hover:bg-muted/70"
+                                  >
+                                    İptal
+                                  </button>
+                                  <span className="text-[9px] text-muted-foreground/50 self-center">Ctrl+Enter</span>
+                                </div>
+                              </div>
                             ) : (
                               <div>
                                 {donor?.notes?.trim() ? (
@@ -853,7 +875,7 @@ export default function AiSiniflandirmaPage() {
                                     + not ekle
                                   </button>
                                 )}
-                                {r.summary}
+                                {r.summary && <p className="mt-0.5">{r.summary}</p>}
                               </div>
                             )}
                           </td>
