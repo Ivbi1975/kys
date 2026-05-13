@@ -205,25 +205,6 @@ function MultiSelectDropdown({
           )}
         </div>
       )}
-      {selected.length > 0 && (
-        <div className="flex flex-wrap gap-0.5 mt-1">
-          {selected.slice(0, 3).map(s => {
-            const disp = getDisplay(s);
-            const col = optMap.get(s)?.color;
-            return (
-              <Badge key={s} variant={excluded ? "destructive" : "secondary"} className="text-[10px] h-4 px-1 flex items-center gap-0.5">
-                {col && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: col }} />}
-                {excluded && "⊘ "}
-                {disp.length > 12 ? disp.slice(0, 12) + "…" : disp}
-                <button onClick={() => toggle(s)} className="hover:text-destructive ml-0.5"><X className="w-2.5 h-2.5" /></button>
-              </Badge>
-            );
-          })}
-          {selected.length > 3 && (
-            <Badge variant="outline" className="text-[10px] h-4 px-1">+{selected.length - 3}</Badge>
-          )}
-        </div>
-      )}
     </div>
   );
 }
