@@ -383,7 +383,7 @@ export default function BagisHavuzuPage() {
   });
 
   const allDescriptionCountMap = useMemo(() => {
-    const allItems = allDescData?.items || [];
+    const allItems = (allDescData?.items || []).filter(item => item.kesimAlaniName === "__havuz__");
     const map: Record<string, number> = {};
     for (const item of allItems) {
       const key = (item.description || "").trim().toLocaleLowerCase("tr");

@@ -1135,14 +1135,16 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
         const valueFragments = sourceRows.map((src, idx) => sql`(
           ${newIds[idx]}, ${targetKesimAlaniId}, ${src.name}, ${src.description}, ${src.donationType}, ${src.shareCount},
           ${src.vekalet}, ${normalizeNotes(src.notes)}, ${src.phone}, ${src.excluded}, ${nextSort + idx}, ${src.isFlagged}, ${src.flagReason},
-          ${src.birim}, ${src.temsilci}, ${src.ozellik}, ${src.fiyat}, ${src.yerTalebi}, ${src.gunTalebi}, ${src.ilkHayvan}, ${src.safi}, NOW()
+          ${src.birim}, ${src.temsilci}, ${src.ozellik}, ${src.fiyat}, ${src.yerTalebi}, ${src.gunTalebi}, ${src.ilkHayvan}, ${src.safi},
+          ${src.aiCategories ?? null}, ${src.aiWarnings ?? null}, NOW()
         )`);
 
         await tx.execute(sql`
           INSERT INTO donations (
             id, kesim_alani_id, name, description, donation_type, share_count,
             vekalet, notes, phone, excluded, sort_order, is_flagged, flag_reason,
-            birim, temsilci, ozellik, fiyat, yer_talebi, gun_talebi, ilk_hayvan, safi, updated_at
+            birim, temsilci, ozellik, fiyat, yer_talebi, gun_talebi, ilk_hayvan, safi,
+            ai_categories, ai_warnings, updated_at
           ) VALUES ${sql.join(valueFragments, sql`, `)}
         `);
 
