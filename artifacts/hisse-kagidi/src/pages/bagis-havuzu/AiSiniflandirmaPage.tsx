@@ -18,6 +18,7 @@ import {
   classifyNotesAsyncChunked, saveAiClassifications,
   PartialChunkError, ApiFetchError,
 } from "@/lib/api";
+import { API_BASE, getApiKey } from "@/lib/api/core";
 import { useToast } from "@/hooks/use-toast";
 import type { AiClassificationResult } from "@/lib/api";
 import { CategoryBadge } from "@/lib/categoryConfig";
@@ -52,6 +53,7 @@ export default function AiSiniflandirmaPage() {
   const activeJobIdsRef = useRef<string[]>([]);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const aiResultsRef = useRef<Map<string, AiResult>>(new Map());
+  const aiRunningRef = useRef(false);
 
   const { data: donationsData, isLoading } = useQuery({
     queryKey: ["pool-donations-ai-page", projectId],
@@ -72,7 +74,51 @@ export default function AiSiniflandirmaPage() {
     }
   }, []);
 
+  useEffect(() => { aiRunningRef.current = aiRunning; }, [aiRunning]);
+
   useEffect(() => () => stopPolling(), [stopPolling]);
+
+  const fireKeepaliveSave = useCallback(() => {
+    const results = aiResultsRef.current;
+    if (results.size === 0) return;
+    const token = getApiKey();
+    const body = JSON.stringify({
+      classifications: Array.from(results.values()).map(r => ({
+        donationId: r.donationId,
+        categories: r.categories,
+        warnings: r.warnings || "",
+        requests: r.requests || "",
+        summary: r.summary || "",
+      })),
+    });
+    fetch(`${API_BASE}/ai-notes/save-classifications`, {
+      method: "PUT",
+      keepalive: true,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body,
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!aiRunning) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      fireKeepaliveSave();
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [aiRunning, fireKeepaliveSave]);
+
+  useEffect(() => {
+    return () => {
+      if (aiRunningRef.current && aiResultsRef.current.size > 0) {
+        fireKeepaliveSave();
+      }
+    };
+  }, [fireKeepaliveSave]);
 
   const startPollingJobs = useCallback((jobIds: string[], batchTotal: number) => {
     stopPolling();
