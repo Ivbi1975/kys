@@ -1,8 +1,8 @@
 import { useState } from "react";
 import {
   BookOpen, ChevronDown, ChevronRight, LogIn, Home, Layers,
-  Users, Scissors, Printer, Tag, Brain, Trash2, Search,
-  Smartphone, Download, Upload, AlertTriangle, CheckCircle,
+  Scissors, Printer, Tag, Brain, Trash2, Search, Package,
+  Smartphone, AlertTriangle, CheckCircle,
   Info, ArrowRight, Star
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
