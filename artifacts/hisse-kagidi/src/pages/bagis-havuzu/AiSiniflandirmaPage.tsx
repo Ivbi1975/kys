@@ -51,6 +51,7 @@ export default function AiSiniflandirmaPage() {
 
   const activeJobIdsRef = useRef<string[]>([]);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const aiResultsRef = useRef<Map<string, AiResult>>(new Map());
 
   const { data: donationsData, isLoading } = useQuery({
     queryKey: ["pool-donations-ai-page", projectId],
@@ -116,6 +117,7 @@ export default function AiSiniflandirmaPage() {
                   donorName: donor?.description || donor?.name || r.donationId,
                 });
               }
+              aiResultsRef.current = next;
               return next;
             });
           }
@@ -172,15 +174,29 @@ export default function AiSiniflandirmaPage() {
             });
           }
 
-          if (allCollectedResults.length > 0) {
+          const toSaveResults = allCollectedResults.length > 0
+            ? allCollectedResults
+            : Array.from(aiResultsRef.current.values()).map(r => ({
+                donationId: r.donationId,
+                categories: r.categories,
+                warnings: r.warnings || "",
+                requests: r.requests || "",
+                summary: r.summary || "",
+              }));
+
+          if (toSaveResults.length > 0) {
             try {
               const SAVE_CHUNK = 2000;
-              for (let si = 0; si < allCollectedResults.length; si += SAVE_CHUNK) {
-                await saveAiClassifications(allCollectedResults.slice(si, si + SAVE_CHUNK));
+              for (let si = 0; si < toSaveResults.length; si += SAVE_CHUNK) {
+                await saveAiClassifications(toSaveResults.slice(si, si + SAVE_CHUNK));
               }
               queryClient.invalidateQueries({ queryKey: ["pool-donations"] });
+              queryClient.invalidateQueries({ queryKey: ["pool-donations-ai-page"] });
               setSaved(true);
-            } catch {}
+              toast({ title: "Kaydedildi", description: `${toSaveResults.length} bağışçı sınıflandırması güncellendi` });
+            } catch {
+              toast({ title: "Otomatik kaydetme başarısız", description: "Lütfen 'Kaydet' butonuna tıklayın", variant: "destructive" });
+            }
           }
         }
       } catch {} finally { isPolling = false; }
@@ -262,6 +278,7 @@ export default function AiSiniflandirmaPage() {
         await saveAiClassifications(toSave.slice(i, i + CHUNK));
       }
       queryClient.invalidateQueries({ queryKey: ["pool-donations"] });
+      queryClient.invalidateQueries({ queryKey: ["pool-donations-ai-page"] });
       setSaved(true);
       toast({ title: "Kaydedildi", description: `${toSave.length} bağışçı sınıflandırması güncellendi` });
     } catch {
