@@ -140,7 +140,7 @@ export default function ApiDokumantasyon() {
             <div className="flex items-center gap-2 text-white/35 text-[11px]">
               <Zap className="h-3.5 w-3.5" /> Hız Sınırı
             </div>
-            <p className="font-mono text-[12px] text-white/70">200 istek / dakika</p>
+            <p className="font-mono text-[12px] text-white/70">Sınır yok</p>
           </div>
         </div>
 
@@ -438,7 +438,6 @@ export default function ApiDokumantasyon() {
           <FieldTable rows={[
             { alan: "401", tur: "Unauthorized", aciklama: "X-API-Key eksik veya geçersiz" },
             { alan: "404", tur: "Not Found", aciklama: "Proje veya kesim alanı bulunamadı" },
-            { alan: "429", tur: "Too Many Requests", aciklama: "Dakikada 200 istek sınırı aşıldı" },
             { alan: "503", tur: "Service Unavailable", aciklama: "VYS_API_KEY sunucuda yapılandırılmamış" },
           ]} />
         </Section>
