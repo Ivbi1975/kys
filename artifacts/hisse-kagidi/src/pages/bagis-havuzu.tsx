@@ -374,24 +374,44 @@ export default function BagisHavuzuPage() {
     return new Set(stats?.multiLocationVekalets || []);
   }, [stats?.multiLocationVekalets]);
 
+  const { data: allDescData } = useQuery({
+    queryKey: ["pool-all-descriptions", projectId],
+    queryFn: () => fetchPoolDonations(projectId, { limit: 100000, offset: 0 }),
+    enabled: !!projectId,
+    staleTime: 120_000,
+    gcTime: 300_000,
+  });
+
+  const allDescriptionCountMap = useMemo(() => {
+    const allItems = allDescData?.items || [];
+    const map: Record<string, number> = {};
+    for (const item of allItems) {
+      const key = (item.description || "").trim().toLocaleLowerCase("tr");
+      if (key) map[key] = (map[key] || 0) + 1;
+    }
+    return map;
+  }, [allDescData]);
+
   const descriptionCountMap = useMemo(() => {
+    if (Object.keys(allDescriptionCountMap).length > 0) return allDescriptionCountMap;
     const map: Record<string, number> = {};
     for (const item of items) {
       const key = (item.description || "").trim().toLocaleLowerCase("tr");
       if (key) map[key] = (map[key] || 0) + 1;
     }
     return map;
-  }, [items]);
+  }, [items, allDescriptionCountMap]);
 
   const filteredItems = useMemo(() => {
     if (descriptionShareCountFilter.length === 0) return items;
     const filterSet = new Set(descriptionShareCountFilter);
-    return items.filter(item => {
+    const source = allDescData?.items || items;
+    return source.filter(item => {
       const key = (item.description || "").trim().toLocaleLowerCase("tr");
-      const cnt = key ? (descriptionCountMap[key] ?? 1) : 1;
+      const cnt = key ? (allDescriptionCountMap[key] ?? 1) : 1;
       return filterSet.has(cnt);
     });
-  }, [items, descriptionShareCountFilter, descriptionCountMap]);
+  }, [items, descriptionShareCountFilter, allDescriptionCountMap, allDescData]);
 
   const effectiveSelectedIds = useMemo(() => {
     if (selectAllPages && allFilteredIds.length > 0) {
