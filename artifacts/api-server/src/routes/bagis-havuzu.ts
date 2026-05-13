@@ -585,6 +585,7 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
     ilkHayvanDist,
     safiDist,
     tagCountResult,
+    untaggedCountResult,
   ] = await Promise.all([
     db.execute(sql`
       SELECT
@@ -692,6 +693,15 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
       GROUP BY ct.id, ct.name, ct.color
       ORDER BY count DESC
     `),
+    db.execute(sql`
+      SELECT COUNT(DISTINCT d.id)::int AS untagged_count
+      FROM donations d
+      JOIN kesim_alanlari ka ON ka.id = d.kesim_alani_id
+      WHERE ${filterWhere}
+        AND NOT EXISTS (
+          SELECT 1 FROM donation_tags dt WHERE dt.donation_id = d.id
+        )
+    `),
   ]);
 
   const stats = result.rows[0] || { total: 0, active: 0, excluded: 0, total_shares: 0 };
@@ -709,6 +719,7 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
     color: String(r.color || ""),
     count: Number(r.count),
   }));
+  const untaggedCount = Number((untaggedCountResult.rows[0] as Record<string, unknown>)?.untagged_count ?? 0);
 
   res.json({
     ...stats,
@@ -727,6 +738,7 @@ router.get("/projects/:id/donations/stats", asyncHandler(async (req, res) => {
     ilkHayvanDistribution: ilkHayvanDist.rows.map((r: Record<string, unknown>) => ({ ilkHayvan: String(r.value), count: Number(r.count) })),
     safiDistribution: safiDist.rows.map((r: Record<string, unknown>) => ({ safi: String(r.value), count: Number(r.count) })),
     tagDistribution,
+    untagged_count: untaggedCount,
   });
 }));
 

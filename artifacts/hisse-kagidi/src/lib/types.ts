@@ -68,6 +68,7 @@ export interface PoolStats {
   ilkHayvanDistribution: { ilkHayvan: string; count: number }[];
   safiDistribution: { safi: string; count: number }[];
   tagDistribution?: { id: string; name: string; color: string; count: number }[];
+  untagged_count?: number;
 }
 
 export interface Team {

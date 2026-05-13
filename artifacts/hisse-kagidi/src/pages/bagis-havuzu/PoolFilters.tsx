@@ -609,7 +609,7 @@ export function PoolFilters({
                       label: t.name,
                       color: t.color,
                     })),
-                    { value: "__no_tag__", label: "(Etiketsiz)", color: undefined },
+                    { value: "__no_tag__", label: "(Etiketsiz)", color: undefined, count: optStats?.untagged_count ?? undefined },
                   ]}
                   selected={tagFilter}
                   onChange={setTagFilter}
