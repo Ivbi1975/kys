@@ -1,16 +1,15 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { produce } from "immer";
-import type { KesimAlani, Donation } from "@/lib/types";
+import type { KesimAlani } from "@/lib/types";
 
 interface UseDragAndDropParams {
   kesim: KesimAlani | null;
   save: (data: KesimAlani, label?: string, forceImmediate?: boolean, saveType?: "full" | "donations" | "groups") => void;
-  toast: (opts: { title: string; description?: string; variant?: "destructive" }) => void;
   isGroupLocked: (groupIdx: number) => boolean;
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
 }
 
-export function useDragAndDrop({ kesim, save, toast, isGroupLocked, scrollContainerRef }: UseDragAndDropParams) {
+export function useDragAndDrop({ kesim, save, isGroupLocked, scrollContainerRef }: UseDragAndDropParams) {
   const [dragItem, setDragItem] = useState<{
     groupIdx: number;
     donationIdx: number;
@@ -46,23 +45,19 @@ export function useDragAndDrop({ kesim, save, toast, isGroupLocked, scrollContai
   ) {
     if (!kesim) return;
     if (isGroupLocked(groupIdx) || isGroupLocked(toGroupIdx)) return;
-    const groups = kesim.animalGroups.map((g) => ({
-      ...g,
-      donations: [...g.donations],
-    }));
-    const [item] = groups[groupIdx].donations.splice(fromIdx, 1);
-    groups[toGroupIdx].donations.splice(toIdx, 0, item);
+    if (groupIdx === toGroupIdx && fromIdx === toIdx) return;
 
-    if (groups[groupIdx].donations.length > 7) {
-      groups[groupIdx].donations = groups[groupIdx].donations.slice(0, 7);
-    }
-    if (groups[toGroupIdx].donations.length > 7) {
-      const overflow = groups[toGroupIdx].donations.splice(7);
-      groups[groupIdx].donations.push(...overflow);
-    }
+    const updated = produce(kesim, (draft) => {
+      const fromDon = { ...draft.animalGroups[groupIdx].donations[fromIdx] };
+      const toDon = { ...draft.animalGroups[toGroupIdx].donations[toIdx] };
+      draft.animalGroups[groupIdx].donations[fromIdx] = toDon;
+      draft.animalGroups[toGroupIdx].donations[toIdx] = fromDon;
+    });
 
-    const updated = produce(kesim, (draft) => { draft.animalGroups = groups; });
-    save(updated, `Grup içi taşıma yapıldı`, false, 'groups');
+    const label = groupIdx === toGroupIdx
+      ? `Satırlar yer değiştirdi`
+      : `Gruplar arası yer değişimi`;
+    save(updated, label, false, 'groups');
   }
 
   const handleDragStart = useCallback((groupIdx: number, donationIdx: number, e?: React.DragEvent) => {
@@ -156,26 +151,6 @@ export function useDragAndDrop({ kesim, save, toast, isGroupLocked, scrollContai
     dragOverGroupRef.current = null;
 
     if (dragItem && kesim) {
-      const srcGroup = kesim.animalGroups[dragItem.groupIdx];
-      const tgtGroup = kesim.animalGroups[groupIdx];
-      if (srcGroup && tgtGroup && dragItem.groupIdx !== groupIdx) {
-        const dragDonation = srcGroup.donations[dragItem.donationIdx];
-        const tgtDonation = tgtGroup.donations[donationIdx];
-        if (dragDonation?.name.trim() && !tgtDonation?.name.trim()) {
-          const tgtFilledCount = tgtGroup.donations.filter(d => d.name.trim()).length;
-          if (tgtFilledCount + 1 > 7) {
-            toast({
-              title: "Kapasite Aşımı",
-              description: `Hedef grupta boş slot kalmadı.`,
-              variant: "destructive",
-            });
-            setDragItem(null);
-            setDragOverItem(null);
-            setDragOverGroup(null);
-            return;
-          }
-        }
-      }
       moveGroupDonation(
         dragItem.groupIdx,
         dragItem.donationIdx,

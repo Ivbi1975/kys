@@ -262,7 +262,7 @@ export function useKesimAlaniState() {
   const teams = useTeams({ kesim, setKesim, toast, setFilterTeam });
   const trash = useTrash({ kesim, setKesim, toast, history });
 
-  const dragAndDrop = useDragAndDrop({ kesim, save, toast, isGroupLocked, scrollContainerRef: ui.scrollContainerRef });
+  const dragAndDrop = useDragAndDrop({ kesim, save, isGroupLocked, scrollContainerRef: ui.scrollContainerRef });
   const {
     dragItem, setDragItem, dragOverItem, setDragOverItem, dragOverGroup, setDragOverGroup,
     moveGroupDonation, handleDragStart, handleDragOver, handleDragLeave, handleDrop, handleDragEnd, handleDragOverCard,
