@@ -18,3 +18,9 @@ id = "otkUd20ram8PeBrpKZEy4"
 uri = "file://sistem-raporu.md"
 type = "text"
 title = "Kurban Hisse Kağıdı — Sistem Raporu"
+
+[[outputs]]
+id = "V--5HAmMCDbBYbr-T1_WV"
+uri = "file://.local/kys-test-plani.md"
+type = "text"
+title = "KYS Test Planı"
