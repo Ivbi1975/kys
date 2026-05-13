@@ -126,24 +126,35 @@ export default function AiSiniflandirmaPage() {
     const jobProgressMap = new Map<string, { done: number; total: number }>();
     const jobErrorMap = new Map<string, number>();
     const jobBatchMap = new Map<string, number>();
-    const savedDonationIds = new Set<string>();
+    type SaveItem = { donationId: string; categories: string[]; warnings: string; requests?: string; summary?: string };
+    const queuedDonationIds = new Set<string>();
+    const saveQueue: SaveItem[] = [];
     let isSaving = false;
     let isPolling = false;
     let totalSavedCount = 0;
 
-    const saveNewResults = async (newResults: { donationId: string; categories: string[]; warnings: string; requests?: string; summary?: string }[]) => {
-      if (isSaving || newResults.length === 0) return;
-      isSaving = true;
-      try {
-        const SAVE_CHUNK = 2000;
-        for (let si = 0; si < newResults.length; si += SAVE_CHUNK) {
-          await saveAiClassifications(newResults.slice(si, si + SAVE_CHUNK));
-        }
-        for (const r of newResults) savedDonationIds.add(r.donationId);
-        totalSavedCount += newResults.length;
-        queryClient.invalidateQueries({ queryKey: ["pool-donations"] });
-      } catch { /* sessiz — kullanıcı manuel Kaydet'e basabilir */ }
-      finally { isSaving = false; }
+    const drainQueue = async () => {
+      if (isSaving) return;
+      while (saveQueue.length > 0) {
+        isSaving = true;
+        const batch = saveQueue.splice(0, saveQueue.length);
+        try {
+          const SAVE_CHUNK = 2000;
+          for (let si = 0; si < batch.length; si += SAVE_CHUNK) {
+            await saveAiClassifications(batch.slice(si, si + SAVE_CHUNK));
+          }
+          totalSavedCount += batch.length;
+          queryClient.invalidateQueries({ queryKey: ["pool-donations"] });
+        } catch { /* sessiz — keepalive fetch son çare olarak devreye girer */ }
+        finally { isSaving = false; }
+      }
+    };
+
+    const enqueueNewResults = (newResults: SaveItem[]) => {
+      if (newResults.length === 0) return;
+      for (const r of newResults) queuedDonationIds.add(r.donationId);
+      saveQueue.push(...newResults);
+      drainQueue();
     };
 
     const poll = async () => {
@@ -169,7 +180,7 @@ export default function AiSiniflandirmaPage() {
           if (status.totalBatches !== undefined) jobBatchMap.set(jid, status.totalBatches);
 
           if (status.results && status.results.length > 0) {
-            const unsaved = status.results.filter(r => !savedDonationIds.has(r.donationId));
+            const unsaved = status.results.filter(r => !queuedDonationIds.has(r.donationId));
             if (unsaved.length > 0) {
               newResultsThisPoll.push(...unsaved.map(r => ({
                 donationId: r.donationId,
@@ -216,7 +227,7 @@ export default function AiSiniflandirmaPage() {
         }
 
         if (newResultsThisPoll.length > 0) {
-          saveNewResults(newResultsThisPoll);
+          enqueueNewResults(newResultsThisPoll);
         }
 
         let totalDone = 0, totalAll = 0;
@@ -246,7 +257,7 @@ export default function AiSiniflandirmaPage() {
           }
 
           const unsavedAtEnd = Array.from(aiResultsRef.current.values())
-            .filter(r => !savedDonationIds.has(r.donationId))
+            .filter(r => !queuedDonationIds.has(r.donationId))
             .map(r => ({
               donationId: r.donationId,
               categories: r.categories,
@@ -256,11 +267,13 @@ export default function AiSiniflandirmaPage() {
             }));
 
           if (unsavedAtEnd.length > 0) {
-            await saveNewResults(unsavedAtEnd);
+            enqueueNewResults(unsavedAtEnd);
           }
 
+          await drainQueue();
+
           queryClient.invalidateQueries({ queryKey: ["pool-donations-ai-page"] });
-          const finalTotal = totalSavedCount + unsavedAtEnd.length;
+          const finalTotal = totalSavedCount;
           setSaved(true);
           toast({ title: "Tümü kaydedildi", description: `${finalTotal} bağışçı sınıflandırması güncellendi` });
         }
