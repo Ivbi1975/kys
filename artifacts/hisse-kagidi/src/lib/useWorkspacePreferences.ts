@@ -1,19 +1,20 @@
 import { useState, useEffect, useCallback } from "react";
 
-export type ColumnKey = "drag" | "index" | "vekalet" | "description" | "name" | "donationType" | "notes" | "actions";
+export type ColumnKey = "drag" | "index" | "vekalet" | "description" | "temsilci" | "name" | "donationType" | "notes" | "actions";
 
 export const ALL_GROUP_COLUMNS: { key: ColumnKey; label: string; alwaysVisible?: boolean }[] = [
   { key: "drag", label: "Sürükle" },
   { key: "index", label: "Sıra", alwaysVisible: true },
   { key: "vekalet", label: "Vekalet" },
   { key: "description", label: "Vekaleti Veren" },
+  { key: "temsilci", label: "Vekaleti Alan" },
   { key: "name", label: "Adına Kesilen" },
   { key: "donationType", label: "Cinsi" },
   { key: "notes", label: "Notlar" },
   { key: "actions", label: "İşlemler" },
 ];
 
-export const DEFAULT_COLUMN_ORDER: ColumnKey[] = ["drag", "index", "vekalet", "description", "name", "donationType", "notes", "actions"];
+export const DEFAULT_COLUMN_ORDER: ColumnKey[] = ["drag", "index", "vekalet", "description", "temsilci", "name", "donationType", "notes", "actions"];
 
 export interface WorkspacePreferences {
   columnCount: 1 | 2 | 3;
@@ -41,10 +42,21 @@ function sanitizeColumnOrder(order: unknown): ColumnKey[] {
   if (!Array.isArray(order)) return [...DEFAULT_COLUMN_ORDER];
   const valid = order.filter((k): k is ColumnKey => typeof k === "string" && isValidColumnKey(k));
   const unique = [...new Set(valid)];
-  if (unique.length !== DEFAULT_COLUMN_ORDER.length) return [...DEFAULT_COLUMN_ORDER];
-  const hasAll = DEFAULT_COLUMN_ORDER.every(k => unique.includes(k));
-  if (!hasAll) return [...DEFAULT_COLUMN_ORDER];
-  return unique;
+  if (unique.length === 0) return [...DEFAULT_COLUMN_ORDER];
+  const missing = DEFAULT_COLUMN_ORDER.filter(k => !unique.includes(k));
+  if (missing.length === 0) return unique;
+  const result = [...unique];
+  for (const k of missing) {
+    const defaultIdx = DEFAULT_COLUMN_ORDER.indexOf(k);
+    let insertAt = result.length;
+    for (let i = defaultIdx - 1; i >= 0; i--) {
+      const prevKey = DEFAULT_COLUMN_ORDER[i];
+      const prevIdx = result.indexOf(prevKey);
+      if (prevIdx >= 0) { insertAt = prevIdx + 1; break; }
+    }
+    result.splice(insertAt, 0, k);
+  }
+  return result;
 }
 
 function sanitizeHiddenColumns(cols: unknown): ColumnKey[] {

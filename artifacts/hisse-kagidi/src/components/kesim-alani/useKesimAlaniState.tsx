@@ -633,6 +633,7 @@ export function useKesimAlaniState() {
       case "drag": return "w-6";
       case "index": return "w-6";
       case "vekalet": return "w-16";
+      case "temsilci": return "w-24";
       case "donationType": return "w-16";
       case "notes": return "w-20";
       case "actions": return "w-8";

@@ -24,7 +24,12 @@ import {
   Package,
   MoreHorizontal,
   AlertTriangle,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
+
+const SORTABLE_COLUMNS: ColumnKey[] = ["vekalet", "description", "temsilci", "name", "donationType"];
 
 interface AnimalGroupCardProps {
   group: AnimalGroup;
@@ -192,6 +197,12 @@ const GroupDonationRow = memo(function GroupDonationRow({
             <span className={`${inputH} flex items-center select-text`}>{turkishTitleCase(d.name) || "—"}</span>
           </td>
         );
+      case "temsilci":
+        return (
+          <td key={colKey} className={cellPad}>
+            <span className={`${inputH} flex items-center select-text`}>{turkishTitleCase(d.temsilci || "") || "—"}</span>
+          </td>
+        );
       case "donationType":
         return (
           <td key={colKey} className={cellPad}>
@@ -201,17 +212,17 @@ const GroupDonationRow = memo(function GroupDonationRow({
       case "notes":
         return (
           <td key={colKey} className={cellPad} data-group-cell={`${groupIdx}-${dIdx}-notes`}>
-            <div className="flex flex-col gap-0.5">
+            <div className={compact ? "flex flex-col gap-0.5" : "flex flex-row items-center gap-1.5"}>
               <LocalInput
-                className={inputClass}
+                className={`${inputClass} ${!compact ? "flex-1 min-w-0" : ""}`}
                 value={d.notes || ""}
                 onCommit={(v) => handleCommit("notes", v)}
                 onKeyDown={handleKeyDown("notes")}
                 placeholder="—"
                 aria-label={`Satır ${dIdx + 1} Notlar`}
               />
-              {((d.aiCategories && d.aiCategories.length > 0) || (d.aiWarnings && d.aiWarnings.trim())) && (
-                <div className="flex gap-0.5 flex-wrap">
+              {!compact && ((d.aiCategories && d.aiCategories.length > 0) || (d.aiWarnings && d.aiWarnings.trim())) && (
+                <div className="flex gap-0.5 flex-wrap flex-shrink-0">
                   {(d.aiCategories || []).map(cat => (
                     <span key={cat} className="px-1 py-0 rounded-full text-[8px] font-medium bg-violet-100 dark:bg-violet-900 text-violet-600 dark:text-violet-400 border border-violet-200/50 dark:border-violet-800/50 opacity-70">
                       {cat}
@@ -569,6 +580,29 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
 
   const team = useMemo(() => group.teamId ? teams.find(t => t.id === group.teamId) : undefined, [group.teamId, teams]);
 
+  const [sortState, setSortState] = useState<{ field: ColumnKey | null; dir: "asc" | "desc" }>({ field: null, dir: "asc" });
+
+  const handleSortHeader = useCallback((key: ColumnKey) => {
+    if (!SORTABLE_COLUMNS.includes(key)) return;
+    setSortState(prev =>
+      prev.field === key
+        ? { field: key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { field: key, dir: "asc" }
+    );
+  }, []);
+
+  const sortedDonations = useMemo(() => {
+    const withIdx = group.donations.map((d, i) => ({ d, origIdx: i }));
+    if (!sortState.field) return withIdx;
+    const field = sortState.field;
+    return [...withIdx].sort((a, b) => {
+      const valA = ((a.d[field as keyof Donation] as string) || "").toLowerCase();
+      const valB = ((b.d[field as keyof Donation] as string) || "").toLowerCase();
+      const cmp = valA.localeCompare(valB, "tr");
+      return sortState.dir === "asc" ? cmp : -cmp;
+    });
+  }, [group.donations, sortState]);
+
   return (
     <Card
       id={`animal-group-${group.animalNo}`}
@@ -744,19 +778,38 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
                     aria-label={`Hayvan ${group.animalNo} tüm bağışçıları seç`}
                   />
                 </th>
-                {visibleColumns.map(key => (
-                  <th key={key} className={`${compact ? "p-0.5" : "p-1.5"} text-left ${columnHeaderWidth(key)}`}>
-                    {key === "drag" ? "" : key === "actions" ? "" : columnHeaderLabel(key)}
-                  </th>
-                ))}
+                {visibleColumns.map(key => {
+                  const isSortable = SORTABLE_COLUMNS.includes(key);
+                  const isActive = sortState.field === key;
+                  return (
+                    <th
+                      key={key}
+                      className={`${compact ? "p-0.5" : "p-1.5"} text-left ${columnHeaderWidth(key)} ${isSortable ? "cursor-pointer select-none hover:bg-muted/50 transition-colors" : ""}`}
+                      onClick={isSortable ? () => handleSortHeader(key) : undefined}
+                    >
+                      {key === "drag" || key === "actions" ? "" : (
+                        <span className="inline-flex items-center gap-0.5">
+                          {columnHeaderLabel(key)}
+                          {isSortable && (
+                            isActive
+                              ? sortState.dir === "asc"
+                                ? <ArrowUp className="w-2.5 h-2.5 text-primary" />
+                                : <ArrowDown className="w-2.5 h-2.5 text-primary" />
+                              : <ArrowUpDown className="w-2.5 h-2.5 text-muted-foreground/40" />
+                          )}
+                        </span>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
-              {group.donations.map((d, dIdx) => (
+              {sortedDonations.map(({ d, origIdx }) => (
                 <GroupDonationRow
                   key={d.id}
                   donation={d}
-                  dIdx={dIdx}
+                  dIdx={origIdx}
                   groupIdx={groupIdx}
                   compact={compact}
                   visibleColumns={visibleColumns}
