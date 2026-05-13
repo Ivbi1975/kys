@@ -978,7 +978,7 @@ export default function BagisHavuzuPage() {
 
   if (isLoading && !data) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background uppercase">
         <div className="max-w-7xl mx-auto p-4">
           <div className="flex items-center gap-3 mb-6">
             <Skeleton className="h-8 w-16" />
@@ -996,7 +996,7 @@ export default function BagisHavuzuPage() {
   const showSelectAllBanner = selectedIds.size === items.length && items.length > 0 && total > items.length && !selectAllPages;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background uppercase">
       <div className="max-w-7xl mx-auto p-4">
         {/* Header row */}
         <div className="flex items-center gap-2 mb-2">

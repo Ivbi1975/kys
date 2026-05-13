@@ -21,7 +21,7 @@ export function KesimAlaniContent(props: KesimAlaniStateReturn) {
 
   return (
     <KesimAlaniProvider value={props}>
-      <div className={`mx-auto p-4 ${fullscreenMode ? "max-w-full" : "max-w-7xl"} ${basketItems.length > 0 ? "pb-24" : ""}`}>
+      <div className={`mx-auto p-4 uppercase ${fullscreenMode ? "max-w-full" : "max-w-7xl"} ${basketItems.length > 0 ? "pb-24" : ""}`}>
         {!fullscreenMode && <KesimAlaniHeader />}
 
         {!fullscreenMode && <StatsCards />}
