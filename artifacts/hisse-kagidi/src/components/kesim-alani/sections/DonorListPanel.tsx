@@ -137,7 +137,7 @@ export function DonorListPanel() {
                 <th className="p-2 text-left cursor-pointer hover:bg-muted w-20" onClick={() => handleSort("donationType")}>
                   <span className="flex items-center gap-1">Cinsi{sortField === "donationType" && (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}{sortField !== "donationType" && <ArrowUpDown className="w-3 h-3 opacity-30" />}</span>
                 </th>
-                <th className="p-2 text-left min-w-[180px]">Notlar / AI</th>
+                <th className="p-2 text-left min-w-[180px]">AI Etiketleri</th>
                 <th className="p-2 text-center cursor-pointer hover:bg-muted w-16" onClick={() => handleSort("shareCount")}>
                   <span className="flex items-center gap-1 justify-center">Hisse{sortField === "shareCount" && (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}{sortField !== "shareCount" && <ArrowUpDown className="w-3 h-3 opacity-30" />}</span>
                 </th>

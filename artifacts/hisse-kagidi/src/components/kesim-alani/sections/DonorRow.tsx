@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  AlertTriangle, Eye, EyeOff, Flag, MoreHorizontal, ShoppingBag, Tag, Trash2, Wand2,
+  AlertTriangle, Eye, EyeOff, Flag, MoreHorizontal, ShoppingBag, StickyNote, Tag, Trash2, Wand2,
 } from "lucide-react";
 
 interface DonorRowProps {
@@ -212,6 +212,7 @@ function DonorRowInner({
   onAddToBasket, onRemoveFromBasket, onSmartPlace, onSplitShare, onDelete,
   onFlagDonation, onUnflagDonation,
 }: DonorRowProps) {
+  const [notePopoverOpen, setNotePopoverOpen] = useState(false);
   return (<>
     <td className="p-2">
       <div className="flex items-center gap-1">
@@ -243,42 +244,30 @@ function DonorRowInner({
         onKeyDown={onKeyDown} onStartEditing={onStartEditing} displayValue={d.donationType} />
     </td>
     <td className="p-2">
-      {isEditing && editField === "notes" ? (
-        <Input className="h-7 text-sm ring-2 ring-primary/40 bg-primary/5" value={editDraft}
-          onChange={(e) => onSetEditDraft(e.target.value)} onBlur={() => onCommitEdit()}
-          onKeyDown={(e) => onKeyDown(e, d.id, "notes")} autoFocus />
-      ) : (
-        <div className="flex items-start gap-1.5 min-w-0">
-          <span
-            className="cursor-text shrink-0 max-w-[90px] truncate px-1 py-0.5 rounded text-xs hover:bg-muted/50 transition-colors text-muted-foreground"
-            title={d.notes || undefined}
-            onClick={() => onStartEditing(d.id, "notes")}
-          >
-            {d.notes || "—"}
-          </span>
-          {((d.aiCategories && d.aiCategories.length > 0) || (d.aiWarnings && d.aiWarnings.trim())) && (
-            <div className="flex gap-0.5 flex-wrap min-w-0 pt-0.5">
-              {(d.aiCategories || []).map(cat => (
-                <span
-                  key={cat}
-                  className="shrink-0 px-1.5 leading-4 rounded text-[9px] font-medium bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 whitespace-nowrap"
-                  title={cat}
-                >
-                  {cat}
-                </span>
-              ))}
-              {d.aiWarnings && d.aiWarnings.trim() && (
-                <span
-                  className="shrink-0 leading-4 px-1 rounded text-[9px] font-medium bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700 flex items-center gap-0.5"
-                  title={d.aiWarnings}
-                >
-                  <AlertTriangle className="w-2.5 h-2.5" />
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+      <div className="flex gap-0.5 flex-wrap">
+        {(d.aiCategories && d.aiCategories.length > 0) ? (
+          <>
+            {d.aiCategories.map(cat => (
+              <span
+                key={cat}
+                className="px-1.5 leading-[18px] rounded text-[9px] font-medium bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 whitespace-nowrap"
+              >
+                {cat}
+              </span>
+            ))}
+            {d.aiWarnings && d.aiWarnings.trim() && (
+              <span
+                className="leading-[18px] px-1 rounded text-[9px] font-medium bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700 flex items-center gap-0.5"
+                title={d.aiWarnings}
+              >
+                <AlertTriangle className="w-2.5 h-2.5" />
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="text-muted-foreground/40 text-xs">—</span>
+        )}
+      </div>
     </td>
     <td className="p-2 text-center">
       {descCount > 1 ? (
@@ -292,6 +281,26 @@ function DonorRowInner({
     </td>
     <td className="p-2">
       <div className="flex items-center gap-0.5">
+        <Popover open={notePopoverOpen} onOpenChange={setNotePopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-7 w-7 p-0 ${d.notes?.trim() ? "text-amber-500 hover:text-amber-600" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
+              title={d.notes?.trim() ? "Notu Gör" : "Not yok"}
+            >
+              <StickyNote className="w-3.5 h-3.5" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-72 p-3" align="end" side="top">
+            <p className="text-xs font-semibold mb-1.5 text-foreground">Not</p>
+            {d.notes?.trim() ? (
+              <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">{d.notes.trim()}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground/50 italic">Not eklenmemiş</p>
+            )}
+          </PopoverContent>
+        </Popover>
         {(d.tags || []).length > 0 && globalTags.length > 0 && (
           <div className="flex gap-0.5 flex-wrap mr-1">
             {(d.tags || []).map(tagId => {
