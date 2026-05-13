@@ -18,6 +18,7 @@ import {
   classifyNotesAsyncChunked, saveAiClassifications,
   PartialChunkError, ApiFetchError,
 } from "@/lib/api";
+import { bulkUpdateNotes } from "@/lib/api/ai-notes";
 import { API_BASE, getApiKey } from "@/lib/api/core";
 import { useToast } from "@/hooks/use-toast";
 import type { AiClassificationResult } from "@/lib/api";
@@ -63,6 +64,26 @@ export default function AiSiniflandirmaPage() {
       try { localStorage.setItem(`ai-selected-${projectId}`, JSON.stringify([...next])); } catch {}
       return next;
     });
+  };
+
+  const [editingNote, setEditingNote] = useState<{ donationId: string; value: string } | null>(null);
+  const [pendingNote, setPendingNote] = useState<{ donationId: string; value: string } | null>(null);
+  const [savingNote, setSavingNote] = useState(false);
+
+  const confirmNoteEdit = async (kesimAlaniId: string) => {
+    if (!pendingNote) return;
+    setSavingNote(true);
+    try {
+      await bulkUpdateNotes(kesimAlaniId, [{ donationId: pendingNote.donationId, notes: pendingNote.value }]);
+      queryClient.invalidateQueries({ queryKey: ["pool-donations-ai-page", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["pool-all-descriptions", projectId] });
+      toast({ title: "Not güncellendi", duration: 2000 });
+    } catch {
+      toast({ title: "Kayıt başarısız", variant: "destructive", duration: 3000 });
+    } finally {
+      setSavingNote(false);
+      setPendingNote(null);
+    }
   };
 
   const activeJobIdsRef = useRef<string[]>([]);
@@ -702,11 +723,11 @@ export default function AiSiniflandirmaPage() {
                                 : <Square className="w-4 h-4" />}
                             </button>
                           </td>
-                          <td className="px-3 py-2.5 font-medium text-xs truncate max-w-[144px]" title={donor?.description || r.donationId}>
-                            {donor?.description || r.donationId}
+                          <td className="px-3 py-2.5 font-medium text-xs truncate max-w-[144px]" title={(donor?.description || r.donationId).toUpperCase()}>
+                            {(donor?.description || r.donationId).toUpperCase()}
                             {isAiFailed && <span className="ml-1 text-[10px] text-destructive font-semibold">[hata]</span>}
                           </td>
-                          <td className="px-3 py-2.5 text-xs text-muted-foreground truncate max-w-[144px]" title={donor?.name || ""}>{donor?.name || "—"}</td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground truncate max-w-[144px]" title={(donor?.name || "").toUpperCase()}>{donor?.name ? donor.name.toUpperCase() : "—"}</td>
                           <td className="px-3 py-2.5 text-xs text-muted-foreground">{donor?.donationType || "—"}</td>
                           <td className="px-3 py-2.5 text-xs text-muted-foreground">{donor?.ozellik || donor?.birim || "—"}</td>
                           <td className="px-3 py-2.5">
@@ -720,11 +741,74 @@ export default function AiSiniflandirmaPage() {
                               )}
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 text-xs text-muted-foreground">
-                            {donor?.notes?.trim() && (
-                              <p className="mb-1 text-foreground/70 italic border-b border-border/40 pb-1">{donor.notes.trim()}</p>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground" onClick={e => e.stopPropagation()}>
+                            {pendingNote?.donationId === r.donationId ? (
+                              <div className="space-y-1.5">
+                                <p className="text-[11px] italic text-foreground/60 bg-muted/30 rounded px-2 py-1 border">{pendingNote.value || "(boş)"}</p>
+                                <p className="text-[10px] text-muted-foreground">Bu notu kaydetmek istiyor musunuz?</p>
+                                <div className="flex gap-1">
+                                  <button
+                                    disabled={savingNote}
+                                    onClick={() => confirmNoteEdit(projectId)}
+                                    className="text-[10px] px-2 py-0.5 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                                  >
+                                    {savingNote ? "Kaydediliyor…" : "Kaydet"}
+                                  </button>
+                                  <button
+                                    disabled={savingNote}
+                                    onClick={() => setPendingNote(null)}
+                                    className="text-[10px] px-2 py-0.5 rounded bg-muted border hover:bg-muted/70 disabled:opacity-50"
+                                  >
+                                    İptal
+                                  </button>
+                                </div>
+                              </div>
+                            ) : editingNote?.donationId === r.donationId ? (
+                              <textarea
+                                autoFocus
+                                value={editingNote.value}
+                                onChange={e => setEditingNote({ donationId: r.donationId, value: e.target.value })}
+                                onKeyDown={e => {
+                                  if (e.key === "Escape") { setEditingNote(null); }
+                                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                                    const orig = donor?.notes?.trim() || "";
+                                    if (editingNote.value !== orig) {
+                                      setPendingNote({ donationId: r.donationId, value: editingNote.value });
+                                    }
+                                    setEditingNote(null);
+                                  }
+                                }}
+                                onBlur={() => {
+                                  const orig = donor?.notes?.trim() || "";
+                                  if (editingNote.value !== orig) {
+                                    setPendingNote({ donationId: r.donationId, value: editingNote.value });
+                                  }
+                                  setEditingNote(null);
+                                }}
+                                rows={3}
+                                className="w-full text-xs border rounded px-2 py-1 bg-background resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+                              />
+                            ) : (
+                              <div>
+                                {donor?.notes?.trim() ? (
+                                  <p
+                                    className="mb-1 text-foreground/70 italic border-b border-border/40 pb-1 cursor-text hover:bg-muted/30 rounded px-1 -mx-1 transition-colors"
+                                    title="Düzenlemek için tıklayın"
+                                    onClick={() => setEditingNote({ donationId: r.donationId, value: donor.notes?.trim() || "" })}
+                                  >
+                                    {donor.notes.trim()}
+                                  </p>
+                                ) : (
+                                  <button
+                                    className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground italic"
+                                    onClick={() => setEditingNote({ donationId: r.donationId, value: "" })}
+                                  >
+                                    + not ekle
+                                  </button>
+                                )}
+                                {r.summary}
+                              </div>
                             )}
-                            {r.summary || (!donor?.notes?.trim() ? "—" : null)}
                           </td>
                           <td className="px-3 py-2.5 text-xs">
                             {r.requests?.trim() ? (
