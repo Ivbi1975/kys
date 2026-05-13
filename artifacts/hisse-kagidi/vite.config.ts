@@ -158,6 +158,7 @@ export default defineConfig({
         target: externalApiTarget,
         changeOrigin: true,
         secure: true,
+        rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },
   },
