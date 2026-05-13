@@ -372,6 +372,15 @@ export default function BagisHavuzuPage() {
     return new Set(stats?.multiLocationVekalets || []);
   }, [stats?.multiLocationVekalets]);
 
+  const descriptionCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const item of items) {
+      const key = (item.description || "").trim().toLocaleLowerCase("tr");
+      if (key) map[key] = (map[key] || 0) + 1;
+    }
+    return map;
+  }, [items]);
+
   const effectiveSelectedIds = useMemo(() => {
     if (selectAllPages && allFilteredIds.length > 0) {
       return new Set(allFilteredIds);
@@ -1251,6 +1260,7 @@ export default function BagisHavuzuPage() {
           onUnflagDonation={handleUnflagDonation}
           onInlineEdit={handleInlineEdit}
           donorMissedCounts={donorMissedCounts}
+          descriptionCountMap={descriptionCountMap}
           kesimAlaniColorMap={kesimAlaniColorMap}
           assignedVekalets={assignedVekalets}
           projectId={projectId}

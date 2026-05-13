@@ -49,6 +49,7 @@ interface VirtualizedDonationTableProps {
   onUnflagDonation?: (id: string) => void;
   onInlineEdit?: (donationId: string, field: string, value: string) => void;
   donorMissedCounts?: Record<string, number>;
+  descriptionCountMap?: Record<string, number>;
   kesimAlaniColorMap?: Record<string, string>;
   assignedVekalets?: Set<string>;
   projectId?: string;
@@ -178,7 +179,7 @@ function SiblingsBadge({ donationId, donorName, missedCount, projectId }: {
   );
 }
 
-function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean, missedCount?: number, projectId?: string) {
+function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean, missedCount?: number, projectId?: string, descriptionCount?: number) {
   switch (key) {
     case "vekalet":
       return (
@@ -212,7 +213,14 @@ function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
         </>
       );
     case "name": return <span className="font-medium">{turkishTitleCase(d.name) || "—"}</span>;
-    case "description": return <span>{turkishTitleCase(d.description) || "—"}</span>;
+    case "description": return (
+      <span className="inline-flex items-center gap-1">
+        <span>{turkishTitleCase(d.description) || "—"}</span>
+        {descriptionCount && descriptionCount > 1 ? (
+          <span className="flex-shrink-0 text-[10px] font-semibold text-muted-foreground/60 bg-muted/60 rounded px-1 leading-tight" title={`Bu isimden ${descriptionCount} kayıt var`}>{descriptionCount}</span>
+        ) : null}
+      </span>
+    );
     case "donationType": return <span>{turkishTitleCase(d.donationType) || "—"}</span>;
     case "notes": return <span className="max-w-[150px] truncate block" title={d.notes}>{d.notes || "—"}</span>;
     case "phone": return <span>{d.phone || "—"}</span>;
@@ -241,7 +249,7 @@ function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
   }
 }
 
-function renderDisplayValue(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean, missedCount?: number, projectId?: string) {
+function renderDisplayValue(d: PoolDonation, key: TableColumnKey, isMultiLoc: boolean, missedCount?: number, projectId?: string, descriptionCount?: number) {
   switch (key) {
     case "vekalet":
       return (
@@ -275,6 +283,14 @@ function renderDisplayValue(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
         </>
       );
     case "name": return <span className="font-medium">{turkishTitleCase(d.name) || "—"}</span>;
+    case "description": return (
+      <span className="inline-flex items-center gap-1">
+        <span>{turkishTitleCase(d.description) || "—"}</span>
+        {descriptionCount && descriptionCount > 1 ? (
+          <span className="flex-shrink-0 text-[10px] font-semibold text-muted-foreground/60 bg-muted/60 rounded px-1 leading-tight" title={`Bu isimden ${descriptionCount} kayıt var`}>{descriptionCount}</span>
+        ) : null}
+      </span>
+    );
     case "notes": return <span className="max-w-[150px] truncate block" title={d.notes}>{d.notes || "—"}</span>;
     case "phone": return d.phone || "—";
     case "shareCount": return <span className="font-bold">{d.shareCount ?? 1}</span>;
@@ -390,8 +406,8 @@ function InlineEditInput({
 
 export function VirtualizedDonationTable({
   items, isLoading, activeFilterCount, selectedIds, toggleSelect, toggleSelectAll, multiLocationVekalets, visibleColumns,
-  sortBy, sortDir, onColumnSort, onFlagDonation, onUnflagDonation, onInlineEdit, donorMissedCounts, kesimAlaniColorMap,
-  assignedVekalets, projectId,
+  sortBy, sortDir, onColumnSort, onFlagDonation, onUnflagDonation, onInlineEdit, donorMissedCounts, descriptionCountMap,
+  kesimAlaniColorMap, assignedVekalets, projectId,
 }: VirtualizedDonationTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const headerInnerRef = useRef<HTMLDivElement>(null);
@@ -595,14 +611,14 @@ export function VirtualizedDonationTable({
                                   className={`p-2 text-xs overflow-hidden text-ellipsis whitespace-nowrap cursor-text hover:bg-muted/50 ${col.key === "vekalet" ? "font-mono" : ""}`}
                                   onClick={() => startEditing(d.id, col.key)}
                                 >
-                                  {renderDisplayValue(d, col.key, isMultiLoc, col.key === "vekalet" ? missedCount : undefined, projectId)}
+                                  {renderDisplayValue(d, col.key, isMultiLoc, col.key === "vekalet" ? missedCount : undefined, projectId, col.key === "description" ? (descriptionCountMap?.[(d.description || "").trim().toLocaleLowerCase("tr")] ?? undefined) : undefined)}
                                 </td>
                               );
                             }
 
                             return (
                               <td key={col.key} className={`p-2 text-xs overflow-hidden text-ellipsis whitespace-nowrap ${col.key === "vekalet" ? "font-mono" : ""}`}>
-                                {renderReadOnlyCell(d, col.key, isMultiLoc, col.key === "vekalet" ? missedCount : undefined, projectId)}
+                                {renderReadOnlyCell(d, col.key, isMultiLoc, col.key === "vekalet" ? missedCount : undefined, projectId, col.key === "description" ? (descriptionCountMap?.[(d.description || "").trim().toLocaleLowerCase("tr")] ?? undefined) : undefined)}
                               </td>
                             );
                           })}
