@@ -80,8 +80,25 @@ export default function AiSiniflandirmaPage() {
     const jobProgressMap = new Map<string, { done: number; total: number }>();
     const jobErrorMap = new Map<string, number>();
     const jobBatchMap = new Map<string, number>();
-    const allCollectedResults: { donationId: string; categories: string[]; warnings: string; requests?: string; summary?: string }[] = [];
+    const savedDonationIds = new Set<string>();
+    let isSaving = false;
     let isPolling = false;
+    let totalSavedCount = 0;
+
+    const saveNewResults = async (newResults: { donationId: string; categories: string[]; warnings: string; requests?: string; summary?: string }[]) => {
+      if (isSaving || newResults.length === 0) return;
+      isSaving = true;
+      try {
+        const SAVE_CHUNK = 2000;
+        for (let si = 0; si < newResults.length; si += SAVE_CHUNK) {
+          await saveAiClassifications(newResults.slice(si, si + SAVE_CHUNK));
+        }
+        for (const r of newResults) savedDonationIds.add(r.donationId);
+        totalSavedCount += newResults.length;
+        queryClient.invalidateQueries({ queryKey: ["pool-donations"] });
+      } catch { /* sessiz — kullanıcı manuel Kaydet'e basabilir */ }
+      finally { isSaving = false; }
+    };
 
     const poll = async () => {
       if (isPolling) return;
@@ -89,6 +106,8 @@ export default function AiSiniflandirmaPage() {
       try {
         const activeIds = jobIds.filter(id => !finishedJobs.has(id));
         const statuses = await Promise.all(activeIds.map(id => fetchJobStatus(id).catch(() => null)));
+
+        const newResultsThisPoll: { donationId: string; categories: string[]; warnings: string; requests?: string; summary?: string }[] = [];
 
         for (let i = 0; i < activeIds.length; i++) {
           const status = statuses[i];
@@ -104,6 +123,17 @@ export default function AiSiniflandirmaPage() {
           if (status.totalBatches !== undefined) jobBatchMap.set(jid, status.totalBatches);
 
           if (status.results && status.results.length > 0) {
+            const unsaved = status.results.filter(r => !savedDonationIds.has(r.donationId));
+            if (unsaved.length > 0) {
+              newResultsThisPoll.push(...unsaved.map(r => ({
+                donationId: r.donationId,
+                categories: Array.isArray(r.categories) ? r.categories : [],
+                warnings: r.warnings || "",
+                requests: r.requests || "",
+                summary: r.summary || "",
+              })));
+            }
+
             setAiResults(prev => {
               const next = new Map(prev);
               for (const r of status.results!) {
@@ -124,15 +154,6 @@ export default function AiSiniflandirmaPage() {
 
           if (status.status === "completed" || status.status === "failed" || status.status === "cancelled") {
             finishedJobs.add(jid);
-            if (status.results && status.results.length > 0) {
-              allCollectedResults.push(...status.results.map(r => ({
-                donationId: r.donationId,
-                categories: Array.isArray(r.categories) ? r.categories : [],
-                warnings: r.warnings || "",
-                requests: r.requests || "",
-                summary: r.summary || "",
-              })));
-            }
             if (status.status === "cancelled") setAiStopped(true);
             if (status.status === "failed") {
               const isTimeout = status.error?.startsWith("Zaman aşımı");
@@ -146,6 +167,10 @@ export default function AiSiniflandirmaPage() {
               if (isTimeout) setAiStopped(true);
             }
           }
+        }
+
+        if (newResultsThisPoll.length > 0) {
+          saveNewResults(newResultsThisPoll);
         }
 
         let totalDone = 0, totalAll = 0;
@@ -174,30 +199,24 @@ export default function AiSiniflandirmaPage() {
             });
           }
 
-          const toSaveResults = allCollectedResults.length > 0
-            ? allCollectedResults
-            : Array.from(aiResultsRef.current.values()).map(r => ({
-                donationId: r.donationId,
-                categories: r.categories,
-                warnings: r.warnings || "",
-                requests: r.requests || "",
-                summary: r.summary || "",
-              }));
+          const unsavedAtEnd = Array.from(aiResultsRef.current.values())
+            .filter(r => !savedDonationIds.has(r.donationId))
+            .map(r => ({
+              donationId: r.donationId,
+              categories: r.categories,
+              warnings: r.warnings || "",
+              requests: r.requests || "",
+              summary: r.summary || "",
+            }));
 
-          if (toSaveResults.length > 0) {
-            try {
-              const SAVE_CHUNK = 2000;
-              for (let si = 0; si < toSaveResults.length; si += SAVE_CHUNK) {
-                await saveAiClassifications(toSaveResults.slice(si, si + SAVE_CHUNK));
-              }
-              queryClient.invalidateQueries({ queryKey: ["pool-donations"] });
-              queryClient.invalidateQueries({ queryKey: ["pool-donations-ai-page"] });
-              setSaved(true);
-              toast({ title: "Kaydedildi", description: `${toSaveResults.length} bağışçı sınıflandırması güncellendi` });
-            } catch {
-              toast({ title: "Otomatik kaydetme başarısız", description: "Lütfen 'Kaydet' butonuna tıklayın", variant: "destructive" });
-            }
+          if (unsavedAtEnd.length > 0) {
+            await saveNewResults(unsavedAtEnd);
           }
+
+          queryClient.invalidateQueries({ queryKey: ["pool-donations-ai-page"] });
+          const finalTotal = totalSavedCount + unsavedAtEnd.length;
+          setSaved(true);
+          toast({ title: "Tümü kaydedildi", description: `${finalTotal} bağışçı sınıflandırması güncellendi` });
         }
       } catch {} finally { isPolling = false; }
     };
