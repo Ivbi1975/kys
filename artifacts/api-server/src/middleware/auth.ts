@@ -5,6 +5,7 @@ import { verifySessionToken, isSessionTokenShape } from "../lib/session-token";
 
 const API_KEY = process.env.API_KEY || "";
 const ADMIN_KEY = process.env.ADMIN_KEY || "";
+const SESSION_SECRET = process.env.SESSION_SECRET || "";
 const IS_DEV = process.env.NODE_ENV === "development";
 
 const PUBLIC_PATH_PREFIXES = [
@@ -56,7 +57,7 @@ export function apiKeyAuth(req: Request, res: Response, next: NextFunction): voi
 
   if (candidate) {
     if (isSessionTokenShape(candidate)) {
-      const result = verifySessionToken(candidate, API_KEY);
+      const result = verifySessionToken(candidate, SESSION_SECRET);
       if (!result.valid) {
         logger.warn({ path: req.path, ip: req.ip, reason: result.reason }, "Invalid session token");
         res.status(401).json({ error: "Geçersiz veya süresi dolmuş oturum." });

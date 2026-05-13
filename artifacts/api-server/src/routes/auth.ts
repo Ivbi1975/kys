@@ -17,19 +17,20 @@ router.post("/auth/login", (req, res) => {
     return;
   }
 
-  const apiKey = process.env.API_KEY || "";
+  const appPassword = process.env.APP_PASSWORD || "";
+  const sessionSecret = process.env.SESSION_SECRET || "";
 
-  if (!apiKey) {
+  if (!appPassword || !sessionSecret) {
     res.status(503).json({ error: ERROR_MESSAGES.SERVER_CONFIG_ERROR });
     return;
   }
 
-  if (!timingSafeCompare(parsed.data.password, apiKey)) {
+  if (!timingSafeCompare(parsed.data.password, appPassword)) {
     res.status(401).json({ error: ERROR_MESSAGES.WRONG_PASSWORD });
     return;
   }
 
-  const { token, expiresAt } = issueSessionToken(apiKey);
+  const { token, expiresAt } = issueSessionToken(sessionSecret);
   res.json({ success: true, token, expiresAt });
 });
 
