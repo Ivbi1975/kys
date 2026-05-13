@@ -158,7 +158,7 @@ function MultiSelectDropdown({
               />
             </div>
           )}
-          <div className="max-h-48 overflow-auto p-1">
+          <div className="max-h-48 overflow-auto px-1 pt-1">
             {filtered.length === 0 && (
               <p className="text-xs text-muted-foreground p-2 text-center">Sonuç yok</p>
             )}
@@ -184,6 +184,7 @@ function MultiSelectDropdown({
                 </button>
               );
             })}
+            <div className="h-1" />
           </div>
           {selected.length > 0 && (
             <div className="border-t p-1">
