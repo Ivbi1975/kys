@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { appSettingsTable, donationsTable, aiJobsTable } from "@workspace/db/schema";
-import { eq, lt, or, desc, and, inArray } from "drizzle-orm";
+import { appSettingsTable, donationsTable, aiJobsTable, kesimAlanlariTable } from "@workspace/db/schema";
+import { eq, lt, or, desc, and, inArray, ne, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { assertOpenAiConfigured, openai } from "@workspace/integrations-openai-ai-server";
 import crypto from "crypto";
@@ -806,6 +806,74 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
       }
     }
   }, { isolationLevel: "repeatable read" });
+
+  // Retroactive sync: propagate ai_categories to transferred copies.
+  // When a pool donation is classified, find non-pool donations in the same
+  // project with the same vekalet and sync their ai_categories too.
+  try {
+    const classifiedIds = enrichedClassifications.map(c => c.donationId);
+    const SYNC_CHUNK = 200;
+    for (let i = 0; i < classifiedIds.length; i += SYNC_CHUNK) {
+      const chunk = classifiedIds.slice(i, i + SYNC_CHUNK);
+      const sourceDonations = await db.select({
+        id: donationsTable.id,
+        vekalet: donationsTable.vekalet,
+        aiCategories: donationsTable.aiCategories,
+        aiWarnings: donationsTable.aiWarnings,
+        kesimAlaniId: donationsTable.kesimAlaniId,
+      })
+        .from(donationsTable)
+        .innerJoin(kesimAlanlariTable, eq(donationsTable.kesimAlaniId, kesimAlanlariTable.id))
+        .where(and(
+          inArray(donationsTable.id, chunk),
+          eq(kesimAlanlariTable.name, "__havuz__"),
+          isNull(donationsTable.deletedAt),
+          isNull(kesimAlanlariTable.deletedAt),
+        ));
+
+      if (sourceDonations.length === 0) continue;
+
+      const poolKaIds = [...new Set(sourceDonations.map(d => d.kesimAlaniId))];
+      const projectRows = await db.select({ id: kesimAlanlariTable.id, projectId: kesimAlanlariTable.projectId })
+        .from(kesimAlanlariTable)
+        .where(inArray(kesimAlanlariTable.id, poolKaIds));
+      const projectIdByKaId = new Map(projectRows.map(r => [r.id, r.projectId]));
+
+      for (const src of sourceDonations) {
+        if (!src.vekalet || !src.aiCategories) continue;
+        const projectId = projectIdByKaId.get(src.kesimAlaniId);
+        if (!projectId) continue;
+
+        const nonPoolKas = await db.select({ id: kesimAlanlariTable.id })
+          .from(kesimAlanlariTable)
+          .where(and(
+            eq(kesimAlanlariTable.projectId, projectId),
+            ne(kesimAlanlariTable.name, "__havuz__"),
+            isNull(kesimAlanlariTable.deletedAt),
+          ));
+
+        if (nonPoolKas.length === 0) continue;
+        const nonPoolKaIds = nonPoolKas.map(k => k.id);
+
+        for (let j = 0; j < nonPoolKaIds.length; j += SYNC_CHUNK) {
+          const kaChunk = nonPoolKaIds.slice(j, j + SYNC_CHUNK);
+          await db.update(donationsTable)
+            .set({
+              aiCategories: src.aiCategories,
+              aiWarnings: src.aiWarnings,
+              updatedAt: new Date(),
+            })
+            .where(and(
+              eq(donationsTable.vekalet, src.vekalet),
+              inArray(donationsTable.kesimAlaniId, kaChunk),
+              isNull(donationsTable.deletedAt),
+            ));
+        }
+      }
+    }
+  } catch (syncErr) {
+    logger.warn({ err: syncErr }, "ai-categories sync to transferred copies failed (non-fatal)");
+  }
 
   res.json({ success: true, count: enrichedClassifications.length });
 }));
