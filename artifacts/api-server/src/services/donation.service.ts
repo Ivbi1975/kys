@@ -237,7 +237,7 @@ export async function updateDonation(kesimAlaniId: string, donationId: string, u
   if (kaCheck.error) return serviceError(kaCheck.error, kaCheck.status);
 
   const [existing] = await db.select().from(donationsTable)
-    .where(eq(donationsTable.id, donationId));
+    .where(and(eq(donationsTable.id, donationId), isNull(donationsTable.deletedAt)));
   if (!existing || existing.kesimAlaniId !== kesimAlaniId) {
     return serviceError("donor_not_found", 404);
   }
@@ -290,6 +290,9 @@ export async function deleteDonation(kesimAlaniId: string, donationId: string, p
   if (permanent) {
     await db.delete(donationsTable).where(eq(donationsTable.id, donationId));
   } else {
+    if (existing.deletedAt) {
+      return serviceError("donor_not_found", 404);
+    }
     await db.update(donationsTable)
       .set({ deletedAt: new Date() })
       .where(eq(donationsTable.id, donationId));
