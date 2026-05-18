@@ -225,7 +225,11 @@ function renderReadOnlyCell(d: PoolDonation, key: TableColumnKey, isMultiLoc: bo
     case "notes": return <span className="max-w-[150px] truncate block" title={d.notes}>{d.notes || "—"}</span>;
     case "phone": return <span>{d.phone || "—"}</span>;
     case "shareCount": return <span className="font-bold">{d.shareCount ?? 1}</span>;
-    case "kesimAlani": return <Badge variant="outline" className="text-xs">{d.kesimAlaniName}</Badge>;
+    case "kesimAlani": {
+      const kaName = d.kesimAlaniName;
+      if (!kaName || kaName === "__havuz__") return <span className="text-muted-foreground text-xs">—</span>;
+      return <Badge variant="outline" className="text-xs">{kaName}</Badge>;
+    }
     case "durum": {
       const { label, color } = getStatusLabel(d);
       return <span className={`font-medium ${color}`}>{label}</span>;

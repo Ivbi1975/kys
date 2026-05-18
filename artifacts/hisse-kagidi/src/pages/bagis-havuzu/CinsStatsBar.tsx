@@ -4,7 +4,7 @@ import type { PoolStats } from "@/lib/types";
 
 interface CinsStatsBarProps {
   stats: PoolStats | undefined;
-  items: { donationType: string; shareCount: number }[];
+  items: { donationType: string; shareCount: number; kesimAlaniName?: string }[];
   donationTypeFilter: string[];
   onToggleType: (type: string) => void;
 }
@@ -19,9 +19,10 @@ const TYPE_COLORS: Record<string, string> = {
 
 const SELECTED_RING = "ring-2 ring-primary ring-offset-1 dark:ring-offset-background";
 
-function computeFallbackDistribution(items: { donationType: string; shareCount: number }[]) {
+function computeFallbackDistribution(items: { donationType: string; shareCount: number; kesimAlaniName?: string }[]) {
   const map = new Map<string, { count: number; shares: number }>();
   for (const item of items) {
+    if (item.kesimAlaniName !== undefined && item.kesimAlaniName !== "__havuz__") continue;
     const type = item.donationType || "";
     if (!type) continue;
     const entry = map.get(type) || { count: 0, shares: 0 };

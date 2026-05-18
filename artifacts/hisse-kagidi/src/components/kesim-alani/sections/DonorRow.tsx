@@ -255,6 +255,16 @@ function DonorRowInner({
         editDraft={editDraft} onSetEditDraft={onSetEditDraft} onCommitEdit={onCommitEdit}
         onKeyDown={onKeyDown} onStartEditing={onStartEditing} displayValue={d.donationType} />
     </td>
+    <td className="p-2 text-center">
+      {descCount > 1 ? (
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 text-sm font-bold border border-amber-200 dark:border-amber-800">{effectiveShare}</span>
+      ) : (
+        <Select value={String(d.shareCount)} onValueChange={(v) => onUpdateField(d.id, "shareCount", parseInt(v))}>
+          <SelectTrigger className="h-8 w-16 text-sm font-bold mx-auto"><SelectValue /></SelectTrigger>
+          <SelectContent>{[1, 2, 3, 4, 5, 6, 7].map((n) => (<SelectItem key={n} value={String(n)}>{n}</SelectItem>))}</SelectContent>
+        </Select>
+      )}
+    </td>
     <td className="p-2">
       <div className="flex gap-0.5 flex-wrap">
         {(d.aiCategories && d.aiCategories.length > 0) ? (
@@ -280,16 +290,6 @@ function DonorRowInner({
           <span className="text-muted-foreground/40 text-xs">—</span>
         )}
       </div>
-    </td>
-    <td className="p-2 text-center">
-      {descCount > 1 ? (
-        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 text-sm font-bold border border-amber-200 dark:border-amber-800">{effectiveShare}</span>
-      ) : (
-        <Select value={String(d.shareCount)} onValueChange={(v) => onUpdateField(d.id, "shareCount", parseInt(v))}>
-          <SelectTrigger className="h-8 w-16 text-sm font-bold mx-auto"><SelectValue /></SelectTrigger>
-          <SelectContent>{[1, 2, 3, 4, 5, 6, 7].map((n) => (<SelectItem key={n} value={String(n)}>{n}</SelectItem>))}</SelectContent>
-        </Select>
-      )}
     </td>
     <td className="p-2">
       <div className="flex items-center gap-0.5">

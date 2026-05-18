@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowRightLeft, Undo2, Trash2, X, Tag, StickyNote, Info } from "lucide-react";
+import { ArrowRightLeft, Undo2, Trash2, X, Tag, StickyNote, Info, ListX } from "lucide-react";
 import type { DonorSiblings, SiblingDonation } from "@/lib/api/bagis-havuzu";
 import type { PoolDonation } from "@/lib/types";
 import { turkishTitleCase } from "@/lib/formatting";
@@ -20,6 +20,7 @@ interface PoolBulkActionsProps {
   onBulkAction: (action: "exclude" | "include" | "delete") => void;
   onTagOpen: () => void;
   onNoteOpen: () => void;
+  onReturnToPool?: () => void;
   onClearSelection: () => void;
 }
 
@@ -32,6 +33,7 @@ export function PoolBulkActions({
   onBulkAction,
   onTagOpen,
   onNoteOpen,
+  onReturnToPool,
   onClearSelection,
 }: PoolBulkActionsProps) {
   const [detailOpen, setDetailOpen] = useState(false);
@@ -40,6 +42,11 @@ export function PoolBulkActions({
 
   const potentialTotal = selectedCount + siblingCount;
   const hiddenCount = selectedCount - selectedDonations.length;
+  const hasTransferredSelected =
+    hiddenCount > 0 ||
+    selectedDonations.some(
+      (d) => d.kesimAlaniName !== undefined && d.kesimAlaniName !== "__havuz__"
+    );
 
   return (
     <>
@@ -73,6 +80,11 @@ export function PoolBulkActions({
               <span className="ml-1 text-xs text-muted-foreground">({potentialTotal})</span>
             )}
           </Button>
+          {onReturnToPool && hasTransferredSelected && (
+            <Button size="sm" variant="outline" onClick={onReturnToPool}>
+              <ListX className="w-4 h-4 mr-1" />Kesim Listesinden Çıkart
+            </Button>
+          )}
           <Button size="sm" variant="outline" onClick={() => onBulkAction("exclude")}>
             <X className="w-4 h-4 mr-1" />Sepetten Çıkar
           </Button>

@@ -39,6 +39,7 @@ import type { BulkDeletePreviewResult, AiClassificationResult } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { StatsPanel } from "./bagis-havuzu/StatsPanel";
+import { CinsStatsBar } from "./bagis-havuzu/CinsStatsBar";
 import { VirtualizedDonationTable } from "./bagis-havuzu/VirtualizedDonationTable";
 import { PoolFilters } from "./bagis-havuzu/PoolFilters";
 import { PoolBulkActions } from "./bagis-havuzu/PoolBulkActions";
@@ -351,6 +352,7 @@ export default function BagisHavuzuPage() {
   const items = data?.items || [];
   const total = data?.total || 0;
   const allFilteredIds = data?.allFilteredIds || [];
+  const havuzKaId = data?.kesimAlanlari?.find(ka => ka.name === "__havuz__")?.id;
   const kesimAlanlari = (data?.kesimAlanlari || []).filter(ka => ka.name !== "__havuz__");
   const donorMissedCounts = data?.donorMissedCounts || {};
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -498,6 +500,7 @@ export default function BagisHavuzuPage() {
   const invalidatePool = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["pool-donations"] });
     queryClient.invalidateQueries({ queryKey: ["pool-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["pool-stats-base"] });
     queryClient.invalidateQueries({ queryKey: ["pool-assigned-vekalets"] });
   }, [queryClient]);
 
@@ -636,6 +639,23 @@ export default function BagisHavuzuPage() {
       return null;
     }
   }, [queryClient, toast]);
+
+  const handleReturnToPool = useCallback(async () => {
+    if (effectiveSelectedIds.size === 0 || !havuzKaId) return;
+    setTransferring(true);
+    try {
+      const ids = [...effectiveSelectedIds];
+      const result = await transferDonationsToKA(projectId, ids, havuzKaId, false);
+      toast({ title: `${result.moved} bağış havuza geri taşındı` });
+      setSelectedIds(new Set());
+      setSelectAllPages(false);
+      invalidatePool();
+    } catch (err) {
+      toast({ title: "Geri taşıma başarısız", description: err instanceof Error ? err.message : "Hata", variant: "destructive" });
+    } finally {
+      setTransferring(false);
+    }
+  }, [effectiveSelectedIds, havuzKaId, projectId, toast, invalidatePool]);
 
   const handleTransfer = useCallback(async (extraIds: string[] = []) => {
     const baseIds = [...effectiveSelectedIds];
@@ -1251,6 +1271,18 @@ export default function BagisHavuzuPage() {
           </div>
         )}
 
+        <CinsStatsBar
+          stats={stats}
+          items={filteredItems}
+          donationTypeFilter={donationTypeFilter}
+          onToggleType={(type) => {
+            setDonationTypeFilter(prev =>
+              prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+            );
+            setPage(0);
+          }}
+        />
+
         <div className="mb-2 flex items-center gap-2">
           <p className="text-sm">
             <span className="font-bold text-lg text-foreground">{total}</span>
@@ -1330,6 +1362,7 @@ export default function BagisHavuzuPage() {
           onBulkAction={handleBulkAction}
           onTagOpen={() => setTagDialogOpen(true)}
           onNoteOpen={() => setNoteDialogOpen(true)}
+          onReturnToPool={havuzKaId ? handleReturnToPool : undefined}
           onClearSelection={() => { setSelectedIds(new Set()); setSelectAllPages(false); }}
         />
 

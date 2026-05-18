@@ -1,11 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, ListChecks, ShoppingBasket, Tag, MapPin, Users, ArrowRightLeft, Layers } from "lucide-react";
+import { Package, ListChecks, ShoppingBasket, Tag, MapPin, Users, ArrowRightLeft, Layers, Inbox } from "lucide-react";
 import type { PoolStats } from "@/lib/types";
 
 export function StatsPanel({ stats }: { stats: PoolStats }) {
+  const inPool = stats.kesimAlaniDistribution
+    .filter(ka => ka.name === "__havuz__")
+    .reduce((sum, ka) => sum + ka.count, 0);
+
+  const transferred = stats.kesimAlaniDistribution
+    .filter(ka => ka.name !== "__havuz__")
+    .reduce((sum, ka) => sum + ka.count, 0);
+
   return (
     <div className="mb-4 space-y-3">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
         <Card>
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
@@ -13,6 +21,17 @@ export function StatsPanel({ stats }: { stats: PoolStats }) {
               <div>
                 <p className="text-xs text-muted-foreground">Toplam</p>
                 <p className="text-lg font-bold">{stats.total}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <Inbox className="w-4 h-4 text-blue-600" />
+              <div>
+                <p className="text-xs text-muted-foreground">Havuzda Kalan</p>
+                <p className="text-lg font-bold">{inPool}</p>
               </div>
             </div>
           </CardContent>
@@ -56,7 +75,7 @@ export function StatsPanel({ stats }: { stats: PoolStats }) {
               <ArrowRightLeft className="w-4 h-4 text-purple-600" />
               <div>
                 <p className="text-xs text-muted-foreground">Listelere Aktarılan</p>
-                <p className="text-lg font-bold">{stats.transferredToLists ?? "—"}</p>
+                <p className="text-lg font-bold">{transferred}</p>
               </div>
             </div>
           </CardContent>

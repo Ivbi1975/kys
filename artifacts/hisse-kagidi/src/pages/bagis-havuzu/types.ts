@@ -93,7 +93,8 @@ export function autoMapColumns(headers: string[]): ColumnMapping[] {
   return mappings;
 }
 
-export function getStatusLabel(d: { excluded?: boolean }): { label: string; color: string } {
-  if (d.excluded) return { label: "Sepet", color: "text-orange-600" };
+export function getStatusLabel(d: { excluded?: boolean; kesimAlaniName?: string }): { label: string; color: string } {
+  if (d.excluded) return { label: "Sepet Dışı", color: "text-orange-600" };
+  if (d.kesimAlaniName && d.kesimAlaniName !== "__havuz__") return { label: "Aktarıldı", color: "text-green-600" };
   return { label: "Havuzda", color: "text-blue-600" };
 }
