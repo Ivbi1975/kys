@@ -9,6 +9,7 @@ export interface LocalDonation {
   notes: string;
   aiCategories?: string[];
   aiWarnings?: string;
+  isFlagged?: boolean;
 }
 
 export interface AiResult extends AiClassificationResult {

@@ -183,6 +183,20 @@
       "when": 1774946800000,
       "tag": "0025_animal_groups_unique_animal_no",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1774946900000,
+      "tag": "0026_ai_job_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1774947000000,
+      "tag": "0027_donations_ai_confidence_score",
+      "breakpoints": true
     }
   ]
 }

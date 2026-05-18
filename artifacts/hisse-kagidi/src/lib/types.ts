@@ -27,6 +27,7 @@ export interface Donation {
   tags?: string[];
   aiCategories?: string[];
   aiWarnings?: string;
+  aiConfidenceScore?: number | null;
   isFlagged?: boolean;
   flagReason?: string;
 }

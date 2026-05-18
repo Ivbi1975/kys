@@ -86,6 +86,7 @@ function mapDonationRow(d: typeof donationsTable.$inferSelect, tags: string[]) {
     tags,
     aiCategories: d.aiCategories ? JSON.parse(d.aiCategories) : [],
     aiWarnings: d.aiWarnings || "",
+    aiConfidenceScore: d.aiConfidenceScore ?? null,
     isFlagged: d.isFlagged,
     flagReason: d.flagReason,
   };
@@ -347,6 +348,7 @@ export async function listDeletedDonations(kesimAlaniId: string) {
     tags: tagsByDonation[d.id] || [],
     aiCategories: d.aiCategories ? JSON.parse(d.aiCategories) : [],
     aiWarnings: d.aiWarnings || "",
+    aiConfidenceScore: d.aiConfidenceScore ?? null,
   }));
 
   return serviceOk({ items });

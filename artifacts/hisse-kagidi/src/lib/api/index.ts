@@ -91,12 +91,14 @@ export {
   fetchActiveJob,
   saveAiClassifications,
   bulkUpdateNotes,
+  fetchAiJobLogs,
 } from "./ai-notes";
 export type {
   AiDonationInput,
   AiClassificationResult,
   AiSettings,
   AiJobStatus,
+  AiJobLog,
 } from "./ai-notes";
 
 export {

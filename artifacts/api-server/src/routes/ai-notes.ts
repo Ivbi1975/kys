@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { appSettingsTable, donationsTable, aiJobsTable, kesimAlanlariTable } from "@workspace/db/schema";
+import { appSettingsTable, donationsTable, aiJobsTable, kesimAlanlariTable, aiJobLogsTable } from "@workspace/db/schema";
 import { eq, lt, or, desc, and, inArray, ne, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { assertOpenAiConfigured, openai } from "@workspace/integrations-openai-ai-server";
@@ -54,10 +54,13 @@ Her bağışçı için JSON formatında yanıt ver:
 {
   "donationId": "...",
   "categories": ["kategori1", "kategori2"],
+  "confidence": 8,
   "requests": "Aksiyon gerektiren spesifik talepler (yoksa boş bırak)",
   "warnings": "Dikkat gerektiren uyarılar ve tutarsızlıklar (yoksa boş bırak)",
   "summary": "Notun kısa ve anlaşılır özeti (1-2 cümle)"
 }
+
+"confidence" alanı 1-10 arası güven skoru (1=çok düşük güven/belirsiz not, 10=çok yüksek güven/net not). Notu net anlayıp kategori atayabiliyorsan yüksek (7-10), belirsizse düşük (1-4) ver.
 
 Yanıtı şu JSON object formatında ver: {"results": [{...}, {...}]}`;
 
@@ -502,6 +505,9 @@ function filterValidResults(results: unknown[]): unknown[] {
           ? [obj.categories]
           : [];
       }
+      const rawConf = obj.confidence;
+      const parsed = typeof rawConf === "number" ? rawConf : typeof rawConf === "string" ? parseInt(rawConf, 10) : NaN;
+      obj.confidence = (!isNaN(parsed) && parsed >= 1 && parsed <= 10) ? parsed : null;
       return obj;
     });
 }
@@ -526,6 +532,7 @@ async function processClassifyJob(
   donations: Array<{ id: string; name: string; donationType: string; vekalet: string; notes: string }>,
   chunkSize: number = CHUNK_SIZE,
 ) {
+  const jobStartedAt = new Date();
   try {
     await db.update(aiJobsTable)
       .set({ status: AiJobStatus.PROCESSING, updatedAt: new Date() })
@@ -623,6 +630,63 @@ async function processClassifyJob(
     }
 
     logger.info({ jobId, count: donations.length, failedBatchCount }, "AI job completed");
+
+    const warningCount = validatedResults.filter(r => {
+      const obj = r as Record<string, unknown>;
+      return typeof obj.warnings === "string" && obj.warnings.trim() !== "";
+    }).length;
+    const durationMs = Date.now() - jobStartedAt.getTime();
+
+    try {
+      const [jobRow] = await db.select({ kesimAlaniId: aiJobsTable.kesimAlaniId })
+        .from(aiJobsTable).where(eq(aiJobsTable.id, jobId));
+      let projectId: string | null = null;
+      if (jobRow?.kesimAlaniId) {
+        const [kaRow] = await db.select({ projectId: kesimAlanlariTable.projectId })
+          .from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, jobRow.kesimAlaniId));
+        projectId = kaRow?.projectId ?? null;
+      }
+
+      const confidenceScores = validatedResults
+        .map(r => (r as Record<string, unknown>).confidence)
+        .filter((c): c is number => typeof c === "number" && c >= 1 && c <= 10);
+      const avgConfidenceScore = confidenceScores.length > 0
+        ? Math.round((confidenceScores.reduce((a, b) => a + b, 0) / confidenceScores.length) * 10) / 10
+        : null;
+
+      const catCounts = new Map<string, number>();
+      for (const r of validatedResults) {
+        const cats = (r as Record<string, unknown>).categories;
+        if (Array.isArray(cats)) {
+          for (const cat of cats) {
+            if (typeof cat === "string") catCounts.set(cat, (catCounts.get(cat) ?? 0) + 1);
+          }
+        }
+      }
+      const categoryDistribution = catCounts.size > 0
+        ? JSON.stringify(Object.fromEntries([...catCounts.entries()].sort((a, b) => b[1] - a[1])))
+        : null;
+
+      await db.insert(aiJobLogsTable).values({
+        id: crypto.randomUUID(),
+        jobId,
+        kesimAlaniId: jobRow?.kesimAlaniId ?? null,
+        projectId,
+        donationCount: donations.length,
+        processedCount: validatedResults.length,
+        warningCount,
+        errorBatchCount: failedBatchCount,
+        totalBatches: chunks.length,
+        durationMs,
+        avgConfidenceScore,
+        categoryDistribution,
+        status: "completed",
+        startedAt: jobStartedAt,
+        completedAt: new Date(),
+      });
+    } catch (logErr) {
+      logger.warn({ err: logErr, jobId }, "Failed to write AI job log (non-fatal)");
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : ERROR_MESSAGES.UNKNOWN_ERROR;
     logger.error({ jobId, error: message }, "AI job failed");
@@ -701,6 +765,23 @@ router.post("/ai-notes/jobs/:jobId/cancel", asyncHandler(async (req, res) => {
   res.json({ success: true, jobId, status: AiJobStatus.CANCELLED });
 }));
 
+router.get("/ai-notes/job-logs", asyncHandler(async (req, res) => {
+  const { projectId, limit: limitStr } = req.query;
+  const limit = Math.min(parseInt(String(limitStr || "50"), 10) || 50, 200);
+
+  if (!projectId || typeof projectId !== "string") {
+    res.status(400).json({ error: "projectId is required" });
+    return;
+  }
+
+  const logs = await db.select().from(aiJobLogsTable)
+    .where(eq(aiJobLogsTable.projectId, projectId))
+    .orderBy(desc(aiJobLogsTable.completedAt))
+    .limit(limit);
+
+  res.json({ logs });
+}));
+
 router.get("/ai-notes/active-job", asyncHandler(async (req, res) => {
   const { kesimAlaniId } = req.query;
   if (!kesimAlaniId || typeof kesimAlaniId !== "string") {
@@ -748,6 +829,7 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
         },
         z.array(z.string()),
       ),
+      confidence: z.number().int().min(1).max(10).optional().nullable(),
       warnings: z.string().optional().default(""),
       requests: z.string().optional().default(""),
       summary: z.string().optional().default(""),
@@ -801,6 +883,7 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
             aiWarnings: c.warnings || null,
             aiRequests: c.requests || null,
             aiSummary: c.summary || null,
+            aiConfidenceScore: c.confidence ?? null,
           })
           .where(eq(donationsTable.id, c.donationId));
       }

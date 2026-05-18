@@ -10,7 +10,7 @@ import {
 import {
   Brain, ArrowLeft, Play, Square, CheckSquare, FastForward, RotateCcw,
   AlertTriangle, Loader2, X, Sparkles, CheckCircle2,
-  MessageSquare, FileText, Tag, Settings2, BarChart3,
+  MessageSquare, FileText, Tag, Settings2, BarChart3, History,
 } from "lucide-react";
 import {
   fetchPoolDonations,
@@ -18,7 +18,8 @@ import {
   classifyNotesAsyncChunked, saveAiClassifications,
   PartialChunkError, ApiFetchError,
 } from "@/lib/api";
-import { bulkUpdateNotes } from "@/lib/api/ai-notes";
+import { bulkUpdateNotes, fetchAiJobLogs } from "@/lib/api/ai-notes";
+import type { AiJobLog } from "@/lib/api";
 import { API_BASE, getApiKey } from "@/lib/api/core";
 import { useToast } from "@/hooks/use-toast";
 import type { AiClassificationResult } from "@/lib/api";
@@ -133,6 +134,13 @@ export default function AiSiniflandirmaPage() {
     queryKey: ["pool-donations-ai-page", projectId],
     queryFn: () => fetchPoolDonations(projectId, { limit: 100000, offset: 0, sortBy: "sortOrder" }),
     enabled: !!projectId,
+  });
+
+  const { data: jobLogsData } = useQuery({
+    queryKey: ["ai-job-logs", projectId],
+    queryFn: () => fetchAiJobLogs(projectId, 20),
+    enabled: !!projectId,
+    refetchInterval: 30000,
   });
 
   const allItems = useMemo(() => donationsData?.items ?? [], [donationsData]);
@@ -659,6 +667,70 @@ export default function AiSiniflandirmaPage() {
                     <div className="text-[10px] text-destructive/80">{resultTypeFilter === "failed" ? "↑ Filtrelendi" : "AI işleyemedi"}</div>
                   </button>
                 )}
+              </div>
+            </div>
+          )}
+
+          {(jobLogsData?.logs ?? []).length > 0 && (
+            <div className="space-y-2 pt-2 border-t">
+              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <History className="w-3.5 h-3.5" />Geçmiş İşler
+              </p>
+              <div className="space-y-1.5">
+                {(jobLogsData?.logs ?? []).map((log: AiJobLog) => {
+                  const completedDate = log.completedAt ? new Date(log.completedAt) : null;
+                  const durationSec = log.durationMs != null ? Math.round(log.durationMs / 1000) : null;
+                  let topCats: [string, number][] = [];
+                  if (log.categoryDistribution) {
+                    try {
+                      const dist = JSON.parse(log.categoryDistribution) as Record<string, number>;
+                      topCats = Object.entries(dist).slice(0, 3);
+                    } catch {}
+                  }
+                  return (
+                    <div key={log.id} className="rounded-md bg-muted/40 border px-2.5 py-2 text-[11px] space-y-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-medium text-foreground">
+                          {log.donationCount} bağış
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {log.avgConfidenceScore != null && (
+                            <span className={`font-semibold ${
+                              log.avgConfidenceScore >= 7 ? "text-green-600 dark:text-green-400"
+                              : log.avgConfidenceScore >= 4 ? "text-amber-600 dark:text-amber-400"
+                              : "text-red-600 dark:text-red-400"
+                            }`}>
+                              ★{log.avgConfidenceScore.toFixed(1)}
+                            </span>
+                          )}
+                          {log.warningCount > 0 && (
+                            <span className="text-destructive font-semibold flex items-center gap-0.5">
+                              <AlertTriangle className="w-3 h-3" />{log.warningCount} uyarı
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {topCats.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {topCats.map(([cat, count]) => (
+                            <span key={cat} className="bg-muted rounded px-1 text-muted-foreground">
+                              {cat.replace(/_/g, " ")} ({count})
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="text-muted-foreground flex items-center gap-2 flex-wrap">
+                        {completedDate && (
+                          <span>{completedDate.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })} {completedDate.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</span>
+                        )}
+                        {durationSec != null && <span>{durationSec}s</span>}
+                        {log.errorBatchCount > 0 && (
+                          <span className="text-amber-600">{log.errorBatchCount}/{log.totalBatches} batch hata</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

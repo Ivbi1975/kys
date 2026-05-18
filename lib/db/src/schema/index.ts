@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, index, unique, foreignKey, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, real, boolean, timestamp, index, unique, foreignKey, jsonb } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -76,6 +76,7 @@ export const donationsTable = pgTable("donations", {
   aiWarnings: text("ai_warnings"),
   aiRequests: text("ai_requests"),
   aiSummary: text("ai_summary"),
+  aiConfidenceScore: integer("ai_confidence_score"),
   isFlagged: boolean("is_flagged").notNull().default(false),
   flagReason: text("flag_reason").notNull().default(""),
   flagResolvedAt: timestamp("flag_resolved_at", { withTimezone: true }),
@@ -313,3 +314,27 @@ export const automationRulesTable = pgTable("automation_rules", {
 ]);
 
 export type AutomationRuleRow = typeof automationRulesTable.$inferSelect;
+
+export const aiJobLogsTable = pgTable("ai_job_logs", {
+  id: text("id").primaryKey(),
+  jobId: text("job_id"),
+  kesimAlaniId: text("kesim_alani_id"),
+  projectId: text("project_id"),
+  donationCount: integer("donation_count").notNull().default(0),
+  processedCount: integer("processed_count").notNull().default(0),
+  warningCount: integer("warning_count").notNull().default(0),
+  errorBatchCount: integer("error_batch_count").notNull().default(0),
+  totalBatches: integer("total_batches").notNull().default(0),
+  durationMs: integer("duration_ms"),
+  avgConfidenceScore: real("avg_confidence_score"),
+  categoryDistribution: text("category_distribution"),
+  status: text("status").notNull().default("completed"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("idx_ai_job_logs_project_id").on(table.projectId),
+  index("idx_ai_job_logs_kesim_alani_id").on(table.kesimAlaniId),
+  index("idx_ai_job_logs_completed_at").on(table.completedAt),
+]);
+
+export type AiJobLogRow = typeof aiJobLogsTable.$inferSelect;

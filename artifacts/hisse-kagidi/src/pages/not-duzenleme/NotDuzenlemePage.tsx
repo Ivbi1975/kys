@@ -294,7 +294,7 @@ export default function NotDuzenlemePage() {
       const addDonation = (d: typeof data.donations[0]) => {
         if (seenIds.has(d.id)) return;
         seenIds.add(d.id);
-        allDonations.push({ id: d.id, name: d.name || "", description: d.description || "", donationType: d.donationType || "", vekalet: d.vekalet || "", notes: d.notes || "", aiCategories: d.aiCategories, aiWarnings: d.aiWarnings });
+        allDonations.push({ id: d.id, name: d.name || "", description: d.description || "", donationType: d.donationType || "", vekalet: d.vekalet || "", notes: d.notes || "", aiCategories: d.aiCategories, aiWarnings: d.aiWarnings, isFlagged: d.isFlagged });
         origMap.set(d.id, { notes: d.notes || "", description: d.description || "" });
       };
       for (const d of data.donations) addDonation(d);
@@ -655,6 +655,8 @@ export default function NotDuzenlemePage() {
   };
 
   const notesWithContent = useMemo(() => donations.filter(d => (d.notes || "").trim() !== ""), [donations]);
+  const flaggedCount = useMemo(() => donations.filter(d => d.isFlagged).length, [donations]);
+  const unflaggedCount = donations.length - flaggedCount;
 
   const startAiClassification = async (resume = false) => {
     if (!kesim) return;
@@ -785,6 +787,12 @@ export default function NotDuzenlemePage() {
               <h1 className="text-base font-semibold truncate">Not Düzenleme</h1>
               <p className="text-xs text-muted-foreground truncate">
                 {kesim?.name} — {donations.length} bağışçı, {notesWithContent.length} notu olan
+                {flaggedCount > 0 && (
+                  <span className="ml-2 inline-flex items-center gap-1">
+                    <span className="text-amber-600 font-medium">⚑ {flaggedCount} işaretli</span>
+                    <span className="text-muted-foreground">/ {unflaggedCount} normal</span>
+                  </span>
+                )}
                 {saving && <span className="ml-2 text-primary">Kaydediliyor...</span>}
                 {!saving && !dirty && <span className="ml-2 text-green-600">Kaydedildi</span>}
               </p>

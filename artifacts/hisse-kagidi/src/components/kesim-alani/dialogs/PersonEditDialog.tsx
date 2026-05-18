@@ -1,8 +1,9 @@
 import type { KesimAlani, Donation } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Eye, EyeOff, ShoppingBag, Trash2, UserCog } from "lucide-react";
+import { Eye, EyeOff, ShoppingBag, Trash2, UserCog, AlertTriangle } from "lucide-react";
 
 interface PersonEditDialogProps {
   kesim: KesimAlani;
@@ -96,47 +97,98 @@ export default function PersonEditDialog({
                       </tr>
                     </thead>
                     <tbody>
-                      {matchingDonations.map((d) => (
-                        <tr key={d.id} className={`border-b ${d.excluded ? "opacity-40" : ""}`}>
-                          <td className="p-2">
-                            <Input className="h-7 text-sm" value={d.vekalet || ""} onChange={(e) => updateDonationField(d.id, "vekalet", e.target.value)} />
-                          </td>
-                          <td className="p-2">
-                            <Input className="h-7 text-sm" value={d.description} onChange={(e) => updateDonationField(d.id, "description", e.target.value)} />
-                          </td>
-                          <td className="p-2">
-                            <Input className="h-7 text-sm" value={d.name} onChange={(e) => updateDonationField(d.id, "name", e.target.value)} />
-                          </td>
-                          <td className="p-2">
-                            <Input className="h-7 text-sm" value={d.donationType} onChange={(e) => updateDonationField(d.id, "donationType", e.target.value)} />
-                          </td>
-                          <td className="p-2">
-                            <Input className="h-7 text-sm" value={d.notes || ""} onChange={(e) => updateDonationField(d.id, "notes", e.target.value)} />
-                          </td>
-                          <td className="p-2 text-center">
-                            <Button variant="ghost" size="sm" className="h-7" onClick={() => updateDonationField(d.id, "excluded", !d.excluded)}>
-                              {d.excluded ? <Eye className="w-4 h-4 text-green-600" /> : <EyeOff className="w-4 h-4 text-muted-foreground" />}
-                            </Button>
-                          </td>
-                          <td className="p-2">
-                            <div className="flex gap-0.5">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className={`h-7 w-7 p-0 ${basketItemIds.has(d.id) ? "bg-emerald-100 dark:bg-emerald-900" : ""}`}
-                                title={basketItemIds.has(d.id) ? "Sepetten Çıkar" : "Keseye Ekle"}
-                                onClick={() => basketItemIds.has(d.id) ? removeFromBasket(d.id) : addDonorToBasket(d.id)}
-                                disabled={d.excluded}
-                              >
-                                <ShoppingBag className={`w-3 h-3 ${basketItemIds.has(d.id) ? "text-emerald-600" : "text-muted-foreground"}`} />
-                              </Button>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => deleteDonation(d.id)}>
-                                <Trash2 className="w-3 h-3 text-destructive" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                      {matchingDonations.map((d) => {
+                        const aiCats: string[] = d.aiCategories
+                          ? (Array.isArray(d.aiCategories)
+                              ? d.aiCategories
+                              : (typeof d.aiCategories === "string" && d.aiCategories
+                                  ? (() => { try { return JSON.parse(d.aiCategories as string); } catch { return []; } })()
+                                  : []))
+                          : [];
+                        const hasAi = aiCats.length > 0 || (d.aiWarnings && d.aiWarnings.trim()) || d.aiConfidenceScore != null;
+                        return (
+                          <>
+                            <tr key={d.id} className={`border-b ${d.excluded ? "opacity-40" : ""}`}>
+                              <td className="p-2">
+                                <Input className="h-7 text-sm" value={d.vekalet || ""} onChange={(e) => updateDonationField(d.id, "vekalet", e.target.value)} />
+                              </td>
+                              <td className="p-2">
+                                <Input className="h-7 text-sm" value={d.description} onChange={(e) => updateDonationField(d.id, "description", e.target.value)} />
+                              </td>
+                              <td className="p-2">
+                                <Input className="h-7 text-sm" value={d.name} onChange={(e) => updateDonationField(d.id, "name", e.target.value)} />
+                              </td>
+                              <td className="p-2">
+                                <Input className="h-7 text-sm" value={d.donationType} onChange={(e) => updateDonationField(d.id, "donationType", e.target.value)} />
+                              </td>
+                              <td className="p-2">
+                                <Input className="h-7 text-sm" value={d.notes || ""} onChange={(e) => updateDonationField(d.id, "notes", e.target.value)} />
+                              </td>
+                              <td className="p-2 text-center">
+                                <Button variant="ghost" size="sm" className="h-7" onClick={() => updateDonationField(d.id, "excluded", !d.excluded)}>
+                                  {d.excluded ? <Eye className="w-4 h-4 text-green-600" /> : <EyeOff className="w-4 h-4 text-muted-foreground" />}
+                                </Button>
+                              </td>
+                              <td className="p-2">
+                                <div className="flex gap-0.5">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className={`h-7 w-7 p-0 ${basketItemIds.has(d.id) ? "bg-emerald-100 dark:bg-emerald-900" : ""}`}
+                                    title={basketItemIds.has(d.id) ? "Sepetten Çıkar" : "Keseye Ekle"}
+                                    onClick={() => basketItemIds.has(d.id) ? removeFromBasket(d.id) : addDonorToBasket(d.id)}
+                                    disabled={d.excluded}
+                                  >
+                                    <ShoppingBag className={`w-3 h-3 ${basketItemIds.has(d.id) ? "text-emerald-600" : "text-muted-foreground"}`} />
+                                  </Button>
+                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => deleteDonation(d.id)}>
+                                    <Trash2 className="w-3 h-3 text-destructive" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                            {hasAi && (
+                              <tr key={`${d.id}-ai`} className={`border-b bg-primary/3 ${d.excluded ? "opacity-40" : ""}`}>
+                                <td colSpan={7} className="px-3 py-1.5">
+                                  <div className="flex flex-wrap items-start gap-2">
+                                    {aiCats.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 items-center">
+                                        <span className="text-[10px] text-muted-foreground font-medium mr-0.5">AI:</span>
+                                        {aiCats.map((cat) => (
+                                          <Badge key={cat} variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                                            {cat.replace(/_/g, " ")}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {d.aiConfidenceScore != null && (
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-[10px] text-muted-foreground">Güven:</span>
+                                        <Badge
+                                          variant="outline"
+                                          className={`text-[10px] px-1.5 py-0 h-4 font-semibold ${
+                                            d.aiConfidenceScore >= 7 ? "border-green-500 text-green-700 dark:text-green-400"
+                                            : d.aiConfidenceScore >= 4 ? "border-amber-500 text-amber-700 dark:text-amber-400"
+                                            : "border-red-500 text-red-700 dark:text-red-400"
+                                          }`}
+                                        >
+                                          {d.aiConfidenceScore}/10
+                                        </Badge>
+                                      </div>
+                                    )}
+                                    {d.aiWarnings && d.aiWarnings.trim() && (
+                                      <div className="flex items-start gap-1 text-[10px] text-destructive">
+                                        <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                        <span>{d.aiWarnings}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

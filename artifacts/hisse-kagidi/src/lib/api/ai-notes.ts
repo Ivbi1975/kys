@@ -11,6 +11,7 @@ export interface AiDonationInput {
 export interface AiClassificationResult {
   donationId: string;
   categories: string[];
+  confidence?: number | null;
   requests: string;
   warnings: string;
   summary: string;
@@ -139,4 +140,26 @@ export async function bulkUpdateNotes(kesimAlaniId: string, updates: { donationI
     method: "PUT",
     body: JSON.stringify({ kesimAlaniId, updates }),
   });
+}
+
+export interface AiJobLog {
+  id: string;
+  jobId: string | null;
+  kesimAlaniId: string | null;
+  projectId: string | null;
+  donationCount: number;
+  processedCount: number;
+  warningCount: number;
+  errorBatchCount: number;
+  totalBatches: number;
+  durationMs: number | null;
+  avgConfidenceScore: number | null;
+  categoryDistribution: string | null;
+  status: string;
+  startedAt: string | null;
+  completedAt: string;
+}
+
+export async function fetchAiJobLogs(projectId: string, limit = 50): Promise<{ logs: AiJobLog[] }> {
+  return apiFetch<{ logs: AiJobLog[] }>(`/ai-notes/job-logs?projectId=${encodeURIComponent(projectId)}&limit=${limit}`);
 }

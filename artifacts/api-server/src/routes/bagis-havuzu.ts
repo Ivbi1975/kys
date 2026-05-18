@@ -514,6 +514,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     tags: tagsByDonation[d.id] || [],
     aiCategories: d.aiCategories ? (() => { try { const p = JSON.parse(d.aiCategories); return Array.isArray(p) ? p.map(String) : []; } catch { return []; } })() : [],
     aiWarnings: d.aiWarnings || "",
+    aiConfidenceScore: d.aiConfidenceScore ?? null,
     isFlagged: d.isFlagged,
     flagReason: d.flagReason,
   }));

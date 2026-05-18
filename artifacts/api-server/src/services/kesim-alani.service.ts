@@ -71,6 +71,7 @@ export interface DonationOutput {
   tags: string[];
   aiCategories: string[];
   aiWarnings: string;
+  aiConfidenceScore: number | null;
   isFlagged: boolean;
   flagReason: string;
 }
@@ -113,6 +114,7 @@ export function assembleKesimAlani(
       tags: tagsByDonation[d.id] || [],
       aiCategories: d.aiCategories ? JSON.parse(d.aiCategories) : [],
       aiWarnings: d.aiWarnings || "",
+      aiConfidenceScore: d.aiConfidenceScore ?? null,
       isFlagged: d.isFlagged,
       flagReason: d.flagReason,
     };
@@ -132,7 +134,7 @@ export function assembleKesimAlani(
     name: "", description: "", donationType: "", shareCount: 1,
     vekalet: "", notes: "", phone: "", birim: "", temsilci: "",
     ozellik: "", fiyat: "", yerTalebi: "", gunTalebi: "", ilkHayvan: "", safi: "",
-    excluded: false, tags: [], aiCategories: [], aiWarnings: "", isFlagged: false, flagReason: "",
+    excluded: false, tags: [], aiCategories: [], aiWarnings: "", aiConfidenceScore: null, isFlagged: false, flagReason: "",
   });
 
   const mappedGroups = groups.map(g => {
@@ -232,7 +234,7 @@ export async function getFullKesimAlaniList(kaRows: KesimAlaniRow[]) {
 
   type RawRow = {
     ka_id: string;
-    donations: { id: string; name: string; description: string; donation_type: string; share_count: number; vekalet: string; notes: string; phone: string; birim?: string; temsilci?: string; excluded: boolean; sort_order: number; ai_categories: string | null; ai_warnings: string | null; ai_requests?: string | null; ai_summary?: string | null; is_flagged?: boolean; flag_reason?: string; flag_resolved_at?: string | null; tags: string[]; ozellik?: string; fiyat?: string; yer_talebi?: string; gun_talebi?: string; ilk_hayvan?: string; safi?: string }[];
+    donations: { id: string; name: string; description: string; donation_type: string; share_count: number; vekalet: string; notes: string; phone: string; birim?: string; temsilci?: string; excluded: boolean; sort_order: number; ai_categories: string | null; ai_warnings: string | null; ai_requests?: string | null; ai_summary?: string | null; ai_confidence_score?: number | null; is_flagged?: boolean; flag_reason?: string; flag_resolved_at?: string | null; tags: string[]; ozellik?: string; fiyat?: string; yer_talebi?: string; gun_talebi?: string; ilk_hayvan?: string; safi?: string }[];
     groups: { id: string; animal_no: number; color_tag: string; locked: boolean; notes: string; fiyat: string; kesildi: boolean; kesildi_at: string | null; team_id: string | null; sort_order: number; donation_links: { donationId: string; sortOrder: number }[] }[];
     teams: { id: string; name: string; color: string }[];
   };
@@ -267,6 +269,7 @@ export async function getFullKesimAlaniList(kaRows: KesimAlaniRow[]) {
         aiWarnings: d.ai_warnings || "",
         aiRequests: d.ai_requests || null,
         aiSummary: d.ai_summary || null,
+        aiConfidenceScore: d.ai_confidence_score ?? null,
         isFlagged: d.is_flagged ?? false,
         flagReason: d.flag_reason || "",
         flagResolvedAt: d.flag_resolved_at ? new Date(d.flag_resolved_at) : null,
@@ -372,7 +375,7 @@ export async function getFullKesimAlani(id: string) {
 
   if (result.rows.length === 0) return null;
 
-  type SingleRawDonation = { id: string; name: string; description: string; donation_type: string; share_count: number; vekalet: string; notes: string; phone: string; birim?: string; temsilci?: string; excluded: boolean; sort_order: number; ai_categories: string | null; ai_warnings: string | null; ai_requests?: string | null; ai_summary?: string | null; is_flagged?: boolean; flag_reason?: string; flag_resolved_at?: string | null; tags: string[]; ozellik?: string; fiyat?: string; yer_talebi?: string; gun_talebi?: string; ilk_hayvan?: string; safi?: string };
+  type SingleRawDonation = { id: string; name: string; description: string; donation_type: string; share_count: number; vekalet: string; notes: string; phone: string; birim?: string; temsilci?: string; excluded: boolean; sort_order: number; ai_categories: string | null; ai_warnings: string | null; ai_requests?: string | null; ai_summary?: string | null; ai_confidence_score?: number | null; is_flagged?: boolean; flag_reason?: string; flag_resolved_at?: string | null; tags: string[]; ozellik?: string; fiyat?: string; yer_talebi?: string; gun_talebi?: string; ilk_hayvan?: string; safi?: string };
   type SingleRawGroup = { id: string; animal_no: number; color_tag: string; locked: boolean; notes: string; fiyat: string; kesildi: boolean; kesildi_at: string | null; team_id: string | null; sort_order: number; donation_links: { donationId: string; sortOrder: number }[] };
   type SingleRawTeam = { id: string; name: string; color: string };
   type SingleRawRow = {
@@ -427,6 +430,7 @@ export async function getFullKesimAlani(id: string) {
       aiWarnings: d.ai_warnings || "",
       aiRequests: d.ai_requests || null,
       aiSummary: d.ai_summary || null,
+      aiConfidenceScore: d.ai_confidence_score ?? null,
       isFlagged: d.is_flagged ?? false,
       flagReason: d.flag_reason || "",
       flagResolvedAt: d.flag_resolved_at ? new Date(d.flag_resolved_at) : null,
