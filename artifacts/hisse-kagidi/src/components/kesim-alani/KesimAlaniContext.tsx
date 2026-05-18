@@ -55,7 +55,7 @@ export type GroupContextValue = Pick<KesimAlaniContextValue,
   "collapsedGroups" | "collapseAll" | "expandAll" |
   "handleSetGroupColorTag" | "moveGroupUp" | "moveGroupDown" |
   "openSplitGroupDialog" | "mergeSelectedGroups" |
-  "updateGroupDonation" | "updateGroupNotes" | "handleGroupCellTab" |
+  "updateGroupDonation" | "updateGroupNotes" | "updateGroupFiyat" | "handleGroupCellTab" |
   "enhancedRemoveFromGroup" | "bulkRemoveFromGroups" |
   "handleAssignTeam" | "toggleGroupDonationSelect" | "handleSelectAllGroupDonations" |
   "bulkMoveTargetGroup" | "setBulkMoveTargetGroup" | "bulkMoveToGroup" |
@@ -220,6 +220,7 @@ export function KesimAlaniProvider({
     moveGroupUp: value.moveGroupUp, moveGroupDown: value.moveGroupDown,
     openSplitGroupDialog: value.openSplitGroupDialog, mergeSelectedGroups: value.mergeSelectedGroups,
     updateGroupDonation: value.updateGroupDonation, updateGroupNotes: value.updateGroupNotes,
+    updateGroupFiyat: value.updateGroupFiyat,
     handleGroupCellTab: value.handleGroupCellTab,
     enhancedRemoveFromGroup: value.enhancedRemoveFromGroup, bulkRemoveFromGroups: value.bulkRemoveFromGroups,
     handleAssignTeam: value.handleAssignTeam,

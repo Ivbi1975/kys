@@ -80,6 +80,7 @@ export function GroupListPanel() {
     setGroupFindDeleteOpen,
     saveSingleGroupField,
     swapLabels,
+    updateGroupFiyat,
   } = ctx;
 
   const [groupSearchInput, setGroupSearchInput] = useState("");
@@ -164,7 +165,7 @@ export function GroupListPanel() {
         columnHeaderLabel={columnHeaderLabel} columnHeaderWidth={columnHeaderWidth}
         projectId={kesim.projectId ?? undefined}
         swapLabel={swapLabels?.get(group.id) ?? ""}
-        onUpdateGroupFiyat={(gIdx, fiyat) => saveSingleGroupField(kesim.animalGroups[gIdx]?.id ?? "", { fiyat })}
+        onUpdateGroupFiyat={updateGroupFiyat}
       />
     );
   }, [

@@ -346,6 +346,7 @@ export function useKesimAlaniState() {
             colorTag: g.colorTag as KesimAlani["animalGroups"][0]["colorTag"],
             locked: g.locked,
             notes: g.notes,
+            fiyat: g.fiyat ?? "",
             kesildi: g.kesildi,
             kesildiAt: g.kesildiAt,
             teamId: g.teamId,

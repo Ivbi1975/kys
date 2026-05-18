@@ -139,6 +139,7 @@ export async function listGroups(params: ListGroupsParams) {
       colorTag: g.colorTag,
       locked: g.locked,
       notes: g.notes,
+      fiyat: g.fiyat,
       kesildi: g.kesildi,
       kesildiAt: g.kesildiAt || null,
       teamId: g.teamId || null,

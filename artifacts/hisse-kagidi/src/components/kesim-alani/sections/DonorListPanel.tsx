@@ -177,6 +177,7 @@ export function DonorListPanel() {
                   onDelete={deleteDonation}
                   onFlagDonation={handleFlagDonation}
                   onUnflagDonation={handleUnflagDonation}
+                  projectId={kesim.projectId ?? undefined}
                 />
               );
             }}

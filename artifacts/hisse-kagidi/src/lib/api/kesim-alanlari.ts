@@ -121,6 +121,7 @@ interface CompactGroupItem {
   colorTag?: string;
   locked?: boolean;
   notes?: string;
+  fiyat?: string;
   kesildi?: boolean;
   kesildiAt?: string | null;
   teamId?: string | null;

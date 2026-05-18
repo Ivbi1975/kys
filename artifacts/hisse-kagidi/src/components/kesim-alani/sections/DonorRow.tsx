@@ -39,6 +39,7 @@ interface DonorRowProps {
   onDelete: (id: string) => void;
   onFlagDonation?: (id: string, reason: string) => void;
   onUnflagDonation?: (id: string) => void;
+  projectId?: string;
 }
 
 function EditableCell({ displayValue }: {
@@ -210,7 +211,7 @@ function DonorRowInner({
   onToggleSelect, onStartEditing, onSetEditDraft, onCommitEdit, onKeyDown,
   onSetPersonEditDesc, onUpdateField, onToggleTag, onSetTagPopover,
   onAddToBasket, onRemoveFromBasket, onSmartPlace, onSplitShare, onDelete,
-  onFlagDonation, onUnflagDonation,
+  onFlagDonation, onUnflagDonation, projectId,
 }: DonorRowProps) {
   const [notePopoverOpen, setNotePopoverOpen] = useState(false);
   return (<>
@@ -226,9 +227,20 @@ function DonorRowInner({
     </td>
     <td className="p-2 text-muted-foreground">{idx + 1}</td>
     <td className="p-2">
-      <EditableCell d={d} field="vekalet" isEditing={isEditing && editField === "vekalet"}
-        editDraft={editDraft} onSetEditDraft={onSetEditDraft} onCommitEdit={onCommitEdit}
-        onKeyDown={onKeyDown} onStartEditing={onStartEditing} displayValue={d.vekalet} />
+      {d.vekalet && projectId ? (
+        <a
+          href={`/bagis-havuzu/${projectId}?vekalet=${encodeURIComponent(d.vekalet)}`}
+          target="_blank"
+          rel="noreferrer"
+          className="block px-1 py-0.5 uppercase select-text text-blue-600 hover:underline"
+        >
+          {d.vekalet}
+        </a>
+      ) : (
+        <EditableCell d={d} field="vekalet" isEditing={isEditing && editField === "vekalet"}
+          editDraft={editDraft} onSetEditDraft={onSetEditDraft} onCommitEdit={onCommitEdit}
+          onKeyDown={onKeyDown} onStartEditing={onStartEditing} displayValue={d.vekalet} />
+      )}
     </td>
     <td className="p-2">
       <span className="block px-1 py-0.5 uppercase select-text">{d.description || "—"}</span>

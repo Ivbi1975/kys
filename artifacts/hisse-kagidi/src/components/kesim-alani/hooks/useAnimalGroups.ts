@@ -132,6 +132,21 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
     [kesim, saveSingleGroupField, history, setKesim]
   );
 
+  const updateGroupFiyat = useCallback(
+    (groupIdx: number, fiyat: string) => {
+      if (!kesim) return;
+      const group = kesim.animalGroups[groupIdx];
+      if (!group) return;
+      const updated = produce(kesim, (draft) => {
+        draft.animalGroups[groupIdx].fiyat = fiyat;
+      });
+      setKesim(updated);
+      history.push(updated, `Grup fiyatı güncellendi: Hayvan ${group.animalNo}`);
+      saveSingleGroupField(group.id, { fiyat });
+    },
+    [kesim, saveSingleGroupField, history, setKesim]
+  );
+
   function toggleGroupLock(groupIdx: number) {
     if (!kesim) return;
     const group = kesim.animalGroups[groupIdx];
@@ -570,14 +585,27 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
   function swapGroups(fromIdx: number, toIdx: number) {
     if (!kesim || fromIdx === toIdx) return;
     if (fromIdx < 0 || toIdx < 0 || fromIdx >= kesim.animalGroups.length || toIdx >= kesim.animalGroups.length) return;
-    const fromNo = kesim.animalGroups[fromIdx].animalNo;
-    const toNo = kesim.animalGroups[toIdx].animalNo;
+    const fromGroup = kesim.animalGroups[fromIdx];
+    const toGroup = kesim.animalGroups[toIdx];
+    const fromPrevNo = fromGroup.animalNo;
+    const toPrevNo = toGroup.animalNo;
     const updated = produce(kesim, (draft) => {
       const temp = draft.animalGroups[fromIdx];
       draft.animalGroups[fromIdx] = draft.animalGroups[toIdx];
       draft.animalGroups[toIdx] = temp;
+      for (let i = 0; i < draft.animalGroups.length; i++) {
+        draft.animalGroups[i].animalNo = i + 1;
+      }
     });
-    save(updated, `Hayvan ${fromNo} ve ${toNo} sırası değiştirildi`, false, "groups");
+    const fromNewNo = toIdx + 1;
+    const toNewNo = fromIdx + 1;
+    setSwapLabels(prev => {
+      const next = new Map(prev);
+      next.set(fromGroup.id, `${fromPrevNo}-${fromNewNo}`);
+      next.set(toGroup.id, `${toPrevNo}-${toNewNo}`);
+      return next;
+    });
+    save(updated, `Hayvan ${fromPrevNo} ve ${toPrevNo} sırası değiştirildi`, false, "groups");
   }
 
   const [groupCardDragState, setGroupCardDragState] = useState<{ dragIdx: number | null; overIdx: number | null }>({ dragIdx: null, overIdx: null });
@@ -836,6 +864,7 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
     updateGroupDonation,
     setGroupColorTag,
     updateGroupNotes,
+    updateGroupFiyat,
     toggleGroupLock,
     parseRangeLockInput,
     applyRangeLock,
