@@ -37,6 +37,7 @@ const animalGroupPayloadSchema = z.object({
   colorTag: z.string().optional().default(""),
   locked: z.boolean().optional().default(false),
   notes: z.string().optional().default(""),
+  fiyat: z.string().optional().default(""),
   kesildi: z.boolean().optional(),
   donations: z.array(donationPayloadSchema).optional().default([]),
 });

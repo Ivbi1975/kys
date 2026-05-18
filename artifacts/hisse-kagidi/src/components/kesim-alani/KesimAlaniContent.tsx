@@ -21,61 +21,97 @@ export function KesimAlaniContent(props: KesimAlaniStateReturn) {
 
   return (
     <KesimAlaniProvider value={props}>
-      <div className={`mx-auto p-4 uppercase ${fullscreenMode ? "max-w-full" : "max-w-7xl"} ${basketItems.length > 0 ? "pb-24" : ""}`}>
+      <div
+        className={`mx-auto px-3 py-3 sm:px-4 sm:py-4 ${fullscreenMode ? "max-w-full" : "max-w-7xl"} ${basketItems.length > 0 ? "pb-24" : ""}`}
+      >
         {!fullscreenMode && <KesimAlaniHeader />}
 
         {!fullscreenMode && <StatsCards />}
 
+        {/* ── Auto-group / Group button bar ── */}
         {!fullscreenMode && kesim.donations.length > 0 && (
-          <div className="mb-4 flex gap-2">
-            <Button onClick={() => handleAutoGroup()} className="flex-1" disabled={groupingInProgress}>
+          <div className="mb-4 rounded-lg border bg-muted/30 p-2.5 flex gap-2 items-center">
+            <Button
+              onClick={() => handleAutoGroup()}
+              className="flex-1 h-9 text-sm gap-2"
+              disabled={groupingInProgress}
+            >
               {groupingInProgress ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {groupingProgress
-                    ? `Gruplama: ${groupingProgress.current}/${groupingProgress.total} hayvan`
-                    : "Gruplama başlıyor..."}
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="truncate">
+                    {groupingProgress
+                      ? `Gruplama: ${groupingProgress.current}/${groupingProgress.total} hayvan`
+                      : "Gruplama başlıyor..."}
+                  </span>
                 </>
               ) : (
                 <>
-                  <Wand2 className="w-4 h-4 mr-2" />
-                  {kesim.animalGroups.length > 0 ? "Artımlı Grupla" : "Otomatik Grupla"} ({requiredAnimals} Hayvan)
+                  <Wand2 className="w-4 h-4" />
+                  <span>
+                    {kesim.animalGroups.length > 0 ? "Artımlı Grupla" : "Otomatik Grupla"}
+                    <span className="hidden sm:inline ml-1 opacity-75">({requiredAnimals} hayvan)</span>
+                  </span>
                 </>
               )}
             </Button>
             {!groupingInProgress && kesim.animalGroups.length > 0 && (
-              <Button variant="outline" onClick={() => handleAutoGroup(true)} disabled={groupingInProgress} title="Tüm grupları sıfırdan yeniden oluştur">
-                <RotateCcw className="w-4 h-4 mr-1" />
-                Tam Grupla
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5 flex-shrink-0"
+                onClick={() => handleAutoGroup(true)}
+                disabled={groupingInProgress}
+                title="Tüm grupları sıfırdan yeniden oluştur"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Tam Grupla</span>
               </Button>
             )}
             {groupingInProgress && (
-              <Button variant="destructive" size="icon" onClick={cancelGrouping} title="İptal">
+              <Button
+                variant="destructive"
+                size="icon"
+                className="h-9 w-9 flex-shrink-0"
+                onClick={cancelGrouping}
+                title="İptal"
+              >
                 <X className="w-4 h-4" />
               </Button>
             )}
           </div>
         )}
 
+        {/* ── İşlem Geçmişi Paneli ── */}
         {historyPanelOpen && !fullscreenMode && (
-          <Card className="mb-4 p-3 max-h-64 overflow-y-auto">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold">İşlem Geçmişi</h3>
-              <Button variant="ghost" size="sm" onClick={() => setHistoryPanelOpen(false)}>✕</Button>
+          <Card className="mb-4 overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
+              <h3 className="text-xs font-semibold text-foreground">İşlem Geçmişi</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                onClick={() => setHistoryPanelOpen(false)}
+              >
+                <X className="w-3.5 h-3.5" />
+              </Button>
             </div>
-            <div className="space-y-1">
+            <div className="max-h-56 overflow-y-auto p-1.5 space-y-0.5">
+              {history.historyList.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-3">Henüz işlem yok</p>
+              )}
               {history.historyList.map((item, i) => (
                 <button
                   key={i}
                   onClick={() => handleGoToStep(i)}
-                  className={`w-full text-left text-xs px-2 py-1.5 rounded transition-colors ${
+                  className={`w-full text-left text-xs px-2.5 py-1.5 rounded-md transition-colors ${
                     item.isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-muted"
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "text-foreground hover:bg-muted"
                   }`}
                 >
-                  <span className="font-medium">{item.description}</span>
-                  <span className="ml-2 opacity-60">
+                  <span>{item.description}</span>
+                  <span className={`ml-2 text-[10px] ${item.isActive ? "opacity-70" : "text-muted-foreground"}`}>
                     {new Date(item.timestamp).toLocaleTimeString("tr-TR")}
                   </span>
                 </button>
@@ -84,23 +120,39 @@ export function KesimAlaniContent(props: KesimAlaniStateReturn) {
           </Card>
         )}
 
+        {/* ── Mobil sekme seçici ── */}
         {!fullscreenMode && (
-          <div className="flex md:hidden border-b mb-4">
+          <div className="flex md:hidden mb-3 rounded-lg border overflow-hidden">
             <button
-              className={`flex-1 py-2 text-sm font-medium text-center border-b-2 transition-colors ${mobileTab === "donors" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
+                mobileTab === "donors"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
               onClick={() => startFilterTransition(() => setMobileTab("donors"))}
             >
-              Bağışçı Listesi ({kesim.donations.filter(d => !d.excluded).length})
+              Bağışçılar
+              <span className="ml-1.5 text-xs opacity-75 tabular-nums">
+                ({kesim.donations.filter(d => !d.excluded).length})
+              </span>
             </button>
             <button
-              className={`flex-1 py-2 text-sm font-medium text-center border-b-2 transition-colors ${mobileTab === "groups" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              className={`flex-1 py-2.5 text-sm font-medium text-center border-l transition-colors ${
+                mobileTab === "groups"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
               onClick={() => startFilterTransition(() => setMobileTab("groups"))}
             >
-              Hayvan Grupları ({kesim.animalGroups.length})
+              Gruplar
+              <span className="ml-1.5 text-xs opacity-75 tabular-nums">
+                ({kesim.animalGroups.length})
+              </span>
             </button>
           </div>
         )}
 
+        {/* ── Ana içerik: Bağışçı listesi + Grup listesi ── */}
         <div
           ref={splitContainerRef}
           className="flex gap-0"

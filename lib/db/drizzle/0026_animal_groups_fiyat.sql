@@ -1,0 +1,1 @@
+ALTER TABLE "animal_groups" ADD COLUMN IF NOT EXISTS "fiyat" text NOT NULL DEFAULT '';

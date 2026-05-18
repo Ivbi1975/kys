@@ -116,6 +116,7 @@ export const animalGroupsTable = pgTable("animal_groups", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   teamId: text("team_id").references(() => teamsTable.id, { onDelete: "set null" }),
+  fiyat: text("fiyat").notNull().default(""),
 }, (table) => [
   index("idx_animal_groups_kesim_alani_id").on(table.kesimAlaniId),
   index("idx_ag_ka_sort").on(table.kesimAlaniId, table.sortOrder),

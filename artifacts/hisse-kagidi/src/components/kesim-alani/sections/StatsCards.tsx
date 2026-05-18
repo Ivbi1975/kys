@@ -143,42 +143,42 @@ export function StatsCards() {
 
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3 mb-4">
-        <Card className="p-3 text-center">
-          <div className="text-2xl font-bold text-primary">{kesim.donations.filter(d => !d.excluded).length}</div>
-          <div className="text-xs text-muted-foreground">Aktif Bağışçı</div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mb-4">
+        <Card className="p-2.5 sm:p-3 text-center">
+          <div className="text-xl sm:text-2xl font-bold text-primary tabular-nums">{kesim.donations.filter(d => !d.excluded).length}</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">Aktif Bağışçı</div>
         </Card>
         {kesim.donations.filter(d => d.excluded).length > 0 && (
-          <Card className="p-3 text-center">
-            <div className="text-2xl font-bold text-destructive">{kesim.donations.filter(d => d.excluded).length}</div>
-            <div className="text-xs text-muted-foreground">Hariç Tutulan</div>
+          <Card className="p-2.5 sm:p-3 text-center">
+            <div className="text-xl sm:text-2xl font-bold text-destructive tabular-nums">{kesim.donations.filter(d => d.excluded).length}</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">Hariç Tutulan</div>
           </Card>
         )}
-        <Card className="p-3 text-center">
-          <div className="text-2xl font-bold text-primary">{totalShares}</div>
-          <div className="text-xs text-muted-foreground">Toplam Hisse</div>
+        <Card className="p-2.5 sm:p-3 text-center">
+          <div className="text-xl sm:text-2xl font-bold text-primary tabular-nums">{totalShares}</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">Toplam Hisse</div>
         </Card>
-        <Card className="p-3 text-center">
-          <div className="text-2xl font-bold text-primary">{requiredAnimals}</div>
-          <div className="text-xs text-muted-foreground">Gereken Hayvan</div>
+        <Card className="p-2.5 sm:p-3 text-center">
+          <div className="text-xl sm:text-2xl font-bold text-primary tabular-nums">{requiredAnimals}</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">Gereken Hayvan</div>
           {remainingSlots > 0 && (
-            <div className="text-[10px] text-orange-500 mt-0.5">({remainingSlots} boş slot)</div>
+            <div className="text-[10px] text-orange-500 mt-0.5 tabular-nums">({remainingSlots} boş)</div>
           )}
         </Card>
-        <Card className="p-3 text-center">
-          <div className="text-2xl font-bold text-primary">
+        <Card className="p-2.5 sm:p-3 text-center">
+          <div className="text-xl sm:text-2xl font-bold text-primary tabular-nums">
             {kesim.animalGroups.length > 0
               ? kesim.animalGroups.reduce((sum, g) => sum + g.donations.filter(d => d.name.trim() === "").length, 0)
               : 0}
           </div>
-          <div className="text-xs text-muted-foreground">Boş Slot</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">Boş Slot</div>
         </Card>
         {kesim.animalGroups.length > 0 && (
-          <Card className="p-3 text-center">
-            <div className="text-2xl font-bold text-primary">
+          <Card className="p-2.5 sm:p-3 text-center">
+            <div className="text-xl sm:text-2xl font-bold text-primary tabular-nums">
               %{Math.round((kesim.animalGroups.reduce((s, g) => s + g.donations.filter(d => d.name.trim() !== "").length, 0) / (kesim.animalGroups.length * 7)) * 100)}
             </div>
-            <div className="text-xs text-muted-foreground">Doluluk</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">Doluluk</div>
           </Card>
         )}
         {kesim.animalGroups.length > 0 && (() => {
@@ -189,13 +189,13 @@ export function StatsCards() {
             .sort()
             .pop();
           return (
-            <Card className="p-3 text-center">
-              <div className="text-2xl font-bold text-emerald-600">
+            <Card className="p-2.5 sm:p-3 text-center">
+              <div className="text-xl sm:text-2xl font-bold text-emerald-600 tabular-nums">
                 {kesildiCount}/{kesim.animalGroups.length}
               </div>
-              <div className="text-xs text-muted-foreground">Kesildi</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">Kesildi</div>
               {lastAt && (
-                <div className="text-[10px] text-muted-foreground mt-0.5">
+                <div className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
                   Son: {new Date(lastAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
                 </div>
               )}
@@ -203,22 +203,22 @@ export function StatsCards() {
           );
         })()}
         {Object.values(photoCounts).reduce((a, b) => a + b, 0) > 0 && (
-          <Card className="p-3 text-center">
-            <div className="text-2xl font-bold text-blue-600">
+          <Card className="p-2.5 sm:p-3 text-center">
+            <div className="text-xl sm:text-2xl font-bold text-blue-600 tabular-nums">
               {Object.values(photoCounts).reduce((a, b) => a + b, 0)}
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-[11px] text-muted-foreground mt-0.5">
               Fotoğraf ({Object.keys(photoCounts).length} grup)
             </div>
           </Card>
         )}
         {ungroupedDonors.length > 0 && (
           <Card
-            className="p-3 text-center cursor-pointer transition-colors hover:bg-muted"
+            className="p-2.5 sm:p-3 text-center cursor-pointer transition-colors hover:bg-muted"
             onClick={() => { if (!donorListVisible) setDonorListVisible(true); }}
           >
-            <div className="text-2xl font-bold text-orange-600">{ungroupedDonors.length}</div>
-            <div className="text-xs text-muted-foreground">{ungroupedShareCount} hisse gruplanmamış</div>
+            <div className="text-xl sm:text-2xl font-bold text-orange-600 tabular-nums">{ungroupedDonors.length}</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">{ungroupedShareCount} hisse gruplanmamış</div>
           </Card>
         )}
       </div>

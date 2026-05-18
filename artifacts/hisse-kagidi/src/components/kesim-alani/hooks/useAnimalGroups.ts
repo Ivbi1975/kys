@@ -40,6 +40,8 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
   const [groupFindDeleteValue, setGroupFindDeleteValue] = useState("");
   const [groupFindDeleteConfirm, setGroupFindDeleteConfirm] = useState(false);
 
+  const [swapLabels, setSwapLabels] = useState<Map<string, string>>(new Map());
+
   const saveSingleGroupField = useCallback(
     (groupId: string, updates: Record<string, unknown>) => {
       if (!kesim) return;
@@ -517,7 +519,10 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
 
   function moveGroupUp(groupIdx: number) {
     if (!kesim || groupIdx <= 0) return;
-    const animalNo = kesim.animalGroups[groupIdx].animalNo;
+    const movingGroup = kesim.animalGroups[groupIdx];
+    const displacedGroup = kesim.animalGroups[groupIdx - 1];
+    const movingPrevNo = movingGroup.animalNo;
+    const displacedPrevNo = displacedGroup.animalNo;
     const updated = produce(kesim, (draft) => {
       const temp = draft.animalGroups[groupIdx - 1];
       draft.animalGroups[groupIdx - 1] = draft.animalGroups[groupIdx];
@@ -526,12 +531,23 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
         draft.animalGroups[i].animalNo = i + 1;
       }
     });
-    save(updated, `Hayvan ${animalNo} yukarı taşındı`, false, "groups");
+    const movingNewNo = groupIdx;
+    const displacedNewNo = groupIdx + 1;
+    setSwapLabels(prev => {
+      const next = new Map(prev);
+      next.set(movingGroup.id, `${movingPrevNo}-${movingNewNo}`);
+      next.set(displacedGroup.id, `${displacedPrevNo}-${displacedNewNo}`);
+      return next;
+    });
+    save(updated, `Hayvan ${movingPrevNo} yukarı taşındı`, false, "groups");
   }
 
   function moveGroupDown(groupIdx: number) {
     if (!kesim || groupIdx >= kesim.animalGroups.length - 1) return;
-    const animalNo = kesim.animalGroups[groupIdx].animalNo;
+    const movingGroup = kesim.animalGroups[groupIdx];
+    const displacedGroup = kesim.animalGroups[groupIdx + 1];
+    const movingPrevNo = movingGroup.animalNo;
+    const displacedPrevNo = displacedGroup.animalNo;
     const updated = produce(kesim, (draft) => {
       const temp = draft.animalGroups[groupIdx];
       draft.animalGroups[groupIdx] = draft.animalGroups[groupIdx + 1];
@@ -540,7 +556,15 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
         draft.animalGroups[i].animalNo = i + 1;
       }
     });
-    save(updated, `Hayvan ${animalNo} aşağı taşındı`, false, "groups");
+    const movingNewNo = groupIdx + 2;
+    const displacedNewNo = groupIdx + 1;
+    setSwapLabels(prev => {
+      const next = new Map(prev);
+      next.set(movingGroup.id, `${movingPrevNo}-${movingNewNo}`);
+      next.set(displacedGroup.id, `${displacedPrevNo}-${displacedNewNo}`);
+      return next;
+    });
+    save(updated, `Hayvan ${movingPrevNo} aşağı taşındı`, false, "groups");
   }
 
   function swapGroups(fromIdx: number, toIdx: number) {
@@ -805,6 +829,7 @@ export function useAnimalGroups({ kesim, setKesim, save, history, toast, workspa
     setGroupFindDeleteValue,
     groupFindDeleteConfirm,
     setGroupFindDeleteConfirm,
+    swapLabels,
     saveSingleGroupField,
     isGroupLocked,
     removeFromGroup,

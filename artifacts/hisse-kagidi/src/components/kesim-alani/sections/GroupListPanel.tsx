@@ -78,6 +78,8 @@ export function GroupListPanel() {
     addWholeAnimalToBasket, basketAnimalGroupIds,
     placeBasketItemInGroup,
     setGroupFindDeleteOpen,
+    saveSingleGroupField,
+    swapLabels,
   } = ctx;
 
   const [groupSearchInput, setGroupSearchInput] = useState("");
@@ -160,6 +162,9 @@ export function GroupListPanel() {
         onGroupCardDrop={handleGroupCardDrop}
         onGroupCardDragEnd={handleGroupCardDragEnd}
         columnHeaderLabel={columnHeaderLabel} columnHeaderWidth={columnHeaderWidth}
+        projectId={kesim.projectId ?? undefined}
+        swapLabel={swapLabels?.get(group.id) ?? ""}
+        onUpdateGroupFiyat={(gIdx, fiyat) => saveSingleGroupField(kesim.animalGroups[gIdx]?.id ?? "", { fiyat })}
       />
     );
   }, [
@@ -174,6 +179,7 @@ export function GroupListPanel() {
     toggleGroupDonationSelect, handleSelectAllGroupDonations, placeBasketItemInGroup, handleFlagDonation, handleUnflagDonation,
     groupCardDragState, handleGroupCardDragStart, handleGroupCardDragOver, handleGroupCardDrop, handleGroupCardDragEnd,
     columnHeaderLabel, columnHeaderWidth,
+    saveSingleGroupField, swapLabels,
   ]);
 
   if (!kesim) return null;

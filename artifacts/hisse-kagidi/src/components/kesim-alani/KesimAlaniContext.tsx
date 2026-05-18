@@ -64,7 +64,7 @@ export type GroupContextValue = Pick<KesimAlaniContextValue,
   "handleToggleBasketItem" | "handleSwapSelect" | "swapSelection" | "cancelSwap" |
   "groupSearchQuery" | "setGroupSearchQuery" | "groupSearchMatchIdx" | "setGroupSearchMatchIdx" |
   "groupSearchMatches" | "currentGroupMatches" |
-  "isGroupLocked" | "saveSingleGroupField" |
+  "isGroupLocked" | "saveSingleGroupField" | "swapLabels" |
   "groupFindDeleteOpen" | "setGroupFindDeleteOpen" | "groupFindDeleteColumn" | "setGroupFindDeleteColumn" |
   "groupFindDeleteValue" | "setGroupFindDeleteValue" | "groupFindDeleteConfirm" | "setGroupFindDeleteConfirm" |
   "getGroupFindDeleteMatches" | "executeGroupFindDelete" |
@@ -236,7 +236,7 @@ export function KesimAlaniProvider({
     groupSearchQuery: value.groupSearchQuery, setGroupSearchQuery: value.setGroupSearchQuery,
     groupSearchMatchIdx: value.groupSearchMatchIdx, setGroupSearchMatchIdx: value.setGroupSearchMatchIdx,
     groupSearchMatches: value.groupSearchMatches, currentGroupMatches: value.currentGroupMatches,
-    isGroupLocked: value.isGroupLocked, saveSingleGroupField: value.saveSingleGroupField,
+    isGroupLocked: value.isGroupLocked, saveSingleGroupField: value.saveSingleGroupField, swapLabels: value.swapLabels,
     groupFindDeleteOpen: value.groupFindDeleteOpen, setGroupFindDeleteOpen: value.setGroupFindDeleteOpen,
     groupFindDeleteColumn: value.groupFindDeleteColumn, setGroupFindDeleteColumn: value.setGroupFindDeleteColumn,
     groupFindDeleteValue: value.groupFindDeleteValue, setGroupFindDeleteValue: value.setGroupFindDeleteValue,
@@ -272,7 +272,7 @@ export function KesimAlaniProvider({
     value.handleToggleBasketItem, value.handleSwapSelect, value.swapSelection, value.cancelSwap,
     value.groupSearchQuery, value.setGroupSearchQuery, value.groupSearchMatchIdx, value.setGroupSearchMatchIdx,
     value.groupSearchMatches, value.currentGroupMatches,
-    value.isGroupLocked, value.saveSingleGroupField,
+    value.isGroupLocked, value.saveSingleGroupField, value.swapLabels,
     value.groupFindDeleteOpen, value.setGroupFindDeleteOpen,
     value.groupFindDeleteColumn, value.setGroupFindDeleteColumn,
     value.groupFindDeleteValue, value.setGroupFindDeleteValue,

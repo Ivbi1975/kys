@@ -38,6 +38,8 @@ interface AnimalGroupCardProps {
   groupIdx: number;
   kesimName: string;
   kesimId: string;
+  projectId?: string;
+  swapLabel?: string;
   isCollapsed: boolean;
   isSelected: boolean;
   compact: boolean;
@@ -71,6 +73,7 @@ interface AnimalGroupCardProps {
   onSwapSelect: (groupIdx: number, donationIdx: number) => void;
   onRemoveFromGroup: (groupIdx: number, donationIdx: number) => void;
   onUpdateGroupNotes: (groupIdx: number, notes: string) => void;
+  onUpdateGroupFiyat: (groupIdx: number, fiyat: string) => void;
   onDragStart: (groupIdx: number, donationIdx: number, e?: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent, groupIdx: number, donationIdx: number) => void;
   onDrop: (groupIdx: number, donationIdx: number) => void;
@@ -119,6 +122,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
   onBasketDrop,
   onFlagDonation,
   onUnflagDonation,
+  projectId,
 }: {
   donation: Donation;
   dIdx: number;
@@ -145,6 +149,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
   onBasketDrop?: (donationId: string, targetGroupIdx: number, targetSlotIdx: number) => boolean;
   onFlagDonation?: (id: string, reason: string) => void;
   onUnflagDonation?: (id: string) => void;
+  projectId?: string;
 }) {
   const d = donation;
   const [noteOpen, setNoteOpen] = useState(false);
@@ -185,7 +190,19 @@ const GroupDonationRow = memo(function GroupDonationRow({
               {d.isFlagged && (
                 <span title={d.flagReason || "Sorunlu bağış"}><AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" /></span>
               )}
-              <span className={`${inputH} flex items-center select-text`}>{turkishTitleCase(d.vekalet) || "—"}</span>
+              {d.vekalet && projectId ? (
+                <a
+                  href={`/bagis-havuzu/${projectId}?vekalet=${encodeURIComponent(d.vekalet)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`${inputH} flex items-center text-primary hover:underline cursor-pointer`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {turkishTitleCase(d.vekalet)}
+                </a>
+              ) : (
+                <span className={`${inputH} flex items-center select-text`}>{turkishTitleCase(d.vekalet) || "—"}</span>
+              )}
             </div>
           </td>
         );
@@ -551,6 +568,7 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
     onSwapSelect,
     onRemoveFromGroup,
     onUpdateGroupNotes,
+    onUpdateGroupFiyat,
     onDragStart,
     onDragOver,
     onDrop,
@@ -566,6 +584,8 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
     onGroupCardDragEnd,
     columnHeaderLabel,
     columnHeaderWidth,
+    projectId,
+    swapLabel,
   } = props;
 
   const isGroupCardBeingDragged = groupCardDragState?.dragIdx === groupIdx;
@@ -595,6 +615,10 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
   const handleNotesCommit = useCallback((value: string) => {
     onUpdateGroupNotes(groupIdx, value);
   }, [groupIdx, onUpdateGroupNotes]);
+
+  const handleFiyatCommit = useCallback((value: string) => {
+    onUpdateGroupFiyat(groupIdx, value);
+  }, [groupIdx, onUpdateGroupFiyat]);
 
   const filledDonations = useMemo(() => group.donations.filter(d => d.name.trim()), [group.donations]);
   const allDonationsSelected = useMemo(() => 
@@ -697,7 +721,12 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
             <ChevronUp className={compact ? "w-3.5 h-3.5" : "w-4 h-4"} />
           )}
           <h3 className={`font-semibold ${compact ? "text-xs" : "text-sm"}`}>
-            {kesimName} - HAYVAN NO: {group.animalNo}
+            {kesimName} - HAYVAN NO:{" "}
+            {swapLabel ? (
+              <span title="Yeni numara — önceki numara">{swapLabel}</span>
+            ) : (
+              group.animalNo
+            )}
           </h3>
           {group.locked && (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 text-[10px] font-semibold border border-amber-500/30">
@@ -857,18 +886,29 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
                   onBasketDrop={props.onBasketDrop}
                   onFlagDonation={props.onFlagDonation}
                   onUnflagDonation={props.onUnflagDonation}
+                  projectId={projectId}
                 />
               ))}
             </tbody>
           </table>
-          <div className={`${compact ? "p-1" : "p-2"} border-t`}>
+          <div className={`${compact ? "p-1" : "p-2"} border-t flex items-center gap-2`}>
             <LocalInput
               value={group.notes || ""}
               onCommit={handleNotesCommit}
-              className={`w-full ${compact ? "text-[10px]" : "text-xs"} bg-transparent border-0 outline-none placeholder:text-muted-foreground/50 text-muted-foreground h-auto`}
+              className={`flex-1 ${compact ? "text-[10px]" : "text-xs"} bg-transparent border-0 outline-none placeholder:text-muted-foreground/50 text-muted-foreground h-auto`}
               placeholder="Grup notu..."
               aria-label={`Hayvan ${group.animalNo} grup notu`}
             />
+            <div className="flex items-center gap-1 flex-shrink-0 border-l pl-2">
+              <span className={`${compact ? "text-[9px]" : "text-[10px]"} text-muted-foreground/60 font-medium select-none`}>₺</span>
+              <LocalInput
+                value={group.fiyat || ""}
+                onCommit={handleFiyatCommit}
+                className={`w-20 ${compact ? "text-[10px]" : "text-xs"} bg-transparent border-0 outline-none placeholder:text-muted-foreground/50 text-muted-foreground h-auto`}
+                placeholder="Fiyat..."
+                aria-label={`Hayvan ${group.animalNo} fiyat`}
+              />
+            </div>
           </div>
         </>
       )}

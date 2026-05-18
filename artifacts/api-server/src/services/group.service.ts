@@ -439,6 +439,7 @@ export async function updateGroup(kesimAlaniId: string, groupId: string, updates
   colorTag?: string;
   locked?: boolean;
   notes?: string;
+  fiyat?: string;
   kesildi?: boolean;
   donations?: { id: string }[];
 }): Promise<ServiceResult<{ data: unknown }>> {
@@ -456,6 +457,7 @@ export async function updateGroup(kesimAlaniId: string, groupId: string, updates
   if (updates.colorTag !== undefined) dbUpdates.colorTag = updates.colorTag;
   if (updates.locked !== undefined) dbUpdates.locked = updates.locked;
   if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+  if (updates.fiyat !== undefined) dbUpdates.fiyat = updates.fiyat;
   if (updates.kesildi !== undefined) {
     dbUpdates.kesildi = updates.kesildi;
     dbUpdates.kesildiAt = updates.kesildi ? new Date() : null;
