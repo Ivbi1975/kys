@@ -1468,8 +1468,12 @@ router.post("/projects/:id/donations/bulk-delete", asyncHandler(async (req, res)
     .from(kesimAlanlariTable)
     .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
 
+  const { force: _force, ...appliedFilters } = body;
+  const loggedFilters = Object.keys(appliedFilters).length > 0 ? appliedFilters : null;
+
   if (kaRows.length === 0) {
     res.json({ success: true, affected: 0 });
+    auditLog({ action: "delete", entityType: "donation", req, projectId, affectedCount: 0, filters: loggedFilters });
     return;
   }
 
@@ -1486,6 +1490,7 @@ router.post("/projects/:id/donations/bulk-delete", asyncHandler(async (req, res)
 
   if (ids.length === 0) {
     res.json({ success: true, affected: 0 });
+    auditLog({ action: "delete", entityType: "donation", req, projectId, affectedCount: 0, filters: loggedFilters });
     return;
   }
 
@@ -1501,6 +1506,14 @@ router.post("/projects/:id/donations/bulk-delete", asyncHandler(async (req, res)
   invalidateKACache();
   refreshProjectStats();
   res.json({ success: true, affected: ids.length });
+  auditLog({
+    action: "delete",
+    entityType: "donation",
+    req,
+    projectId,
+    affectedCount: ids.length,
+    filters: loggedFilters,
+  });
 }));
 
 router.delete("/projects/:id/donations", asyncHandler(async (req, res) => {
