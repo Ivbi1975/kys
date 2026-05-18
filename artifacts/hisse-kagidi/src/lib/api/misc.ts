@@ -307,3 +307,23 @@ export async function globalSearch(
   if (projectId) params.set("projectId", projectId);
   return apiFetch<GlobalSearchResult[]>(`/global-search?${params.toString()}`);
 }
+
+export interface ConflictLogEntry {
+  id: string;
+  projectId: string | null;
+  donationId: string | null;
+  donationName: string;
+  vekalet: string;
+  sourceKesimAlaniId: string | null;
+  sourceKesimAlaniName: string;
+  targetKesimAlaniId: string | null;
+  targetKesimAlaniName: string;
+  conflictType: string;
+  detectedAt: string;
+  resolution: string | null;
+  resolvedAt: string | null;
+}
+
+export async function fetchConflictLog(projectId: string): Promise<ConflictLogEntry[]> {
+  return apiFetch<ConflictLogEntry[]>(`/projects/${projectId}/conflict-log`);
+}

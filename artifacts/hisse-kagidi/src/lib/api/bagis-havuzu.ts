@@ -1,5 +1,5 @@
 import type { PoolDonation, PoolStats } from "../types";
-import { apiFetch } from "./core";
+import { apiFetch, getApiKey, API_BASE } from "./core";
 
 export interface PoolDonationsResponse {
   items: PoolDonation[];
@@ -156,16 +156,55 @@ export interface TransferredItem {
   notes: string;
 }
 
+export interface TransferConflictItem {
+  donationId: string;
+  donationName: string;
+  vekalet: string;
+  existingVekaletDonationId?: string;
+  existingVekaletName?: string;
+}
+
+export interface TransferConflictResponse {
+  error: "transfer_conflict";
+  conflicts: TransferConflictItem[];
+  sourceKesimAlaniName: string;
+  targetKesimAlaniName: string;
+}
+
+export type TransferDonationsResult =
+  | { success: boolean; moved: number; alreadyInTarget?: number; skipped?: number; transferredItems?: TransferredItem[]; conflict?: undefined }
+  | { conflict: TransferConflictResponse; success?: undefined };
+
 export async function transferDonationsToKA(
   projectId: string,
   donationIds: string[],
   targetKesimAlaniId: string,
   skipExisting?: boolean,
-): Promise<{ success: boolean; moved: number; alreadyInTarget?: number; skipped?: number; transferredItems?: TransferredItem[] }> {
-  return apiFetch<{ success: boolean; moved: number; alreadyInTarget?: number; skipped?: number; transferredItems?: TransferredItem[] }>(`/projects/${projectId}/donations/transfer`, {
+  force?: boolean,
+): Promise<TransferDonationsResult> {
+  const token = getApiKey();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}/projects/${projectId}/donations/transfer`, {
     method: "POST",
-    body: JSON.stringify({ donationIds, targetKesimAlaniId, skipExisting }),
+    headers,
+    body: JSON.stringify({ donationIds, targetKesimAlaniId, skipExisting, force }),
   });
+
+  if (res.status === 409) {
+    const data = await res.json();
+    if (data.error === "transfer_conflict") {
+      return { conflict: data as TransferConflictResponse };
+    }
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Sunucu hatası" }));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
+
+  return res.json();
 }
 
 type BulkActionBody = (

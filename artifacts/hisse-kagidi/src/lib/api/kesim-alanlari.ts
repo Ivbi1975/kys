@@ -1,6 +1,7 @@
 import type { KesimAlani, Donation } from "../types";
-import { apiFetch } from "./core";
+import { apiFetch, getApiKey, API_BASE } from "./core";
 import { buildSignedPhotoUrl } from "./signed-url";
+import type { TransferConflictResponse } from "./bagis-havuzu";
 
 export async function fetchKesimAlanlari(projectId?: string | null): Promise<KesimAlani[]> {
   const url = projectId ? `/kesim-alanlari?projectId=${encodeURIComponent(projectId)}` : "/kesim-alanlari";
@@ -416,11 +417,34 @@ export async function apiCreateDonation(
   });
 }
 
-export async function moveDonationsToKesimAlani(donationIds: string[], sourceKesimAlaniId: string, targetKesimAlaniId: string): Promise<{ success: boolean; count: number; skipped: number; movedIds: string[] }> {
-  return apiFetch<{ success: boolean; count: number; skipped: number; movedIds: string[] }>("/kesim-alanlari/move-donations", {
+export type MoveDonationsResult =
+  | { success: boolean; count: number; skipped: number; movedIds: string[]; conflict?: undefined }
+  | { conflict: TransferConflictResponse; success?: undefined };
+
+export async function moveDonationsToKesimAlani(donationIds: string[], sourceKesimAlaniId: string, targetKesimAlaniId: string, force?: boolean): Promise<MoveDonationsResult> {
+  const token = getApiKey();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}/kesim-alanlari/move-donations`, {
     method: "POST",
-    body: JSON.stringify({ donationIds, sourceKesimAlaniId, targetKesimAlaniId }),
+    headers,
+    body: JSON.stringify({ donationIds, sourceKesimAlaniId, targetKesimAlaniId, force }),
   });
+
+  if (res.status === 409) {
+    const data = await res.json();
+    if (data.error === "transfer_conflict") {
+      return { conflict: data as TransferConflictResponse };
+    }
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Sunucu hatası" }));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
+
+  return res.json();
 }
 
 export async function moveAnimalGroupToKesimAlani(animalGroupId: string, sourceKesimAlaniId: string, targetKesimAlaniId: string, lastUpdatedAt?: string): Promise<{ success: boolean; animalGroupId: string; newAnimalNo: number }> {

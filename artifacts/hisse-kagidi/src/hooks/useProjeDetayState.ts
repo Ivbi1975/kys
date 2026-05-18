@@ -14,11 +14,12 @@ import {
   fetchCatismaTespiti,
   transferDonation,
   fetchTransferLog,
+  fetchConflictLog,
   fetchPendingEditRequests,
   splitKesimAlani,
   renameKesimAlani,
 } from "@/lib/api";
-import type { PendingEditRequest, Conflict, ConflictEntry, DonationTransferEntry } from "@/lib/api";
+import type { PendingEditRequest, Conflict, ConflictEntry, DonationTransferEntry, ConflictLogEntry } from "@/lib/api";
 import { getTotalShares, getRequiredAnimals } from "@/lib/grouping";
 
 export function useProjeDetayState() {
@@ -115,6 +116,10 @@ export function useProjeDetayState() {
   const [transferLogLoading, setTransferLogLoading] = useState(false);
   const [showTransferLog, setShowTransferLog] = useState(false);
 
+  const [conflictLog, setConflictLog] = useState<ConflictLogEntry[]>([]);
+  const [conflictLogLoading, setConflictLogLoading] = useState(false);
+  const [showConflictLog, setShowConflictLog] = useState(false);
+
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
 
   const [pendingEditCount, setPendingEditCount] = useState(0);
@@ -159,6 +164,18 @@ export function useProjeDetayState() {
     }
   }, [projectId]);
 
+  const loadConflictLog = useCallback(async () => {
+    if (!projectId) return;
+    setConflictLogLoading(true);
+    try {
+      const log = await fetchConflictLog(projectId);
+      setConflictLog(log);
+    } catch {
+    } finally {
+      setConflictLogLoading(false);
+    }
+  }, [projectId]);
+
   useEffect(() => {
     loadDataFn();
     loadPendingEditRequests();
@@ -175,6 +192,12 @@ export function useProjeDetayState() {
       loadTransferLog();
     }
   }, [showTransferLog, projectId, loadTransferLog]);
+
+  useEffect(() => {
+    if (showConflictLog) {
+      loadConflictLog();
+    }
+  }, [showConflictLog, projectId, loadConflictLog]);
 
   const handleCreateKesimAlani = useCallback(async (yetkili?: string, displayName?: string, maxVekalet?: number | null, maxAnimal?: number | null) => {
     if (!newKesimAdi.trim()) return;
@@ -428,6 +451,10 @@ export function useProjeDetayState() {
     transferLogLoading,
     showTransferLog,
     setShowTransferLog,
+    conflictLog,
+    conflictLogLoading,
+    showConflictLog,
+    setShowConflictLog,
     globalSearchOpen,
     setGlobalSearchOpen,
     pendingEditCount,

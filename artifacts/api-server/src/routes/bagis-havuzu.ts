@@ -16,6 +16,7 @@ import { ERROR_MESSAGES } from "../lib/constants";
 import { refreshProjectStats } from "./projects";
 import { executeRules } from "../services/rule-engine.service";
 import { invalidateKACache } from "../services/kesim-alani.service";
+import { checkTransferConflicts, logConflicts } from "../services/conflict-log.service";
 
 const router: IRouter = Router();
 
@@ -980,6 +981,7 @@ const transferSchema = z.object({
   donationIds: z.array(z.string()).min(1).max(50000),
   targetKesimAlaniId: z.string().min(1),
   skipExisting: z.boolean().optional(),
+  force: z.boolean().optional().default(false),
 });
 
 router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) => {
@@ -993,7 +995,7 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
     return;
   }
 
-  const { donationIds, targetKesimAlaniId, skipExisting } = parsed.data;
+  const { donationIds, targetKesimAlaniId, skipExisting, force } = parsed.data;
 
   const [targetKA] = await db.select()
     .from(kesimAlanlariTable)
@@ -1021,6 +1023,28 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
   const poolKAId = projectKAIds.find(k => k.name === "__havuz__")?.id;
   // Source KAs exclude the target so donations already there are never "re-moved" to themselves
   const sourceKAIds = [...validKAIds].filter(id => id !== targetKesimAlaniId);
+
+  // Conflict detection: check if any donations have vekalet numbers that already exist in target
+  const poolKaId = poolKAId ?? sourceKAIds[0] ?? "";
+  const conflictCheck = await checkTransferConflicts(donationIds, poolKaId, targetKesimAlaniId, projectId);
+  if (conflictCheck.hasConflicts && !force) {
+    await logConflicts(
+      projectId,
+      conflictCheck.conflicts,
+      poolKaId,
+      conflictCheck.sourceKesimAlaniName || "Bağış Havuzu",
+      targetKesimAlaniId,
+      conflictCheck.targetKesimAlaniName,
+      "blocked",
+    ).catch(() => {});
+    res.status(409).json({
+      error: "transfer_conflict",
+      conflicts: conflictCheck.conflicts,
+      sourceKesimAlaniName: conflictCheck.sourceKesimAlaniName || "Bağış Havuzu",
+      targetKesimAlaniName: conflictCheck.targetKesimAlaniName,
+    });
+    return;
+  }
 
   let movedCount = 0;
   let alreadyInTarget = 0;
@@ -1191,6 +1215,18 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
         notes: normalizeNotes(r.notes),
       })));
     }
+  }
+
+  if (conflictCheck.hasConflicts && force && conflictCheck.conflicts.length > 0) {
+    await logConflicts(
+      projectId,
+      conflictCheck.conflicts,
+      poolKaId,
+      conflictCheck.sourceKesimAlaniName || "Bağış Havuzu",
+      targetKesimAlaniId,
+      conflictCheck.targetKesimAlaniName,
+      "forced",
+    ).catch(() => {});
   }
 
   invalidateKACache();

@@ -26,6 +26,7 @@ import { KesimAlaniList } from "@/components/proje-detay/KesimAlaniList";
 import { SplitModal } from "@/components/proje-detay/SplitModal";
 import { ConflictSection } from "@/components/proje-detay/ConflictSection";
 import { TransferLogSection } from "@/components/proje-detay/TransferLogSection";
+import { ConflictLogSection } from "@/components/proje-detay/ConflictLogSection";
 import { ProjeDetayDialogs } from "@/components/proje-detay/ProjeDetayDialogs";
 
 export default function ProjeDetayPage() {
@@ -243,6 +244,13 @@ export default function ProjeDetayPage() {
           setShowTransferLog={state.setShowTransferLog}
           transferLogLoading={state.transferLogLoading}
           transferLog={state.transferLog}
+        />
+
+        <ConflictLogSection
+          showConflictLog={state.showConflictLog}
+          setShowConflictLog={state.setShowConflictLog}
+          conflictLogLoading={state.conflictLogLoading}
+          conflictLog={state.conflictLog}
         />
       </div>
 

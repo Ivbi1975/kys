@@ -56,7 +56,8 @@ import type { CustomTag, PoolDonation } from "@/lib/types";
 import { trUpperCase } from "@/lib/utils";
 import { loadBasketFromStorage, saveBasketToStorage } from "@/components/kesim-alani/hooks/types";
 import type { BasketItem } from "@/components/kesim-alani/hooks/types";
-import type { TransferredItem, DonorSiblings } from "@/lib/api/bagis-havuzu";
+import type { TransferredItem, DonorSiblings, TransferConflictResponse } from "@/lib/api/bagis-havuzu";
+import { MoveDonationConflictModal } from "@/components/MoveDonationConflictModal";
 
 export default function BagisHavuzuPage() {
   const params = useParams<{ id: string }>();
@@ -134,6 +135,8 @@ export default function BagisHavuzuPage() {
   const [bulkDeleteFilteredDeleting, setBulkDeleteFilteredDeleting] = useState(false);
   const [transferTarget, setTransferTarget] = useState("");
   const [transferring, setTransferring] = useState(false);
+  const [pendingConflict, setPendingConflict] = useState<TransferConflictResponse | null>(null);
+  const [pendingConflictIds, setPendingConflictIds] = useState<string[]>([]);
   const [newListName, setNewListName] = useState("");
   const [creatingNewList, setCreatingNewList] = useState(false);
   const [aiRunning, setAiRunning] = useState(false);
@@ -684,6 +687,14 @@ export default function BagisHavuzuPage() {
         return;
       }
       const result = await transferDonationsToKA(projectId, ids, targetId, true);
+
+      if (result.conflict) {
+        setPendingConflict(result.conflict);
+        setPendingConflictIds(ids);
+        setTransferring(false);
+        return;
+      }
+
       let msg = `${result.moved} bağış aktarıldı`;
       if (result.alreadyInTarget && result.alreadyInTarget > 0) {
         msg += ` (${result.alreadyInTarget} bağış zaten bu listede)`;
@@ -739,6 +750,36 @@ export default function BagisHavuzuPage() {
       setTransferring(false);
     }
   }, [effectiveSelectedIds, transferTarget, creatingNewList, newListName, projectId, toast, invalidatePool, kesimAlanlari]);
+
+  const handleForceTransfer = useCallback(async () => {
+    if (!pendingConflict || pendingConflictIds.length === 0) return;
+    let targetId = transferTarget;
+    if (!targetId) return;
+    setTransferring(true);
+    try {
+      const result = await transferDonationsToKA(projectId, pendingConflictIds, targetId, true, true);
+      setPendingConflict(null);
+      setPendingConflictIds([]);
+      if (!result.conflict) {
+        let msg = `${result.moved} bağış aktarıldı`;
+        if (result.alreadyInTarget && result.alreadyInTarget > 0) {
+          msg += ` (${result.alreadyInTarget} bağış zaten bu listede)`;
+        }
+        toast({ title: msg });
+        setSelectedIds(new Set());
+        setSelectAllPages(false);
+        setTransferOpen(false);
+        setTransferTarget("");
+        setNewListName("");
+        setCreatingNewList(false);
+        invalidatePool();
+      }
+    } catch (err) {
+      toast({ title: "Aktarma başarısız", description: err instanceof Error ? err.message : "Hata", variant: "destructive" });
+    } finally {
+      setTransferring(false);
+    }
+  }, [pendingConflict, pendingConflictIds, transferTarget, projectId, toast, invalidatePool]);
 
   const handleDeleteAll = useCallback(async () => {
     setDeletingAll(true);
@@ -1446,6 +1487,18 @@ export default function BagisHavuzuPage() {
           deleting={bulkDeleteFilteredDeleting}
           onConfirm={handleBulkDeleteFiltered}
         />
+
+        {pendingConflict && (
+          <MoveDonationConflictModal
+            open={!!pendingConflict}
+            conflicts={pendingConflict.conflicts}
+            sourceKesimAlaniName={pendingConflict.sourceKesimAlaniName}
+            targetKesimAlaniName={pendingConflict.targetKesimAlaniName}
+            onProceed={handleForceTransfer}
+            onCancel={() => { setPendingConflict(null); setPendingConflictIds([]); }}
+            isLoading={transferring}
+          />
+        )}
       </div>
     </div>
   );

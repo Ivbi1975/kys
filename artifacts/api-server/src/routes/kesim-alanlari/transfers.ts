@@ -10,6 +10,10 @@ import {
   getTransferLog,
   getPendingEditRequests,
 } from "../../services/transfer.service";
+import { checkTransferConflicts, logConflicts, fetchConflictLog } from "../../services/conflict-log.service";
+import { db } from "@workspace/db";
+import { kesimAlanlariTable } from "@workspace/db/schema";
+import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -18,6 +22,7 @@ router.post("/kesim-alanlari/move-donations", asyncHandler(async (req, res) => {
     donationIds: z.array(z.string()).min(1),
     sourceKesimAlaniId: z.string(),
     targetKesimAlaniId: z.string(),
+    force: z.boolean().optional().default(false),
   }).safeParse(req.body);
 
   if (!parsed.success) {
@@ -25,9 +30,35 @@ router.post("/kesim-alanlari/move-donations", asyncHandler(async (req, res) => {
     return;
   }
 
-  const { sourceKesimAlaniId, targetKesimAlaniId } = parsed.data;
+  const { sourceKesimAlaniId, targetKesimAlaniId, force } = parsed.data;
   if (sourceKesimAlaniId === targetKesimAlaniId) {
     res.status(400).json({ error: ERROR_MESSAGES.SAME_SOURCE_TARGET });
+    return;
+  }
+
+  const [sourceKAForProjectId] = await db.select({ projectId: kesimAlanlariTable.projectId }).from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, sourceKesimAlaniId));
+  const resolvedProjectId = sourceKAForProjectId?.projectId ?? undefined;
+  const conflictCheck = await checkTransferConflicts(parsed.data.donationIds, sourceKesimAlaniId, targetKesimAlaniId, resolvedProjectId);
+
+  if (conflictCheck.hasConflicts && !force) {
+    const sourceKAForBlock = sourceKAForProjectId;
+    if (sourceKAForBlock?.projectId) {
+      await logConflicts(
+        sourceKAForBlock.projectId,
+        conflictCheck.conflicts,
+        sourceKesimAlaniId,
+        conflictCheck.sourceKesimAlaniName,
+        targetKesimAlaniId,
+        conflictCheck.targetKesimAlaniName,
+        "blocked",
+      ).catch(() => {});
+    }
+    res.status(409).json({
+      error: "transfer_conflict",
+      conflicts: conflictCheck.conflicts,
+      sourceKesimAlaniName: conflictCheck.sourceKesimAlaniName,
+      targetKesimAlaniName: conflictCheck.targetKesimAlaniName,
+    });
     return;
   }
 
@@ -42,6 +73,21 @@ router.post("/kesim-alanlari/move-donations", asyncHandler(async (req, res) => {
     };
     res.status(result.status).json({ error: errorMap[result.error] || result.error });
     return;
+  }
+
+  if (conflictCheck.hasConflicts && force && conflictCheck.conflicts.length > 0) {
+    const [sourceKA] = await db.select({ projectId: kesimAlanlariTable.projectId }).from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, sourceKesimAlaniId));
+    if (sourceKA?.projectId) {
+      await logConflicts(
+        sourceKA.projectId,
+        conflictCheck.conflicts,
+        sourceKesimAlaniId,
+        conflictCheck.sourceKesimAlaniName,
+        targetKesimAlaniId,
+        conflictCheck.targetKesimAlaniName,
+        "forced",
+      ).catch(() => {});
+    }
   }
 
   res.json({ success: true, count: result.count, skipped: result.skipped, movedIds: result.movedIds });
@@ -126,6 +172,11 @@ router.post("/donation-transfers", asyncHandler(async (req, res) => {
 router.get("/projects/:projectId/transfer-log", asyncHandler(async (req, res) => {
   const result = await getTransferLog(req.params.projectId);
   res.json(result.data);
+}));
+
+router.get("/projects/:projectId/conflict-log", asyncHandler(async (req, res) => {
+  const log = await fetchConflictLog(req.params.projectId);
+  res.json(log);
 }));
 
 router.get("/projects/:projectId/pending-edit-requests", asyncHandler(async (req, res) => {

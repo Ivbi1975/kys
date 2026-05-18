@@ -40,6 +40,7 @@ export {
   apiRestoreDonation,
   apiPermanentDeleteDonation,
   moveDonationsToKesimAlani,
+  type MoveDonationsResult,
   moveAnimalGroupToKesimAlani,
   generateTrackingToken,
   fetchPhotoCountsAdmin,
@@ -155,6 +156,7 @@ export {
   assignTeamAdmin,
   createDonationTransfers,
   fetchTransferLog,
+  fetchConflictLog,
   runIntegrityCheck,
   repairIntegrity,
   globalSearch,
@@ -174,4 +176,5 @@ export type {
   IntegrityRepairResult,
   GlobalSearchResult,
   FlaggedDonation,
+  ConflictLogEntry,
 } from "./misc";

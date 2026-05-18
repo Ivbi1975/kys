@@ -338,3 +338,25 @@ export const aiJobLogsTable = pgTable("ai_job_logs", {
 ]);
 
 export type AiJobLogRow = typeof aiJobLogsTable.$inferSelect;
+
+export const conflictsLogTable = pgTable("conflicts_log", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").references(() => projectsTable.id, { onDelete: "cascade" }),
+  donationId: text("donation_id"),
+  donationName: text("donation_name").notNull().default(""),
+  vekalet: text("vekalet").notNull().default(""),
+  sourceKesimAlaniId: text("source_kesim_alani_id"),
+  sourceKesimAlaniName: text("source_kesim_alani_name").notNull().default(""),
+  targetKesimAlaniId: text("target_kesim_alani_id"),
+  targetKesimAlaniName: text("target_kesim_alani_name").notNull().default(""),
+  conflictType: text("conflict_type").notNull().default("vekalet_duplicate"),
+  detectedAt: timestamp("detected_at", { withTimezone: true }).notNull().defaultNow(),
+  resolution: text("resolution"),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+}, (table) => [
+  index("idx_conflicts_log_project_id").on(table.projectId),
+  index("idx_conflicts_log_detected_at").on(table.detectedAt),
+  index("idx_conflicts_log_donation_id").on(table.donationId),
+]);
+
+export type ConflictsLogRow = typeof conflictsLogTable.$inferSelect;
