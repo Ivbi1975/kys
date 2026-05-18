@@ -34,9 +34,10 @@ export interface AuditLogFilters {
   limit?: number;
   cursor?: number;
   projectId?: string;
+  kesimAlaniId?: string;
 }
 
-export async function fetchAuditLogs(filters: AuditLogFilters = {}): Promise<AuditLogResponse> {
+export async function fetchAuditLogs(filters: AuditLogFilters = {}, signal?: AbortSignal): Promise<AuditLogResponse> {
   const params = new URLSearchParams();
   if (filters.entityType) params.set("entityType", filters.entityType);
   if (filters.action) params.set("action", filters.action);
@@ -46,6 +47,7 @@ export async function fetchAuditLogs(filters: AuditLogFilters = {}): Promise<Aud
   if (filters.limit) params.set("limit", String(filters.limit));
   if (filters.cursor) params.set("cursor", String(filters.cursor));
   if (filters.projectId) params.set("projectId", filters.projectId);
+  if (filters.kesimAlaniId) params.set("kesimAlaniId", filters.kesimAlaniId);
   const qs = params.toString();
-  return apiFetch<AuditLogResponse>(`/audit-logs${qs ? `?${qs}` : ""}`);
+  return apiFetch<AuditLogResponse>(`/audit-logs${qs ? `?${qs}` : ""}`, { signal });
 }

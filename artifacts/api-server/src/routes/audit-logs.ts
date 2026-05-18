@@ -14,6 +14,7 @@ router.get("/audit-logs", asyncHandler(async (req, res) => {
     limit: Number(req.query.limit) || 50,
     cursor: req.query.cursor ? Number(req.query.cursor) : undefined,
     projectId: typeof req.query.projectId === "string" ? req.query.projectId : undefined,
+    kesimAlaniId: typeof req.query.kesimAlaniId === "string" ? req.query.kesimAlaniId : undefined,
   };
 
   const result = await listAuditLogs(filters);

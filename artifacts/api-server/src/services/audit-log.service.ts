@@ -117,6 +117,7 @@ export interface AuditLogFilters {
   limit?: number;
   cursor?: number;
   projectId?: string;
+  kesimAlaniId?: string;
 }
 
 export async function listAuditLogs(filters: AuditLogFilters) {
@@ -142,6 +143,9 @@ export async function listAuditLogs(filters: AuditLogFilters) {
   }
   if (filters.projectId) {
     conditions.push(eq(auditLogsTable.projectId, filters.projectId));
+  }
+  if (filters.kesimAlaniId) {
+    conditions.push(eq(auditLogsTable.targetKesimAlaniId, filters.kesimAlaniId));
   }
 
   const limit = Math.min(Math.max(filters.limit || 50, 1), 200);

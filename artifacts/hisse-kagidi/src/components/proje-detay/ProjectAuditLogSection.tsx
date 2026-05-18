@@ -1,8 +1,16 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { ClipboardList, ChevronDown, ChevronUp, RefreshCw, ExternalLink, Filter } from "lucide-react";
+import {
+  ClipboardList,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+  ExternalLink,
+  Filter,
+  X,
+} from "lucide-react";
 import { fetchAuditLogs, type AuditLogEntry } from "@/lib/api/audit-logs";
 import { formatDateTime } from "@/lib/formatting";
 
@@ -61,6 +69,58 @@ const ACTION_COLORS: Record<string, string> = {
   bulk_import: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
   filter_apply: "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200",
 };
+
+interface ActiveFilters {
+  action: string;
+  datePreset: "all" | "today" | "thisWeek" | "custom";
+  customStart: string;
+  customEnd: string;
+  kesimAlaniId: string;
+}
+
+const DEFAULT_FILTERS: ActiveFilters = {
+  action: "",
+  datePreset: "all",
+  customStart: "",
+  customEnd: "",
+  kesimAlaniId: "",
+};
+
+function getStartOfDay(d: Date): Date {
+  const r = new Date(d);
+  r.setHours(0, 0, 0, 0);
+  return r;
+}
+
+function getStartOfWeek(d: Date): Date {
+  const r = new Date(d);
+  const day = r.getDay();
+  const diff = (day === 0 ? -6 : 1) - day;
+  r.setDate(r.getDate() + diff);
+  r.setHours(0, 0, 0, 0);
+  return r;
+}
+
+function resolveDates(f: ActiveFilters): { startDate?: string; endDate?: string } {
+  const now = new Date();
+  if (f.datePreset === "today") {
+    return { startDate: getStartOfDay(now).toISOString() };
+  }
+  if (f.datePreset === "thisWeek") {
+    return { startDate: getStartOfWeek(now).toISOString() };
+  }
+  if (f.datePreset === "custom") {
+    return {
+      startDate: f.customStart ? new Date(f.customStart).toISOString() : undefined,
+      endDate: f.customEnd ? new Date(f.customEnd + "T23:59:59").toISOString() : undefined,
+    };
+  }
+  return {};
+}
+
+function hasActiveFilters(f: ActiveFilters): boolean {
+  return !!(f.action || f.datePreset !== "all" || f.kesimAlaniId);
+}
 
 interface ProjectAuditLogSectionProps {
   projectId: string;
@@ -265,6 +325,103 @@ function LogEntryRow({
   );
 }
 
+function AuditFilterBar({
+  filters,
+  onChange,
+  kesimAlanlari,
+}: {
+  filters: ActiveFilters;
+  onChange: (f: ActiveFilters) => void;
+  kesimAlanlari: Array<{ id: string; name: string }>;
+}) {
+  const set = <K extends keyof ActiveFilters>(key: K, value: ActiveFilters[K]) =>
+    onChange({ ...filters, [key]: value });
+
+  const selectClass =
+    "text-xs border rounded-md px-2 py-1 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring h-7";
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-2 py-2 border-b bg-muted/30">
+      <span className="text-[11px] text-muted-foreground font-medium flex-shrink-0 flex items-center gap-1">
+        <Filter className="w-3 h-3" />
+        Filtrele:
+      </span>
+
+      <select
+        className={selectClass}
+        value={filters.action}
+        onChange={e => set("action", e.target.value)}
+        title="İşlem tipi"
+      >
+        <option value="">Tüm İşlemler</option>
+        {Object.entries(ACTION_LABELS).map(([key, label]) => (
+          <option key={key} value={key}>{label}</option>
+        ))}
+      </select>
+
+      <select
+        className={selectClass}
+        value={filters.datePreset}
+        onChange={e => {
+          const v = e.target.value as ActiveFilters["datePreset"];
+          onChange({ ...filters, datePreset: v, customStart: "", customEnd: "" });
+        }}
+        title="Tarih aralığı"
+      >
+        <option value="all">Tüm Tarihler</option>
+        <option value="today">Bugün</option>
+        <option value="thisWeek">Bu Hafta</option>
+        <option value="custom">Özel Aralık</option>
+      </select>
+
+      {filters.datePreset === "custom" && (
+        <>
+          <input
+            type="date"
+            className={selectClass}
+            value={filters.customStart}
+            onChange={e => set("customStart", e.target.value)}
+            title="Başlangıç tarihi"
+          />
+          <span className="text-[11px] text-muted-foreground">–</span>
+          <input
+            type="date"
+            className={selectClass}
+            value={filters.customEnd}
+            onChange={e => set("customEnd", e.target.value)}
+            title="Bitiş tarihi"
+          />
+        </>
+      )}
+
+      {kesimAlanlari.length > 0 && (
+        <select
+          className={selectClass}
+          value={filters.kesimAlaniId}
+          onChange={e => set("kesimAlaniId", e.target.value)}
+          title="Kesim alanı"
+        >
+          <option value="">Tüm Kesim Alanları</option>
+          {kesimAlanlari.map(ka => (
+            <option key={ka.id} value={ka.id}>{ka.name}</option>
+          ))}
+        </select>
+      )}
+
+      {hasActiveFilters(filters) && (
+        <button
+          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground ml-auto"
+          onClick={() => onChange(DEFAULT_FILTERS)}
+          title="Filtreleri temizle"
+        >
+          <X className="w-3 h-3" />
+          Temizle
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function ProjectAuditLogSection({
   projectId,
   kesimAlanlari,
@@ -275,12 +432,30 @@ export function ProjectAuditLogSection({
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [activeFilters, setActiveFilters] = useState<ActiveFilters>(DEFAULT_FILTERS);
 
-  const loadLogs = useCallback(async (append = false) => {
+  const abortRef = useRef<AbortController | null>(null);
+
+  const loadLogs = useCallback(async (append = false, filtersOverride?: ActiveFilters) => {
+    if (abortRef.current) abortRef.current.abort();
+    abortRef.current = new AbortController();
+
     setLoading(true);
     try {
+      const f = filtersOverride ?? activeFilters;
       const cursor = append ? nextCursor ?? undefined : undefined;
-      const result = await fetchAuditLogs({ projectId, limit: 30, cursor });
+      const { startDate, endDate } = resolveDates(f);
+
+      const result = await fetchAuditLogs({
+        projectId,
+        limit: 30,
+        cursor,
+        action: f.action || undefined,
+        startDate,
+        endDate,
+        kesimAlaniId: f.kesimAlaniId || undefined,
+      }, abortRef.current.signal);
+
       if (append) {
         setLogs(prev => [...prev, ...result.items]);
       } else {
@@ -288,18 +463,35 @@ export function ProjectAuditLogSection({
       }
       setHasMore(result.hasMore);
       setNextCursor(result.nextCursor);
-    } catch (err) {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
       console.error("[ProjectAuditLogSection] Log yüklenemedi:", err);
     } finally {
       setLoading(false);
     }
-  }, [projectId, nextCursor]);
+  }, [projectId, nextCursor, activeFilters]);
 
   useEffect(() => {
     if (open && logs.length === 0) {
       loadLogs(false);
     }
   }, [open]);
+
+  const handleFilterChange = useCallback((newFilters: ActiveFilters) => {
+    setActiveFilters(newFilters);
+    setNextCursor(null);
+    if (open) {
+      setLogs([]);
+      setHasMore(false);
+      loadLogs(false, newFilters);
+    }
+  }, [open, loadLogs]);
+
+  const activeFilterCount = [
+    activeFilters.action,
+    activeFilters.datePreset !== "all" ? "date" : "",
+    activeFilters.kesimAlaniId,
+  ].filter(Boolean).length;
 
   return (
     <div className="mb-6">
@@ -314,6 +506,11 @@ export function ProjectAuditLogSection({
           {logs.length > 0 && (
             <span className="bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 text-xs px-1.5 py-0.5 rounded-full font-semibold">
               {logs.length}{hasMore ? "+" : ""}
+            </span>
+          )}
+          {activeFilterCount > 0 && (
+            <span className="bg-primary/10 text-primary text-xs px-1.5 py-0.5 rounded-full font-semibold">
+              {activeFilterCount} filtre
             </span>
           )}
         </span>
@@ -336,6 +533,12 @@ export function ProjectAuditLogSection({
 
       {open && (
         <Card className="p-0 overflow-hidden">
+          <AuditFilterBar
+            filters={activeFilters}
+            onChange={handleFilterChange}
+            kesimAlanlari={kesimAlanlari}
+          />
+
           {loading && logs.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
               <RefreshCw className="w-4 h-4 animate-spin mx-auto mb-2" />
@@ -343,7 +546,9 @@ export function ProjectAuditLogSection({
             </div>
           ) : logs.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
-              Henüz işlem geçmişi yok.
+              {hasActiveFilters(activeFilters)
+                ? "Bu filtrelere uyan işlem bulunamadı."
+                : "Henüz işlem geçmişi yok."}
             </div>
           ) : (
             <div className="divide-y">
