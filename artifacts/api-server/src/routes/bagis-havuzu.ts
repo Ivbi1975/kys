@@ -1858,30 +1858,33 @@ router.post("/projects/:id/donations/bulk-notes", asyncHandler(async (req, res) 
       isNull(donationsTable.deletedAt),
     );
 
-    const snapshots = await db.select({ id: donationsTable.id, notes: donationsTable.notes })
-      .from(donationsTable)
-      .where(scopedWhere);
-    for (const snap of snapshots) {
-      previousNotes.push({ donationId: snap.id, notes: snap.notes ?? "" });
-    }
-
-    if (mode === "replace") {
-      const result = await db.update(donationsTable)
-        .set({ notes: note, updatedAt: new Date() })
+    await db.transaction(async (tx) => {
+      const snapshots = await tx.select({ id: donationsTable.id, notes: donationsTable.notes })
+        .from(donationsTable)
         .where(scopedWhere)
-        .returning({ id: donationsTable.id });
-      affected += result.length;
-    } else {
-      const result = await db.execute(sql`
-        UPDATE donations SET
-          notes = CASE WHEN notes IS NULL OR notes = '' THEN ${note} ELSE notes || E'\n' || ${note} END,
-          updated_at = NOW()
-        WHERE id IN (${sql.join(chunk.map(id => sql`${id}`), sql`, `)})
-          AND kesim_alani_id IN (${sql.join(validKAIds.map(id => sql`${id}`), sql`, `)})
-          AND deleted_at IS NULL
-      `);
-      affected += Number((result as { rowCount?: number }).rowCount || 0);
-    }
+        .for("update");
+      for (const snap of snapshots) {
+        previousNotes.push({ donationId: snap.id, notes: snap.notes ?? "" });
+      }
+
+      if (mode === "replace") {
+        const result = await tx.update(donationsTable)
+          .set({ notes: note, updatedAt: new Date() })
+          .where(scopedWhere)
+          .returning({ id: donationsTable.id });
+        affected += result.length;
+      } else {
+        const result = await tx.execute(sql`
+          UPDATE donations SET
+            notes = CASE WHEN notes IS NULL OR notes = '' THEN ${note} ELSE notes || E'\n' || ${note} END,
+            updated_at = NOW()
+          WHERE id IN (${sql.join(chunk.map(id => sql`${id}`), sql`, `)})
+            AND kesim_alani_id IN (${sql.join(validKAIds.map(id => sql`${id}`), sql`, `)})
+            AND deleted_at IS NULL
+        `);
+        affected += Number((result as { rowCount?: number }).rowCount || 0);
+      }
+    });
   }
 
   invalidateKACache();
