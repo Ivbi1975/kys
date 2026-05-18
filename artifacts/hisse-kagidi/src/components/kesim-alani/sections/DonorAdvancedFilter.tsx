@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SlidersHorizontal, X } from "lucide-react";
+import { turkishTitleCase } from "@/lib/formatting";
 import { useFilterContext } from "../KesimAlaniContext";
 
 export function DonorAdvancedFilter() {
@@ -73,7 +74,7 @@ export function DonorAdvancedFilter() {
                 const isActive = filterTags.includes(tag.id);
                 return (
                   <button key={tag.id} className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${isActive ? "ring-2 ring-offset-1 ring-primary text-white" : "opacity-60 hover:opacity-100 text-white"}`} style={{ backgroundColor: tag.color }} onClick={() => setFilterTags(isActive ? filterTags.filter(t => t !== tag.id) : [...filterTags, tag.id])}>
-                    {tag.name}
+                    {turkishTitleCase(tag.name)}
                   </button>
                 );
               })}

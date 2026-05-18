@@ -16,11 +16,17 @@ const createTagSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   color: z.string().optional(),
+  vekaletId: z.string().nullish(),
+  notes: z.string().nullish(),
+  aiNotes: z.string().nullish(),
 });
 
 const updateTagSchema = z.object({
   name: z.string().min(1).optional(),
   color: z.string().optional(),
+  vekaletId: z.string().nullish(),
+  notes: z.string().nullish(),
+  aiNotes: z.string().nullish(),
 });
 
 router.get("/tags", asyncHandler(async (_req, res) => {
@@ -42,8 +48,15 @@ router.post("/tags", asyncHandler(async (req, res) => {
     return;
   }
 
-  const { id, name, color } = parsed.data;
-  await db.insert(customTagsTable).values({ id, name, color: color || "#3b82f6" });
+  const { id, name, color, vekaletId, notes, aiNotes } = parsed.data;
+  await db.insert(customTagsTable).values({
+    id,
+    name,
+    color: color || "#3b82f6",
+    vekaletId: vekaletId ?? null,
+    notes: notes ?? null,
+    aiNotes: aiNotes ?? null,
+  });
   cacheInvalidate(TAGS_CACHE_KEY);
   const [tag] = await db.select().from(customTagsTable).where(eq(customTagsTable.id, id));
   res.status(201).json(tag);
@@ -57,9 +70,19 @@ router.put("/tags/:id", asyncHandler(async (req, res) => {
   }
 
   const { id } = req.params;
-  const updates: { name?: string; color?: string } = {};
+  const updates: {
+    name?: string;
+    color?: string;
+    vekaletId?: string | null;
+    notes?: string | null;
+    aiNotes?: string | null;
+  } = {};
   if (parsed.data.name !== undefined) updates.name = parsed.data.name;
   if (parsed.data.color !== undefined) updates.color = parsed.data.color;
+  if ("vekaletId" in parsed.data) updates.vekaletId = parsed.data.vekaletId ?? null;
+  if ("notes" in parsed.data) updates.notes = parsed.data.notes ?? null;
+  if ("aiNotes" in parsed.data) updates.aiNotes = parsed.data.aiNotes ?? null;
+
   await db.update(customTagsTable).set(updates).where(eq(customTagsTable.id, id));
   cacheInvalidate(TAGS_CACHE_KEY);
   const [tag] = await db.select().from(customTagsTable).where(eq(customTagsTable.id, id));

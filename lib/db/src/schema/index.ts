@@ -146,6 +146,9 @@ export const customTagsTable = pgTable("custom_tags", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   color: text("color").notNull().default("#3b82f6"),
+  vekaletId: text("vekalet_id"),
+  notes: text("notes"),
+  aiNotes: text("ai_notes"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("idx_custom_tags_name").on(table.name),

@@ -4,6 +4,9 @@ export interface CustomTag {
   id: string;
   name: string;
   color: string;
+  vekaletId?: string | null;
+  notes?: string | null;
+  aiNotes?: string | null;
 }
 
 export interface Donation {

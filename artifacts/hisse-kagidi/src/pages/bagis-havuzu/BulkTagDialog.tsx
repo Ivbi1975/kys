@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Tag, Plus, Loader2 } from "lucide-react";
+import { Tags, Plus, Loader2, PlusCircle, MinusCircle } from "lucide-react";
 import type { CustomTag } from "@/lib/types";
+import { turkishTitleCase } from "@/lib/formatting";
 
 interface BulkTagDialogProps {
   open: boolean;
@@ -28,25 +28,25 @@ export function BulkTagDialog({
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(TAG_COLORS[0]);
   const [showCreate, setShowCreate] = useState(false);
-  const [processing, setProcessing] = useState(false);
+  const [processing, setProcessing] = useState<string | null>(null);
   const [creatingTag, setCreatingTag] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setNewName("");
       setShowCreate(false);
-      setProcessing(false);
+      setProcessing(null);
       setCreatingTag(false);
     }
   }, [open]);
 
-  async function handleTag(tagId: string) {
-    setProcessing(true);
+  async function handleTag(tagId: string, action: "add" | "remove") {
+    setProcessing(`${tagId}:${action}`);
     try {
-      await onTag(tagId, "add");
+      await onTag(tagId, action);
       onOpenChange(false);
     } finally {
-      setProcessing(false);
+      setProcessing(null);
     }
   }
 
@@ -54,7 +54,7 @@ export function BulkTagDialog({
     if (!newName.trim()) return;
     setCreatingTag(true);
     try {
-      const tag = await onCreateTag(newName.trim(), newColor);
+      const tag = await onCreateTag(turkishTitleCase(newName.trim()), newColor);
       if (tag) {
         await onTag(tag.id, "add");
         onOpenChange(false);
@@ -64,35 +64,64 @@ export function BulkTagDialog({
     }
   }
 
+  const isAnyProcessing = processing !== null || creatingTag;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Tag className="w-5 h-5" />
-            Sonuçları Etiketle
+            <Tags className="w-5 h-5" />
+            Toplu Etiketleme
           </DialogTitle>
         </DialogHeader>
 
         <p className="text-sm text-muted-foreground">
-          <strong>{selectedCount}</strong> bağışa etiket eklenecek.
+          <strong>{selectedCount}</strong> seçili bağışa etiket ekle veya kaldır.
         </p>
 
         {tags.length > 0 && (
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Mevcut etiket seç:</label>
-            <div className="flex flex-wrap gap-1.5">
-              {tags.map(tag => (
-                <button
-                  key={tag.id}
-                  onClick={() => handleTag(tag.id)}
-                  disabled={processing}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border hover:bg-muted/50 transition-colors text-sm disabled:opacity-50"
-                >
-                  <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
-                  {tag.name}
-                </button>
-              ))}
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Etiket seç:</label>
+            <div className="space-y-1">
+              {tags.map(tag => {
+                const addKey = `${tag.id}:add`;
+                const removeKey = `${tag.id}:remove`;
+                return (
+                  <div
+                    key={tag.id}
+                    className="flex items-center gap-2 px-2 py-1 rounded-md border bg-card hover:bg-muted/40 transition-colors"
+                  >
+                    <span
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: tag.color }}
+                    />
+                    <span className="flex-1 text-sm font-medium">{turkishTitleCase(tag.name)}</span>
+                    <button
+                      onClick={() => handleTag(tag.id, "add")}
+                      disabled={isAnyProcessing}
+                      title="Etiket ekle"
+                      className="flex items-center gap-1 text-xs px-2 py-0.5 rounded text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 disabled:opacity-40 transition-colors"
+                    >
+                      {processing === addKey
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <PlusCircle className="w-3.5 h-3.5" />}
+                      Ekle
+                    </button>
+                    <button
+                      onClick={() => handleTag(tag.id, "remove")}
+                      disabled={isAnyProcessing}
+                      title="Etiketi kaldır"
+                      className="flex items-center gap-1 text-xs px-2 py-0.5 rounded text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 disabled:opacity-40 transition-colors"
+                    >
+                      {processing === removeKey
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <MinusCircle className="w-3.5 h-3.5" />}
+                      Kaldır
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -100,11 +129,11 @@ export function BulkTagDialog({
         <div className="border-t pt-3">
           {!showCreate ? (
             <Button variant="outline" size="sm" className="w-full" onClick={() => setShowCreate(true)}>
-              <Plus className="w-4 h-4 mr-1" />Yeni Etiket Oluştur
+              <Plus className="w-4 h-4 mr-1" />Yeni Etiket Oluştur ve Ekle
             </Button>
           ) : (
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">Yeni etiket:</label>
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Yeni etiket:</label>
               <Input
                 placeholder="Etiket adı..."
                 value={newName}
@@ -113,7 +142,12 @@ export function BulkTagDialog({
                 className="h-8 text-sm"
                 autoFocus
               />
-              <div className="flex gap-1.5">
+              {newName.trim() && (
+                <p className="text-xs text-muted-foreground">
+                  Görünüm: <strong>{turkishTitleCase(newName.trim())}</strong>
+                </p>
+              )}
+              <div className="flex gap-1.5 flex-wrap">
                 {TAG_COLORS.map(c => (
                   <button
                     key={c}
@@ -138,13 +172,6 @@ export function BulkTagDialog({
             </div>
           )}
         </div>
-
-        {processing && (
-          <div className="flex items-center justify-center gap-2 py-2">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-sm text-muted-foreground">Etiketleniyor...</span>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );

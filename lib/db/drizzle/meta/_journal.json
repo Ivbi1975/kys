@@ -204,6 +204,13 @@
       "when": 1747552800000,
       "tag": "0028_conflicts_log",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1747526400000,
+      "tag": "0029_custom_tags_extra_fields",
+      "breakpoints": true
     }
   ]
 }

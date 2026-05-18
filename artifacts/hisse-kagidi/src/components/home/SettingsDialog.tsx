@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -7,11 +9,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tag, Pencil } from "lucide-react";
+import { Plus, Trash2, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tags, Pencil, Check, Bot } from "lucide-react";
 import type { ThemeMode } from "@/lib/useTheme";
 import { TAG_COLORS } from "@/lib/constants";
 import type { IntegrityReport } from "@/lib/api";
 import type { CustomTag } from "@/lib/types";
+import { turkishTitleCase } from "@/lib/formatting";
 
 interface SettingsDialogProps {
   settingsOpen: boolean;
@@ -27,6 +30,12 @@ interface SettingsDialogProps {
   setEditTagName: (name: string) => void;
   editTagColor: string;
   setEditTagColor: (color: string) => void;
+  editTagVekaletId: string;
+  setEditTagVekaletId: (v: string) => void;
+  editTagNotes: string;
+  setEditTagNotes: (v: string) => void;
+  editTagAiNotes: string;
+  setEditTagAiNotes: (v: string) => void;
   newTagName: string;
   setNewTagName: (name: string) => void;
   newTagColor: string;
@@ -41,10 +50,11 @@ interface SettingsDialogProps {
   onExportBackup: () => void;
   onImportBackup: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onExportCsv: () => void;
-  onAddTag: () => void;
+  onAddTag: (extra?: { vekaletId?: string; notes?: string; aiNotes?: string }) => void;
   onDeleteTag: (id: string) => void;
   onStartEditTag: (tag: CustomTag) => void;
   onCommitEditTag: () => void;
+  onCancelEditTag: () => void;
   onIntegrityCheck: () => void;
   onIntegrityRepair: () => void;
   onNavigateAiSettings: () => void;
@@ -64,6 +74,12 @@ export function SettingsDialog({
   setEditTagName,
   editTagColor,
   setEditTagColor,
+  editTagVekaletId,
+  setEditTagVekaletId,
+  editTagNotes,
+  setEditTagNotes,
+  editTagAiNotes,
+  setEditTagAiNotes,
   newTagName,
   setNewTagName,
   newTagColor,
@@ -82,10 +98,24 @@ export function SettingsDialog({
   onDeleteTag,
   onStartEditTag,
   onCommitEditTag,
+  onCancelEditTag,
   onIntegrityCheck,
   onIntegrityRepair,
   onNavigateAiSettings,
 }: SettingsDialogProps) {
+  const [newTagVekaletId, setNewTagVekaletId] = useState("");
+  const [newTagNotes, setNewTagNotes] = useState("");
+  const [newTagAiNotes, setNewTagAiNotes] = useState("");
+  const [showNewTagExtra, setShowNewTagExtra] = useState(false);
+
+  function handleAddTagWithExtra() {
+    onAddTag({ vekaletId: newTagVekaletId, notes: newTagNotes, aiNotes: newTagAiNotes });
+    setNewTagVekaletId("");
+    setNewTagNotes("");
+    setNewTagAiNotes("");
+    setShowNewTagExtra(false);
+  }
+
   return (
     <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
       <DialogTrigger asChild>
@@ -302,8 +332,8 @@ export function SettingsDialog({
           </div>
 
           <div className="border-t pt-4">
-            <label className="text-sm font-medium mb-2 block">
-              <Tag className="w-4 h-4 inline mr-1" />
+            <label className="text-sm font-medium mb-3 flex items-center gap-1.5">
+              <Tags className="w-4 h-4" />
               Etiketler
             </label>
             <p className="text-xs text-muted-foreground mb-3">
@@ -313,70 +343,144 @@ export function SettingsDialog({
             {globalTags.length > 0 && (
               <div className="space-y-2 mb-3">
                 {globalTags.map(tag => (
-                  <div key={tag.id} className="flex items-center gap-2">
+                  <div key={tag.id} className="rounded-lg border overflow-hidden">
                     {editingTagId === tag.id ? (
-                      <>
-                        <div className="flex gap-1 flex-shrink-0">
+                      <div className="p-3 space-y-2 bg-muted/30">
+                        <div className="flex gap-1 flex-wrap">
                           {TAG_COLORS.map(c => (
                             <button
                               key={c}
-                              className={`w-5 h-5 rounded-full border-2 ${editTagColor === c ? "ring-2 ring-offset-1 ring-primary" : "border-transparent"}`}
+                              className={`w-5 h-5 rounded-full border-2 transition-transform ${editTagColor === c ? "ring-2 ring-offset-1 ring-primary scale-110" : "border-transparent"}`}
                               style={{ backgroundColor: c }}
                               onClick={() => setEditTagColor(c)}
                             />
                           ))}
                         </div>
                         <Input
-                          className="h-7 text-sm flex-1"
+                          className="h-7 text-sm"
+                          placeholder="Etiket adı"
                           value={editTagName}
                           onChange={(e) => setEditTagName(e.target.value)}
-                          onBlur={onCommitEditTag}
                           onKeyDown={(e) => e.key === "Enter" && onCommitEditTag()}
                           autoFocus
                         />
-                      </>
+                        <Input
+                          className="h-7 text-sm"
+                          placeholder="Vekalet ID (isteğe bağlı)"
+                          value={editTagVekaletId}
+                          onChange={(e) => setEditTagVekaletId(e.target.value)}
+                        />
+                        <Textarea
+                          className="text-sm min-h-[56px] resize-none"
+                          placeholder="Not (isteğe bağlı)"
+                          value={editTagNotes}
+                          onChange={(e) => setEditTagNotes(e.target.value)}
+                          rows={2}
+                        />
+                        <Textarea
+                          className="text-sm min-h-[56px] resize-none"
+                          placeholder="AI Not (isteğe bağlı)"
+                          value={editTagAiNotes}
+                          onChange={(e) => setEditTagAiNotes(e.target.value)}
+                          rows={2}
+                        />
+                        <div className="flex gap-2">
+                          <Button size="sm" className="flex-1" onClick={onCommitEditTag}>
+                            <Check className="w-3.5 h-3.5 mr-1" />
+                            Kaydet
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={onCancelEditTag}>İptal</Button>
+                        </div>
+                      </div>
                     ) : (
-                      <>
+                      <div className="flex items-center gap-2 px-3 py-2">
                         <span
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white flex-1"
+                          className="w-3 h-3 rounded-full flex-shrink-0"
                           style={{ backgroundColor: tag.color }}
+                        />
+                        <span
+                          className="flex-1 text-sm font-medium truncate"
                         >
-                          {tag.name}
+                          {turkishTitleCase(tag.name)}
                         </span>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onStartEditTag(tag)}>
+                        {(tag.vekaletId || tag.notes || tag.aiNotes) && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-0.5 flex-shrink-0">
+                            {tag.aiNotes && <Bot className="w-3 h-3" />}
+                            {(tag.notes || tag.vekaletId) && <span className="w-1 h-1 rounded-full bg-muted-foreground inline-block" />}
+                          </span>
+                        )}
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 flex-shrink-0" onClick={() => onStartEditTag(tag)}>
                           <Pencil className="w-3 h-3" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onDeleteTag(tag.id)}>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 flex-shrink-0" onClick={() => onDeleteTag(tag.id)}>
                           <Trash2 className="w-3 h-3 text-destructive" />
                         </Button>
-                      </>
+                      </div>
                     )}
                   </div>
                 ))}
               </div>
             )}
 
-            <div className="flex gap-2 items-center">
-              <div className="flex gap-1 flex-shrink-0">
-                {TAG_COLORS.slice(0, 5).map(c => (
-                  <button
-                    key={c}
-                    className={`w-5 h-5 rounded-full border-2 ${newTagColor === c ? "ring-2 ring-offset-1 ring-primary" : "border-transparent"}`}
-                    style={{ backgroundColor: c }}
-                    onClick={() => setNewTagColor(c)}
-                  />
-                ))}
+            <div className="space-y-2">
+              <div className="flex gap-2 items-center">
+                <div className="flex gap-1 flex-shrink-0">
+                  {TAG_COLORS.slice(0, 5).map(c => (
+                    <button
+                      key={c}
+                      className={`w-5 h-5 rounded-full border-2 ${newTagColor === c ? "ring-2 ring-offset-1 ring-primary" : "border-transparent"}`}
+                      style={{ backgroundColor: c }}
+                      onClick={() => setNewTagColor(c)}
+                    />
+                  ))}
+                </div>
+                <Input
+                  className="h-7 text-sm flex-1"
+                  placeholder="Yeni etiket adı"
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAddTagWithExtra()}
+                />
+                <Button variant="outline" size="sm" onClick={handleAddTagWithExtra} disabled={!newTagName.trim()}>
+                  <Plus className="w-4 h-4" />
+                </Button>
               </div>
-              <Input
-                className="h-7 text-sm flex-1"
-                placeholder="Yeni etiket adı"
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && onAddTag()}
-              />
-              <Button variant="outline" size="sm" onClick={onAddTag} disabled={!newTagName.trim()}>
-                <Plus className="w-4 h-4" />
-              </Button>
+              {newTagName.trim() && (
+                <p className="text-xs text-muted-foreground">
+                  Görünüm: <strong>{turkishTitleCase(newTagName.trim())}</strong>
+                </p>
+              )}
+              <button
+                className="text-xs text-muted-foreground underline hover:text-foreground transition-colors"
+                onClick={() => setShowNewTagExtra(v => !v)}
+                type="button"
+              >
+                {showNewTagExtra ? "Ek alanları gizle" : "Ek alanlar ekle (Vekalet ID, Not, AI Not)"}
+              </button>
+              {showNewTagExtra && (
+                <div className="space-y-1.5 pt-1">
+                  <Input
+                    className="h-7 text-sm"
+                    placeholder="Vekalet ID (isteğe bağlı)"
+                    value={newTagVekaletId}
+                    onChange={(e) => setNewTagVekaletId(e.target.value)}
+                  />
+                  <Textarea
+                    className="text-sm min-h-[48px] resize-none"
+                    placeholder="Not (isteğe bağlı)"
+                    value={newTagNotes}
+                    onChange={(e) => setNewTagNotes(e.target.value)}
+                    rows={2}
+                  />
+                  <Textarea
+                    className="text-sm min-h-[48px] resize-none"
+                    placeholder="AI Not (isteğe bağlı)"
+                    value={newTagAiNotes}
+                    onChange={(e) => setNewTagAiNotes(e.target.value)}
+                    rows={2}
+                  />
+                </div>
+              )}
             </div>
           </div>
 

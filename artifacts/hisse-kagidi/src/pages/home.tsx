@@ -101,6 +101,12 @@ export default function Home() {
             setEditTagName={state.setEditTagName}
             editTagColor={state.editTagColor}
             setEditTagColor={state.setEditTagColor}
+            editTagVekaletId={state.editTagVekaletId}
+            setEditTagVekaletId={state.setEditTagVekaletId}
+            editTagNotes={state.editTagNotes}
+            setEditTagNotes={state.setEditTagNotes}
+            editTagAiNotes={state.editTagAiNotes}
+            setEditTagAiNotes={state.setEditTagAiNotes}
             newTagName={state.newTagName}
             setNewTagName={state.setNewTagName}
             newTagColor={state.newTagColor}
@@ -119,6 +125,7 @@ export default function Home() {
             onDeleteTag={state.handleDeleteTag}
             onStartEditTag={state.startEditTag}
             onCommitEditTag={state.commitEditTag}
+            onCancelEditTag={state.cancelEditTag}
             onIntegrityCheck={state.handleIntegrityCheck}
             onIntegrityRepair={state.handleIntegrityRepair}
             onNavigateAiSettings={() => { state.setSettingsOpen(false); state.setLocation("/ai-prompt-ayarlari"); }}

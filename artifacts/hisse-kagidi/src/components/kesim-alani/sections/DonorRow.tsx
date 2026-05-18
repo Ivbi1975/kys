@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   AlertTriangle, Eye, EyeOff, Flag, MoreHorizontal, ShoppingBag, StickyNote, Tag, Trash2, Wand2,
 } from "lucide-react";
+import { turkishTitleCase } from "@/lib/formatting";
 
 interface DonorRowProps {
   d: Donation;
@@ -127,7 +128,7 @@ function DonorRowOverflowMenu({
                       <button key={tag.id} className={`w-full flex items-center gap-2 px-1.5 py-1 rounded text-xs hover:bg-muted transition-colors ${isActive ? "bg-muted" : ""}`}
                         onClick={() => onToggleTag(d.id, tag.id)}>
                         <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
-                        <span className="flex-1 text-left">{tag.name}</span>
+                        <span className="flex-1 text-left">{turkishTitleCase(tag.name)}</span>
                         {isActive && <span className="text-primary text-xs">✓</span>}
                       </button>
                     );
@@ -318,7 +319,7 @@ function DonorRowInner({
             {(d.tags || []).map(tagId => {
               const tag = globalTags.find(t => t.id === tagId);
               if (!tag) return null;
-              return (<span key={tagId} className="px-1.5 py-0 rounded-full text-[9px] font-medium text-white leading-4" style={{ backgroundColor: tag.color }}>{tag.name}</span>);
+              return (<span key={tagId} className="px-1.5 py-0 rounded-full text-[9px] font-medium text-white leading-4" style={{ backgroundColor: tag.color }}>{turkishTitleCase(tag.name)}</span>);
             })}
           </div>
         )}

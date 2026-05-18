@@ -36,6 +36,7 @@ import { useTheme } from "@/lib/useTheme";
 import { useToast } from "@/hooks/use-toast";
 import { useMinLoadingTime } from "@/hooks/useMinLoadingTime";
 import { useKesimAlaniActions } from "@/hooks/useKesimAlaniActions";
+import { turkishTitleCase } from "@/lib/formatting";
 
 export function useHomeState() {
   const [, setLocation] = useLocation();
@@ -60,6 +61,9 @@ export function useHomeState() {
   const [editingTagId, setEditingTagId] = useState<string | null>(null);
   const [editTagName, setEditTagName] = useState("");
   const [editTagColor, setEditTagColor] = useState("");
+  const [editTagVekaletId, setEditTagVekaletId] = useState("");
+  const [editTagNotes, setEditTagNotes] = useState("");
+  const [editTagAiNotes, setEditTagAiNotes] = useState("");
   const [loading, setLoading] = useState(true);
   const showSkeleton = useMinLoadingTime(loading);
   const [migrationDone, setMigrationDone] = useState(false);
@@ -147,12 +151,15 @@ export function useHomeState() {
     init();
   }, []);
 
-  const handleAddTag = useCallback(async () => {
+  const handleAddTag = useCallback(async (extra?: { vekaletId?: string; notes?: string; aiNotes?: string }) => {
     if (!newTagName.trim()) return;
     const tag: CustomTag = {
       id: crypto.randomUUID(),
-      name: newTagName.trim(),
+      name: turkishTitleCase(newTagName.trim()),
       color: newTagColor,
+      vekaletId: extra?.vekaletId?.trim() || null,
+      notes: extra?.notes?.trim() || null,
+      aiNotes: extra?.aiNotes?.trim() || null,
     };
     try {
       await createTag(tag);
@@ -186,10 +193,22 @@ export function useHomeState() {
     }
   }, [globalTags, toast]);
 
+  const cancelEditTag = useCallback(() => {
+    setEditingTagId(null);
+    setEditTagName("");
+    setEditTagColor("");
+    setEditTagVekaletId("");
+    setEditTagNotes("");
+    setEditTagAiNotes("");
+  }, []);
+
   const startEditTag = useCallback((tag: CustomTag) => {
     setEditingTagId(tag.id);
     setEditTagName(tag.name);
     setEditTagColor(tag.color);
+    setEditTagVekaletId(tag.vekaletId || "");
+    setEditTagNotes(tag.notes || "");
+    setEditTagAiNotes(tag.aiNotes || "");
   }, []);
 
   const commitEditTag = useCallback(async () => {
@@ -197,7 +216,14 @@ export function useHomeState() {
       setEditingTagId(null);
       return;
     }
-    const updated = { id: editingTagId, name: editTagName.trim(), color: editTagColor };
+    const updated: CustomTag = {
+      id: editingTagId,
+      name: turkishTitleCase(editTagName.trim()),
+      color: editTagColor,
+      vekaletId: editTagVekaletId.trim() || null,
+      notes: editTagNotes.trim() || null,
+      aiNotes: editTagAiNotes.trim() || null,
+    };
     try {
       await updateTag(updated);
       invalidateHomeDataCache();
@@ -213,7 +239,7 @@ export function useHomeState() {
       });
     }
     setEditingTagId(null);
-  }, [editingTagId, editTagName, editTagColor, toast]);
+  }, [editingTagId, editTagName, editTagColor, editTagVekaletId, editTagNotes, editTagAiNotes, toast]);
 
   const handleCreate = useCallback(async (displayName?: string, maxVekalet?: number | null, maxAnimal?: number | null) => {
     if (!newName.trim()) return;
@@ -719,6 +745,12 @@ export function useHomeState() {
     setEditTagName,
     editTagColor,
     setEditTagColor,
+    editTagVekaletId,
+    setEditTagVekaletId,
+    editTagNotes,
+    setEditTagNotes,
+    editTagAiNotes,
+    setEditTagAiNotes,
     showSkeleton,
     migrationDone,
     deleteConfirm: kesimActions.deleteConfirm,
@@ -762,6 +794,7 @@ export function useHomeState() {
     setPendingImportJson,
     handleAddTag,
     handleDeleteTag,
+    cancelEditTag,
     startEditTag,
     commitEditTag,
     handleCreate,
