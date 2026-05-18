@@ -516,7 +516,7 @@ export default function BagisHavuzuPage() {
     setTemsilciFilter([]);
     setKesimAlaniFilter("none");
     setFlagFilter("");
-    setAiCategoryFilter("");
+    setAiCategoryFilter([]);
     setOzellikFilter([]);
     setFiyatFilter([]);
     setYerTalebiFilter([]);
@@ -683,7 +683,8 @@ export default function BagisHavuzuPage() {
     try {
       const ids = [...effectiveSelectedIds];
       const result = await transferDonationsToKA(projectId, ids, havuzKaId, false);
-      toast({ title: `${result.moved} bağış havuza geri taşındı` });
+      const movedCount = result.conflict ? 0 : result.moved;
+      toast({ title: `${movedCount} bağış havuza geri taşındı` });
       setSelectedIds(new Set());
       setSelectAllPages(false);
       invalidatePool();

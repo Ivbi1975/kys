@@ -1346,7 +1346,7 @@ router.post("/projects/:id/donations/bulk-action", asyncHandler(async (req, res)
 
 const logFilterSchema = z.object({
   filters: z.record(z.unknown()).default({}),
-  affectedCount: z.number().int().nonneg().optional(),
+  affectedCount: z.number().int().nonnegative().optional(),
 });
 
 router.post("/projects/:id/pool/log-filter", asyncHandler(async (req, res) => {

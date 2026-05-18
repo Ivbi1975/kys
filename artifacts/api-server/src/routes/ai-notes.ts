@@ -3,13 +3,17 @@ import { db } from "@workspace/db";
 import { appSettingsTable, donationsTable, aiJobsTable, kesimAlanlariTable, aiJobLogsTable } from "@workspace/db/schema";
 import { eq, lt, or, desc, and, inArray, ne, isNull } from "drizzle-orm";
 import { z } from "zod";
-import { assertOpenAiConfigured, openai } from "@workspace/integrations-openai-ai-server";
+import { openai } from "@workspace/integrations-openai-ai-server";
 import crypto from "crypto";
 import { asyncHandler } from "../middleware/error-handler";
 import { logger } from "../lib/logger";
 import { TX_BATCH_SIZE, AiJobStatus, STALE_JOB_CUTOFF_MS, STALE_JOB_CLEANUP_INTERVAL_MS, AI_JOB_TTL_MS, AI_JOB_EXPIRY_CHECK_INTERVAL_MS, ERROR_MESSAGES } from "../lib/constants";
 
 const router: IRouter = Router();
+
+function assertOpenAiConfigured(): void {
+  if (!openai) throw new Error("OpenAI entegrasyonu yapılandırılmamış.");
+}
 
 const DEFAULT_PROMPT = `Sen bir kurban/bağış yönetim sisteminin asistanısın. Sana verilen bağışçı notlarını detaylı şekilde analiz et ve her not için aşağıdaki kategorilerde sınıflandırma yap.
 

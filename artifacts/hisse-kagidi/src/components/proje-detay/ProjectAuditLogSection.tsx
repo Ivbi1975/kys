@@ -242,19 +242,19 @@ function LogEntryRow({
         </div>
       )}
 
-      {meta?.sourceKesimAlaniId && (
+      {!!(meta?.sourceKesimAlaniId) && (
         <div className="flex items-center gap-1 mt-0.5">
           <span className="text-[10px] text-muted-foreground">Kaynak:</span>
           <KALink
-            kaId={meta.sourceKesimAlaniId as string}
-            kaName={meta.sourceKesimAlaniName as string | null}
+            kaId={meta!.sourceKesimAlaniId as string}
+            kaName={meta!.sourceKesimAlaniName as string | null}
             kesimAlanlari={kesimAlanlari}
             onNavigate={onNavigate}
           />
         </div>
       )}
 
-      {entry.filters && (
+      {!!(entry.filters) && (
         <FiltersDisplay
           filters={entry.filters}
           projectId={projectId}
