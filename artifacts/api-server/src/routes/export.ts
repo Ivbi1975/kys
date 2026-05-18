@@ -213,6 +213,7 @@ async function buildProjectFlatExcel(client: DbClient, projectId: string): Promi
 
   const dataResult = await client.query(
     `SELECT
+       ka.id AS ka_id,
        ka.name AS ka_name,
        d.name, d.description, d.donation_type, d.share_count,
        d.vekalet, d.notes, d.phone, d.excluded,
@@ -224,13 +225,29 @@ async function buildProjectFlatExcel(client: DbClient, projectId: string): Promi
      LEFT JOIN animal_groups ag ON ag.id = agd.group_id
      LEFT JOIN teams t ON t.id = ag.team_id
      WHERE d.deleted_at IS NULL AND ka.deleted_at IS NULL AND ka.project_id = $1
-     ORDER BY ka.name, d.sort_order`,
+     ORDER BY ka.name, ka.id, d.sort_order`,
     [projectId],
   );
 
+  const COL_MIN_WIDTH = 8;
+  const COL_MAX_WIDTH = 55;
+  // Track max content length per column index for auto-sizing
+  const colMaxLen: number[] = CSV_HEADERS.map((h) => h.length);
+
   const workbook = new ExcelJS.Workbook();
   const ws = workbook.addWorksheet("Bağışçılar");
-  ws.columns = CSV_HEADERS.map((h) => ({ header: h, width: Math.max(14, h.length + 2) }));
+  // Set initial widths from headers; will be updated after scanning all rows
+  ws.columns = CSV_HEADERS.map((h) => ({ header: h, width: Math.max(COL_MIN_WIDTH, h.length + 2) }));
+
+  ws.pageSetup = {
+    paperSize: 9,
+    orientation: "landscape",
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    printTitlesRow: "1:1",
+    margins: { left: 0.5, right: 0.5, top: 0.6, bottom: 1.0, header: 0.3, footer: 0.3 },
+  };
 
   const headerRow = ws.getRow(1);
   headerRow.eachCell((cell) => {
@@ -241,24 +258,61 @@ async function buildProjectFlatExcel(client: DbClient, projectId: string): Promi
   });
   headerRow.height = 22;
 
+  let prevKaId: string | null = null;
+  let dataRowIdx = 0;
+
   for (const row of dataResult.rows) {
-    ws.addRow([
-      row.ka_name || "",
-      row.name || "",
-      row.description || "",
-      row.donation_type || "",
-      row.share_count ?? 1,
-      row.vekalet || "",
-      row.notes || "",
-      row.phone || "",
+    const kaName = (row.ka_name as string) || "";
+    const kaId = (row.ka_id as string) || "";
+    if (kaId !== prevKaId && prevKaId !== null) {
+      const sepRow = ws.addRow(Array(CSV_HEADERS.length).fill(""));
+      sepRow.height = 6;
+      sepRow.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD1D5DB" } };
+        cell.border = CELL_BORDER;
+      });
+    }
+    prevKaId = kaId;
+
+    const cellValues: (string | number)[] = [
+      kaName,
+      (row.name as string) || "",
+      (row.description as string) || "",
+      (row.donation_type as string) || "",
+      row.share_count != null ? Number(row.share_count) : 1,
+      (row.vekalet as string) || "",
+      (row.notes as string) || "",
+      (row.phone as string) || "",
       row.excluded ? "Evet" : "Hayır",
       row.animal_no != null ? Number(row.animal_no) : "",
-      row.color_tag || "",
+      (row.color_tag as string) || "",
       row.kesildi ? "Evet" : "Hayır",
       row.kesildi_at ? new Date(row.kesildi_at as string | number | Date).toLocaleDateString("tr-TR") : "",
-      row.team_name || "",
-    ]);
+      (row.team_name as string) || "",
+    ];
+
+    // Update column max lengths for auto-sizing
+    cellValues.forEach((val, i) => {
+      const len = String(val).length;
+      if (len > colMaxLen[i]) colMaxLen[i] = len;
+    });
+
+    const newRow = ws.addRow(cellValues);
+    newRow.height = 18;
+    const isEven = dataRowIdx % 2 === 1;
+    newRow.eachCell((cell, colNum) => {
+      cell.border = CELL_BORDER;
+      cell.font = { name: "Calibri", size: 10 };
+      cell.alignment = { vertical: "middle", wrapText: colNum === 7 };
+      if (isEven) cell.fill = EXCEL_EVEN_FILL;
+    });
+    dataRowIdx++;
   }
+
+  // Apply content-based column widths (clamped to min/max)
+  ws.columns.forEach((col, i) => {
+    col.width = Math.min(COL_MAX_WIDTH, Math.max(COL_MIN_WIDTH, (colMaxLen[i] ?? 0) + 3));
+  });
 
   const safeName = projectName.replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ _-]/g, "").replace(/\s+/g, "_");
   const today = new Date().toISOString().split("T")[0];
@@ -315,6 +369,7 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
 
     const donationsResult = await client.query(
       `SELECT
+         ag.id AS group_id,
          ag.animal_no,
          d.name, d.description, d.donation_type, d.vekalet, d.notes,
          d.ai_categories, d.ai_warnings,
@@ -327,17 +382,18 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
       [kaId],
     );
 
-    const groupMap = new Map<number, AnimalGroupData>();
-    const groupOrder: number[] = [];
+    const groupMap = new Map<string, AnimalGroupData>();
+    const groupOrder: string[] = [];
 
     for (const row of donationsResult.rows) {
+      const groupId = row.group_id as string;
       const animalNo = row.animal_no as number;
-      if (!groupMap.has(animalNo)) {
-        groupMap.set(animalNo, { animalNo, slots: [] });
-        groupOrder.push(animalNo);
+      if (!groupMap.has(groupId)) {
+        groupMap.set(groupId, { animalNo, slots: [] });
+        groupOrder.push(groupId);
       }
       if (row.name !== null || row.description !== null || row.donation_type !== null) {
-        groupMap.get(animalNo)!.slots.push({
+        groupMap.get(groupId)!.slots.push({
           vekalet: row.vekalet || "",
           vekaleti_veren: trUpperCase((row.description as string | null) || (row.name as string | null)),
           adina_kesilen: trUpperCase(row.name),
@@ -347,7 +403,7 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
       }
     }
 
-    const groups: AnimalGroupData[] = groupOrder.map(no => groupMap.get(no)!);
+    const groups: AnimalGroupData[] = groupOrder.map(id => groupMap.get(id)!);
     const totalGroups = groups.length;
 
     const safeName = kaName.replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ _-]/g, "").replace(/\s+/g, "_");
@@ -375,6 +431,8 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
       fitToPage: true,
       fitToWidth: 1,
       fitToHeight: 0,
+      // Each group block already includes its own header row; no printTitlesRow
+      // needed here — it would duplicate the header on every printed page.
       margins: {
         left: 0.5,
         right: 0.5,
@@ -409,11 +467,13 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
       if (NUM_COLS > LOGO_COLS + 1) ws.mergeCells(titleRowIdx, LOGO_COLS + 1, titleRowIdx, NUM_COLS);
       currentRow++;
 
-      // Embed logo image in the left section of the title row
+      // Embed logo image in the left section of the title row.
+      // Use ImagePosition (tl + ext) to avoid the ExcelJS Anchor class entirely —
+      // ImageRange (tl + br) requires full Anchor objects with native EMU fields.
       if (logoImageId !== null) {
         ws.addImage(logoImageId, {
           tl: { col: 0, row: titleRowIdx - 1 },
-          br: { col: LOGO_COLS, row: titleRowIdx },
+          ext: { width: 120, height: 40 },
           editAs: "oneCell",
         });
       }
