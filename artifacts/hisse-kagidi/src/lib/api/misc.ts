@@ -148,6 +148,7 @@ export interface TransferPayload {
 }
 
 export interface TransferResult {
+  batchId?: string;
   success: boolean;
   source: KesimAlani;
   target: KesimAlani;
@@ -326,4 +327,24 @@ export interface ConflictLogEntry {
 
 export async function fetchConflictLog(projectId: string): Promise<ConflictLogEntry[]> {
   return apiFetch<ConflictLogEntry[]>(`/projects/${projectId}/conflict-log`);
+}
+
+export async function undoTransfer(payload: {
+  batchId: string;
+  projectId: string;
+}): Promise<{ success: boolean; count: number }> {
+  return apiFetch<{ success: boolean; count: number }>("/kesim-alanlari/undo-transfer", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function restoreNotes(
+  projectId: string,
+  restores: { donationId: string; notes: string }[],
+): Promise<{ success: boolean; affected: number }> {
+  return apiFetch<{ success: boolean; affected: number }>(`/projects/${projectId}/donations/restore-notes`, {
+    method: "POST",
+    body: JSON.stringify({ restores }),
+  });
 }

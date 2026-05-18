@@ -13,12 +13,14 @@ import {
   archiveProject,
   fetchCatismaTespiti,
   transferDonation,
+  undoTransfer,
   fetchTransferLog,
   fetchConflictLog,
   fetchPendingEditRequests,
   splitKesimAlani,
   renameKesimAlani,
 } from "@/lib/api";
+import { makeUndoToastAction } from "@/hooks/makeUndoToastAction";
 import type { PendingEditRequest, Conflict, ConflictEntry, DonationTransferEntry, ConflictLogEntry } from "@/lib/api";
 import { getTotalShares, getRequiredAnimals } from "@/lib/grouping";
 
@@ -357,14 +359,32 @@ export function useProjeDetayState() {
     setTransferring(true);
     try {
       const { entry } = transferDialog;
-      await transferDonation({
+      const fromKaId = entry.kesimAlaniId;
+      const toKaId = targetKesimAlaniId;
+      const result = await transferDonation({
         donationId: entry.donationId,
-        sourceKesimAlaniId: entry.kesimAlaniId,
-        targetKesimAlaniId,
+        sourceKesimAlaniId: fromKaId,
+        targetKesimAlaniId: toKaId,
         transferAnimal: transferAnimal && !!entry.animalGroupId,
         animalGroupId: entry.animalGroupId ?? undefined,
       });
-      toast({ title: "Taşıma başarılı", description: `${entry.donationName} başarıyla taşındı.` });
+      const batchId = result?.batchId;
+      const undoAction = batchId ? makeUndoToastAction(async () => {
+        try {
+          await undoTransfer({ batchId, projectId: projectId! });
+          await loadDataFn();
+          await loadConflicts();
+          toast({ title: "Taşıma geri alındı" });
+        } catch {
+          toast({ title: "Geri alma başarısız", variant: "destructive" });
+        }
+      }) : undefined;
+      toast({
+        title: "Taşıma başarılı",
+        description: `${entry.donationName} başarıyla taşındı.`,
+        action: undoAction,
+        duration: 10000,
+      });
       setTransferDialog(null);
       await loadDataFn();
       await loadConflicts();
@@ -377,7 +397,7 @@ export function useProjeDetayState() {
     } finally {
       setTransferring(false);
     }
-  }, [transferDialog, targetKesimAlaniId, transferAnimal, toast, loadDataFn, loadConflicts]);
+  }, [transferDialog, targetKesimAlaniId, transferAnimal, toast, loadDataFn, loadConflicts, projectId]);
 
 
   const totals = useMemo(() =>

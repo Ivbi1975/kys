@@ -34,9 +34,12 @@ import {
   bulkDeleteFiltered,
   downloadExcelExport,
   fetchPoolAssignedVekalets,
+  undoTransfer,
+  restoreNotes,
 } from "@/lib/api";
 import type { BulkDeletePreviewResult, AiClassificationResult } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { StatsPanel } from "./bagis-havuzu/StatsPanel";
 import { CinsStatsBar } from "./bagis-havuzu/CinsStatsBar";
@@ -641,7 +644,24 @@ export default function BagisHavuzuPage() {
         : { donationIds: [...effectiveSelectedIds], tagId, action };
       const result = await bulkTagDonations(projectId, body);
       const tagName = globalTags.find(t => t.id === tagId)?.name || tagId;
-      toast({ title: `${result.affected} bağışa "${tagName}" etiketi ${action === "add" ? "eklendi" : "kaldırıldı"}` });
+      const reverseAction = action === "add" ? "remove" : "add";
+      const returnedAffectedIds = result.affectedIds;
+      const undoAction = returnedAffectedIds && returnedAffectedIds.length > 0 ? (
+        <ToastAction altText="Geri Al" onClick={async () => {
+          try {
+            await bulkTagDonations(projectId, { donationIds: returnedAffectedIds, tagId, action: reverseAction });
+            invalidatePool();
+            toast({ title: `Etiket işlemi geri alındı` });
+          } catch {
+            toast({ title: "Geri alma başarısız", variant: "destructive" });
+          }
+        }}>Geri Al</ToastAction>
+      ) : undefined;
+      toast({
+        title: `${result.affected} bağışa "${tagName}" etiketi ${action === "add" ? "eklendi" : "kaldırıldı"}`,
+        action: undoAction,
+        duration: undoAction ? 10000 : undefined,
+      });
       setSelectedIds(new Set());
       setSelectAllPages(false);
       invalidatePool();
@@ -657,7 +677,23 @@ export default function BagisHavuzuPage() {
         ? { filter: statsFilters, note, mode }
         : { donationIds: [...effectiveSelectedIds], note, mode };
       const result = await bulkNoteDonations(projectId, body);
-      toast({ title: `${result.affected} bağışa not ${mode === "append" ? "eklendi" : "güncellendi"}` });
+      const serverPreviousNotes = result.previousNotes;
+      const undoAction = serverPreviousNotes && serverPreviousNotes.length > 0 ? (
+        <ToastAction altText="Geri Al" onClick={async () => {
+          try {
+            await restoreNotes(projectId, serverPreviousNotes);
+            invalidatePool();
+            toast({ title: `Not değişikliği geri alındı` });
+          } catch {
+            toast({ title: "Geri alma başarısız", variant: "destructive" });
+          }
+        }}>Geri Al</ToastAction>
+      ) : undefined;
+      toast({
+        title: `${result.affected} bağışa not ${mode === "append" ? "eklendi" : "güncellendi"}`,
+        action: undoAction,
+        duration: undoAction ? 10000 : undefined,
+      });
       setSelectedIds(new Set());
       setSelectAllPages(false);
       invalidatePool();
@@ -771,7 +807,20 @@ export default function BagisHavuzuPage() {
         }
       }
 
-      toast({ title: msg });
+      const movedCount = result.moved ?? result.transferredItems?.length ?? 0;
+      const batchId = result.batchId;
+      const undoAction = batchId && movedCount > 0 ? (
+        <ToastAction altText="Geri Al" onClick={async () => {
+          try {
+            await undoTransfer({ batchId, projectId });
+            invalidatePool();
+            toast({ title: `${movedCount} bağış havuza geri alındı` });
+          } catch {
+            toast({ title: "Geri alma başarısız", variant: "destructive" });
+          }
+        }}>Geri Al</ToastAction>
+      ) : undefined;
+      toast({ title: msg, action: undoAction, duration: undoAction ? 10000 : undefined });
       setSelectedIds(new Set());
       setSelectAllPages(false);
       setTransferOpen(false);
@@ -784,7 +833,7 @@ export default function BagisHavuzuPage() {
     } finally {
       setTransferring(false);
     }
-  }, [effectiveSelectedIds, transferTarget, creatingNewList, newListName, projectId, toast, invalidatePool, kesimAlanlari]);
+  }, [effectiveSelectedIds, transferTarget, creatingNewList, newListName, projectId, toast, invalidatePool, kesimAlanlari, havuzKaId]);
 
   const handleForceTransfer = useCallback(async () => {
     if (!pendingConflict || pendingConflictIds.length === 0) return;
@@ -800,7 +849,20 @@ export default function BagisHavuzuPage() {
         if (result.alreadyInTarget && result.alreadyInTarget > 0) {
           msg += ` (${result.alreadyInTarget} bağış zaten bu listede)`;
         }
-        toast({ title: msg });
+        const forceMovedCount = result.moved ?? result.transferredItems?.length ?? 0;
+        const forceBatchId = result.batchId;
+        const undoAction = forceBatchId && forceMovedCount > 0 ? (
+          <ToastAction altText="Geri Al" onClick={async () => {
+            try {
+              await undoTransfer({ batchId: forceBatchId, projectId });
+              invalidatePool();
+              toast({ title: `${forceMovedCount} bağış havuza geri alındı` });
+            } catch {
+              toast({ title: "Geri alma başarısız", variant: "destructive" });
+            }
+          }}>Geri Al</ToastAction>
+        ) : undefined;
+        toast({ title: msg, action: undoAction, duration: undoAction ? 10000 : undefined });
         setSelectedIds(new Set());
         setSelectAllPages(false);
         setTransferOpen(false);
@@ -814,7 +876,7 @@ export default function BagisHavuzuPage() {
     } finally {
       setTransferring(false);
     }
-  }, [pendingConflict, pendingConflictIds, transferTarget, projectId, toast, invalidatePool]);
+  }, [pendingConflict, pendingConflictIds, transferTarget, projectId, toast, invalidatePool, havuzKaId]);
 
   const handleDeleteAll = useCallback(async () => {
     setDeletingAll(true);

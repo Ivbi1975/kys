@@ -13,8 +13,8 @@ import {
 import { checkTransferConflicts, logConflicts, fetchConflictLog } from "../../services/conflict-log.service";
 import { auditLog } from "../../services/audit-log.service";
 import { db } from "@workspace/db";
-import { kesimAlanlariTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { kesimAlanlariTable, donationTransfersTable } from "@workspace/db/schema";
+import { eq, and } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -200,9 +200,10 @@ router.post("/donation-transfers", asyncHandler(async (req, res) => {
       toKesimAlaniName: z.string(),
       removedFromSource: z.boolean(),
       shareCount: z.number().int().min(1),
-      transferType: z.enum(["donation", "animalGroup"]).default("donation"),
+      transferType: z.enum(["donation", "animalGroup", "undo"]).default("donation"),
       animalGroupId: z.string().optional(),
       animalNo: z.number().int().optional(),
+      batchId: z.string().optional(),
       createdAt: z.string(),
     })).min(1),
   });
@@ -234,6 +235,107 @@ router.post("/donation-transfers", asyncHandler(async (req, res) => {
       },
     });
   }
+}));
+
+router.post("/kesim-alanlari/undo-transfer", asyncHandler(async (req, res) => {
+  const parsed = z.object({
+    batchId: z.string().min(1),
+    projectId: z.string().min(1),
+  }).safeParse(req.body);
+
+  if (!parsed.success) {
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
+    return;
+  }
+
+  const { batchId, projectId } = parsed.data;
+
+  const batchEntries = await db.select()
+    .from(donationTransfersTable)
+    .where(and(
+      eq(donationTransfersTable.batchId, batchId),
+      eq(donationTransfersTable.projectId, projectId),
+    ));
+
+  if (batchEntries.length === 0) {
+    res.status(404).json({ error: "Geri alınacak işlem bulunamadı" });
+    return;
+  }
+
+  // Group entries by (fromKA, toKA) pair — each group is undone independently so
+  // mixed-source batches (e.g. pool + direct) are handled correctly.
+  const groups = new Map<string, { fromKaId: string; toKaId: string; donationIds: string[] }>();
+  for (const entry of batchEntries) {
+    const fromKaId = entry.fromKesimAlaniId;
+    const toKaId = entry.toKesimAlaniId;
+    const donationId = entry.donationId;
+    if (!fromKaId || !toKaId || !donationId) continue;
+    const key = `${fromKaId}::${toKaId}`;
+    if (!groups.has(key)) groups.set(key, { fromKaId, toKaId, donationIds: [] });
+    groups.get(key)!.donationIds.push(donationId);
+  }
+
+  if (groups.size === 0) {
+    res.status(400).json({ error: "Geri alınacak geçerli kayıt bulunamadı" });
+    return;
+  }
+
+  let totalCount = 0;
+  const undoLogEntries: Parameters<typeof saveDonationTransfers>[0] = [];
+  const now = new Date();
+
+  for (const { fromKaId, toKaId, donationIds } of groups.values()) {
+    // Undo: move back from toKA → fromKA (reverse of original direction)
+    const result = await moveDonations({
+      donationIds,
+      sourceKesimAlaniId: toKaId,
+      targetKesimAlaniId: fromKaId,
+    });
+
+    if (!result.ok) continue; // skip groups that can't be undone (e.g. KA deleted)
+
+    totalCount += result.count;
+
+    if (result.movedIds.length > 0) {
+      const [fromInfo, toInfo] = await Promise.all([
+        getKAInfo(fromKaId),
+        getKAInfo(toKaId),
+      ]);
+      for (const id of result.movedIds) {
+        undoLogEntries.push({
+          id: crypto.randomUUID(),
+          projectId,
+          donationId: id,
+          donorName: "",
+          donorDescription: "Geri alındı",
+          fromKesimAlaniId: toKaId,
+          fromKesimAlaniName: toInfo.name || "",
+          toKesimAlaniId: fromKaId,
+          toKesimAlaniName: fromInfo.name || "",
+          removedFromSource: true,
+          shareCount: 1,
+          transferType: "undo",
+          createdAt: now.toISOString(),
+        });
+      }
+    }
+  }
+
+  if (undoLogEntries.length > 0) {
+    await saveDonationTransfers(undoLogEntries);
+  }
+
+  res.json({ success: true, count: totalCount });
+  refreshProjectStats();
+
+  auditLog({
+    action: "move",
+    entityType: "donation",
+    req,
+    projectId,
+    affectedCount: totalCount,
+    metadata: { undone: true, batchId },
+  });
 }));
 
 router.get("/projects/:projectId/transfer-log", asyncHandler(async (req, res) => {

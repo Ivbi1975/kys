@@ -243,6 +243,7 @@ export const donationTransfersTable = pgTable("donation_transfers", {
   transferType: text("transfer_type").notNull().default("donation"),
   animalGroupId: text("animal_group_id"),
   animalNo: integer("animal_no"),
+  batchId: text("batch_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -250,6 +251,7 @@ export const donationTransfersTable = pgTable("donation_transfers", {
   index("idx_donation_transfers_donation_id").on(table.donationId),
   index("idx_donation_transfers_from_ka").on(table.fromKesimAlaniId),
   index("idx_donation_transfers_to_ka").on(table.toKesimAlaniId),
+  index("idx_donation_transfers_batch_id").on(table.batchId),
 ]);
 
 export const insertDonationTransferSchema = createInsertSchema(donationTransfersTable);

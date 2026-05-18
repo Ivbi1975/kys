@@ -124,6 +124,7 @@ interface TransferEntry {
   transferType?: string;
   animalGroupId?: string;
   animalNo?: number;
+  batchId?: string;
 }
 
 export async function saveDonationTransfers(entries: TransferEntry[]) {

@@ -172,7 +172,7 @@ export interface TransferConflictResponse {
 }
 
 export type TransferDonationsResult =
-  | { success: boolean; moved: number; alreadyInTarget?: number; skipped?: number; transferredItems?: TransferredItem[]; conflict?: undefined }
+  | { success: boolean; moved: number; alreadyInTarget?: number; skipped?: number; transferredItems?: TransferredItem[]; batchId?: string; conflict?: undefined }
   | { conflict: TransferConflictResponse; success?: undefined };
 
 export async function transferDonationsToKA(
@@ -230,8 +230,8 @@ type BulkTagBody = (
 export async function bulkTagDonations(
   projectId: string,
   body: BulkTagBody,
-): Promise<{ success: boolean; affected: number }> {
-  return apiFetch<{ success: boolean; affected: number }>(`/projects/${projectId}/donations/bulk-tag`, {
+): Promise<{ success: boolean; affected: number; affectedIds?: string[] }> {
+  return apiFetch<{ success: boolean; affected: number; affectedIds?: string[] }>(`/projects/${projectId}/donations/bulk-tag`, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -245,8 +245,8 @@ type BulkNoteBody = (
 export async function bulkNoteDonations(
   projectId: string,
   body: BulkNoteBody,
-): Promise<{ success: boolean; affected: number }> {
-  return apiFetch<{ success: boolean; affected: number }>(`/projects/${projectId}/donations/bulk-notes`, {
+): Promise<{ success: boolean; affected: number; previousNotes?: { donationId: string; notes: string }[] }> {
+  return apiFetch<{ success: boolean; affected: number; previousNotes?: { donationId: string; notes: string }[] }>(`/projects/${projectId}/donations/bulk-notes`, {
     method: "POST",
     body: JSON.stringify(body),
   });

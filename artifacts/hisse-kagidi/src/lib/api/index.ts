@@ -163,6 +163,8 @@ export {
   flagDonation,
   unflagDonation,
   fetchFlaggedDonations,
+  undoTransfer,
+  restoreNotes,
 } from "./misc";
 export type {
   ConflictEntry,

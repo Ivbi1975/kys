@@ -8,6 +8,7 @@ import {
   customTagsTable,
   animalGroupDonationsTable,
   automationRulesTable,
+  donationTransfersTable,
 } from "@workspace/db/schema";
 import { eq, isNull, and, sql, inArray, ilike, or, asc, desc, notInArray, ne, gte, lte, not } from "drizzle-orm";
 import { z } from "zod";
@@ -1059,6 +1060,8 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
   let alreadyInTarget = 0;
   // IDs that were successfully moved (pool or non-pool) — used for fetching transferredItems
   let movedIds: string[] = [];
+  // Only pool-source IDs — used for server-authoritative undo batchId logging
+  let poolMovedIds: string[] = [];
 
   await db.transaction(async (tx) => {
     const CHUNK = 5000;
@@ -1142,6 +1145,7 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
               WHERE id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})
             `);
             movedIds.push(...result.map(r => r.id));
+            poolMovedIds.push(...result.map(r => r.id));
             movedCount += result.length;
             nextSort += result.length;
           }
@@ -1238,9 +1242,43 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
     ).catch(() => {});
   }
 
+  let batchId: string | undefined;
+  if (poolMovedIds.length > 0 && poolKAId) {
+    batchId = crypto.randomUUID();
+    const [poolKA] = await db.select({ name: kesimAlanlariTable.name })
+      .from(kesimAlanlariTable)
+      .where(eq(kesimAlanlariTable.id, poolKAId));
+    const now = new Date();
+    const logEntries = poolMovedIds.map(donationId => {
+      const item = transferredItems.find(t => t.id === donationId);
+      return {
+        id: crypto.randomUUID(),
+        projectId,
+        donationId,
+        donorName: item?.name ?? "",
+        donorDescription: item?.description ?? "",
+        fromKesimAlaniId: poolKAId,
+        fromKesimAlaniName: poolKA?.name ?? "__havuz__",
+        toKesimAlaniId: targetKesimAlaniId,
+        toKesimAlaniName: targetKA.name ?? "",
+        removedFromSource: true,
+        shareCount: item?.shareCount ?? 1,
+        transferType: "donation",
+        batchId,
+        createdAt: now.toISOString(),
+      };
+    });
+    const CHUNK = 500;
+    for (let i = 0; i < logEntries.length; i += CHUNK) {
+      await db.insert(donationTransfersTable).values(
+        logEntries.slice(i, i + CHUNK).map(e => ({ ...e, createdAt: new Date(e.createdAt) }))
+      );
+    }
+  }
+
   invalidateKACache();
   refreshProjectStats();
-  res.json({ success: true, moved: movedCount, alreadyInTarget, skipped: skipExisting ? alreadyInTarget : 0, transferredItems });
+  res.json({ success: true, moved: movedCount, alreadyInTarget, skipped: skipExisting ? alreadyInTarget : 0, transferredItems, batchId });
   auditLog({
     action: "bulk_transfer",
     entityType: "pool",
@@ -1615,9 +1653,8 @@ router.post("/projects/:id/donations/bulk-tag", asyncHandler(async (req, res) =>
     return;
   }
 
-  let affected = 0;
   const CHUNK = 500;
-
+  const affectedIds: string[] = [];
   await db.transaction(async (tx) => {
     for (let i = 0; i < donationIds.length; i += CHUNK) {
       const chunk = donationIds.slice(i, i + CHUNK);
@@ -1638,7 +1675,7 @@ router.post("/projects/:id/donations/bulk-tag", asyncHandler(async (req, res) =>
           .values(values)
           .onConflictDoNothing()
           .returning({ donationId: donationTagsTable.donationId });
-        affected += result.length;
+        affectedIds.push(...result.map(r => r.donationId));
       } else {
         const result = await tx.delete(donationTagsTable)
           .where(and(
@@ -1646,13 +1683,13 @@ router.post("/projects/:id/donations/bulk-tag", asyncHandler(async (req, res) =>
             eq(donationTagsTable.tagId, tagId),
           ))
           .returning({ donationId: donationTagsTable.donationId });
-        affected += result.length;
+        affectedIds.push(...result.map(r => r.donationId));
       }
     }
   });
 
   invalidateKACache();
-  res.json({ success: true, affected });
+  res.json({ success: true, affected: affectedIds.length, affectedIds });
 }));
 
 const flagSchema = z.object({
@@ -1798,6 +1835,7 @@ router.post("/projects/:id/donations/bulk-notes", asyncHandler(async (req, res) 
 
   let affected = 0;
   const CHUNK = 500;
+  const previousNotes: { donationId: string; notes: string }[] = [];
 
   for (let i = 0; i < donationIds.length; i += CHUNK) {
     const chunk = donationIds.slice(i, i + CHUNK);
@@ -1806,6 +1844,13 @@ router.post("/projects/:id/donations/bulk-notes", asyncHandler(async (req, res) 
       inArray(donationsTable.kesimAlaniId, validKAIds),
       isNull(donationsTable.deletedAt),
     );
+
+    const snapshots = await db.select({ id: donationsTable.id, notes: donationsTable.notes })
+      .from(donationsTable)
+      .where(scopedWhere);
+    for (const snap of snapshots) {
+      previousNotes.push({ donationId: snap.id, notes: snap.notes ?? "" });
+    }
 
     if (mode === "replace") {
       const result = await db.update(donationsTable)
@@ -1824,6 +1869,58 @@ router.post("/projects/:id/donations/bulk-notes", asyncHandler(async (req, res) 
       `);
       affected += Number((result as { rowCount?: number }).rowCount || 0);
     }
+  }
+
+  invalidateKACache();
+  res.json({ success: true, affected, previousNotes });
+}));
+
+router.post("/projects/:id/donations/restore-notes", asyncHandler(async (req, res) => {
+  const projectId = req.params.id;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const parsed = z.object({
+    restores: z.array(z.object({
+      donationId: z.string().min(1),
+      notes: z.string(),
+    })).min(1).max(50000),
+  }).safeParse(req.body);
+
+  if (!parsed.success) {
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
+    return;
+  }
+
+  const projectKAIds = await db.select({ id: kesimAlanlariTable.id })
+    .from(kesimAlanlariTable)
+    .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
+  const validKAIds = projectKAIds.map(k => k.id);
+
+  if (validKAIds.length === 0) {
+    res.json({ success: true, affected: 0 });
+    return;
+  }
+
+  let affected = 0;
+  const CHUNK = 500;
+  const restores = parsed.data.restores;
+
+  for (let i = 0; i < restores.length; i += CHUNK) {
+    const chunk = restores.slice(i, i + CHUNK);
+    await db.transaction(async (tx) => {
+      for (const { donationId, notes } of chunk) {
+        const result = await tx.update(donationsTable)
+          .set({ notes, updatedAt: new Date() })
+          .where(and(
+            eq(donationsTable.id, donationId),
+            inArray(donationsTable.kesimAlaniId, validKAIds),
+            isNull(donationsTable.deletedAt),
+          ))
+          .returning({ id: donationsTable.id });
+        affected += result.length;
+      }
+    });
   }
 
   invalidateKACache();
