@@ -1,0 +1,158 @@
+Kurban Yönetim Sistemi — Geliştirme Görev Raporu
+1. Kesim Listesi Sistemi
+1.1 Grup İsimlendirme Düzeni
+Kesim listesi grup isimlendirme mantığı güncellenecek.
+No:2 ve No:4 yer değiştirdiğinde isimlendirme:
+2-4
+4-2
+şeklinde dinamik olarak güncellenecek.
+1.2 Kesim Listesi Sayfası Yeniden Tasarım
+Kesim listesi ekranı yeniden tasarlanacak.
+Amaç:
+Karmaşayı azaltmak
+Kontrol edilebilirliği artırmak
+Tüm mevcut fonksiyonların erişilebilir kalmasını sağlamak
+Yeni tasarım:
+Daha sade
+Aynı anda daha fazla veri okunabilir
+Mobil ve masaüstünde uyumlu olacak
+1.3 Fiyat Alanı
+Kesim listesi gruplarına Fiyat alanı eklenecek.
+1.4 Vekalet ID Linkleme
+Kesim listesinde bulunan Vekalet ID alanı tıklanabilir olacak.
+Tıklandığında:
+Yeni sekmede detay sayfası açılacak.
+1.5 Çakışma Kontrolü
+Aynı hayvan / aynı kayıt / aynı çıktı gibi çakışmalar kontrol edilecek.
+Olası tekrar kayıtlar için:
+Uyarı sistemi
+Çakışma logu
+Engelleme veya birleştirme mekanizması
+2. Ayrıntılı Log Sistemi
+2.1 Genel Log Sistemi
+Sistem genelinde ayrıntılı log altyapısı kurulacak.
+Tüm kullanıcı işlemleri kayıt altına alınacak.
+2.2 Kesim Listesi Logları
+Kesim listesinde yapılan her işlem loglanacak:
+Ekleme
+Silme
+Güncelleme
+Taşıma
+Durum değişikliği
+2.3 Havuz Sistemi Logları
+Havuz tarafındaki işlemler de ayrıntılı loglanacak.
+Örnek:
+Şu filtre uygulandı
+Şu kadar bağış seçildi
+Şu kesim listesine aktarıldı
+2.4 Linklenebilir Log Sistemi
+Log içerisindeki:
+filtreler
+kesim listeleri
+işlem parametreleri
+tıklanabilir olacak.
+Örnek:
+Filtre adına tıklayınca:
+aynı filtre yeniden uygulanacak
+Kesim listesine tıklayınca:
+ilgili liste açılacak
+2.5 Geri Alma (Undo) Sistemi
+“Son yapılan işlemi geri al” özelliği eklenecek.
+Özellikle:
+taşıma
+toplu aktarım
+toplu düzenleme
+işlemlerinde kullanılacak.
+3. Etiket Sistemi
+3.1 Etiket Alanları
+
+Etiketlere aşağıdaki alanlar eklenecek:
+
+Vekalet ID
+Notlar
+Normal not
+AI notu
+3.2 Etiket Yönetimi
+Etiket ekleme/silme özelliği eklenecek.
+Toplu etiket seçimi yapılabilecek.
+3.3 UTF-8 ve Türkçe Karakter Desteği
+Türkçe karakter problemleri düzeltilecek.
+UTF-8 tam destek sağlanacak.
+3.4 Yazım Düzeni
+Etiketlerde:
+İlk harfler büyük olacak
+Yazım standardı uygulanacak
+3.5 İkon Güncellemesi
+Mevcut ikonlar değiştirilecek.
+Daha okunabilir ve modern ikon sistemi kullanılacak.
+4. Havuz Sistemi
+4.1 Durum ve Kesim Listesi Güncelleme Problemi
+Havuz tarafında:
+kesim listesi sütunu
+durum sütunu
+güncellenmiyor.
+Düzenleme:
+Taşınan kaydın:
+yeni kesim listesi adı
+güncel durum bilgisi
+anında görünmeli.
+4.2 Havuz ve Kesim Listesi Görsel Birliği
+Havuz ve kesim listesi ekranları:
+aynı görünüş yapısına sahip olacak
+aynı veri düzenini gösterecek
+4.3 Havuz Ayarı
+
+Yeni özellik:
+
+“Seçilenleri kesim listesinden çıkart”
+4.4 Kurban Havuz Sayımı
+Havuz sayım sisteminde hatalar mevcut.
+Sayım algoritması kontrol edilip düzeltilecek.
+5. Popup / Modal Sistemi
+5.1 Popup Boyutları
+Tüm popup/modal pencereleri büyütülecek.
+Özellikle:
+Havuz aktar popup’ı
+Toplu işlem popup’ları
+Filtre popup’ları
+
+Amaç:
+
+Daha rahat kullanım
+Daha fazla veri görünürlüğü
+6. AI Sistemi
+6.1 AI Geri Dönüş Görüntüleme
+AI tarafından üretilen geri dönüşler görüntülenebilir olacak.
+6.2 AI Sınıflandırma Logu
+AI sınıflandırma işlemleri loglanacak.
+Şunlar tutulacak:
+giriş verisi
+AI sonucu
+güven skoru
+işlem zamanı
+7. Not Sistemi
+7.1 İşaretli / İşaretsiz Sayaçları
+Notlar bölümünde:
+işaretli not sayısı
+işaretsiz not sayısı
+gösterilecek.
+8. Excel Çıktı Sistemi
+8.1 Görselli Excel Çıktısı
+Excel çıktıları:
+görselli
+düzenli
+baskıya uygun
+olacak şekilde geliştirilecek.
+8.2 Excel Hata Düzeltmeleri
+Mevcut Excel export sistemindeki hatalar giderilecek.
+9. Çıktı Sistemi
+9.1 Aynı Hayvan ve Çıktı Problemi
+Aynı hayvan için oluşan çıktı problemleri analiz edilip düzeltilecek.
+10. Sepet Sistemi
+10.1 Sepet Problemleri
+Sepet alanlarında mevcut bozukluklar düzeltilecek.
+Kontrol edilecek başlıklar:
+veri senkronizasyonu
+miktar güncelleme
+toplu işlem davranışları
+taşıma sonrası durumlar
