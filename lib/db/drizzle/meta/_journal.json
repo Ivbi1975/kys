@@ -201,8 +201,15 @@
     {
       "idx": 28,
       "version": "7",
+      "when": 1747560000000,
+      "tag": "0028_audit_log_extended",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
       "when": 1747552800000,
-      "tag": "0028_conflicts_log",
+      "tag": "0029_conflicts_log",
       "breakpoints": true
     },
     {

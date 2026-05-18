@@ -360,3 +360,18 @@ export async function bulkDeleteFiltered(
     body: JSON.stringify({ ...filters, force: true }),
   });
 }
+
+export async function logFilterApplied(
+  projectId: string,
+  filters: Record<string, unknown>,
+  affectedCount?: number,
+): Promise<void> {
+  try {
+    await apiFetch<{ success: boolean }>(`/projects/${projectId}/pool/log-filter`, {
+      method: "POST",
+      body: JSON.stringify({ filters, affectedCount }),
+    });
+  } catch {
+    // fire-and-forget: silently ignore errors
+  }
+}

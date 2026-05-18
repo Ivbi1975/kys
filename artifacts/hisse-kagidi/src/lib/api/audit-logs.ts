@@ -12,6 +12,11 @@ export interface AuditLogEntry {
   sourceIdentifier: string | null;
   ipAddress: string | null;
   createdAt: string;
+  projectId: string | null;
+  filters: unknown;
+  targetKesimAlaniId: string | null;
+  affectedCount: number | null;
+  metadata: unknown;
 }
 
 export interface AuditLogResponse {
@@ -28,6 +33,7 @@ export interface AuditLogFilters {
   endDate?: string;
   limit?: number;
   cursor?: number;
+  projectId?: string;
 }
 
 export async function fetchAuditLogs(filters: AuditLogFilters = {}): Promise<AuditLogResponse> {
@@ -39,6 +45,7 @@ export async function fetchAuditLogs(filters: AuditLogFilters = {}): Promise<Aud
   if (filters.endDate) params.set("endDate", filters.endDate);
   if (filters.limit) params.set("limit", String(filters.limit));
   if (filters.cursor) params.set("cursor", String(filters.cursor));
+  if (filters.projectId) params.set("projectId", filters.projectId);
   const qs = params.toString();
   return apiFetch<AuditLogResponse>(`/audit-logs${qs ? `?${qs}` : ""}`);
 }

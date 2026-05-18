@@ -11,11 +11,19 @@ import {
   getPendingEditRequests,
 } from "../../services/transfer.service";
 import { checkTransferConflicts, logConflicts, fetchConflictLog } from "../../services/conflict-log.service";
+import { auditLog } from "../../services/audit-log.service";
 import { db } from "@workspace/db";
 import { kesimAlanlariTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
+
+async function getKAInfo(kaId: string): Promise<{ projectId: string | null; name: string | null }> {
+  const [ka] = await db.select({ projectId: kesimAlanlariTable.projectId, name: kesimAlanlariTable.name })
+    .from(kesimAlanlariTable)
+    .where(eq(kesimAlanlariTable.id, kaId));
+  return { projectId: ka?.projectId ?? null, name: ka?.name ?? null };
+}
 
 router.post("/kesim-alanlari/move-donations", asyncHandler(async (req, res) => {
   const parsed = z.object({
@@ -92,6 +100,25 @@ router.post("/kesim-alanlari/move-donations", asyncHandler(async (req, res) => {
 
   res.json({ success: true, count: result.count, skipped: result.skipped, movedIds: result.movedIds });
   refreshProjectStats();
+
+  getKAInfo(targetKesimAlaniId).then(({ projectId, name: targetName }) => {
+    getKAInfo(sourceKesimAlaniId).then(({ name: sourceName }) => {
+      auditLog({
+        action: "move",
+        entityType: "donation",
+        req,
+        projectId: projectId ?? undefined,
+        targetKesimAlaniId,
+        affectedCount: result.count,
+        metadata: {
+          sourceKesimAlaniId,
+          sourceKesimAlaniName: sourceName,
+          targetKesimAlaniName: targetName,
+          skipped: result.skipped,
+        },
+      });
+    });
+  });
 }));
 
 router.post("/kesim-alanlari/move-animal-group", asyncHandler(async (req, res) => {
@@ -129,6 +156,26 @@ router.post("/kesim-alanlari/move-animal-group", asyncHandler(async (req, res) =
     }
 
     res.json({ success: true, animalGroupId: result.animalGroupId, newAnimalNo: result.newAnimalNo });
+
+    getKAInfo(targetKesimAlaniId).then(({ projectId, name: targetName }) => {
+      getKAInfo(sourceKesimAlaniId).then(({ name: sourceName }) => {
+        auditLog({
+          action: "move",
+          entityType: "animal_group",
+          entityId: parsed.data.animalGroupId,
+          req,
+          projectId: projectId ?? undefined,
+          targetKesimAlaniId,
+          affectedCount: 1,
+          metadata: {
+            sourceKesimAlaniId,
+            sourceKesimAlaniName: sourceName,
+            targetKesimAlaniName: targetName,
+            newAnimalNo: result.newAnimalNo,
+          },
+        });
+      });
+    });
   } catch (err: any) {
     if (err?.message === "concurrent_modification") {
       res.status(409).json({ error: "Bu hayvan grubu başka biri tarafından değiştirilmiş. Lütfen sayfayı yenileyip tekrar deneyin." });
@@ -167,6 +214,26 @@ router.post("/donation-transfers", asyncHandler(async (req, res) => {
 
   const result = await saveDonationTransfers(parsed.data.entries);
   res.json({ success: true, count: result.count });
+
+  const entries = parsed.data.entries;
+  if (entries.length > 0) {
+    const projectId = entries[0].projectId;
+    auditLog({
+      action: "transfer",
+      entityType: "donation",
+      req,
+      projectId,
+      affectedCount: entries.length,
+      metadata: {
+        entries: entries.map(e => ({
+          donorName: e.donorName,
+          fromKesimAlaniName: e.fromKesimAlaniName,
+          toKesimAlaniName: e.toKesimAlaniName,
+          transferType: e.transferType,
+        })),
+      },
+    });
+  }
 }));
 
 router.get("/projects/:projectId/transfer-log", asyncHandler(async (req, res) => {

@@ -293,10 +293,16 @@ export const auditLogsTable = pgTable("audit_logs", {
   sourceIdentifier: text("source_identifier"),
   ipAddress: text("ip_address"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  projectId: text("project_id"),
+  filters: jsonb("filters"),
+  targetKesimAlaniId: text("target_kesim_alani_id"),
+  affectedCount: integer("affected_count"),
+  metadata: jsonb("metadata"),
 }, (table) => [
   index("idx_audit_entity").on(table.entityType, table.entityId),
   index("idx_audit_action").on(table.action),
   index("idx_audit_created_at").on(table.createdAt),
+  index("idx_audit_project_id").on(table.projectId),
 ]);
 
 export type AuditLogRow = typeof auditLogsTable.$inferSelect;

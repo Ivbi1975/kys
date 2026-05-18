@@ -17,6 +17,7 @@ import { refreshProjectStats } from "./projects";
 import { executeRules } from "../services/rule-engine.service";
 import { invalidateKACache } from "../services/kesim-alani.service";
 import { checkTransferConflicts, logConflicts } from "../services/conflict-log.service";
+import { auditLog } from "../services/audit-log.service";
 
 const router: IRouter = Router();
 
@@ -893,6 +894,14 @@ router.post("/projects/:id/donations/bulk-import", asyncHandler(async (req, res)
 
   refreshProjectStats();
   res.status(201).json({ success: true, inserted });
+  auditLog({
+    action: "bulk_import",
+    entityType: "donation",
+    req,
+    projectId,
+    affectedCount: inserted,
+    metadata: { totalRequested: donations.length, inserted },
+  });
 }));
 
 const siblingsSchema = z.object({
@@ -1232,6 +1241,20 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
   invalidateKACache();
   refreshProjectStats();
   res.json({ success: true, moved: movedCount, alreadyInTarget, skipped: skipExisting ? alreadyInTarget : 0, transferredItems });
+  auditLog({
+    action: "bulk_transfer",
+    entityType: "pool",
+    req,
+    projectId,
+    targetKesimAlaniId,
+    affectedCount: movedCount,
+    metadata: {
+      targetKesimAlaniName: targetKA.name,
+      alreadyInTarget,
+      skipped: skipExisting ? alreadyInTarget : 0,
+      donationIds: donationIds.slice(0, 100),
+    },
+  });
 }));
 
 async function getFilteredDonationIds(projectId: string, filter: Record<string, unknown>): Promise<string[]> {
@@ -1310,6 +1333,42 @@ router.post("/projects/:id/donations/bulk-action", asyncHandler(async (req, res)
   invalidateKACache();
   refreshProjectStats();
   res.json({ success: true, affected });
+  auditLog({
+    action: "bulk_action",
+    entityType: "donation",
+    req,
+    projectId,
+    affectedCount: affected,
+    filters: parsed.data.filter ?? null,
+    metadata: { action, donationIdCount: parsed.data.donationIds?.length ?? 0 },
+  });
+}));
+
+const logFilterSchema = z.object({
+  filters: z.record(z.unknown()).default({}),
+  affectedCount: z.number().int().nonneg().optional(),
+});
+
+router.post("/projects/:id/pool/log-filter", asyncHandler(async (req, res) => {
+  const projectId = req.params.id;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const parsed = logFilterSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
+    return;
+  }
+
+  res.json({ success: true });
+  auditLog({
+    action: "filter_apply",
+    entityType: "pool",
+    req,
+    projectId,
+    filters: parsed.data.filters,
+    affectedCount: parsed.data.affectedCount,
+  });
 }));
 
 router.post("/projects/:id/donations/bulk-delete-preview", asyncHandler(async (req, res) => {

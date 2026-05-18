@@ -27,6 +27,7 @@ import { SplitModal } from "@/components/proje-detay/SplitModal";
 import { ConflictSection } from "@/components/proje-detay/ConflictSection";
 import { TransferLogSection } from "@/components/proje-detay/TransferLogSection";
 import { ConflictLogSection } from "@/components/proje-detay/ConflictLogSection";
+import { ProjectAuditLogSection } from "@/components/proje-detay/ProjectAuditLogSection";
 import { ProjeDetayDialogs } from "@/components/proje-detay/ProjeDetayDialogs";
 
 export default function ProjeDetayPage() {
@@ -251,6 +252,12 @@ export default function ProjeDetayPage() {
           setShowConflictLog={state.setShowConflictLog}
           conflictLogLoading={state.conflictLogLoading}
           conflictLog={state.conflictLog}
+        />
+
+        <ProjectAuditLogSection
+          projectId={state.project.id}
+          kesimAlanlari={state.kesimAlanlari}
+          onNavigate={state.setLocation}
         />
       </div>
 

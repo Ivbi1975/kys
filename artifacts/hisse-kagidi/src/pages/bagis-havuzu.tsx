@@ -58,6 +58,7 @@ import { loadBasketFromStorage, saveBasketToStorage } from "@/components/kesim-a
 import type { BasketItem } from "@/components/kesim-alani/hooks/types";
 import type { TransferredItem, DonorSiblings, TransferConflictResponse } from "@/lib/api/bagis-havuzu";
 import { MoveDonationConflictModal } from "@/components/MoveDonationConflictModal";
+import { logFilterApplied } from "@/lib/api/bagis-havuzu";
 
 export default function BagisHavuzuPage() {
   const params = useParams<{ id: string }>();
@@ -159,6 +160,7 @@ export default function BagisHavuzuPage() {
   const siblingTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const filterLogTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => {
     searchTimer.current = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(searchTimer.current);
@@ -241,6 +243,38 @@ export default function BagisHavuzuPage() {
     const newUrl = `/bagis-havuzu/${projectId}${qs ? `?${qs}` : ""}`;
     window.history.replaceState(null, "", import.meta.env.BASE_URL.replace(/\/$/, "") + newUrl);
   }, [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, flagFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter, notesFilter, sortBy, sortDir, sortBy2, sortDir2, sortBy3, sortDir3, shareCountMin, shareCountMax, excludeFields, dateField, dateFrom, dateTo, page, projectId]);
+
+  useEffect(() => {
+    const activeFilters: Record<string, unknown> = {};
+    if (debouncedSearch) activeFilters.search = debouncedSearch;
+    if (statusFilter) activeFilters.status = statusFilter;
+    if (donationTypeFilter.length) activeFilters.donationType = donationTypeFilter;
+    if (birimFilter.length) activeFilters.birim = birimFilter;
+    if (temsilciFilter.length) activeFilters.temsilci = temsilciFilter;
+    if (kesimAlaniFilter !== "none") activeFilters.kesimAlaniId = kesimAlaniFilter;
+    if (flagFilter) activeFilters.flagFilter = flagFilter;
+    if (aiCategoryFilter.length) activeFilters.aiCategory = aiCategoryFilter;
+    if (ozellikFilter.length) activeFilters.ozellik = ozellikFilter;
+    if (fiyatFilter.length) activeFilters.fiyat = fiyatFilter;
+    if (yerTalebiFilter.length) activeFilters.yerTalebi = yerTalebiFilter;
+    if (gunTalebiFilter.length) activeFilters.gunTalebi = gunTalebiFilter;
+    if (ilkHayvanFilter.length) activeFilters.ilkHayvan = ilkHayvanFilter;
+    if (safiFilter.length) activeFilters.safi = safiFilter;
+    if (tagFilter.length) activeFilters.tagIds = tagFilter;
+    if (notesFilter) activeFilters.notesFilter = notesFilter;
+    if (dateFrom) activeFilters.dateFrom = dateFrom;
+    if (dateTo) activeFilters.dateTo = dateTo;
+    if (shareCountMin) activeFilters.shareCountMin = shareCountMin;
+    if (shareCountMax) activeFilters.shareCountMax = shareCountMax;
+
+    if (Object.keys(activeFilters).length === 0) return;
+
+    clearTimeout(filterLogTimer.current);
+    filterLogTimer.current = setTimeout(() => {
+      logFilterApplied(projectId, activeFilters);
+    }, 3000);
+    return () => clearTimeout(filterLogTimer.current);
+  }, [debouncedSearch, statusFilter, donationTypeFilter, birimFilter, temsilciFilter, kesimAlaniFilter, flagFilter, aiCategoryFilter, ozellikFilter, fiyatFilter, yerTalebiFilter, gunTalebiFilter, ilkHayvanFilter, safiFilter, tagFilter, notesFilter, dateFrom, dateTo, shareCountMin, shareCountMax, projectId]);
 
   const toggleExcludeField = useCallback((field: string) => {
     setExcludeFields(prev => {

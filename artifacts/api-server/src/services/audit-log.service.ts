@@ -23,7 +23,12 @@ export type AuditAction =
   | "export"
   | "repair"
   | "move"
-  | "bulk_create";
+  | "bulk_create"
+  | "transfer"
+  | "bulk_transfer"
+  | "bulk_action"
+  | "bulk_import"
+  | "filter_apply";
 
 export type AuditEntityType =
   | "donation"
@@ -31,7 +36,8 @@ export type AuditEntityType =
   | "project"
   | "kesim_alani"
   | "settings"
-  | "backup";
+  | "backup"
+  | "pool";
 
 export interface AuditLogParams {
   action: AuditAction;
@@ -44,6 +50,11 @@ export interface AuditLogParams {
   sourceType?: string;
   sourceIdentifier?: string;
   ipAddress?: string;
+  projectId?: string;
+  filters?: unknown;
+  targetKesimAlaniId?: string;
+  affectedCount?: number;
+  metadata?: unknown;
 }
 
 function detectSourceType(req?: Request): { sourceType: string; sourceIdentifier: string | null } {
@@ -86,6 +97,11 @@ export async function auditLog(params: AuditLogParams): Promise<void> {
       sourceType: params.sourceType || detectedType,
       sourceIdentifier: params.sourceIdentifier || detectedId,
       ipAddress: params.ipAddress || (params.req?.ip ?? null),
+      projectId: params.projectId || null,
+      filters: params.filters !== undefined ? params.filters : null,
+      targetKesimAlaniId: params.targetKesimAlaniId || null,
+      affectedCount: params.affectedCount !== undefined ? params.affectedCount : null,
+      metadata: params.metadata !== undefined ? params.metadata : null,
     });
   } catch (err) {
     logger.error({ err, action: params.action, entityType: params.entityType }, "Failed to write audit log");
@@ -100,6 +116,7 @@ export interface AuditLogFilters {
   endDate?: string;
   limit?: number;
   cursor?: number;
+  projectId?: string;
 }
 
 export async function listAuditLogs(filters: AuditLogFilters) {
@@ -122,6 +139,9 @@ export async function listAuditLogs(filters: AuditLogFilters) {
   }
   if (filters.cursor) {
     conditions.push(lt(auditLogsTable.id, filters.cursor));
+  }
+  if (filters.projectId) {
+    conditions.push(eq(auditLogsTable.projectId, filters.projectId));
   }
 
   const limit = Math.min(Math.max(filters.limit || 50, 1), 200);
