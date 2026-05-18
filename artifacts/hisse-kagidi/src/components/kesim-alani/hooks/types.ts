@@ -64,12 +64,28 @@ export function generateId(): string {
 
 export const BASKET_STORAGE_KEY = "kurban-basket";
 
-export function loadBasketFromStorage(projectId: string | null | undefined): BasketItem[] {
+export function loadBasketFromStorage(projectId: string | null | undefined, migrateFromGeneric = false): BasketItem[] {
   try {
     const key = projectId ? `${BASKET_STORAGE_KEY}-${projectId}` : BASKET_STORAGE_KEY;
     const raw = localStorage.getItem(key);
-    if (!raw) return [];
-    const items = JSON.parse(raw) as BasketItem[];
+    let items: BasketItem[] = [];
+    if (raw) {
+      items = JSON.parse(raw) as BasketItem[];
+    }
+    if (migrateFromGeneric && projectId && items.length === 0) {
+      const genericRaw = localStorage.getItem(BASKET_STORAGE_KEY);
+      if (genericRaw) {
+        try {
+          const genericItems = JSON.parse(genericRaw) as BasketItem[];
+          if (genericItems.length > 0) {
+            items = genericItems;
+            localStorage.setItem(key, genericRaw);
+            localStorage.removeItem(BASKET_STORAGE_KEY);
+          }
+        } catch {}
+      }
+    }
+    if (items.length === 0) return [];
     const now = Date.now();
     return items.map(item => ({
       ...item,

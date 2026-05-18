@@ -39,7 +39,7 @@ export function KesimAlaniDialogs(props: KesimAlaniStateReturn) {
     photoViewGroup, setPhotoViewGroup, photoViewPhotos, photoViewLoading,
     teamDialogOpen, setTeamDialogOpen, teamName, setTeamName, teamEditId, setTeamEditId, teamColor, setTeamColor, teamSaving, handleSaveTeam, handleDeleteTeam,
     basketOpen, setBasketOpen, basketItems, localBasketItems, foreignBasketItems, basketItemIds,
-    addToBasket, removeFromBasket, clearBasket, addDonorToBasket, autoDistributeBasket,
+    addToBasket, removeFromBasket, clearBasket, addDonorToBasket, autoDistributeBasket, updateBasketItemShareCount,
     sortedDonorList, totalShares, filterTeam, setFilterTeam,
     jumpDialogOpen, setJumpDialogOpen,
     donorListReportOpen, setDonorListReportOpen, fullscreenMode, showScrollTop,
@@ -174,6 +174,7 @@ export function KesimAlaniDialogs(props: KesimAlaniStateReturn) {
         returnSelectedToSource={returnSelectedToSource}
         transferSelectedToGroup={transferSelectedToGroup}
         addEmptyGroup={addEmptyGroup}
+        updateBasketItemShareCount={updateBasketItemShareCount}
       />
 
       <JumpDialog

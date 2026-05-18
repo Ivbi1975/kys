@@ -307,7 +307,7 @@ export function useKesimAlaniState() {
             setKesim(fallback);
             history.initialize(fallback);
             setDataFullyLoaded(true);
-            const stored = loadBasketFromStorage(fallback.projectId);
+            const stored = loadBasketFromStorage(fallback.projectId, true);
             basket.setBasketItems(stored);
             fetchPhotoCountsAdmin(fallback.id).then(notifications.setPhotoCounts).catch(() => {});
             fetchTags().then(tags => ui.setGlobalTags(tags)).catch(() => {});
@@ -394,7 +394,7 @@ export function useKesimAlaniState() {
 
         updateKesimState();
 
-        const stored = loadBasketFromStorage(meta.projectId);
+        const stored = loadBasketFromStorage(meta.projectId, true);
         basket.setBasketItems(stored);
 
         void (async () => {
@@ -428,7 +428,7 @@ export function useKesimAlaniState() {
         if (fallback) {
           setKesim(fallback);
           history.initialize(fallback);
-          const stored = loadBasketFromStorage(fallback.projectId);
+          const stored = loadBasketFromStorage(fallback.projectId, true);
           basket.setBasketItems(stored);
         }
       }
@@ -671,7 +671,10 @@ export function useKesimAlaniState() {
     setSelectedIds,
     removedFromGroupIds,
     isGroupLocked,
-    addSelectedToBasket: () => basket.addSelectedToBasket(selectedIds),
+    addSelectedToBasket: () => {
+      basket.addSelectedToBasket(selectedIds);
+      setSelectedIds(new Set());
+    },
     addReviewRowsToBasket,
     applyBulkImport,
     applyBulkImportChecked,

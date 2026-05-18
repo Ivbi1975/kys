@@ -41,6 +41,23 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
     }
   }, [basketItems, kesim?.projectId]);
 
+  const kesimDonationIdKey = kesim?.donations.map(d => d.id).sort().join(",") ?? "";
+  useEffect(() => {
+    if (!kesim) return;
+    const activeDonationIds = new Set(kesim.donations.map(d => d.id));
+    const staleLocal = basketItems.filter(
+      b => b.kesimAlaniId === kesim.id && b.type !== "animalGroup" && !activeDonationIds.has(b.donationId)
+    );
+    if (staleLocal.length === 0) return;
+    const staleIds = staleLocal.map(b => b.donationId);
+    setBasketItems(prev => prev.filter(b => !staleIds.includes(b.donationId)));
+    toast({
+      title: `${staleLocal.length} sepet öğesi temizlendi`,
+      description: "Bu bağışçılar artık bu listede bulunmadığı için sepetten kaldırıldı.",
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kesimDonationIdKey, kesim?.id]);
+
   const basketItemIds = useMemo(() => new Set(basketItems.filter(b => b.type !== "animalGroup").map((b) => b.donationId)), [basketItems]);
   const basketAnimalGroupIds = useMemo(() => new Set(basketItems.filter(b => b.type === "animalGroup").map(b => b.animalGroupId!)), [basketItems]);
   const localBasketItems = useMemo(
@@ -269,24 +286,44 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
 
   function addSelectedToBasket(selectedIds: Set<string>) {
     if (!kesim || selectedIds.size === 0) return;
-    setBasketItems((prev) => {
-      const existingIds = new Set(prev.map((b) => b.donationId));
-      const newItems = [...prev];
-      for (const id of selectedIds) {
-        if (!existingIds.has(id)) {
-          const d = kesim.donations.find((dd) => dd.id === id);
-          if (d && !d.excluded) {
-            newItems.push(makeBasketItem(d));
-            existingIds.add(id);
-          }
+    const toAdd: BasketItem[] = [];
+    for (const id of selectedIds) {
+      if (!basketItemIds.has(id)) {
+        const d = kesim.donations.find((dd) => dd.id === id);
+        if (d && !d.excluded) {
+          toAdd.push(makeBasketItem(d));
         }
       }
-      return newItems;
-    });
-    toast({
-      title: "Sepete Eklendi",
-      description: `${selectedIds.size} bağışçı sepete eklendi.`,
-    });
+    }
+    if (toAdd.length > 0) {
+      setBasketItems((prev) => [...prev, ...toAdd]);
+      toast({
+        title: "Sepete Eklendi",
+        description: `${toAdd.length} bağışçı sepete eklendi.`,
+      });
+    } else {
+      toast({
+        title: "Zaten Sepette",
+        description: "Seçili bağışçılar zaten sepette veya hariç tutulmuş.",
+      });
+    }
+  }
+
+  function updateBasketItemShareCount(donationId: string, newCount: number) {
+    const count = Math.max(1, Math.min(7, Math.round(newCount)));
+    setBasketItems((prev) =>
+      prev.map((b) =>
+        b.donationId === donationId && b.type !== "animalGroup"
+          ? { ...b, donorShareCount: count }
+          : b
+      )
+    );
+  }
+
+  function removeBasketItemsForDonations(donationIds: string[]) {
+    if (donationIds.length === 0) return;
+    const idSet = new Set(donationIds);
+    setBasketItems((prev) => prev.filter((b) => !idSet.has(b.donationId)));
   }
 
   function autoDistributeBasket() {
@@ -850,6 +887,7 @@ export function useBasket({ kesim, setKesim, save, history, toast, isGroupLocked
     removeFromBasket,
     clearBasket,
     addSelectedToBasket,
+    updateBasketItemShareCount,
     autoDistributeBasket,
     handleToggleBasketItem,
     returnSelectedToDonorList,

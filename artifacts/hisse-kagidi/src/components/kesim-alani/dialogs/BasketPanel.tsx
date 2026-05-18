@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import type { KesimAlani } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,30 @@ import {
   type GroupByCriterion,
 } from "./BasketPanel.utils";
 
+function ShareCountInput({ donationId, value, onUpdate }: { donationId: string; value: number; onUpdate: (id: string, v: number) => void }) {
+  const [local, setLocal] = useState(value);
+  useEffect(() => { setLocal(value); }, [value]);
+  const commit = useCallback(() => {
+    const clamped = Math.max(1, Math.min(7, isNaN(local) ? value : local));
+    if (clamped !== value) onUpdate(donationId, clamped);
+    else setLocal(value);
+  }, [local, value, donationId, onUpdate]);
+  return (
+    <input
+      type="number"
+      min={1}
+      max={7}
+      value={local}
+      title="Hisse sayısını düzenle"
+      className="w-7 text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-100 dark:bg-violet-900/50 px-1 rounded text-center border-0 outline-none focus:ring-1 focus:ring-violet-400"
+      onClick={e => e.stopPropagation()}
+      onChange={e => { const v = parseInt(e.target.value); setLocal(isNaN(v) ? local : v); }}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commit(); (e.target as HTMLInputElement).blur(); } }}
+    />
+  );
+}
+
 interface BasketPanelProps {
   kesim: KesimAlani;
   basketItems: BasketItem[];
@@ -30,6 +54,7 @@ interface BasketPanelProps {
   returnSelectedToSource: (selectedIds: Set<string>) => ReturnToSourceResult;
   transferSelectedToGroup: (selectedIds: Set<string>, targetGroupIdx: number) => boolean;
   addEmptyGroup?: () => void;
+  updateBasketItemShareCount?: (donationId: string, newCount: number) => void;
 }
 
 export function BasketPanel({
@@ -37,7 +62,7 @@ export function BasketPanel({
   basketOpen, setBasketOpen, removeFromBasket, clearBasket,
   autoDistributeBasket,
   returnSelectedToDonorList, returnSelectedToSource, transferSelectedToGroup,
-  addEmptyGroup,
+  addEmptyGroup, updateBasketItemShareCount,
 }: BasketPanelProps) {
   const [selectedBasketIds, setSelectedBasketIds] = useState<Set<string>>(new Set());
   const [retrieveTargetGroup, setRetrieveTargetGroup] = useState<number>(-1);
@@ -259,7 +284,11 @@ export function BasketPanel({
           onClick={e => e.stopPropagation()}
         />
         <span className="font-medium">{b.description || b.name}</span>
-        <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-100 dark:bg-violet-900/50 px-1 rounded">{totalShares}</span>
+        {updateBasketItemShareCount ? (
+          <ShareCountInput donationId={b.donationId} value={totalShares} onUpdate={updateBasketItemShareCount} />
+        ) : (
+          <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-100 dark:bg-violet-900/50 px-1 rounded">{totalShares}</span>
+        )}
         {b.sourceGroupAnimalNo && <span className="text-[10px] text-amber-600 dark:text-amber-400">H{b.sourceGroupAnimalNo}</span>}
         {timed && (
           <span className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-0.5" title={`Sepette ${timeStr}`}>
