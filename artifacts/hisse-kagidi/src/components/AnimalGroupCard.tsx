@@ -867,7 +867,7 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
                   return (
                     <th
                       key={key}
-                      className={`${compact ? "p-0.5" : "p-1.5"} text-left ${columnHeaderWidth(key)} ${isSortable ? "cursor-pointer select-none hover:bg-muted/50 transition-colors" : ""}`}
+                      className={`${compact ? "p-0.5" : "p-1.5"} text-left whitespace-nowrap ${columnHeaderWidth(key)} ${isSortable ? "cursor-pointer select-none hover:bg-muted/50 transition-colors" : ""}`}
                       onClick={isSortable ? () => handleSortHeader(key) : undefined}
                     >
                       {key === "drag" || key === "actions" ? "" : (
