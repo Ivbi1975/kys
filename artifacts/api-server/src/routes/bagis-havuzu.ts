@@ -951,9 +951,16 @@ router.post("/projects/:id/donations/siblings", asyncHandler(async (req, res) =>
   const siblingRows = await db.select({
     id: donationsTable.id,
     name: donationsTable.name,
+    description: donationsTable.description,
     vekalet: donationsTable.vekalet,
     shareCount: donationsTable.shareCount,
     donationType: donationsTable.donationType,
+    birim: donationsTable.birim,
+    temsilci: donationsTable.temsilci,
+    ozellik: donationsTable.ozellik,
+    fiyat: donationsTable.fiyat,
+    phone: donationsTable.phone,
+    notes: donationsTable.notes,
   })
     .from(donationsTable)
     .where(and(
@@ -963,7 +970,12 @@ router.post("/projects/:id/donations/siblings", asyncHandler(async (req, res) =>
       notInArray(donationsTable.id, donationIds),
     ));
 
-  type SiblingDonation = { id: string; name: string; vekalet: string | null; shareCount: number; donationType: string | null };
+  type SiblingDonation = {
+    id: string; name: string; description: string; vekalet: string | null;
+    shareCount: number; donationType: string | null;
+    birim: string; temsilci: string; ozellik: string; fiyat: string;
+    phone: string; notes: string;
+  };
   const grouped = new Map<string, SiblingDonation[]>();
   for (const s of siblingRows) {
     if (!s.name) continue;
@@ -971,9 +983,16 @@ router.post("/projects/:id/donations/siblings", asyncHandler(async (req, res) =>
     grouped.get(s.name)!.push({
       id: s.id,
       name: s.name,
+      description: s.description || "",
       vekalet: s.vekalet || null,
       shareCount: s.shareCount,
       donationType: s.donationType || null,
+      birim: s.birim || "",
+      temsilci: s.temsilci || "",
+      ozellik: s.ozellik || "",
+      fiyat: s.fiyat || "",
+      phone: s.phone || "",
+      notes: s.notes || "",
     });
   }
 

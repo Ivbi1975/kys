@@ -313,9 +313,16 @@ export async function deleteAllPoolDonations(projectId: string): Promise<{ succe
 export interface SiblingDonation {
   id: string;
   name: string;
+  description: string;
   vekalet: string | null;
   shareCount: number;
   donationType: string | null;
+  birim: string;
+  temsilci: string;
+  ozellik: string;
+  fiyat: string;
+  phone: string;
+  notes: string;
 }
 
 export interface DonorSiblings {
