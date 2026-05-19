@@ -208,14 +208,14 @@ const GroupDonationRow = memo(function GroupDonationRow({
         );
       case "description":
         return (
-          <td key={colKey} className={cellPad}>
-            <span className={`${inputH} flex items-center select-text`}>{turkishTitleCase(d.description) || "—"}</span>
+          <td key={colKey} className={`${cellPad} max-w-[150px] overflow-hidden`}>
+            <span className={`${inputH} flex items-center select-text whitespace-nowrap overflow-hidden overflow-ellipsis`} title={d.description}>{turkishTitleCase(d.description) || "—"}</span>
           </td>
         );
       case "name":
         return (
-          <td key={colKey} className={cellPad}>
-            <span className={`${inputH} flex items-center select-text`}>{turkishTitleCase(d.name) || "—"}</span>
+          <td key={colKey} className={`${cellPad} max-w-[150px] overflow-hidden`}>
+            <span className={`${inputH} flex items-center select-text whitespace-nowrap overflow-hidden overflow-ellipsis`} title={d.name}>{turkishTitleCase(d.name) || "—"}</span>
           </td>
         );
       case "donationType":
