@@ -1,5 +1,6 @@
 import { useRef, useCallback, useState, useMemo, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +57,7 @@ interface VirtualizedDonationTableProps {
 }
 
 const ROW_HEIGHT = 36;
+const INDEX_WIDTH = 36;
 
 const COLUMN_WIDTHS: Record<TableColumnKey, number> = {
   vekalet: 110,
@@ -306,6 +308,7 @@ function ColGroup({ cols }: { cols: { key: TableColumnKey; label: string }[] }) 
   return (
     <colgroup>
       <col style={{ width: CHECKBOX_WIDTH }} />
+      <col style={{ width: INDEX_WIDTH }} />
       {cols.map(col => (
         <col key={col.key} style={{ width: COLUMN_WIDTHS[col.key] }} />
       ))}
@@ -315,7 +318,7 @@ function ColGroup({ cols }: { cols: { key: TableColumnKey; label: string }[] }) 
 }
 
 function getTableWidth(cols: { key: TableColumnKey }[]) {
-  return CHECKBOX_WIDTH + cols.reduce((sum, col) => sum + COLUMN_WIDTHS[col.key], 0) + FLAG_ACTION_WIDTH;
+  return CHECKBOX_WIDTH + INDEX_WIDTH + cols.reduce((sum, col) => sum + COLUMN_WIDTHS[col.key], 0) + FLAG_ACTION_WIDTH;
 }
 
 function FlagAction({ d, onFlag, onUnflag }: { d: PoolDonation; onFlag?: (id: string, reason: string) => void; onUnflag?: (id: string) => void }) {
@@ -504,9 +507,9 @@ export function VirtualizedDonationTable({
   }, [editableCols, items, clearEditing]);
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <Card className="overflow-hidden">
       {/* Fixed header */}
-      <div className="overflow-hidden bg-background border-b shadow-sm relative z-10">
+      <div className="overflow-hidden bg-muted/50 border-b shadow-sm relative z-10">
         <div ref={headerInnerRef} style={{ minWidth: tableWidth }}>
           <table className="w-full text-sm" style={{ tableLayout: "fixed", minWidth: tableWidth }}>
             <ColGroup cols={cols} />
@@ -519,6 +522,7 @@ export function VirtualizedDonationTable({
                       : <Square className="w-4 h-4" />}
                   </button>
                 </th>
+                <th className="p-2 text-xs font-medium text-muted-foreground text-left w-9">#</th>
                 {cols.map(col => {
                   const sortable = !!SORT_KEY_MAP[col.key];
                   return (
@@ -591,6 +595,7 @@ export function VirtualizedDonationTable({
                               {isSelected ? <CheckSquare className="w-4 h-4 text-primary" /> : <Square className="w-4 h-4" />}
                             </button>
                           </td>
+                          <td className="p-2 text-muted-foreground text-xs tabular-nums">{virtualRow.index + 1}</td>
                           {cols.map(col => {
                             const isEditable = EDITABLE_COLUMNS.has(col.key) && !!onInlineEdit;
                             const isCellEditing = isRowEditing && editingField === col.key;
@@ -639,6 +644,6 @@ export function VirtualizedDonationTable({
           )}
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

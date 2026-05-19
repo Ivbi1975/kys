@@ -247,6 +247,9 @@ function DonorRowInner({
       <span className="block px-1 py-0.5 uppercase select-text">{d.description || "—"}</span>
     </td>
     <td className="p-2">
+      <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text">{d.temsilci || "—"}</span>
+    </td>
+    <td className="p-2">
       <EditableCell d={d} field="name" isEditing={isEditing && editField === "name"}
         editDraft={editDraft} onSetEditDraft={onSetEditDraft} onCommitEdit={onCommitEdit}
         onKeyDown={onKeyDown} onStartEditing={onStartEditing} displayValue={d.name} />
@@ -255,6 +258,27 @@ function DonorRowInner({
       <EditableCell d={d} field="donationType" isEditing={isEditing && editField === "donationType"}
         editDraft={editDraft} onSetEditDraft={onSetEditDraft} onCommitEdit={onCommitEdit}
         onKeyDown={onKeyDown} onStartEditing={onStartEditing} displayValue={d.donationType} />
+    </td>
+    <td className="p-2">
+      <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text truncate max-w-[90px]">{d.birim || "—"}</span>
+    </td>
+    <td className="p-2">
+      <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text truncate max-w-[90px]">{d.ozellik || "—"}</span>
+    </td>
+    <td className="p-2">
+      <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text">{d.fiyat || "—"}</span>
+    </td>
+    <td className="p-2">
+      <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text truncate max-w-[90px]">{d.yerTalebi || "—"}</span>
+    </td>
+    <td className="p-2">
+      <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text truncate max-w-[90px]">{d.gunTalebi || "—"}</span>
+    </td>
+    <td className="p-2">
+      <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text truncate max-w-[90px]">{d.ilkHayvan || "—"}</span>
+    </td>
+    <td className="p-2">
+      <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text">{d.safi || "—"}</span>
     </td>
     <td className="p-2 text-center">
       {descCount > 1 ? (
@@ -265,6 +289,12 @@ function DonorRowInner({
           <SelectContent>{[1, 2, 3, 4, 5, 6, 7].map((n) => (<SelectItem key={n} value={String(n)}>{n}</SelectItem>))}</SelectContent>
         </Select>
       )}
+    </td>
+    <td className="p-2">
+      <span
+        className="block px-1 py-0.5 text-xs text-muted-foreground truncate max-w-[130px] select-text"
+        title={d.notes || ""}
+      >{d.notes || "—"}</span>
     </td>
     <td className="p-2">
       <div className="flex gap-0.5 flex-wrap">

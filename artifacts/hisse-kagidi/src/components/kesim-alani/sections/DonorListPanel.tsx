@@ -117,8 +117,9 @@ export function DonorListPanel() {
               : searchQuery.trim() ? `"${searchQuery}" için sonuç bulunamadı` : 'Tüm bağışçılar gruplara atanmış veya henüz eklenmedi.'}
           </div>
         ) : (
-          <TableVirtuoso
-            style={{ height: `min(calc(100vh - 150px), ${visibleDonations.length * 45 + 50}px)`, minHeight: 200 }}
+          <div className="overflow-x-auto">
+        <TableVirtuoso
+            style={{ height: `min(calc(100vh - 150px), ${visibleDonations.length * 45 + 50}px)`, minHeight: 200, minWidth: 1700 }}
             data={visibleDonations}
             overscan={30}
             computeItemKey={(_idx: number, d: Donation) => d.id}
@@ -126,21 +127,30 @@ export function DonorListPanel() {
             fixedHeaderContent={() => (
               <tr className="border-b bg-muted/50">
                 <th className="p-2 w-8"><input type="checkbox" checked={visibleDonations.length > 0 && visibleDonations.every(d => selectedIds.has(d.id))} onChange={() => { const visibleIds = new Set(visibleDonations.map(d => d.id)); const allSelected = visibleDonations.every(d => selectedIds.has(d.id)); if (allSelected) { setSelectedIds(prev => { const next = new Set(prev); visibleIds.forEach(id => next.delete(id)); return next; }); } else { setSelectedIds(prev => new Set([...prev, ...visibleIds])); } }} className="rounded" /></th>
-                <th className="p-2 text-left w-8">#</th>
-                <th className="p-2 text-left w-20">Vekalet</th>
-                <th className="p-2 text-left cursor-pointer hover:bg-muted" onClick={() => handleSort("description")}>
+                <th className="p-2 text-left w-8 text-xs font-medium text-muted-foreground">#</th>
+                <th className="p-2 text-left w-20 text-xs font-medium text-muted-foreground">Vekalet</th>
+                <th className="p-2 text-left cursor-pointer hover:bg-muted min-w-[120px] text-xs font-medium text-muted-foreground" onClick={() => handleSort("description")}>
                   <span className="flex items-center gap-1">Vekaleti Veren{sortField === "description" && (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}{sortField !== "description" && <ArrowUpDown className="w-3 h-3 opacity-30" />}</span>
                 </th>
-                <th className="p-2 text-left cursor-pointer hover:bg-muted" onClick={() => handleSort("name")}>
+                <th className="p-2 text-left w-24 text-xs font-medium text-muted-foreground">Temsilci</th>
+                <th className="p-2 text-left cursor-pointer hover:bg-muted min-w-[120px] text-xs font-medium text-muted-foreground" onClick={() => handleSort("name")}>
                   <span className="flex items-center gap-1">Adına Kesilen{sortField === "name" && (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}{sortField !== "name" && <ArrowUpDown className="w-3 h-3 opacity-30" />}</span>
                 </th>
-                <th className="p-2 text-left cursor-pointer hover:bg-muted w-20" onClick={() => handleSort("donationType")}>
+                <th className="p-2 text-left cursor-pointer hover:bg-muted w-20 text-xs font-medium text-muted-foreground" onClick={() => handleSort("donationType")}>
                   <span className="flex items-center gap-1">Cinsi{sortField === "donationType" && (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}{sortField !== "donationType" && <ArrowUpDown className="w-3 h-3 opacity-30" />}</span>
                 </th>
-                <th className="p-2 text-center cursor-pointer hover:bg-muted w-16" onClick={() => handleSort("shareCount")}>
+                <th className="p-2 text-left w-24 text-xs font-medium text-muted-foreground">Birim</th>
+                <th className="p-2 text-left w-24 text-xs font-medium text-muted-foreground">Özellik</th>
+                <th className="p-2 text-left w-20 text-xs font-medium text-muted-foreground">Fiyat</th>
+                <th className="p-2 text-left w-24 text-xs font-medium text-muted-foreground">Yer Talebi</th>
+                <th className="p-2 text-left w-24 text-xs font-medium text-muted-foreground">Gün Talebi</th>
+                <th className="p-2 text-left w-24 text-xs font-medium text-muted-foreground">İlk Hayvan</th>
+                <th className="p-2 text-left w-16 text-xs font-medium text-muted-foreground">Şafi</th>
+                <th className="p-2 text-center cursor-pointer hover:bg-muted w-16 text-xs font-medium text-muted-foreground" onClick={() => handleSort("shareCount")}>
                   <span className="flex items-center gap-1 justify-center">Hisse{sortField === "shareCount" && (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}{sortField !== "shareCount" && <ArrowUpDown className="w-3 h-3 opacity-30" />}</span>
                 </th>
-                <th className="p-2 text-left min-w-[180px]">AI Etiketleri</th>
+                <th className="p-2 text-left w-32 text-xs font-medium text-muted-foreground">Notlar</th>
+                <th className="p-2 text-left min-w-[180px] text-xs font-medium text-muted-foreground">AI Etiketleri</th>
                 <th className="p-2 w-10"></th>
               </tr>
             )}
@@ -182,6 +192,7 @@ export function DonorListPanel() {
               );
             }}
           />
+        </div>
         )}
       </Card>
     </Profiler>
