@@ -234,6 +234,7 @@ export default function KesimTakipPage() {
                 onClearFilter={() => { setSearchQuery(""); setFilterMode("all"); }}
                 onReorder={handleReorder}
                 isDragEnabled={filterMode === "all" && !searchQuery.trim()}
+                projectId={data.projectId ?? undefined}
               />
 
               <p className="text-[10px] text-center mt-4" style={{ color: "#94a3b8" }}>

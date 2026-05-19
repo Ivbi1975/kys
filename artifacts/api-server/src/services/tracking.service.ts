@@ -117,6 +117,7 @@ export async function getTrackingPage(token: string) {
       serverTime: new Date().toISOString(),
       kesimAlaniName: ka.name,
       projectName: projectNameResult,
+      projectId: ka.projectId || null,
       totalGroups: groups.length,
       kesildiCount: groups.filter(g => g.kesildi).length,
       groups: mappedGroups,

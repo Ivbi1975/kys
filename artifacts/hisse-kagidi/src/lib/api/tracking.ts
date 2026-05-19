@@ -22,6 +22,7 @@ export interface TrackingData {
   serverTime?: string;
   kesimAlaniName: string;
   projectName: string | null;
+  projectId: string | null;
   totalGroups: number;
   kesildiCount: number;
   groups: TrackingGroup[];

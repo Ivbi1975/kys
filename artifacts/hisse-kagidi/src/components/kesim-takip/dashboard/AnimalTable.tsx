@@ -15,6 +15,7 @@ interface AnimalTableProps {
   onClearFilter?: () => void;
   onReorder?: (orderedIds: string[]) => void;
   isDragEnabled?: boolean;
+  projectId?: string;
 }
 
 export function AnimalTable({
@@ -28,6 +29,7 @@ export function AnimalTable({
   onClearFilter,
   onReorder,
   isDragEnabled = false,
+  projectId,
 }: AnimalTableProps) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<{ id: string; position: "before" | "after" } | null>(null);
@@ -164,6 +166,7 @@ export function AnimalTable({
                     onDragOver={handleDragOver}
                     onDragEnd={handleDragEnd}
                     onDrop={handleDrop}
+                    projectId={projectId}
                   />
                 );
               })}
@@ -205,6 +208,7 @@ export function AnimalTable({
 const AnimalRow = memo(function AnimalRow({
   group, index, isToggling, noteCount, teams, onToggle, onSelect,
   isDragEnabled, isDragging, dropPosition, onDragStart, onDragOver, onDragEnd, onDrop,
+  projectId,
 }: {
   group: TrackingGroup; index: number; isToggling: boolean;
   noteCount: number; teams: TrackingTeam[];
@@ -215,6 +219,7 @@ const AnimalRow = memo(function AnimalRow({
   onDragOver: (e: React.DragEvent, g: TrackingGroup) => void;
   onDragEnd: () => void;
   onDrop: (e: React.DragEvent, g: TrackingGroup) => void;
+  projectId?: string;
 }) {
   const team = group.teamId ? teams.find(t => t.id === group.teamId) : null;
   const colorBorder = group.colorTag && COLOR_MAP[group.colorTag] ? COLOR_MAP[group.colorTag] : null;
@@ -284,12 +289,26 @@ const AnimalRow = memo(function AnimalRow({
           {group.donors[0] && (
             <>
               {group.donors[0].vekalet && (
-                <span
-                  className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-md mb-1"
-                  style={{ background: "rgba(59,130,246,0.14)", color: "#60a5fa" }}
-                >
-                  Vekaletli
-                </span>
+                <div className="flex flex-col items-start gap-0.5 mb-1">
+                  <span
+                    className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
+                    style={{ background: "rgba(59,130,246,0.14)", color: "#60a5fa" }}
+                  >
+                    Vekaletli
+                  </span>
+                  {projectId && (
+                    <a
+                      href={`/bagis-havuzu/${projectId}?vekalet=${encodeURIComponent(group.donors[0].vekalet)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] font-medium uppercase select-text hover:underline"
+                      style={{ color: "#60a5fa" }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {group.donors[0].vekalet}
+                    </a>
+                  )}
+                </div>
               )}
               <p className="text-xs truncate" style={{ color: "#cbd5e1" }}>
                 {group.donors[0].description || group.donors[0].name}
