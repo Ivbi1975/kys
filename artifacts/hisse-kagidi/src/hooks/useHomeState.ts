@@ -126,7 +126,7 @@ export function useHomeState() {
     try {
       const [homeData, categories] = await Promise.all([
         fetchHomeData(),
-        fetchTagCategories(),
+        fetchTagCategories().catch(() => [] as TagCategory[]),
       ]);
       setKesimAlanlari(homeData.kesimAlanlari);
       setGlobalTags(sortTagsTr(homeData.tags));

@@ -116,6 +116,7 @@ export function KesimAlaniProvider({
     groupCinsFilter: value.groupCinsFilter, setGroupCinsFilter: value.setGroupCinsFilter,
     filteredGroupItems: value.filteredGroupItems, searchIndex: value.searchIndex,
     globalTags: value.globalTags,
+    tagCategories: value.tagCategories,
   }), [
     value.sortField, value.setSortField, value.sortDir, value.setSortDir,
     value.personSearchQuery, value.setPersonSearchQuery, value.debouncedSearchQuery, value.setDebouncedSearchQuery,
