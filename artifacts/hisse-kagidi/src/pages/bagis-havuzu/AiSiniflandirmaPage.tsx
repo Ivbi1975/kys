@@ -23,6 +23,7 @@ import type { AiJobLog } from "@/lib/api";
 import { API_BASE, getApiKey } from "@/lib/api/core";
 import { useToast } from "@/hooks/use-toast";
 import type { AiClassificationResult } from "@/lib/api";
+import type { PoolDonation } from "@/lib/types";
 import { CategoryBadge } from "@/lib/categoryConfig";
 
 interface AiResult extends AiClassificationResult {
@@ -47,7 +48,7 @@ export default function AiSiniflandirmaPage() {
   const [aiProgress, setAiProgress] = useState({ done: 0, total: 0 });
   const [aiErrorBatches, setAiErrorBatches] = useState(0);
   const [aiTotalBatches, setAiTotalBatches] = useState(0);
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [resultTypeFilter, setResultTypeFilter] = useState<"warnings" | "failed" | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -503,7 +504,7 @@ export default function AiSiniflandirmaPage() {
     let all = Array.from(aiResults.values());
     if (resultTypeFilter === "warnings") return all.filter(r => r.warnings && r.warnings.trim() && !AI_FAIL_MESSAGES.has(r.warnings));
     if (resultTypeFilter === "failed") return all.filter(r => AI_FAIL_MESSAGES.has(r.warnings));
-    if (categoryFilter) return all.filter(r => r.categories.some(c => c.toLocaleLowerCase("tr") === categoryFilter.toLocaleLowerCase("tr")));
+    if (categoryFilter.length > 0) return all.filter(r => categoryFilter.every(f => r.categories.some(c => c.toLocaleLowerCase("tr") === f.toLocaleLowerCase("tr"))));
     return all;
   }, [aiResults, categoryFilter, resultTypeFilter]);
 
@@ -756,9 +757,9 @@ export default function AiSiniflandirmaPage() {
                 <h2 className="text-sm font-semibold flex items-center gap-1.5">
                   <Sparkles className={`w-4 h-4 text-primary ${aiRunning ? "animate-pulse" : ""}`} />
                   Kategori Dağılımı
-                  {categoryFilter && (
-                    <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs" onClick={() => setCategoryFilter(null)}>
-                      <X className="w-3 h-3 mr-0.5" />Filtreyi Kaldır
+                  {categoryFilter.length > 0 && (
+                    <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs" onClick={() => setCategoryFilter([])}>
+                      <X className="w-3 h-3 mr-0.5" />Filtreyi Kaldır ({categoryFilter.length})
                     </Button>
                   )}
                 </h2>
@@ -770,8 +771,8 @@ export default function AiSiniflandirmaPage() {
                     key={cat}
                     cat={cat}
                     count={count}
-                    active={categoryFilter === cat}
-                    onClick={() => setCategoryFilter(prev => prev === cat ? null : cat)}
+                    active={categoryFilter.includes(cat)}
+                    onClick={() => setCategoryFilter(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])}
                   />
                 ))}
               </div>
@@ -794,10 +795,12 @@ export default function AiSiniflandirmaPage() {
                       AI işleyemedi <X className="w-2.5 h-2.5 ml-0.5" />
                     </Badge>
                   )}
-                  {!resultTypeFilter && categoryFilter && (
-                    <Badge variant="outline" className="text-xs ml-1 cursor-pointer" onClick={() => setCategoryFilter(null)}>
-                      {categoryFilter.replace(/_/g, " ")} <X className="w-2.5 h-2.5 ml-0.5" />
-                    </Badge>
+                  {!resultTypeFilter && categoryFilter.length > 0 && (
+                    categoryFilter.map(f => (
+                      <Badge key={f} variant="outline" className="text-xs ml-1 cursor-pointer" onClick={() => setCategoryFilter(prev => prev.filter(c => c !== f))}>
+                        {f.charAt(0).toUpperCase() + f.replace(/_/g, " ").slice(1)} <X className="w-2.5 h-2.5 ml-0.5" />
+                      </Badge>
+                    ))
                   )}
                 </h2>
                 <span className="text-xs text-muted-foreground">{filteredResults.length} kayıt</span>
@@ -868,7 +871,7 @@ export default function AiSiniflandirmaPage() {
                             <div className="flex flex-wrap gap-1">
                               {r.categories.length > 0 ? (
                                 r.categories.map(cat => (
-                                  <CategoryBadge key={cat} cat={cat} onClick={e => { e.stopPropagation(); setCategoryFilter(prev => prev === cat ? null : cat); }} />
+                                  <CategoryBadge key={cat} cat={cat} onClick={() => setCategoryFilter(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])} />
                                 ))
                               ) : (
                                 <span className="text-xs text-muted-foreground/50">—</span>

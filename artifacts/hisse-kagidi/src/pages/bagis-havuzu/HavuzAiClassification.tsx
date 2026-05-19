@@ -72,8 +72,8 @@ interface HavuzAiClassificationProps {
   aiReportCollapsed: boolean;
   setAiReportCollapsed: (v: boolean) => void;
   aiReportStats: HavuzAiReportStats;
-  aiCategoryFilter: string | null;
-  setAiCategoryFilter: (v: string | null) => void;
+  aiCategoryFilter: string[];
+  setAiCategoryFilter: (v: string[]) => void;
   total: number;
 }
 
@@ -187,12 +187,19 @@ export function HavuzAiClassification({
         )}
       </Card>
 
-      {aiCategoryFilter && (
-        <div className="flex items-center gap-2">
+      {aiCategoryFilter.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs text-muted-foreground">AI Kategori filtresi:</span>
-          <Badge variant="default" className="text-xs cursor-pointer" onClick={() => setAiCategoryFilter(null)}>
-            {aiCategoryFilter.replace(/_/g, " ")} <X className="w-3 h-3 ml-1" />
-          </Badge>
+          {aiCategoryFilter.map(cat => (
+            <Badge key={cat} variant="default" className="text-xs cursor-pointer" onClick={() => setAiCategoryFilter(aiCategoryFilter.filter(c => c !== cat))}>
+              {cat.charAt(0).toUpperCase() + cat.replace(/_/g, " ").slice(1)} <X className="w-3 h-3 ml-1" />
+            </Badge>
+          ))}
+          {aiCategoryFilter.length > 1 && (
+            <button className="text-xs text-muted-foreground hover:text-foreground underline" onClick={() => setAiCategoryFilter([])}>
+              Tümünü temizle
+            </button>
+          )}
         </div>
       )}
 
@@ -211,9 +218,11 @@ export function HavuzAiClassification({
                 key={cat}
                 cat={cat}
                 count={count}
-                active={!!(aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr"))}
+                active={aiCategoryFilter.some(f => cat.toLocaleLowerCase("tr") === f.toLocaleLowerCase("tr"))}
                 onClick={() => setAiCategoryFilter(
-                  aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr") ? null : cat
+                  aiCategoryFilter.some(f => cat.toLocaleLowerCase("tr") === f.toLocaleLowerCase("tr"))
+                    ? aiCategoryFilter.filter(f => f.toLocaleLowerCase("tr") !== cat.toLocaleLowerCase("tr"))
+                    : [...aiCategoryFilter, cat]
                 )}
               />
             ))}
@@ -269,9 +278,11 @@ export function HavuzAiClassification({
                         key={cat}
                         cat={cat}
                         count={count}
-                        active={!!(aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr"))}
+                        active={aiCategoryFilter.some(f => cat.toLocaleLowerCase("tr") === f.toLocaleLowerCase("tr"))}
                         onClick={() => setAiCategoryFilter(
-                          aiCategoryFilter && cat.toLocaleLowerCase("tr") === aiCategoryFilter.toLocaleLowerCase("tr") ? null : cat
+                          aiCategoryFilter.some(f => cat.toLocaleLowerCase("tr") === f.toLocaleLowerCase("tr"))
+                            ? aiCategoryFilter.filter(f => f.toLocaleLowerCase("tr") !== cat.toLocaleLowerCase("tr"))
+                            : [...aiCategoryFilter, cat]
                         )}
                       />
                     ))}

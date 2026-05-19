@@ -657,7 +657,7 @@ export function PoolFilters({
 
             {globalTags.length > 0 && (
               <div>
-                <span className="block text-[10px] text-muted-foreground mb-0.5">Etiket <span className="opacity-50">(herhangi)</span></span>
+                <span className="block text-[10px] text-muted-foreground mb-0.5">Etiket <span className="opacity-50">(tümü)</span></span>
                 <MultiSelectDropdown
                   label="Etiket"
                   options={[

@@ -1,7 +1,7 @@
 import type { IconType } from "react-icons";
 import {
-  FaLock, FaMosque, FaHourglass, FaCalendarDay, FaCloud,
-  FaSkull, FaWallet, FaHeart, FaCommentDots, FaBell,
+  FaLock, FaMosque, FaHourglass, FaCalendarDay, FaMoon,
+  FaWallet, FaHeart, FaCommentDots, FaBell,
   FaPrayingHands, FaSun, FaStar, FaChild, FaCrown,
   FaExclamationCircle, FaCut, FaHorse, FaDrumstickBite, FaLink,
 } from "react-icons/fa";
@@ -17,8 +17,7 @@ export const CATEGORY_CONFIG: Record<string, CategoryEntry> = {
   erken_kesim:     { Icon: FaHourglass,          bg: "bg-amber-700"    },
   "2.gün":         { Icon: FaCalendarDay,        bg: "bg-teal-700"     },
   "3.gün":         { Icon: FaSun,                bg: "bg-lime-700"     },
-  mevta:           { Icon: FaCloud,              bg: "bg-slate-600"    },
-  mevta_kurbani:   { Icon: FaSkull,              bg: "bg-cyan-800"     },
+  mevta_kurbani:   { Icon: FaMoon,               bg: "bg-cyan-800"     },
   ödeme_notu:      { Icon: FaWallet,             bg: "bg-emerald-700"  },
   adak:            { Icon: FaHeart,              bg: "bg-purple-700"   },
   akika:           { Icon: FaBell,               bg: "bg-rose-700"     },
@@ -49,7 +48,8 @@ export function CategoryBadge({ cat, count, onClick, active, size = "md" }: Cate
   const entry = CATEGORY_CONFIG[cat];
   const Icon = entry?.Icon;
   const bg = entry?.bg ?? FALLBACK_BG;
-  const label = cat.replace(/_/g, " ");
+  const raw = cat.replace(/_/g, " ");
+  const label = raw.charAt(0).toUpperCase() + raw.slice(1);
 
   if (size === "sm") {
     return (

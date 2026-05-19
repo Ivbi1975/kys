@@ -126,13 +126,16 @@ function buildStatsFilterSQL(projectId: string, query: Record<string, unknown>) 
       }
     } else {
       if (hasNoTag && realTagIds.length > 0) {
-        const tagSub = sql`d.id IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id IN (${sql.join(realTagIds.map(t => sql`${t}`), sql`, `)}))`;
-        parts.push(sql`(d.id NOT IN (SELECT dt2.donation_id FROM donation_tags dt2) OR (${tagSub}))`);
+        parts.push(sql`d.id NOT IN (SELECT dt2.donation_id FROM donation_tags dt2)`);
+        for (const t of realTagIds) {
+          parts.push(sql`d.id IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id = ${t})`);
+        }
       } else if (hasNoTag) {
         parts.push(sql`d.id NOT IN (SELECT dt2.donation_id FROM donation_tags dt2)`);
       } else {
-        const tagSub = sql`d.id IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id IN (${sql.join(realTagIds.map(t => sql`${t}`), sql`, `)}))`;
-        parts.push(tagSub);
+        for (const t of realTagIds) {
+          parts.push(sql`d.id IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id = ${t})`);
+        }
       }
     }
   }
@@ -142,12 +145,16 @@ function buildStatsFilterSQL(projectId: string, query: Record<string, unknown>) 
   if (shareCountMin !== null && !isNaN(shareCountMin)) parts.push(sql`d.share_count >= ${shareCountMin}`);
   if (shareCountMax !== null && !isNaN(shareCountMax)) parts.push(sql`d.share_count <= ${shareCountMax}`);
 
-  const aiCategory = typeof query.aiCategory === "string" ? query.aiCategory.trim() : "";
-  if (aiCategory) {
+  const aiCategoryValues = parseMultiValue(query.aiCategory);
+  if (aiCategoryValues.length > 0) {
     if (excludeSet.has("aiCategory")) {
-      parts.push(sql`(d.ai_categories IS NULL OR d.ai_categories::text = '[]' OR NOT (d.ai_categories::text ILIKE ${'%' + aiCategory + '%'}))`);
+      for (const cat of aiCategoryValues) {
+        parts.push(sql`(d.ai_categories IS NULL OR d.ai_categories::text = '[]' OR NOT (d.ai_categories::text ILIKE ${'%' + cat + '%'}))`);
+      }
     } else {
-      parts.push(sql`d.ai_categories::text ILIKE ${'%' + aiCategory + '%'}`);
+      for (const cat of aiCategoryValues) {
+        parts.push(sql`d.ai_categories::text ILIKE ${'%' + cat + '%'}`);
+      }
     }
   }
 
@@ -210,7 +217,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   const birimValues = parseMultiValue(req.query.birim);
   const temsilciValues = parseMultiValue(req.query.temsilci);
   const kesimAlaniId = typeof req.query.kesimAlaniId === "string" ? req.query.kesimAlaniId.trim() : "";
-  const aiCategory = typeof req.query.aiCategory === "string" ? req.query.aiCategory.trim() : "";
+  const aiCategoryValues = parseMultiValue(req.query.aiCategory);
   const ozellikValues = parseMultiValue(req.query.ozellik);
   const fiyatValues = parseMultiValue(req.query.fiyat);
   const yerTalebiValues = parseMultiValue(req.query.yerTalebi);
@@ -356,13 +363,16 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
       }
     } else {
       if (hasNoTag && realTagIds.length > 0) {
-        const tagSql = sql`${donationsTable.id} IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id IN (${sql.join(realTagIds.map(t => sql`${t}`), sql`, `)}))`;
-        conditions.push(or(noTagSql, tagSql)!);
+        conditions.push(noTagSql);
+        for (const t of realTagIds) {
+          conditions.push(sql`${donationsTable.id} IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id = ${t})`);
+        }
       } else if (hasNoTag) {
         conditions.push(noTagSql);
       } else {
-        const tagSql = sql`${donationsTable.id} IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id IN (${sql.join(realTagIds.map(t => sql`${t}`), sql`, `)}))`;
-        conditions.push(tagSql);
+        for (const t of realTagIds) {
+          conditions.push(sql`${donationsTable.id} IN (SELECT dt.donation_id FROM donation_tags dt WHERE dt.tag_id = ${t})`);
+        }
       }
     }
   }
@@ -416,17 +426,21 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     conditions.push(eq(donationsTable.excluded, false));
   }
 
-  if (aiCategory) {
+  if (aiCategoryValues.length > 0) {
     if (excludeSet.has("aiCategory")) {
-      conditions.push(
-        or(
-          sql`${donationsTable.aiCategories} IS NULL`,
-          sql`${donationsTable.aiCategories}::text = '[]'`,
-          sql`NOT (${donationsTable.aiCategories}::text ILIKE ${'%' + aiCategory + '%'})`,
-        )!
-      );
+      for (const cat of aiCategoryValues) {
+        conditions.push(
+          or(
+            sql`${donationsTable.aiCategories} IS NULL`,
+            sql`${donationsTable.aiCategories}::text = '[]'`,
+            sql`NOT (${donationsTable.aiCategories}::text ILIKE ${'%' + cat + '%'})`,
+          )!
+        );
+      }
     } else {
-      conditions.push(sql`${donationsTable.aiCategories}::text ILIKE ${'%' + aiCategory + '%'}`);
+      for (const cat of aiCategoryValues) {
+        conditions.push(sql`${donationsTable.aiCategories}::text ILIKE ${'%' + cat + '%'}`);
+      }
     }
   }
 
