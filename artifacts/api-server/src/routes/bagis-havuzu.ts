@@ -100,7 +100,15 @@ function buildStatsFilterSQL(projectId: string, query: Record<string, unknown>) 
   } else if (kesimAlaniId) {
     parts.push(sql`d.kesim_alani_id = ${kesimAlaniId}`);
   } else {
-    // "Tümü": show ALL donations in this project — no extra filter needed.
+    // "Tümü": havuz-originated donations (currently in havuz OR transferred from havuz).
+    parts.push(sql`(
+      d.kesim_alani_id IN (SELECT id FROM kesim_alanlari WHERE project_id = ${projectId} AND name = '__havuz__' AND deleted_at IS NULL)
+      OR d.id IN (
+        SELECT dt.donation_id FROM donation_transfers dt
+        JOIN kesim_alanlari ka ON ka.id = dt.from_kesim_alani_id AND ka.name = '__havuz__' AND ka.project_id = ${projectId}
+        WHERE dt.project_id = ${projectId}
+      )
+    )`);
   }
 
   const tagIdValues = parseMultiValue(query.tagIds);
@@ -324,8 +332,23 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   } else if (kesimAlaniId) {
     conditions.push(eq(donationsTable.kesimAlaniId, kesimAlaniId));
   } else {
-    // "Tümü": show ALL donations in this project (across all non-deleted KAs).
-    // No additional filter — the existing inArray(kesimAlaniId, kaIds) already scopes to project.
+    // "Tümü": havuz-originated donations (currently in havuz OR transferred from havuz).
+    // The Durum column uses animal_group_donations to show the correct label even when
+    // the donation's kesim_alani_id still points to __havuz__.
+    if (havuzKaIds.length > 0) {
+      conditions.push(
+        or(
+          inArray(donationsTable.kesimAlaniId, havuzKaIds),
+          sql`${donationsTable.id} IN (
+            SELECT dt.donation_id FROM donation_transfers dt
+            WHERE dt.from_kesim_alani_id IN (${sql.join(havuzKaIds.map(id => sql`${id}`), sql`, `)})
+              AND dt.project_id = ${projectId}
+          )`,
+        )!,
+      );
+    } else {
+      conditions.push(sql`false`);
+    }
   }
 
   if (tagIdValues.length > 0) {
