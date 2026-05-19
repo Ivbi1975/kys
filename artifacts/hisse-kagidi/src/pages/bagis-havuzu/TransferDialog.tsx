@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowRightLeft, Loader2, RefreshCw, Check, Square, CheckSquare, FolderOpen, FolderPlus } from "lucide-react";
 import { fetchPoolDonations, fetchDonationSiblings } from "@/lib/api";
-import type { DonorSiblings } from "@/lib/api/bagis-havuzu";
+import type { DonorSiblings, SiblingDonation } from "@/lib/api/bagis-havuzu";
 
 interface TransferDialogProps {
   open: boolean;
@@ -27,20 +27,24 @@ interface TransferDialogProps {
   skipSiblings?: boolean;
 }
 
-const COLS = [
-  { key: "vekalet",     label: "Vekalet",     width: "w-24"  },
-  { key: "description", label: "Adına Kesilen", width: "w-40" },
-  { key: "donationType",label: "Cins",         width: "w-24"  },
-  { key: "shareCount",  label: "Hisse",        width: "w-14"  },
-  { key: "birim",       label: "Birim",        width: "w-24"  },
-  { key: "temsilci",    label: "Temsilci",     width: "w-28"  },
-  { key: "ozellik",     label: "Özellik",      width: "w-24"  },
-  { key: "fiyat",       label: "Fiyat",        width: "w-20"  },
-  { key: "notes",       label: "Not",          width: "flex-1 min-w-[80px]" },
-] as const;
+const COLS: { key: keyof SiblingDonation | "fiyatFmt"; label: string; cls: string }[] = [
+  { key: "vekalet",      label: "Vekalet",       cls: "w-32 flex-shrink-0" },
+  { key: "description",  label: "Adına Kesilen",  cls: "w-52 flex-shrink-0" },
+  { key: "donationType", label: "Cins",           cls: "w-28 flex-shrink-0" },
+  { key: "shareCount",   label: "Hisse",          cls: "w-16 flex-shrink-0 text-center" },
+  { key: "birim",        label: "Birim",          cls: "w-28 flex-shrink-0" },
+  { key: "temsilci",     label: "Temsilci",       cls: "w-32 flex-shrink-0" },
+  { key: "ozellik",      label: "Özellik",        cls: "w-28 flex-shrink-0" },
+  { key: "fiyatFmt",     label: "Fiyat",          cls: "w-24 flex-shrink-0 text-right" },
+  { key: "notes",        label: "Not",            cls: "flex-1 min-w-[100px]" },
+];
 
-function cell(val: string | number | null | undefined) {
-  return val ? String(val) : <span className="text-muted-foreground/40">—</span>;
+function empty(val: string | number | null | undefined) {
+  return val === null || val === undefined || val === "" || val === 0;
+}
+function Cell({ val, mono, right }: { val: string | number | null | undefined; mono?: boolean; right?: boolean }) {
+  if (empty(val)) return <span className="text-muted-foreground/35 select-none">—</span>;
+  return <span className={`${mono ? "font-mono" : ""} ${right ? "tabular-nums" : ""}`}>{String(val)}</span>;
 }
 
 export function TransferDialog({
@@ -125,13 +129,21 @@ export function TransferDialog({
 
   const hasSiblings = !loadingSiblings && siblings.length > 0;
 
+  function getColVal(d: SiblingDonation, key: string): string | number | null | undefined {
+    if (key === "fiyatFmt") return d.fiyat ? `₺${d.fiyat}` : null;
+    return (d as unknown as Record<string, unknown>)[key] as string | number | null | undefined;
+  }
+
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); else onOpenChange(v); }}>
-      <DialogContent className="max-w-[95vw] w-full flex flex-col" style={{ maxHeight: "92vh", height: hasSiblings ? "92vh" : "auto" }}>
+      <DialogContent
+        className="max-w-[95vw] w-full flex flex-col gap-3"
+        style={{ maxHeight: "92vh", height: hasSiblings ? "92vh" : "auto" }}
+      >
 
         {/* Header */}
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="flex items-center gap-2.5">
+          <DialogTitle className="flex items-center gap-2.5 text-lg">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
               <ArrowRightLeft className="h-4 w-4 text-primary" />
             </span>
@@ -141,100 +153,98 @@ export function TransferDialog({
 
         {/* Summary line */}
         <div className="flex items-center gap-2 flex-wrap text-sm flex-shrink-0 -mt-1">
-          <span><strong>{selectedCount}</strong> <span className="text-muted-foreground">seçili bağış</span></span>
+          <span className="font-bold text-base">{selectedCount}</span>
+          <span className="text-muted-foreground">seçili bağış</span>
           {loadingSiblings && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1 text-xs text-muted-foreground ml-2">
               <Loader2 className="h-3 w-3 animate-spin" />kontrol ediliyor…
             </span>
           )}
           {!loadingSiblings && selectedExtraCount > 0 && (
             <>
-              <span className="text-muted-foreground">+</span>
-              <span><strong className="text-amber-600 dark:text-amber-400">{selectedExtraCount}</strong> <span className="text-muted-foreground">ek bağış</span></span>
-              <span className="text-muted-foreground">=</span>
-              <span className="font-semibold text-primary">{totalToTransfer} toplam</span>
+              <span className="text-muted-foreground font-bold">+</span>
+              <span className="font-bold text-base text-amber-600 dark:text-amber-400">{selectedExtraCount}</span>
+              <span className="text-muted-foreground">ek bağış</span>
+              <span className="text-muted-foreground font-bold">=</span>
+              <span className="font-bold text-base text-primary">{totalToTransfer} toplam</span>
             </>
           )}
         </div>
 
-        {/* Siblings table — takes all available height */}
+        {/* Siblings table — flex-1 to fill modal height */}
         {hasSiblings && (
           <div className="flex-1 min-h-0 flex flex-col rounded-lg border overflow-hidden">
-            {/* Table header */}
-            <div className="flex-shrink-0 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-100 dark:border-amber-900/50">
-              {/* Select-all row */}
-              <div className="flex items-center justify-between px-3 py-2">
-                <button
-                  onClick={toggleAll}
-                  className="flex items-center gap-2 text-xs font-medium text-amber-800 dark:text-amber-200 hover:opacity-75 transition-opacity"
-                >
-                  {allSelected
-                    ? <CheckSquare className="h-4 w-4 text-primary flex-shrink-0" />
-                    : selectedDonors.size === 0
-                      ? <Square className="h-4 w-4 flex-shrink-0" />
-                      : <CheckSquare className="h-4 w-4 text-muted-foreground/50 flex-shrink-0" />}
-                  {totalExtraCount} ek bağış — {allSelected ? "Tümünü kaldır" : "Tümünü seç"}
-                </button>
-                <span className="text-xs text-muted-foreground tabular-nums">{selectedDonors.size}/{siblings.length} kişi seçili</span>
-              </div>
-              {/* Column headers */}
-              <div className="flex items-center gap-0 px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-t border-amber-100/60 dark:border-amber-900/30 pt-1.5">
-                <span className="w-7 flex-shrink-0" />
-                <span className="w-36 flex-shrink-0 pr-2">Vekalet Veren</span>
-                {COLS.map(c => (
-                  <span key={c.key} className={`${c.width} flex-shrink-0 pr-2 truncate`}>{c.label}</span>
-                ))}
-              </div>
+
+            {/* Toolbar row */}
+            <div className="flex-shrink-0 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900/60 px-3 py-2 flex items-center justify-between gap-4">
+              <button
+                onClick={toggleAll}
+                className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-200 hover:opacity-75 transition-opacity"
+              >
+                {allSelected
+                  ? <CheckSquare className="h-4 w-4 text-primary flex-shrink-0" />
+                  : selectedDonors.size === 0
+                    ? <Square className="h-4 w-4 flex-shrink-0" />
+                    : <CheckSquare className="h-4 w-4 text-muted-foreground/50 flex-shrink-0" />}
+                {totalExtraCount} ek bağış — {allSelected ? "Tümünü kaldır" : "Tümünü seç"}
+              </button>
+              <span className="text-sm font-medium text-muted-foreground tabular-nums">{selectedDonors.size}/{siblings.length} kişi seçili</span>
             </div>
 
-            {/* Scrollable rows */}
-            <div className="flex-1 overflow-y-auto divide-y">
+            {/* Column header */}
+            <div className="flex-shrink-0 flex items-center gap-0 px-3 py-2 bg-muted/40 border-b text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              <span className="w-7 flex-shrink-0" />
+              {COLS.map(c => (
+                <span key={c.key} className={`${c.cls} pr-3 truncate`}>{c.label}</span>
+              ))}
+            </div>
+
+            {/* Scrollable body */}
+            <div className="flex-1 overflow-y-auto">
               {siblings.map(s => {
                 const checked = selectedDonors.has(s.donorName);
                 return (
-                  <div key={s.donorName} className={`${checked ? "bg-primary/5" : ""}`}>
-                    {/* Group toggle row */}
+                  <div key={s.donorName} className={checked ? "bg-primary/[0.04]" : ""}>
+
+                    {/* Group header row — full name, no truncate */}
                     <button
-                      className={`flex items-center gap-0 w-full px-3 py-2 text-left transition-colors hover:bg-muted/40 border-b border-dashed border-muted/40`}
+                      className="flex items-center gap-0 w-full px-3 py-2.5 text-left border-b transition-colors hover:bg-muted/30"
                       onClick={() => toggleDonor(s.donorName)}
                     >
-                      <span className={`w-7 flex-shrink-0 flex items-center justify-center`}>
-                        <span className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${checked ? "bg-primary border-primary" : "border-input"}`}>
+                      <span className="w-7 flex-shrink-0 flex items-center justify-center">
+                        <span className={`flex h-4 w-4 items-center justify-center rounded border transition-colors flex-shrink-0 ${checked ? "bg-primary border-primary" : "border-input"}`}>
                           {checked && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
                         </span>
                       </span>
-                      <span className="w-36 flex-shrink-0 pr-2 font-semibold text-sm truncate">{s.donorName}</span>
-                      <span className="text-xs text-muted-foreground">{s.extraCount} bağış</span>
-                      <span className="ml-auto text-xs font-medium text-amber-600 dark:text-amber-400 tabular-nums pr-1">+{s.extraCount}</span>
+                      <span className="font-bold text-sm pr-3 leading-snug">{s.donorName}</span>
+                      <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">{s.extraCount} bağış</span>
+                      <span className="ml-auto text-sm font-bold text-amber-600 dark:text-amber-400 tabular-nums pl-3 whitespace-nowrap">+{s.extraCount}</span>
                     </button>
 
                     {/* Per-donation rows */}
                     {s.donations.map((d, i) => (
                       <div
                         key={d.id}
-                        className={`flex items-center gap-0 px-3 py-1.5 text-xs ${i % 2 === 0 ? "bg-muted/10" : ""} ${checked ? "opacity-100" : "opacity-50"}`}
+                        className={`flex items-center gap-0 px-3 py-2 border-b border-dashed border-muted/50 text-sm ${i % 2 === 0 ? "bg-muted/[0.06]" : ""} ${checked ? "" : "opacity-40"}`}
                       >
                         <span className="w-7 flex-shrink-0" />
-                        {/* Vekalet Veren (name) */}
-                        <span className="w-36 flex-shrink-0 pr-2 font-mono text-[11px] text-muted-foreground truncate">{d.name || "—"}</span>
-                        {/* Vekalet */}
-                        <span className="w-24 flex-shrink-0 pr-2 font-mono text-[11px] truncate">{cell(d.vekalet)}</span>
-                        {/* Adına Kesilen */}
-                        <span className="w-40 flex-shrink-0 pr-2 truncate">{cell(d.description)}</span>
-                        {/* Cins */}
-                        <span className="w-24 flex-shrink-0 pr-2 truncate">{cell(d.donationType)}</span>
-                        {/* Hisse */}
-                        <span className="w-14 flex-shrink-0 pr-2 tabular-nums">{d.shareCount > 1 ? <strong>{d.shareCount}</strong> : cell(d.shareCount)}</span>
-                        {/* Birim */}
-                        <span className="w-24 flex-shrink-0 pr-2 truncate">{cell(d.birim)}</span>
-                        {/* Temsilci */}
-                        <span className="w-28 flex-shrink-0 pr-2 truncate">{cell(d.temsilci)}</span>
-                        {/* Özellik */}
-                        <span className="w-24 flex-shrink-0 pr-2 truncate">{cell(d.ozellik)}</span>
-                        {/* Fiyat */}
-                        <span className="w-20 flex-shrink-0 pr-2 tabular-nums">{d.fiyat ? `₺${d.fiyat}` : <span className="text-muted-foreground/40">—</span>}</span>
-                        {/* Not */}
-                        <span className="flex-1 min-w-[80px] truncate text-muted-foreground">{cell(d.notes)}</span>
+                        {COLS.map(c => {
+                          const val = getColVal(d, c.key);
+                          const isMono = c.key === "vekalet";
+                          const isEmpty = !val && val !== 0;
+                          return (
+                            <span
+                              key={c.key}
+                              className={`${c.cls} pr-3 truncate font-medium ${isMono ? "font-mono text-xs" : ""}`}
+                              title={isEmpty ? undefined : String(val)}
+                            >
+                              {isEmpty
+                                ? <span className="text-muted-foreground/30 select-none">—</span>
+                                : <span>{String(val)}</span>
+                              }
+                            </span>
+                          );
+                        })}
                       </div>
                     ))}
                   </div>
@@ -245,16 +255,16 @@ export function TransferDialog({
         )}
 
         {/* Destination + Actions */}
-        <div className="flex-shrink-0 space-y-3 pt-1">
+        <div className="flex-shrink-0 space-y-3">
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
             {/* Mevcut liste */}
             <div className="space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
                 <FolderOpen className="h-3.5 w-3.5" />Mevcut listeye aktar
               </p>
               <div className="flex gap-1.5">
                 <Select value={transferTarget} onValueChange={(v) => { setTransferTarget(v); setCreatingNewList(false); }}>
-                  <SelectTrigger className="flex-1"><SelectValue placeholder="Kesim listesi seçin…" /></SelectTrigger>
+                  <SelectTrigger className="flex-1 font-medium"><SelectValue placeholder="Kesim listesi seçin…" /></SelectTrigger>
                   <SelectContent>
                     {kaList.map((ka) => <SelectItem key={ka.id} value={ka.id}>{ka.name}</SelectItem>)}
                   </SelectContent>
@@ -268,13 +278,13 @@ export function TransferDialog({
             {/* veya */}
             <div className="flex flex-col items-center gap-1 pt-5">
               <div className="h-8 w-px bg-border" />
-              <span className="text-xs text-muted-foreground">veya</span>
+              <span className="text-xs font-medium text-muted-foreground">veya</span>
               <div className="h-8 w-px bg-border" />
             </div>
 
             {/* Yeni liste */}
             <div className="space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
                 <FolderPlus className="h-3.5 w-3.5" />Yeni liste oluştur
               </p>
               <Input
@@ -285,15 +295,15 @@ export function TransferDialog({
                   if (e.target.value) { setTransferTarget(""); setCreatingNewList(true); }
                   else { setCreatingNewList(false); }
                 }}
-                className="h-9"
+                className="h-10 font-medium"
               />
             </div>
           </div>
 
           {/* Actions */}
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={handleClose}>İptal</Button>
-            <Button className="flex-[2]" onClick={handleTransfer} disabled={!canTransfer}>
+            <Button variant="outline" className="flex-1 font-semibold" onClick={handleClose}>İptal</Button>
+            <Button className="flex-[2] font-bold text-base" onClick={handleTransfer} disabled={!canTransfer}>
               {transferring
                 ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Aktarılıyor…</>
                 : <><ArrowRightLeft className="h-4 w-4 mr-2" />{totalToTransfer} Bağışı Aktar</>}
