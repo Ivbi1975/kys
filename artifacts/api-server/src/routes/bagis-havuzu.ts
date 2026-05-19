@@ -507,15 +507,37 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
 
   const donationIds = rows.map(r => r.id);
   let tagsByDonation: Record<string, string[]> = {};
+  // Map donation_id → effective kesim_alani_id derived from animal_group_donations.
+  // Donations may still have kesim_alani_id = havuz even after being assigned
+  // to an animal group in a real kesim alanı, so we look up the group assignment
+  // and use that KA to show the correct "Durum" label.
+  const groupKaMap: Record<string, string> = {};
   if (donationIds.length > 0) {
-    const tags = await db.select({
-      donationId: donationTagsTable.donationId,
-      tagId: donationTagsTable.tagId,
-    }).from(donationTagsTable).where(inArray(donationTagsTable.donationId, donationIds));
+    const [tags, groupAssignments] = await Promise.all([
+      db.select({
+        donationId: donationTagsTable.donationId,
+        tagId: donationTagsTable.tagId,
+      }).from(donationTagsTable).where(inArray(donationTagsTable.donationId, donationIds)),
+      db.execute(sql`
+        SELECT DISTINCT ON (agd.donation_id) agd.donation_id, ag.kesim_alani_id
+        FROM animal_group_donations agd
+        JOIN animal_groups ag ON ag.id = agd.group_id AND ag.deleted_at IS NULL
+        WHERE agd.donation_id IN (${sql.join(donationIds.map(id => sql`${id}`), sql`, `)})
+        ORDER BY agd.donation_id, agd.id ASC
+      `),
+    ]);
 
     for (const t of tags) {
       if (!tagsByDonation[t.donationId]) tagsByDonation[t.donationId] = [];
       tagsByDonation[t.donationId].push(t.tagId);
+    }
+
+    type GaRow = { donation_id: string; kesim_alani_id: string };
+    for (const row of groupAssignments.rows as GaRow[]) {
+      // Only use group KA if it's a known, non-havuz KA
+      if (kaNameMap[row.kesim_alani_id] && kaNameMap[row.kesim_alani_id] !== "__havuz__") {
+        groupKaMap[row.donation_id] = row.kesim_alani_id;
+      }
     }
   }
 
@@ -539,12 +561,11 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     excluded: d.excluded,
     sortOrder: d.sortOrder,
     kesimAlaniId: d.kesimAlaniId,
-    // kaNameMap is built from kaIds (non-deleted KAs for this project) and the
-    // first condition already restricts donations to those same kaIds, so
-    // kaNameMap[d.kesimAlaniId] will always resolve — the "" fallback is purely
-    // defensive and should never be reached in practice.
-    kesimAlaniName: kaNameMap[d.kesimAlaniId] || "",
-    kesimListeId: kaKesimListeIdMap[d.kesimAlaniId] ?? null,
+    // Derive effective KA: if the donation is assigned to a group in a real
+    // kesim alanı (via animal_group_donations), use that KA for the label even
+    // if the donation's own kesim_alani_id still points to the havuz.
+    kesimAlaniName: kaNameMap[groupKaMap[d.id] ?? d.kesimAlaniId] || "",
+    kesimListeId: kaKesimListeIdMap[groupKaMap[d.id] ?? d.kesimAlaniId] ?? null,
     tags: tagsByDonation[d.id] || [],
     aiCategories: parseAiCategories(d.aiCategories),
     aiWarnings: d.aiWarnings || "",
