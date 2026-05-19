@@ -35,6 +35,7 @@ export interface AuditLogFilters {
   cursor?: number;
   projectId?: string;
   kesimAlaniId?: string;
+  poolScope?: boolean;
 }
 
 export async function fetchAuditLogs(filters: AuditLogFilters = {}, signal?: AbortSignal): Promise<AuditLogResponse> {
@@ -48,6 +49,7 @@ export async function fetchAuditLogs(filters: AuditLogFilters = {}, signal?: Abo
   if (filters.cursor) params.set("cursor", String(filters.cursor));
   if (filters.projectId) params.set("projectId", filters.projectId);
   if (filters.kesimAlaniId) params.set("kesimAlaniId", filters.kesimAlaniId);
+  if (filters.poolScope) params.set("poolScope", "1");
   const qs = params.toString();
   return apiFetch<AuditLogResponse>(`/audit-logs${qs ? `?${qs}` : ""}`, { signal });
 }

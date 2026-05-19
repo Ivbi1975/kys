@@ -59,6 +59,7 @@ const KesimTakipPage = lazy(() => import("@/pages/kesim-takip"));
 const KesimRaporPage = lazy(() => import("@/pages/kesim-rapor"));
 const BagisHavuzuPage = lazy(() => import("@/pages/bagis-havuzu"));
 const AiSiniflandirmaPage = lazy(() => import("@/pages/bagis-havuzu/AiSiniflandirmaPage"));
+const IslemGecmisiPage = lazy(() => import("@/pages/islem-gecmisi"));
 const SorunluBagislarPage = lazy(() => import("@/pages/sorunlu-bagislar"));
 const ApiDokumantasyonPage = lazy(() => import("@/pages/api-dokumantasyon"));
 const KullanimKilavuzuPage = lazy(() => import("@/pages/kullanim-kilavuzu"));
@@ -174,6 +175,7 @@ function ProtectedRouterInner() {
               <Route path="/rapor/:id" component={KesimRaporPage} />
               <Route path="/not-duzenleme/:id" component={NotDuzenlemePage} />
               <Route path="/ai-prompt-ayarlari" component={AiPromptAyarlariPage} />
+              <Route path="/proje/:id/islem-gecmisi" component={IslemGecmisiPage} />
               <Route path="/proje/:id" component={ProjeDetayPage} />
               <Route path="/bagis-havuzu/:id/ai" component={AiSiniflandirmaPage} />
               <Route path="/bagis-havuzu/:id" component={BagisHavuzuPage} />

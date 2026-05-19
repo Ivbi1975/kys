@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import {
   ChevronDown, ChevronRight, FolderOpen,
   PanelLeftClose, Home, Trash2,
-  BookOpen, Layers, Scissors, X, Package, HelpCircle,
+  BookOpen, Layers, Scissors, X, Package, HelpCircle, ClipboardList,
 } from "lucide-react";
 import { fetchHomeData } from "@/lib/api/projects";
 import type { HomeData } from "@/lib/api/projects";
@@ -39,6 +39,7 @@ export function SidebarNav({ collapsed, onToggle, isMobileDrawer, onMobileClose 
     location.match(/^\/proje\/([^/]+)/)?.[1] ||
     location.match(/^\/bagis-havuzu\/([^/]+)/)?.[1] ||
     null;
+  const activeIslemGecmisiId = location.match(/^\/proje\/([^/]+)\/islem-gecmisi/)?.[1] || null;
   const activeKesimId = location.match(/^\/kesim\/([^/]+)/)?.[1] || null;
 
   useEffect(() => {
@@ -145,6 +146,15 @@ export function SidebarNav({ collapsed, onToggle, isMobileDrawer, onMobileClose 
                           label="Havuz"
                           active={location.startsWith(`/bagis-havuzu/${project.id}`)}
                           onClick={() => go(`/bagis-havuzu/${project.id}`)}
+                          small
+                        />
+                        {/* İşlem Geçmişi node */}
+                        <NavItem
+                          collapsed={false}
+                          icon={<ClipboardList className="h-[14px] w-[14px] flex-shrink-0" />}
+                          label="İşlem Geçmişi"
+                          active={activeIslemGecmisiId === project.id}
+                          onClick={() => go(`/proje/${project.id}/islem-gecmisi`)}
                           small
                         />
                         {/* Kesim Listeleri — indented under Havuz */}

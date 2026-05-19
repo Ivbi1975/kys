@@ -5,6 +5,7 @@ import { Loader2, RotateCcw, Wand2, X } from "lucide-react";
 import type { useKesimAlaniState } from "./useKesimAlaniState";
 import { KesimAlaniProvider } from "./KesimAlaniContext";
 import { KesimAlaniHeader, StatsCards, DonorListPanel, GroupListPanel } from "./sections";
+import { SonIslemlerKart } from "@/components/SonIslemlerKart";
 
 type KesimAlaniStateReturn = ReturnType<typeof useKesimAlaniState>;
 
@@ -187,6 +188,16 @@ export function KesimAlaniContent(props: KesimAlaniStateReturn) {
             <GroupListPanel />
           </div>
         </div>
+
+        {!fullscreenMode && kesim.projectId && (
+          <div className="mt-6">
+            <SonIslemlerKart
+              projectId={kesim.projectId}
+              kesimAlaniId={kesim.id}
+              defaultOpen={false}
+            />
+          </div>
+        )}
       </div>
     </KesimAlaniProvider>
   );

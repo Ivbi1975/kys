@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   ChevronRight,
   Scissors,
+  ClipboardList,
 } from "lucide-react";
 import QrCodeModal from "@/components/QrCodeModal";
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
@@ -27,7 +28,6 @@ import { SplitModal } from "@/components/proje-detay/SplitModal";
 import { ConflictSection } from "@/components/proje-detay/ConflictSection";
 import { TransferLogSection } from "@/components/proje-detay/TransferLogSection";
 import { ConflictLogSection } from "@/components/proje-detay/ConflictLogSection";
-import { ProjectAuditLogSection } from "@/components/proje-detay/ProjectAuditLogSection";
 import { ProjeDetayDialogs } from "@/components/proje-detay/ProjeDetayDialogs";
 
 export default function ProjeDetayPage() {
@@ -254,11 +254,18 @@ export default function ProjeDetayPage() {
           conflictLog={state.conflictLog}
         />
 
-        <ProjectAuditLogSection
-          projectId={state.project.id}
-          kesimAlanlari={state.kesimAlanlari}
-          onNavigate={state.setLocation}
-        />
+        <div className="mb-6">
+          <button
+            className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border bg-muted/20 hover:bg-muted/40 transition-colors text-sm font-medium text-foreground"
+            onClick={() => state.setLocation(`/proje/${state.project!.id}/islem-gecmisi`)}
+          >
+            <span className="flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-muted-foreground" />
+              İşlem Geçmişi
+            </span>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
       </div>
 
       <ProjeDetayDialogs

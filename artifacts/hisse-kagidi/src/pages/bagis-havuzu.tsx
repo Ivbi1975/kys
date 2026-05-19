@@ -62,6 +62,7 @@ import type { BasketItem } from "@/components/kesim-alani/hooks/types";
 import type { TransferredItem, DonorSiblings, TransferConflictResponse } from "@/lib/api/bagis-havuzu";
 import { MoveDonationConflictModal } from "@/components/MoveDonationConflictModal";
 import { logFilterApplied } from "@/lib/api/bagis-havuzu";
+import { SonIslemlerKart } from "@/components/SonIslemlerKart";
 
 export default function BagisHavuzuPage() {
   const params = useParams<{ id: string }>();
@@ -1488,6 +1489,16 @@ export default function BagisHavuzuPage() {
               <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Önceki</Button>
               <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Sonraki</Button>
             </div>
+          </div>
+        )}
+
+        {projectId && (
+          <div className="mt-4">
+            <SonIslemlerKart
+              projectId={projectId}
+              poolScope={true}
+              defaultOpen={false}
+            />
           </div>
         )}
 

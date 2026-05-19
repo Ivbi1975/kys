@@ -15,6 +15,7 @@ router.get("/audit-logs", asyncHandler(async (req, res) => {
     cursor: req.query.cursor ? Number(req.query.cursor) : undefined,
     projectId: typeof req.query.projectId === "string" ? req.query.projectId : undefined,
     kesimAlaniId: typeof req.query.kesimAlaniId === "string" ? req.query.kesimAlaniId : undefined,
+    poolScope: req.query.poolScope === "1" || req.query.poolScope === "true",
   };
 
   const result = await listAuditLogs(filters);

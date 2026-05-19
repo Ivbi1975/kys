@@ -1,6 +1,6 @@
 import { db } from "@workspace/db";
 import { auditLogsTable } from "@workspace/db/schema";
-import { eq, and, gte, lte, desc, lt, sql } from "drizzle-orm";
+import { eq, and, gte, lte, desc, lt, sql, or, isNull } from "drizzle-orm";
 import type { Request } from "express";
 import { logger } from "../lib/logger";
 
@@ -118,6 +118,7 @@ export interface AuditLogFilters {
   cursor?: number;
   projectId?: string;
   kesimAlaniId?: string;
+  poolScope?: boolean;
 }
 
 export async function listAuditLogs(filters: AuditLogFilters) {
@@ -146,6 +147,17 @@ export async function listAuditLogs(filters: AuditLogFilters) {
   }
   if (filters.kesimAlaniId) {
     conditions.push(eq(auditLogsTable.targetKesimAlaniId, filters.kesimAlaniId));
+  }
+  if (filters.poolScope) {
+    conditions.push(
+      or(
+        eq(auditLogsTable.entityType, "pool"),
+        and(
+          eq(auditLogsTable.entityType, "donation"),
+          isNull(auditLogsTable.targetKesimAlaniId),
+        ),
+      )!,
+    );
   }
 
   const limit = Math.min(Math.max(filters.limit || 50, 1), 200);
