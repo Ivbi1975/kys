@@ -1,5 +1,4 @@
 import { Router, type IRouter } from "express";
-import { parseAiCategories } from "../lib/ai-categories";
 import crypto from "node:crypto";
 import { db } from "@workspace/db";
 import { refreshProjectStats } from "./projects";
@@ -111,7 +110,13 @@ router.post("/backup/export", asyncHandler(async (_req, res) => {
   }
 
   const donationsById: Record<string, DonationExport> = {};
+  const allAiTagRows = await db.select({ id: customTagsTable.id, name: customTagsTable.name })
+    .from(customTagsTable).where(eq(customTagsTable.categoryId, "__ai_category__"));
+  const aiTagNameMap = new Map(allAiTagRows.map(t => [t.id, t.name]));
+
   for (const d of allDonations) {
+    const donTags = tagsByDonation[d.id] || [];
+    const aiCategories = donTags.filter(id => aiTagNameMap.has(id)).map(id => aiTagNameMap.get(id) as string);
     donationsById[d.id] = {
       id: d.id,
       name: d.name,
@@ -121,8 +126,8 @@ router.post("/backup/export", asyncHandler(async (_req, res) => {
       vekalet: d.vekalet,
       notes: d.notes,
       excluded: d.excluded,
-      tags: tagsByDonation[d.id] || [],
-      aiCategories: parseAiCategories(d.aiCategories) || undefined,
+      tags: donTags,
+      aiCategories: aiCategories.length > 0 ? aiCategories : undefined,
       aiWarnings: d.aiWarnings || undefined,
     };
   }
@@ -342,9 +347,6 @@ router.post("/backup/import", asyncHandler(async (req, res) => {
             excluded: d.excluded || false,
             sortOrder: i,
           };
-          if (d.aiCategories && d.aiCategories.length > 0) {
-            dValues.aiCategories = JSON.stringify(d.aiCategories.map(stripHtml));
-          }
           if (d.aiWarnings) {
             dValues.aiWarnings = stripHtml(d.aiWarnings);
           }

@@ -186,7 +186,7 @@ interface AnimalGroupData {
   slots: DonationSlot[];
 }
 
-function buildNotesValue(row: { notes: string | null; ai_categories: string[] | null; ai_warnings: string | null }): string {
+function buildNotesValue(row: { notes: string | null; ai_categories: string[] | null | undefined; ai_warnings: string | null }): string {
   const aiParts: string[] = [];
   if (row.ai_categories && Array.isArray(row.ai_categories) && row.ai_categories.length > 0) {
     aiParts.push(row.ai_categories.join(", "));
@@ -372,7 +372,13 @@ router.get("/export/excel", asyncHandler(async (req, res) => {
          ag.id AS group_id,
          ag.animal_no,
          d.name, d.description, d.donation_type, d.vekalet, d.notes,
-         d.ai_categories, d.ai_warnings,
+         d.ai_warnings,
+         COALESCE((
+           SELECT array_agg(ct.name)
+           FROM donation_tags dt
+           JOIN custom_tags ct ON ct.id = dt.tag_id
+           WHERE dt.donation_id = d.id AND ct.category_id = '__ai_category__'
+         ), '{}') AS ai_categories,
          agd.sort_order AS slot_order
        FROM animal_groups ag
        LEFT JOIN animal_group_donations agd ON agd.group_id = ag.id

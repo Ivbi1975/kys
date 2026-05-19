@@ -3,6 +3,7 @@ import {
   automationRulesTable,
   donationsTable,
   donationTagsTable,
+  customTagsTable,
   kesimAlanlariTable,
 } from "@workspace/db/schema";
 import { eq, and, isNull, inArray, asc, sql } from "drizzle-orm";
@@ -96,9 +97,8 @@ function evaluateCondition(donation: Record<string, unknown>, condition: RuleCon
   }
 
   if (field === "aiCategories") {
-    const raw = getFieldValue(donation, "aiCategories");
-    let cats: string[] = [];
-    try { const p = JSON.parse(raw); if (Array.isArray(p)) cats = p.map(String); } catch {}
+    const val = donation["aiCategories"];
+    const cats: string[] = Array.isArray(val) ? val.map(String) : [];
     const catValues = Array.isArray(value) ? value.map(String) : [String(value)];
     switch (operator) {
       case "contains":
@@ -225,15 +225,28 @@ export async function executeRules(projectId: string): Promise<ExecutionResult> 
   }
 
   const donationIds = donations.map(d => d.id);
-  const allTags = await db.select({
-    donationId: donationTagsTable.donationId,
-    tagId: donationTagsTable.tagId,
-  }).from(donationTagsTable).where(inArray(donationTagsTable.donationId, donationIds));
+  const [allTags, aiTagRows] = await Promise.all([
+    db.select({
+      donationId: donationTagsTable.donationId,
+      tagId: donationTagsTable.tagId,
+    }).from(donationTagsTable).where(inArray(donationTagsTable.donationId, donationIds)),
+    db.select({ id: customTagsTable.id, name: customTagsTable.name })
+      .from(customTagsTable)
+      .where(eq(customTagsTable.categoryId, "__ai_category__")),
+  ]);
 
   const tagsByDonation: Record<string, string[]> = {};
   for (const t of allTags) {
     if (!tagsByDonation[t.donationId]) tagsByDonation[t.donationId] = [];
     tagsByDonation[t.donationId].push(t.tagId);
+  }
+
+  const aiTagNameMap = new Map(aiTagRows.map(t => [t.id, t.name]));
+  const aiCategoriesByDonation: Record<string, string[]> = {};
+  for (const d of donations) {
+    aiCategoriesByDonation[d.id] = (tagsByDonation[d.id] || [])
+      .filter(id => aiTagNameMap.has(id))
+      .map(id => aiTagNameMap.get(id) as string);
   }
 
   const exclusiveProcessedIds = new Set<string>();
@@ -260,7 +273,8 @@ export async function executeRules(projectId: string): Promise<ExecutionResult> 
 
     const matchedDonations = donations.filter(d => {
       if (exclusive && exclusiveProcessedIds.has(d.id)) return false;
-      return matchesRule(d as unknown as Record<string, unknown>, rawConditions, tagsByDonation[d.id] || []);
+      const donationWithAi = { ...d, aiCategories: aiCategoriesByDonation[d.id] || [] };
+      return matchesRule(donationWithAi as unknown as Record<string, unknown>, rawConditions, tagsByDonation[d.id] || []);
     });
 
     if (matchedDonations.length === 0) {

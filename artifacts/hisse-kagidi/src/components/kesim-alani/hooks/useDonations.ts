@@ -248,10 +248,8 @@ export function useDonations({
         g.donations.forEach(toggle);
       }
     });
-    const donor = updated.donations.find(d => d.id === donationId);
     setKesim(updated);
     history.push(updated, `AI Kategori güncellendi`);
-    saveSingleDonationField(donationId, { aiCategories: donor?.aiCategories || [] });
   }
 
   function toggleDonationTag(donationId: string, tagId: string) {

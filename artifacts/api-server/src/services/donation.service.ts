@@ -3,11 +3,11 @@ import {
   kesimAlanlariTable,
   donationsTable,
   donationTagsTable,
+  customTagsTable,
 } from "@workspace/db/schema";
 import { desc, gt, lt, or, count, ilike, asc } from "drizzle-orm";
 import { eq, inArray, isNull, isNotNull, and, ne } from "drizzle-orm";
 import { MAX_QUERY_LIMIT } from "../lib/constants";
-import { parseAiCategories } from "../lib/ai-categories";
 import { serviceError, serviceOk, type ServiceResult } from "./result";
 import { requireActiveKesimAlani, getFullKesimAlani } from "./kesim-alani.service";
 
@@ -64,7 +64,7 @@ function hydrateTagsByDonation(donationTags: { donationId: string; tagId: string
   return tagsByDonation;
 }
 
-function mapDonationRow(d: typeof donationsTable.$inferSelect, tags: string[]) {
+function mapDonationRow(d: typeof donationsTable.$inferSelect, tags: string[], aiTagNameMap: Map<string, string> = new Map()) {
   return {
     id: d.id,
     name: d.name,
@@ -85,7 +85,7 @@ function mapDonationRow(d: typeof donationsTable.$inferSelect, tags: string[]) {
     excluded: d.excluded,
     sortOrder: d.sortOrder,
     tags,
-    aiCategories: parseAiCategories(d.aiCategories),
+    aiCategories: tags.filter(id => aiTagNameMap.has(id)).map(id => aiTagNameMap.get(id) as string),
     aiWarnings: d.aiWarnings || "",
     aiConfidenceScore: d.aiConfidenceScore ?? null,
     isFlagged: d.isFlagged,
@@ -143,13 +143,18 @@ export async function listDonations(params: ListDonationsParams): Promise<Servic
   const pageRows = hasMore ? rows.slice(0, limit) : rows;
 
   const donationIds = pageRows.map(d => d.id);
-  const donationTags = donationIds.length > 0
-    ? await db.select({ donationId: donationTagsTable.donationId, tagId: donationTagsTable.tagId })
-        .from(donationTagsTable).where(inArray(donationTagsTable.donationId, donationIds))
-    : [];
+  const [donationTags, aiTagRows] = donationIds.length > 0
+    ? await Promise.all([
+        db.select({ donationId: donationTagsTable.donationId, tagId: donationTagsTable.tagId })
+          .from(donationTagsTable).where(inArray(donationTagsTable.donationId, donationIds)),
+        db.select({ id: customTagsTable.id, name: customTagsTable.name })
+          .from(customTagsTable).where(eq(customTagsTable.categoryId, "__ai_category__")),
+      ])
+    : [[], []];
 
   const tagsByDonation = hydrateTagsByDonation(donationTags);
-  const items = pageRows.map(d => mapDonationRow(d, tagsByDonation[d.id] || []));
+  const aiTagNameMap = new Map((aiTagRows as { id: string; name: string }[]).map(t => [t.id, t.name]));
+  const items = pageRows.map(d => mapDonationRow(d, tagsByDonation[d.id] || [], aiTagNameMap));
 
   const lastItem = pageRows[pageRows.length - 1];
   let nextCursor: string | null = null;
@@ -328,29 +333,37 @@ export async function listDeletedDonations(kesimAlaniId: string) {
     .orderBy(donationsTable.deletedAt);
 
   const donationIds = deletedDonations.map(d => d.id);
-  const donationTags = donationIds.length > 0
-    ? await db.select({ donationId: donationTagsTable.donationId, tagId: donationTagsTable.tagId })
-        .from(donationTagsTable).where(inArray(donationTagsTable.donationId, donationIds))
-    : [];
+  const [donationTags, aiTagRowsDel] = donationIds.length > 0
+    ? await Promise.all([
+        db.select({ donationId: donationTagsTable.donationId, tagId: donationTagsTable.tagId })
+          .from(donationTagsTable).where(inArray(donationTagsTable.donationId, donationIds)),
+        db.select({ id: customTagsTable.id, name: customTagsTable.name })
+          .from(customTagsTable).where(eq(customTagsTable.categoryId, "__ai_category__")),
+      ])
+    : [[], []];
 
   const tagsByDonation = hydrateTagsByDonation(donationTags);
+  const aiTagNameMapDel = new Map((aiTagRowsDel as { id: string; name: string }[]).map(t => [t.id, t.name]));
 
-  const items = deletedDonations.map(d => ({
-    id: d.id,
-    kesimAlaniId: d.kesimAlaniId,
-    name: d.name,
-    description: d.description,
-    donationType: d.donationType,
-    shareCount: d.shareCount,
-    vekalet: d.vekalet,
-    notes: d.notes,
-    excluded: d.excluded,
-    deletedAt: d.deletedAt,
-    tags: tagsByDonation[d.id] || [],
-    aiCategories: parseAiCategories(d.aiCategories),
-    aiWarnings: d.aiWarnings || "",
-    aiConfidenceScore: d.aiConfidenceScore ?? null,
-  }));
+  const items = deletedDonations.map(d => {
+    const donTags = tagsByDonation[d.id] || [];
+    return {
+      id: d.id,
+      kesimAlaniId: d.kesimAlaniId,
+      name: d.name,
+      description: d.description,
+      donationType: d.donationType,
+      shareCount: d.shareCount,
+      vekalet: d.vekalet,
+      notes: d.notes,
+      excluded: d.excluded,
+      deletedAt: d.deletedAt,
+      tags: donTags,
+      aiCategories: donTags.filter(id => aiTagNameMapDel.has(id)).map(id => aiTagNameMapDel.get(id) as string),
+      aiWarnings: d.aiWarnings || "",
+      aiConfidenceScore: d.aiConfidenceScore ?? null,
+    };
+  });
 
   return serviceOk({ items });
 }

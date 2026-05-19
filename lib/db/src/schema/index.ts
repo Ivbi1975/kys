@@ -72,7 +72,6 @@ export const donationsTable = pgTable("donations", {
   sortOrder: integer("sort_order").notNull().default(0),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  aiCategories: text("ai_categories"),
   aiWarnings: text("ai_warnings"),
   aiRequests: text("ai_requests"),
   aiSummary: text("ai_summary"),

@@ -853,7 +853,7 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
       .onConflictDoNothing();
   }
 
-  // Single transaction: write ai_categories + donation_tags atomically.
+  // Single transaction: write donation_tags atomically.
   await db.transaction(async (tx) => {
     const processedDonationIds = enrichedClassifications.map(c => c.donationId);
 
@@ -872,7 +872,6 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
       for (const c of chunk) {
         await tx.update(donationsTable)
           .set({
-            aiCategories: JSON.stringify(c.categories),
             aiWarnings: c.warnings || null,
             aiRequests: c.requests || null,
             aiSummary: c.summary || null,
@@ -894,10 +893,14 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
     }
   }, { isolationLevel: "repeatable read" });
 
-  // Retroactive sync: propagate ai_categories to transferred copies.
+  // Retroactive sync: propagate AI tags to transferred copies.
   // When a pool donation is classified, find non-pool donations in the same
-  // project with the same vekalet and sync their ai_categories too.
+  // project with the same vekalet and sync their donation_tags too.
   try {
+    // Build a lookup of categories by donation id from the just-classified results
+    const categoryByDonationId = new Map(enrichedClassifications.map(c => [c.donationId, c.categories]));
+    const warningByDonationId = new Map(enrichedClassifications.map(c => [c.donationId, c.warnings]));
+
     const classifiedIds = enrichedClassifications.map(c => c.donationId);
     const SYNC_CHUNK = 200;
     for (let i = 0; i < classifiedIds.length; i += SYNC_CHUNK) {
@@ -905,7 +908,6 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
       const sourceDonations = await db.select({
         id: donationsTable.id,
         vekalet: donationsTable.vekalet,
-        aiCategories: donationsTable.aiCategories,
         aiWarnings: donationsTable.aiWarnings,
         kesimAlaniId: donationsTable.kesimAlaniId,
       })
@@ -927,9 +929,12 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
       const projectIdByKaId = new Map(projectRows.map(r => [r.id, r.projectId]));
 
       for (const src of sourceDonations) {
-        if (!src.vekalet || !src.aiCategories) continue;
+        if (!src.vekalet) continue;
         const projectId = projectIdByKaId.get(src.kesimAlaniId);
         if (!projectId) continue;
+
+        const srcCategories = categoryByDonationId.get(src.id) ?? [];
+        const srcWarnings = warningByDonationId.get(src.id) ?? null;
 
         const nonPoolKas = await db.select({ id: kesimAlanlariTable.id })
           .from(kesimAlanlariTable)
@@ -941,17 +946,6 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
 
         if (nonPoolKas.length === 0) continue;
         const nonPoolKaIds = nonPoolKas.map(k => k.id);
-
-        // Parse source categories for donation_tags propagation
-        const srcCategories: string[] = [];
-        try {
-          const parsed = JSON.parse(src.aiCategories ?? "[]");
-          if (Array.isArray(parsed)) {
-            for (const cat of parsed) {
-              if (typeof cat === "string" && cat.length > 0) srcCategories.push(cat);
-            }
-          }
-        } catch { /* ignore parse errors */ }
 
         for (let j = 0; j < nonPoolKaIds.length; j += SYNC_CHUNK) {
           const kaChunk = nonPoolKaIds.slice(j, j + SYNC_CHUNK);
@@ -970,8 +964,7 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
 
           await db.update(donationsTable)
             .set({
-              aiCategories: src.aiCategories,
-              aiWarnings: src.aiWarnings,
+              aiWarnings: srcWarnings || null,
               updatedAt: new Date(),
             })
             .where(inArray(donationsTable.id, targetIds));
@@ -985,19 +978,23 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
             `);
             if (srcCategories.length > 0) {
               const tagRows = targetIds.flatMap(donationId =>
-                srcCategories.map(cat => ({
-                  donationId,
-                  tagId: `__ai_tag__${crypto.createHash("md5").update(cat).digest("hex")}`,
-                }))
+                srcCategories
+                  .filter((cat): cat is string => typeof cat === "string" && cat.length > 0)
+                  .map(cat => ({
+                    donationId,
+                    tagId: `__ai_tag__${crypto.createHash("md5").update(cat).digest("hex")}`,
+                  }))
               );
-              await db.insert(donationTagsTable).values(tagRows).onConflictDoNothing();
+              if (tagRows.length > 0) {
+                await db.insert(donationTagsTable).values(tagRows).onConflictDoNothing();
+              }
             }
           }
         }
       }
     }
   } catch (syncErr) {
-    logger.warn({ err: syncErr }, "ai-categories sync to transferred copies failed (non-fatal)");
+    logger.warn({ err: syncErr }, "ai-tags sync to transferred copies failed (non-fatal)");
   }
 
   res.json({ success: true, count: enrichedClassifications.length });

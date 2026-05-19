@@ -1,5 +1,4 @@
 import { Router, type IRouter } from "express";
-import { parseAiCategories } from "../lib/ai-categories";
 import { db } from "@workspace/db";
 import {
   projectsTable,
@@ -491,8 +490,10 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   // to an animal group in a real kesim alanı, so we look up the group assignment
   // and use that KA to show the correct "Durum" label.
   const groupKaMap: Record<string, string> = {};
+  // Map AI tag id → category name for computing aiCategories from donation_tags
+  let aiTagNameMap: Map<string, string> = new Map();
   if (donationIds.length > 0) {
-    const [tags, groupAssignments] = await Promise.all([
+    const [tags, groupAssignments, aiTagRows] = await Promise.all([
       db.select({
         donationId: donationTagsTable.donationId,
         tagId: donationTagsTable.tagId,
@@ -504,12 +505,17 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
         WHERE agd.donation_id IN (${sql.join(donationIds.map(id => sql`${id}`), sql`, `)})
         ORDER BY agd.donation_id, agd.id ASC
       `),
+      db.select({ id: customTagsTable.id, name: customTagsTable.name })
+        .from(customTagsTable)
+        .where(eq(customTagsTable.categoryId, "__ai_category__")),
     ]);
 
     for (const t of tags) {
       if (!tagsByDonation[t.donationId]) tagsByDonation[t.donationId] = [];
       tagsByDonation[t.donationId].push(t.tagId);
     }
+
+    aiTagNameMap = new Map(aiTagRows.map(t => [t.id, t.name]));
 
     type GaRow = { donation_id: string; kesim_alani_id: string };
     for (const row of groupAssignments.rows as GaRow[]) {
@@ -546,7 +552,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     kesimAlaniName: kaNameMap[groupKaMap[d.id] ?? d.kesimAlaniId] || "",
     kesimListeId: kaKesimListeIdMap[groupKaMap[d.id] ?? d.kesimAlaniId] ?? null,
     tags: tagsByDonation[d.id] || [],
-    aiCategories: parseAiCategories(d.aiCategories),
+    aiCategories: (tagsByDonation[d.id] || []).filter(id => aiTagNameMap.has(id)).map(id => aiTagNameMap.get(id) as string),
     aiWarnings: d.aiWarnings || "",
     aiConfidenceScore: d.aiConfidenceScore ?? null,
     isFlagged: d.isFlagged,
@@ -2039,18 +2045,33 @@ router.get("/projects/:id/flagged-donations", asyncHandler(async (req, res) => {
   const donationIds = flaggedRows.map(d => d.id);
 
   let groupInfoMap: Record<string, { groupId: string; animalNo: number; slotIndex: number }[]> = {};
+  let flaggedTagsByDonation: Record<string, string[]> = {};
+  let flaggedAiTagNameMap: Map<string, string> = new Map();
   if (donationIds.length > 0) {
-    const groupLinks = await db.execute(sql`
-      SELECT agd.donation_id, agd.group_id, ag.animal_no, agd.sort_order
-      FROM animal_group_donations agd
-      JOIN animal_groups ag ON ag.id = agd.group_id
-      WHERE agd.donation_id IN (${sql.join(donationIds.map(id => sql`${id}`), sql`, `)})
-      ORDER BY ag.animal_no, agd.sort_order
-    `);
+    const [groupLinks, flaggedTags, flaggedAiTagRows] = await Promise.all([
+      db.execute(sql`
+        SELECT agd.donation_id, agd.group_id, ag.animal_no, agd.sort_order
+        FROM animal_group_donations agd
+        JOIN animal_groups ag ON ag.id = agd.group_id
+        WHERE agd.donation_id IN (${sql.join(donationIds.map(id => sql`${id}`), sql`, `)})
+        ORDER BY ag.animal_no, agd.sort_order
+      `),
+      db.select({ donationId: donationTagsTable.donationId, tagId: donationTagsTable.tagId })
+        .from(donationTagsTable)
+        .where(inArray(donationTagsTable.donationId, donationIds)),
+      db.select({ id: customTagsTable.id, name: customTagsTable.name })
+        .from(customTagsTable)
+        .where(eq(customTagsTable.categoryId, "__ai_category__")),
+    ]);
     for (const row of groupLinks.rows as { donation_id: string; group_id: string; animal_no: number; sort_order: number }[]) {
       if (!groupInfoMap[row.donation_id]) groupInfoMap[row.donation_id] = [];
       groupInfoMap[row.donation_id].push({ groupId: row.group_id, animalNo: row.animal_no, slotIndex: row.sort_order });
     }
+    for (const t of flaggedTags) {
+      if (!flaggedTagsByDonation[t.donationId]) flaggedTagsByDonation[t.donationId] = [];
+      flaggedTagsByDonation[t.donationId].push(t.tagId);
+    }
+    flaggedAiTagNameMap = new Map(flaggedAiTagRows.map(t => [t.id, t.name]));
   }
 
   const items = flaggedRows.map(d => ({
@@ -2066,7 +2087,7 @@ router.get("/projects/:id/flagged-donations", asyncHandler(async (req, res) => {
     isFlagged: d.isFlagged,
     flagReason: d.flagReason,
     aiWarnings: d.aiWarnings || "",
-    aiCategories: parseAiCategories(d.aiCategories),
+    aiCategories: (flaggedTagsByDonation[d.id] || []).filter(id => flaggedAiTagNameMap.has(id)).map(id => flaggedAiTagNameMap.get(id) as string),
     kesimAlaniId: d.kesimAlaniId,
     kesimAlaniName: kaNameMap[d.kesimAlaniId] || "",
     groups: groupInfoMap[d.id] || [],
