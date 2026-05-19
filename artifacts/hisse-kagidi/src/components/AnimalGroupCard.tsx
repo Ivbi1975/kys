@@ -721,12 +721,7 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
             <ChevronUp className={compact ? "w-3.5 h-3.5" : "w-4 h-4"} />
           )}
           <h3 className={`font-semibold ${compact ? "text-xs" : "text-sm"}`}>
-            {kesimName} - HAYVAN NO:{" "}
-            {swapLabel ? (
-              <span title="Yeni numara — önceki numara">{swapLabel}</span>
-            ) : (
-              group.animalNo
-            )}
+            {kesimName} - HAYVAN NO: {group.animalNo}
           </h3>
           {group.locked && (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 text-[10px] font-semibold border border-amber-500/30">
