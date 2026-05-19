@@ -22,7 +22,7 @@ export function DonorListPanel() {
     kesim, activeFilterCount, addDonorToBasket, basketItemIds, commitEdit,
     debouncedSearchQuery, deleteDonation, handleFlagDonation, handleUnflagDonation, descCountMap, donorListVisible,
     editDraft, editingCell, effectiveShareMap, filteredDonations,
-    globalTags, groupedDonorIds, handleDonorCellKeyDown, handleSort,
+    globalTags, tagCategories, groupedDonorIds, handleDonorCellKeyDown, handleSort,
     openTrash, removeFromBasket, removedFromGroupIds, searchInputRef,
     selectedIds, setDebouncedSearchQuery, setDonorListReportOpen,
     setDonorListVisible, setEditDraft, setPersonEditDesc,
@@ -170,6 +170,7 @@ export function DonorListPanel() {
                   canSplit={splitShares > 7}
                   splitShares={splitShares}
                   globalTags={globalTags}
+                  tagCategories={tagCategories}
                   tagPopoverOpen={tagPopoverDonorId === d.id}
                   onToggleSelect={toggleSelect}
                   onStartEditing={startEditing}

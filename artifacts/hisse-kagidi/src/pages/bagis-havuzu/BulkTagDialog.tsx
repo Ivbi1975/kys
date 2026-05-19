@@ -5,13 +5,15 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Tags, Plus, Loader2, PlusCircle, MinusCircle } from "lucide-react";
-import type { CustomTag } from "@/lib/types";
+import type { CustomTag, TagCategory } from "@/lib/types";
 import { turkishTitleCase, sortTagsTr } from "@/lib/formatting";
+import { groupTagsByCategory } from "@/lib/groupTags";
 
 interface BulkTagDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tags: CustomTag[];
+  tagCategories: TagCategory[];
   selectedCount: number;
   onTag: (tagId: string, action: "add" | "remove") => Promise<void>;
   onCreateTag: (name: string, color: string) => Promise<CustomTag | null>;
@@ -23,7 +25,7 @@ const TAG_COLORS = [
 ];
 
 export function BulkTagDialog({
-  open, onOpenChange, tags, selectedCount, onTag, onCreateTag,
+  open, onOpenChange, tags, tagCategories, selectedCount, onTag, onCreateTag,
 }: BulkTagDialogProps) {
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(TAG_COLORS[0]);
@@ -65,6 +67,47 @@ export function BulkTagDialog({
   }
 
   const isAnyProcessing = processing !== null || creatingTag;
+  const tagGroups = groupTagsByCategory(sortTagsTr(tags), tagCategories);
+  const hasGroups = tagCategories.length > 0 && tags.some(t => t.categoryId);
+
+  function renderTagRow(tag: CustomTag) {
+    const addKey = `${tag.id}:add`;
+    const removeKey = `${tag.id}:remove`;
+    return (
+      <div
+        key={tag.id}
+        className="flex items-center gap-2 px-2 py-1 rounded-md border bg-card hover:bg-muted/40 transition-colors"
+      >
+        <span
+          className="w-3 h-3 rounded-full flex-shrink-0"
+          style={{ backgroundColor: tag.color }}
+        />
+        <span className="flex-1 text-sm font-medium">{turkishTitleCase(tag.name)}</span>
+        <button
+          onClick={() => handleTag(tag.id, "add")}
+          disabled={isAnyProcessing}
+          title="Etiket ekle"
+          className="flex items-center gap-1 text-xs px-2 py-0.5 rounded text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 disabled:opacity-40 transition-colors"
+        >
+          {processing === addKey
+            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            : <PlusCircle className="w-3.5 h-3.5" />}
+          Ekle
+        </button>
+        <button
+          onClick={() => handleTag(tag.id, "remove")}
+          disabled={isAnyProcessing}
+          title="Etiketi kaldır"
+          className="flex items-center gap-1 text-xs px-2 py-0.5 rounded text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 disabled:opacity-40 transition-colors"
+        >
+          {processing === removeKey
+            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            : <MinusCircle className="w-3.5 h-3.5" />}
+          Kaldır
+        </button>
+      </div>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -82,47 +125,27 @@ export function BulkTagDialog({
 
         {tags.length > 0 && (
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Etiket seç:</label>
-            <div className="space-y-1">
-              {sortTagsTr(tags).map(tag => {
-                const addKey = `${tag.id}:add`;
-                const removeKey = `${tag.id}:remove`;
-                return (
-                  <div
-                    key={tag.id}
-                    className="flex items-center gap-2 px-2 py-1 rounded-md border bg-card hover:bg-muted/40 transition-colors"
-                  >
-                    <span
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: tag.color }}
-                    />
-                    <span className="flex-1 text-sm font-medium">{turkishTitleCase(tag.name)}</span>
-                    <button
-                      onClick={() => handleTag(tag.id, "add")}
-                      disabled={isAnyProcessing}
-                      title="Etiket ekle"
-                      className="flex items-center gap-1 text-xs px-2 py-0.5 rounded text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 disabled:opacity-40 transition-colors"
-                    >
-                      {processing === addKey
-                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        : <PlusCircle className="w-3.5 h-3.5" />}
-                      Ekle
-                    </button>
-                    <button
-                      onClick={() => handleTag(tag.id, "remove")}
-                      disabled={isAnyProcessing}
-                      title="Etiketi kaldır"
-                      className="flex items-center gap-1 text-xs px-2 py-0.5 rounded text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 disabled:opacity-40 transition-colors"
-                    >
-                      {processing === removeKey
-                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        : <MinusCircle className="w-3.5 h-3.5" />}
-                      Kaldır
-                    </button>
+            {hasGroups ? (
+              <div className="space-y-3">
+                {tagGroups.map((group, i) => (
+                  <div key={group.category?.id ?? `__none_${i}`}>
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-0.5">
+                      {group.category ? group.category.name : "Kategorisiz"}
+                    </p>
+                    <div className="space-y-1">
+                      {group.tags.map(tag => renderTagRow(tag))}
+                    </div>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Etiket seç:</label>
+                <div className="space-y-1 mt-1">
+                  {sortTagsTr(tags).map(tag => renderTagRow(tag))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

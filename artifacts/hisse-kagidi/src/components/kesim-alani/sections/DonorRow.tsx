@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import type { Donation } from "@/lib/types";
+import type { Donation, TagCategory } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,6 +8,7 @@ import {
   AlertTriangle, Eye, EyeOff, Flag, MoreHorizontal, ShoppingBag, StickyNote, Tag, Trash2, Wand2,
 } from "lucide-react";
 import { turkishTitleCase } from "@/lib/formatting";
+import { groupTagsByCategory } from "@/lib/groupTags";
 
 interface DonorRowProps {
   d: Donation;
@@ -22,7 +23,8 @@ interface DonorRowProps {
   isGrouped: boolean;
   canSplit: boolean;
   splitShares: number;
-  globalTags: Array<{ id: string; name: string; color: string }>;
+  globalTags: Array<{ id: string; name: string; color: string; categoryId?: string | null }>;
+  tagCategories: TagCategory[];
   tagPopoverOpen: boolean;
   onToggleSelect: (id: string) => void;
   onStartEditing: (id: string, field: string) => void;
@@ -122,17 +124,43 @@ function DonorRowOverflowMenu({
               <div className="px-2 py-1">
                 <p className="text-[10px] text-muted-foreground font-medium mb-1">Etiketler</p>
                 <div className="space-y-0.5">
-                  {globalTags.map(tag => {
-                    const isActive = (d.tags || []).includes(tag.id);
-                    return (
-                      <button key={tag.id} className={`w-full flex items-center gap-2 px-1.5 py-1 rounded text-xs hover:bg-muted transition-colors ${isActive ? "bg-muted" : ""}`}
-                        onClick={() => onToggleTag(d.id, tag.id)}>
-                        <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
-                        <span className="flex-1 text-left">{turkishTitleCase(tag.name)}</span>
-                        {isActive && <span className="text-primary text-xs">✓</span>}
-                      </button>
-                    );
-                  })}
+                  {(() => {
+                    const groups = groupTagsByCategory(globalTags, tagCategories);
+                    const hasGroups = tagCategories.length > 0 && globalTags.some(t => t.categoryId);
+                    if (!hasGroups) {
+                      return globalTags.map(tag => {
+                        const isActive = (d.tags || []).includes(tag.id);
+                        return (
+                          <button key={tag.id} className={`w-full flex items-center gap-2 px-1.5 py-1 rounded text-xs hover:bg-muted transition-colors ${isActive ? "bg-muted" : ""}`}
+                            onClick={() => onToggleTag(d.id, tag.id)}>
+                            <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+                            <span className="flex-1 text-left">{turkishTitleCase(tag.name)}</span>
+                            {isActive && <span className="text-primary text-xs">✓</span>}
+                          </button>
+                        );
+                      });
+                    }
+                    return groups.map((group, i) => (
+                      <div key={group.category?.id ?? `g_${i}`}>
+                        <div className="px-1 pt-1.5 pb-0.5">
+                          <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">
+                            {group.category ? group.category.name : "Kategorisiz"}
+                          </span>
+                        </div>
+                        {group.tags.map(tag => {
+                          const isActive = (d.tags || []).includes(tag.id);
+                          return (
+                            <button key={tag.id} className={`w-full flex items-center gap-2 px-1.5 py-1 rounded text-xs hover:bg-muted transition-colors ${isActive ? "bg-muted" : ""}`}
+                              onClick={() => onToggleTag(d.id, tag.id)}>
+                              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+                              <span className="flex-1 text-left">{turkishTitleCase(tag.name)}</span>
+                              {isActive && <span className="text-primary text-xs">✓</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()}
                 </div>
               </div>
             </>

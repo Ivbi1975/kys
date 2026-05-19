@@ -25,7 +25,7 @@ import {
   classifyNotesAsyncChunked, PartialChunkError, ApiFetchError,
   fetchJobStatus, cancelJob, fetchProjects, saveAiClassifications,
   transferDonationsToKA, createKesimAlani,
-  fetchTags, createTag,
+  fetchTags, createTag, fetchTagCategories,
   flagDonation, unflagDonation,
   updatePoolDonationField,
   deleteAllPoolDonations,
@@ -55,7 +55,7 @@ import { BulkNoteDialog } from "./bagis-havuzu/BulkNoteDialog";
 import { BulkDeleteFilteredDialog } from "./bagis-havuzu/BulkDeleteFilteredDialog";
 import { ALL_TABLE_COLUMNS, PAGE_SIZE, type TableColumnKey } from "./bagis-havuzu/types";
 import { getDonationCellValue, parseUrlMulti, serializeMulti } from "./bagis-havuzu/utils";
-import type { CustomTag, PoolDonation } from "@/lib/types";
+import type { CustomTag, TagCategory, PoolDonation } from "@/lib/types";
 import { trUpperCase } from "@/lib/utils";
 import { loadBasketFromStorage, saveBasketToStorage } from "@/components/kesim-alani/hooks/types";
 import type { BasketItem } from "@/components/kesim-alani/hooks/types";
@@ -371,6 +371,11 @@ export default function BagisHavuzuPage() {
   const { data: globalTags = [] } = useQuery({
     queryKey: ["tags"],
     queryFn: fetchTags,
+  });
+
+  const { data: tagCategories = [] } = useQuery<TagCategory[]>({
+    queryKey: ["tag-categories"],
+    queryFn: fetchTagCategories,
   });
 
   const { data: projects } = useQuery({
@@ -1342,6 +1347,7 @@ export default function BagisHavuzuPage() {
               projectId={projectId}
               kesimAlanlari={kesimAlanlari}
               globalTags={globalTags}
+              tagCategories={tagCategories}
             />
           </div>
         )}
@@ -1385,6 +1391,7 @@ export default function BagisHavuzuPage() {
             baseStats={baseStats}
             kesimAlanlari={kesimAlanlari}
             globalTags={globalTags}
+            tagCategories={tagCategories}
           />
         )}
 
@@ -1553,6 +1560,7 @@ export default function BagisHavuzuPage() {
           open={tagDialogOpen}
           onOpenChange={setTagDialogOpen}
           tags={globalTags}
+          tagCategories={tagCategories}
           selectedCount={effectiveSelectedIds.size}
           onTag={handleBulkTag}
           onCreateTag={handleCreateTag}

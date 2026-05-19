@@ -3,7 +3,7 @@ import type { VirtuosoHandle } from "react-virtuoso";
 import { useParams, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag } from "@/lib/types";
-import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, fetchTags, fetchPhotoCountsAdmin, fetchGroupPhotosAdmin, fetchKesimAlaniMeta, fetchAllDonations, fetchAllGroupsCompact } from "@/lib/api";
+import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, fetchTags, fetchTagCategories, fetchPhotoCountsAdmin, fetchGroupPhotosAdmin, fetchKesimAlaniMeta, fetchAllDonations, fetchAllGroupsCompact } from "@/lib/api";
 import { sortTagsTr } from "@/lib/formatting";
 import type { CompactGroupItem } from "@/lib/api/kesim-alanlari";
 import { getTotalShares, getRequiredAnimals, computeEffectiveShares, trCollator } from "@/lib/grouping";
@@ -312,6 +312,7 @@ export function useKesimAlaniState() {
             basket.setBasketItems(stored);
             fetchPhotoCountsAdmin(fallback.id).then(notifications.setPhotoCounts).catch(() => {});
             fetchTags().then(tags => ui.setGlobalTags(sortTagsTr(tags))).catch(() => {});
+            fetchTagCategories().then(ui.setTagCategories).catch(() => {});
           } else {
             setLocation("/");
           }
@@ -418,6 +419,7 @@ export function useKesimAlaniState() {
           }
 
           try { ui.setGlobalTags(sortTagsTr(await fetchTags())); } catch {}
+          try { ui.setTagCategories(await fetchTagCategories()); } catch {}
         })();
       } catch (err) {
         if (requestId !== loadRequestIdRef.current) return;
@@ -725,6 +727,7 @@ export function useKesimAlaniState() {
     getAvailableGroupsForDonor,
     getSwapSuggestions,
     globalTags: ui.globalTags,
+    tagCategories: ui.tagCategories,
     groupRows,
     groupedDonorIds,
     groupsHeaderRef: ui.groupsHeaderRef,

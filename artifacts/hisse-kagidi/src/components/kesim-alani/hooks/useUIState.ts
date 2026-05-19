@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { VirtuosoHandle } from "react-virtuoso";
-import type { CustomTag, ColorTag } from "@/lib/types";
+import type { CustomTag, TagCategory, ColorTag } from "@/lib/types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTheme } from "@/lib/useTheme";
 
@@ -21,6 +21,7 @@ export function useUIState() {
   const [mobileTab, setMobileTab] = useState<"donors" | "groups">("donors");
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const [globalTags, setGlobalTags] = useState<CustomTag[]>([]);
+  const [tagCategories, setTagCategories] = useState<TagCategory[]>([]);
   const [tagPopoverDonorId, setTagPopoverDonorId] = useState<string | null>(null);
   const [smartPlacePopover, setSmartPlacePopover] = useState<string | null>(null);
   const [splitShareDialog, setSplitShareDialog] = useState<{ donationId: string; totalShares: number } | null>(null);
@@ -67,6 +68,7 @@ export function useUIState() {
     mobileTab, setMobileTab,
     isDraggingSplit, setIsDraggingSplit,
     globalTags, setGlobalTags,
+    tagCategories, setTagCategories,
     tagPopoverDonorId, setTagPopoverDonorId,
     smartPlacePopover, setSmartPlacePopover,
     splitShareDialog, setSplitShareDialog,

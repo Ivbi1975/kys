@@ -142,6 +142,19 @@ export const animalGroupDonationsTable = pgTable("animal_group_donations", {
   unique("uq_agd_group_donation").on(table.groupId, table.donationId),
 ]);
 
+export const tagCategoriesTable = pgTable("tag_categories", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("idx_tag_categories_sort").on(table.sortOrder),
+]);
+
+export const insertTagCategorySchema = createInsertSchema(tagCategoriesTable);
+export type InsertTagCategory = z.infer<typeof insertTagCategorySchema>;
+export type TagCategoryRow = typeof tagCategoriesTable.$inferSelect;
+
 export const customTagsTable = pgTable("custom_tags", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -149,9 +162,11 @@ export const customTagsTable = pgTable("custom_tags", {
   vekaletId: text("vekalet_id"),
   notes: text("notes"),
   aiNotes: text("ai_notes"),
+  categoryId: text("category_id").references(() => tagCategoriesTable.id, { onDelete: "set null" }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("idx_custom_tags_name").on(table.name),
+  index("idx_custom_tags_category_id").on(table.categoryId),
 ]);
 
 export const insertCustomTagSchema = createInsertSchema(customTagsTable);

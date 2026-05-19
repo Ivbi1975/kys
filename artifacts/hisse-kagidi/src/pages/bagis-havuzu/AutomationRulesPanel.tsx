@@ -16,7 +16,8 @@ import {
   fetchAutomationRules, createAutomationRule,
   updateAutomationRule, deleteAutomationRule, executeAutomationRules,
 } from "@/lib/api";
-import type { AutomationRule, RuleCondition, RuleAction, RuleExecutionResult, CustomTag, CompoundConditions, ConditionGroup } from "@/lib/types";
+import type { AutomationRule, RuleCondition, RuleAction, RuleExecutionResult, CustomTag, TagCategory, CompoundConditions, ConditionGroup } from "@/lib/types";
+import { groupTagsByCategory } from "@/lib/groupTags";
 import { useToast } from "@/hooks/use-toast";
 
 const FIELD_OPTIONS = [
@@ -96,6 +97,7 @@ interface AutomationRulesPanelProps {
   projectId: string;
   kesimAlanlari: { id: string; name: string }[];
   globalTags: CustomTag[];
+  tagCategories: TagCategory[];
 }
 
 function isCompoundConditions(conditions: RuleCondition[] | CompoundConditions): conditions is CompoundConditions {
@@ -113,12 +115,14 @@ function ConditionRow({
   onRemove,
   kesimAlanlari,
   globalTags,
+  tagCategories,
 }: {
   cond: RuleCondition;
   onUpdate: (updates: Partial<RuleCondition>) => void;
   onRemove: () => void;
   kesimAlanlari: { id: string; name: string }[];
   globalTags: CustomTag[];
+  tagCategories: TagCategory[];
 }) {
   const opType = getOperatorType(cond.field);
   const operators = OPERATOR_OPTIONS[opType];
@@ -173,8 +177,17 @@ function ConditionRow({
                 <SelectValue placeholder="Etiket" />
               </SelectTrigger>
               <SelectContent>
-                {globalTags.map(t => (
-                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                {groupTagsByCategory(globalTags, tagCategories).map((group, i) => (
+                  <div key={group.category?.id ?? `g_${i}`}>
+                    {(tagCategories.length > 0) && (
+                      <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        {group.category ? group.category.name : "Kategorisiz"}
+                      </div>
+                    )}
+                    {group.tags.map(t => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </div>
                 ))}
               </SelectContent>
             </Select>
@@ -250,11 +263,13 @@ function ConditionBuilder({
   onChange,
   kesimAlanlari,
   globalTags,
+  tagCategories,
 }: {
   compound: CompoundConditions;
   onChange: (c: CompoundConditions) => void;
   kesimAlanlari: { id: string; name: string }[];
   globalTags: CustomTag[];
+  tagCategories: TagCategory[];
 }) {
   const addGroup = () => {
     onChange({
@@ -378,6 +393,7 @@ function ConditionBuilder({
                   onRemove={() => removeCondition(groupIdx, condIdx)}
                   kesimAlanlari={kesimAlanlari}
                   globalTags={globalTags}
+                  tagCategories={tagCategories}
                 />
               </div>
             ))}
@@ -403,11 +419,13 @@ function ActionBuilder({
   onChange,
   kesimAlanlari,
   globalTags,
+  tagCategories,
 }: {
   action: RuleAction;
   onChange: (a: RuleAction) => void;
   kesimAlanlari: { id: string; name: string }[];
   globalTags: CustomTag[];
+  tagCategories: TagCategory[];
 }) {
   return (
     <div className="space-y-2">
@@ -450,8 +468,17 @@ function ActionBuilder({
               <SelectValue placeholder="Etiket" />
             </SelectTrigger>
             <SelectContent>
-              {globalTags.map(t => (
-                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+              {groupTagsByCategory(globalTags, tagCategories).map((group, i) => (
+                <div key={group.category?.id ?? `g_${i}`}>
+                  {(tagCategories.length > 0) && (
+                    <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      {group.category ? group.category.name : "Kategorisiz"}
+                    </div>
+                  )}
+                  {group.tags.map(t => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </div>
               ))}
             </SelectContent>
           </Select>
@@ -531,7 +558,7 @@ function getConditionDescription(cond: RuleCondition, kesimAlanlari: { id: strin
   return `${fieldLabel} ${opLabel} "${valueStr}"`;
 }
 
-export function AutomationRulesPanel({ projectId, kesimAlanlari, globalTags }: AutomationRulesPanelProps) {
+export function AutomationRulesPanel({ projectId, kesimAlanlari, globalTags, tagCategories }: AutomationRulesPanelProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -797,6 +824,7 @@ export function AutomationRulesPanel({ projectId, kesimAlanlari, globalTags }: A
               onChange={setCompound}
               kesimAlanlari={kesimAlanlari}
               globalTags={globalTags}
+              tagCategories={tagCategories}
             />
 
             <ActionBuilder
@@ -804,6 +832,7 @@ export function AutomationRulesPanel({ projectId, kesimAlanlari, globalTags }: A
               onChange={setAction}
               kesimAlanlari={kesimAlanlari}
               globalTags={globalTags}
+              tagCategories={tagCategories}
             />
 
             <div className="flex items-center gap-2">

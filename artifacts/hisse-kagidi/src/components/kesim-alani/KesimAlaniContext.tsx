@@ -16,7 +16,7 @@ export type FilterContextValue = Pick<KesimAlaniContextValue,
   "filteredDonations" | "uniqueDonationTypes" | "availableAiCategories" |
   "colorTagFilter" | "setColorTagFilter" | "groupCinsFilter" | "setGroupCinsFilter" |
   "filteredGroupItems" | "searchIndex" |
-  "globalTags"
+  "globalTags" | "tagCategories"
 >;
 
 export type SelectionContextValue = Pick<KesimAlaniContextValue,
@@ -132,6 +132,7 @@ export function KesimAlaniProvider({
     value.colorTagFilter, value.setColorTagFilter, value.groupCinsFilter, value.setGroupCinsFilter,
     value.filteredGroupItems, value.searchIndex,
     value.globalTags,
+    value.tagCategories,
   ]);
 
   const selectionValue = useMemo<SelectionContextValue>(() => ({

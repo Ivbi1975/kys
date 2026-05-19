@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
-import type { KesimAlani, CustomTag, Project } from "@/lib/types";
+import type { KesimAlani, CustomTag, TagCategory, Project } from "@/lib/types";
 import {
   fetchHomeData,
   invalidateHomeDataCache,
@@ -13,6 +13,10 @@ import {
   createTag,
   updateTag,
   deleteTagApi,
+  fetchTagCategories,
+  createTagCategory,
+  updateTagCategory,
+  deleteTagCategoryApi,
   saveLogoApi,
   deleteLogoApi,
   exportBackupApi,
@@ -56,6 +60,7 @@ export function useHomeState() {
   const backupInputRef = useRef<HTMLInputElement>(null);
   const { isDark, mode: themeMode, toggle: toggleTheme, setThemeMode } = useTheme();
   const [globalTags, setGlobalTags] = useState<CustomTag[]>([]);
+  const [tagCategories, setTagCategories] = useState<TagCategory[]>([]);
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState("#3b82f6");
   const [editingTagId, setEditingTagId] = useState<string | null>(null);
@@ -119,9 +124,13 @@ export function useHomeState() {
 
   const refreshData = useCallback(async () => {
     try {
-      const homeData = await fetchHomeData();
+      const [homeData, categories] = await Promise.all([
+        fetchHomeData(),
+        fetchTagCategories(),
+      ]);
       setKesimAlanlari(homeData.kesimAlanlari);
       setGlobalTags(sortTagsTr(homeData.tags));
+      setTagCategories(categories);
       setLogoPreview(homeData.logo);
       setProjects(homeData.projects);
       setDeletedKesimAlanlari(homeData.deletedKesimAlanlari);
@@ -223,6 +232,7 @@ export function useHomeState() {
       vekaletId: editTagVekaletId.trim() || null,
       notes: editTagNotes.trim() || null,
       aiNotes: editTagAiNotes.trim() || null,
+      categoryId: globalTags.find(t => t.id === editingTagId)?.categoryId ?? null,
     };
     try {
       await updateTag(updated);
@@ -239,7 +249,80 @@ export function useHomeState() {
       });
     }
     setEditingTagId(null);
-  }, [editingTagId, editTagName, editTagColor, editTagVekaletId, editTagNotes, editTagAiNotes, toast]);
+  }, [editingTagId, editTagName, editTagColor, editTagVekaletId, editTagNotes, editTagAiNotes, globalTags, toast]);
+
+  const handleAssignTagCategory = useCallback(async (tagId: string, categoryId: string | null) => {
+    const tag = globalTags.find(t => t.id === tagId);
+    if (!tag) return;
+    const updated: CustomTag = { ...tag, categoryId };
+    try {
+      await updateTag(updated);
+      invalidateHomeDataCache();
+      setGlobalTags(prev => prev.map(t => t.id === tagId ? updated : t));
+    } catch (err) {
+      toast({
+        title: "Etiket kategorisi güncellenemedi",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    }
+  }, [globalTags, toast]);
+
+  const handleAddCategory = useCallback(async (name: string) => {
+    if (!name.trim()) return;
+    const category: TagCategory = {
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      sortOrder: tagCategories.length,
+    };
+    try {
+      await createTagCategory(category);
+      setTagCategories(prev => [...prev, category]);
+      toast({ title: "Kategori oluşturuldu", description: category.name });
+      return category;
+    } catch (err) {
+      toast({
+        title: "Kategori oluşturulamadı",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+      return null;
+    }
+  }, [tagCategories, toast]);
+
+  const handleRenameCategory = useCallback(async (id: string, name: string) => {
+    if (!name.trim()) return;
+    const category = tagCategories.find(c => c.id === id);
+    if (!category) return;
+    const updated: TagCategory = { ...category, name: name.trim() };
+    try {
+      await updateTagCategory(updated);
+      setTagCategories(prev => prev.map(c => c.id === id ? updated : c));
+      toast({ title: "Kategori yeniden adlandırıldı" });
+    } catch (err) {
+      toast({
+        title: "Kategori adlandırılamadı",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    }
+  }, [tagCategories, toast]);
+
+  const handleDeleteCategory = useCallback(async (id: string) => {
+    const category = tagCategories.find(c => c.id === id);
+    try {
+      await deleteTagCategoryApi(id);
+      setTagCategories(prev => prev.filter(c => c.id !== id));
+      setGlobalTags(prev => prev.map(t => t.categoryId === id ? { ...t, categoryId: null } : t));
+      toast({ title: "Kategori silindi", description: category?.name || "" });
+    } catch (err) {
+      toast({
+        title: "Kategori silinemedi",
+        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    }
+  }, [tagCategories, toast]);
 
   const handleCreate = useCallback(async (displayName?: string, maxVekalet?: number | null, maxAnimal?: number | null) => {
     if (!newName.trim()) return;
@@ -792,11 +875,16 @@ export function useHomeState() {
     setImportModeOpen,
     pendingImportJson,
     setPendingImportJson,
+    tagCategories,
     handleAddTag,
     handleDeleteTag,
     cancelEditTag,
     startEditTag,
     commitEditTag,
+    handleAssignTagCategory,
+    handleAddCategory,
+    handleRenameCategory,
+    handleDeleteCategory,
     handleCreate,
     handleCreateProject,
     handleUpdateProject,

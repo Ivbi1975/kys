@@ -1,5 +1,12 @@
 export type ColorTag = "green" | "orange" | "red" | "";
 
+export interface TagCategory {
+  id: string;
+  name: string;
+  sortOrder: number;
+  updatedAt?: string;
+}
+
 export interface CustomTag {
   id: string;
   name: string;
@@ -7,6 +14,7 @@ export interface CustomTag {
   vekaletId?: string | null;
   notes?: string | null;
   aiNotes?: string | null;
+  categoryId?: string | null;
 }
 
 export interface Donation {

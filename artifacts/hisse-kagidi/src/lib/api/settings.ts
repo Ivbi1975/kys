@@ -1,4 +1,4 @@
-import type { KesimAlani, CustomTag } from "../types";
+import type { KesimAlani, CustomTag, TagCategory } from "../types";
 import { apiFetch } from "./core";
 import { fetchKesimAlanlari, createKesimAlani } from "./kesim-alanlari";
 
@@ -22,6 +22,28 @@ export async function updateTag(tag: CustomTag): Promise<CustomTag> {
 
 export async function deleteTagApi(id: string): Promise<{ success: boolean }> {
   return apiFetch<{ success: boolean }>(`/tags/${id}`, { method: "DELETE" });
+}
+
+export async function fetchTagCategories(): Promise<TagCategory[]> {
+  return apiFetch<TagCategory[]>("/tag-categories");
+}
+
+export async function createTagCategory(category: TagCategory): Promise<TagCategory> {
+  return apiFetch<TagCategory>("/tag-categories", {
+    method: "POST",
+    body: JSON.stringify(category),
+  });
+}
+
+export async function updateTagCategory(category: TagCategory): Promise<TagCategory> {
+  return apiFetch<TagCategory>(`/tag-categories/${category.id}`, {
+    method: "PUT",
+    body: JSON.stringify(category),
+  });
+}
+
+export async function deleteTagCategoryApi(id: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/tag-categories/${id}`, { method: "DELETE" });
 }
 
 export async function fetchLogo(): Promise<string | null> {

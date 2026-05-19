@@ -126,6 +126,11 @@ export default function Home() {
             onStartEditTag={state.startEditTag}
             onCommitEditTag={state.commitEditTag}
             onCancelEditTag={state.cancelEditTag}
+            tagCategories={state.tagCategories}
+            onAssignTagCategory={state.handleAssignTagCategory}
+            onAddCategory={state.handleAddCategory}
+            onRenameCategory={state.handleRenameCategory}
+            onDeleteCategory={state.handleDeleteCategory}
             onIntegrityCheck={state.handleIntegrityCheck}
             onIntegrityRepair={state.handleIntegrityRepair}
             onNavigateAiSettings={() => { state.setSettingsOpen(false); state.setLocation("/ai-prompt-ayarlari"); }}

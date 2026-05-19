@@ -4,8 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { X, Plus, ChevronDown, Check, Ban } from "lucide-react";
-import type { PoolStats, CustomTag } from "@/lib/types";
+import type { PoolStats, CustomTag, TagCategory } from "@/lib/types";
 import { sortTagsTr } from "@/lib/formatting";
+import { groupTagsByCategory } from "@/lib/groupTags";
 
 interface PoolFiltersProps {
   statusFilter: string;
@@ -70,6 +71,7 @@ interface PoolFiltersProps {
   baseStats?: PoolStats;
   kesimAlanlari: { id: string; name: string }[];
   globalTags: CustomTag[];
+  tagCategories: TagCategory[];
 }
 
 function MultiSelectDropdown({
@@ -81,7 +83,7 @@ function MultiSelectDropdown({
   onToggleExclude,
 }: {
   label: string;
-  options: { value: string; count?: number; label?: string; color?: string }[];
+  options: { value: string; count?: number; label?: string; color?: string; isHeader?: boolean }[];
   selected: string[];
   onChange: (v: string[]) => void;
   excluded?: boolean;
@@ -112,17 +114,18 @@ function MultiSelectDropdown({
   }, [selected, onChange]);
 
   const mergedOptions = useMemo(() => {
-    const optSet = new Set(options.map(o => o.value));
+    const optSet = new Set(options.filter(o => !o.isHeader).map(o => o.value));
     const missing: typeof options = selected
       .filter(s => !optSet.has(s))
       .map(s => ({ value: s, count: 0, label: s === "__empty__" ? "(Boş)" : undefined, color: undefined }));
     return [...options, ...missing];
   }, [options, selected]);
 
-  const optMap = new Map(mergedOptions.map(o => [o.value, o]));
+  const optMap = new Map(mergedOptions.filter(o => !o.isHeader).map(o => [o.value, o]));
   const getDisplay = (val: string) => optMap.get(val)?.label || val;
 
   const filtered = mergedOptions.filter(o => {
+    if (o.isHeader) return true;
     if (!filterText) return true;
     const text = (o.label || o.value).toLocaleLowerCase("tr");
     return text.includes(filterText.toLocaleLowerCase("tr"));
@@ -169,6 +172,13 @@ function MultiSelectDropdown({
                 <p className="text-xs text-muted-foreground p-2 text-center">Sonuç yok</p>
               )}
               {filtered.map(opt => {
+                if (opt.isHeader) {
+                  return (
+                    <div key={opt.value} className="px-2 pt-2 pb-0.5">
+                      <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">{opt.label}</span>
+                    </div>
+                  );
+                }
                 const isChecked = selected.includes(opt.value);
                 const displayText = opt.label || opt.value;
                 return (
@@ -346,6 +356,7 @@ export function PoolFilters({
   baseStats,
   kesimAlanlari,
   globalTags,
+  tagCategories,
 }: PoolFiltersProps) {
   const optStats = baseStats || stats;
 
@@ -661,15 +672,39 @@ export function PoolFilters({
                 <span className="block text-[10px] text-muted-foreground mb-0.5">Etiket <span className="opacity-50">(tümü)</span></span>
                 <MultiSelectDropdown
                   label="Etiket"
-                  options={[
-                    ...sortTagsTr(globalTags).map(t => ({
-                      value: t.id,
-                      count: tagCountMap.get(t.id) ?? undefined,
-                      label: t.name,
-                      color: t.color,
-                    })),
-                    { value: "__no_tag__", label: "(Etiketsiz)", color: undefined, count: optStats?.untagged_count ?? undefined },
-                  ]}
+                  options={(() => {
+                    const tagGroups = groupTagsByCategory(sortTagsTr(globalTags), tagCategories);
+                    const hasGroups = tagCategories.length > 0 && globalTags.some(t => t.categoryId);
+                    if (!hasGroups) {
+                      return [
+                        ...sortTagsTr(globalTags).map(t => ({
+                          value: t.id,
+                          count: tagCountMap.get(t.id) ?? undefined,
+                          label: t.name,
+                          color: t.color,
+                        })),
+                        { value: "__no_tag__", label: "(Etiketsiz)", color: undefined, count: optStats?.untagged_count ?? undefined },
+                      ];
+                    }
+                    const result: { value: string; count?: number; label?: string; color?: string; isHeader?: boolean }[] = [];
+                    for (const group of tagGroups) {
+                      result.push({
+                        value: `__header_${group.category?.id ?? "none"}`,
+                        label: group.category ? group.category.name : "Kategorisiz",
+                        isHeader: true,
+                      });
+                      for (const t of group.tags) {
+                        result.push({
+                          value: t.id,
+                          count: tagCountMap.get(t.id) ?? undefined,
+                          label: t.name,
+                          color: t.color,
+                        });
+                      }
+                    }
+                    result.push({ value: "__no_tag__", label: "(Etiketsiz)", color: undefined, count: optStats?.untagged_count ?? undefined });
+                    return result;
+                  })()}
                   selected={tagFilter}
                   onChange={setTagFilter}
                   excluded={excludeFields.has("tags")}
