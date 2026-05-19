@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fetchKesimAlaniTrackingNotes, fetchNotificationLogs } from "@/lib/api";
@@ -8,6 +8,8 @@ import {
   Redo2, Save, Search, Send, Settings2, ShoppingBag, Undo2, UserCog, Download,
   CheckCircle2, AlertCircle,
 } from "lucide-react";
+import { ActivityLogPanel } from "@/components/ActivityLogPanel";
+import { fetchProjectAuditLogs, undoProjectAuditLog, isReversibleEntry } from "@/lib/api/audit-logs";
 import { useKesimAlaniContext } from "../KesimAlaniContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTrackingActions } from "@/hooks/useTrackingActions";
@@ -25,6 +27,43 @@ export function KesimAlaniHeader() {
   } = useKesimAlaniContext();
 
   const [panelOpen, setPanelOpen] = useState(false);
+  const [activityLogOpen, setActivityLogOpen] = useState(false);
+  const [isServerUndoing, setIsServerUndoing] = useState(false);
+  const serverUndoInFlightRef = useRef(false);
+
+  const handleServerUndoWithFallback = useCallback(async () => {
+    if (!kesim?.projectId || serverUndoInFlightRef.current) return;
+    serverUndoInFlightRef.current = true;
+    setIsServerUndoing(true);
+    try {
+      const result = await fetchProjectAuditLogs(kesim.projectId, { scope: "all", limit: 20 });
+      const reversible = result.items.find(isReversibleEntry);
+      if (reversible) {
+        await undoProjectAuditLog(kesim.projectId, reversible.id);
+        toast({ title: "Son aktarım geri alındı" });
+        window.location.reload();
+      } else {
+        handleUndo();
+      }
+    } catch {
+      handleUndo();
+    } finally {
+      setIsServerUndoing(false);
+      serverUndoInFlightRef.current = false;
+    }
+  }, [kesim?.projectId, handleUndo, toast]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key !== "z" || e.shiftKey) return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return;
+      e.preventDefault();
+      handleServerUndoWithFallback();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleServerUndoWithFallback]);
 
   const { resolveToken, buildTrackingUrl } = useTrackingActions({
     onTokenGenerated: (_, token) => {
@@ -130,10 +169,11 @@ export function KesimAlaniHeader() {
           <div className="flex items-center gap-0.5">
             <Button
               variant="ghost" size="sm" className="h-8 w-8 p-0"
-              onClick={handleUndo} disabled={!history.canUndo}
-              title="Geri Al (Ctrl+Z)"
+              onClick={handleServerUndoWithFallback}
+              disabled={isServerUndoing || (!history.canUndo && !kesim?.projectId)}
+              title="Geri Al (Ctrl+Z) — önce sunucu logu, sonra yerel geçmiş"
             >
-              <Undo2 className="w-4 h-4" />
+              {isServerUndoing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />}
             </Button>
             <Button
               variant="ghost" size="sm" className="h-8 w-8 p-0"
@@ -146,6 +186,14 @@ export function KesimAlaniHeader() {
               variant="ghost" size="sm" className="h-8 w-8 p-0"
               onClick={() => setHistoryPanelOpen(!historyPanelOpen)}
               title="Geçmiş"
+            >
+              <History className="w-4 h-4" />
+            </Button>
+            <Button
+              variant={activityLogOpen ? "secondary" : "ghost"}
+              size="sm" className="h-8 w-8 p-0"
+              onClick={() => setActivityLogOpen(v => !v)}
+              title="Aktivite Günlüğü"
             >
               <History className="w-4 h-4" />
             </Button>
@@ -253,6 +301,16 @@ export function KesimAlaniHeader() {
           </Button>
         </div>
       </div>
+
+      <ActivityLogPanel
+        projectId={kesim.projectId || ""}
+        scope="kesim"
+        kesimAlaniId={kesim.id}
+        open={activityLogOpen}
+        onClose={() => setActivityLogOpen(false)}
+        showUndoLastButton={true}
+        onUndoSuccess={() => window.location.reload()}
+      />
 
       {/* ── Collapsible settings panel ── */}
       {panelOpen && (

@@ -1076,6 +1076,7 @@ const transferSchema = z.object({
   targetKesimAlaniId: z.string().min(1),
   skipExisting: z.boolean().optional(),
   force: z.boolean().optional().default(false),
+  filterSnapshot: z.record(z.unknown()).optional(),
 });
 
 router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) => {
@@ -1089,7 +1090,7 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
     return;
   }
 
-  const { donationIds, targetKesimAlaniId, skipExisting, force } = parsed.data;
+  const { donationIds, targetKesimAlaniId, skipExisting, force, filterSnapshot } = parsed.data;
 
   const [targetKA] = await db.select()
     .from(kesimAlanlariTable)
@@ -1385,6 +1386,9 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
       alreadyInTarget,
       skipped: skipExisting ? alreadyInTarget : 0,
       donationIds: donationIds.slice(0, 100),
+      batchId: batchId ?? null,
+      reversible: !!batchId,
+      filterSnapshot: filterSnapshot ?? null,
     },
   });
 }));

@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   ArrowLeft, Upload, Search, X, Filter, Package,
-  BarChart3, Loader2, AlertTriangle, Settings2, Zap, Trash2, ListPlus, FileSpreadsheet, Brain,
+  BarChart3, Loader2, AlertTriangle, Settings2, Zap, Trash2, ListPlus, FileSpreadsheet, Brain, History, RotateCcw,
 } from "lucide-react";
 import {
   fetchPoolDonations, fetchPoolStats,
@@ -63,6 +63,8 @@ import type { TransferredItem, DonorSiblings, TransferConflictResponse } from "@
 import { MoveDonationConflictModal } from "@/components/MoveDonationConflictModal";
 import { logFilterApplied } from "@/lib/api/bagis-havuzu";
 import { SonIslemlerKart } from "@/components/SonIslemlerKart";
+import { ActivityLogPanel } from "@/components/ActivityLogPanel";
+import { fetchProjectAuditLogs, undoProjectAuditLog, isReversibleEntry } from "@/lib/api/audit-logs";
 
 export default function BagisHavuzuPage() {
   const params = useParams<{ id: string }>();
@@ -126,6 +128,8 @@ export default function BagisHavuzuPage() {
   });
 
   const [showRules, setShowRules] = useState(false);
+  const [activityLogOpen, setActivityLogOpen] = useState(false);
+  const [isUndoingLast, setIsUndoingLast] = useState(false);
   const [bulkCreateListeOpen, setBulkCreateListeOpen] = useState(false);
 
   const [importOpen, setImportOpen] = useState(false);
@@ -400,6 +404,11 @@ export default function BagisHavuzuPage() {
   const allFilteredIds = data?.allFilteredIds || [];
   const havuzKaId = data?.kesimAlanlari?.find(ka => ka.name === "__havuz__")?.id;
   const kesimAlanlari = (data?.kesimAlanlari || []).filter(ka => ka.name !== "__havuz__");
+  const kesimAlanlariMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    (data?.kesimAlanlari || []).forEach(ka => { if (ka.id && ka.name && ka.name !== "__havuz__") map[ka.id] = ka.name; });
+    return map;
+  }, [data?.kesimAlanlari]);
   const donorMissedCounts = data?.donorMissedCounts || {};
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -549,6 +558,42 @@ export default function BagisHavuzuPage() {
     queryClient.invalidateQueries({ queryKey: ["pool-assigned-vekalets"] });
     queryClient.invalidateQueries({ queryKey: ["pool-all-descriptions"] });
   }, [queryClient]);
+
+  const handleUndoLastLog = useCallback(async () => {
+    if (!projectId || isUndoingLast) return;
+    setIsUndoingLast(true);
+    try {
+      const result = await fetchProjectAuditLogs(projectId, { scope: "havuz", limit: 10 });
+      const lastReversible = result.items.find(isReversibleEntry);
+      if (!lastReversible) {
+        toast({ title: "Geri alınacak işlem bulunamadı" });
+        return;
+      }
+      const undoResult = await undoProjectAuditLog(projectId, lastReversible.id);
+      toast({ title: `${undoResult.count} bağış havuza geri alındı` });
+      invalidatePool();
+    } catch (err) {
+      toast({
+        title: "Geri alma başarısız",
+        description: err instanceof Error ? err.message : "Hata",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUndoingLast(false);
+    }
+  }, [projectId, isUndoingLast, toast, invalidatePool]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key !== "z" || e.shiftKey) return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return;
+      e.preventDefault();
+      handleUndoLastLog();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleUndoLastLog]);
 
   const handleFlagDonation = useCallback(async (id: string, reason: string) => {
     try {
@@ -763,7 +808,15 @@ export default function BagisHavuzuPage() {
         setTransferring(false);
         return;
       }
-      const result = await transferDonationsToKA(projectId, ids, targetId, true);
+      const currentFilterSnapshot: Record<string, unknown> = {};
+      if (search) currentFilterSnapshot.search = search;
+      if (donationTypeFilter.length > 0) currentFilterSnapshot.donationTypes = donationTypeFilter;
+      if (tagFilter.length > 0) currentFilterSnapshot.tags = tagFilter;
+      if (dateFrom) currentFilterSnapshot.dateFrom = dateFrom;
+      if (dateTo) currentFilterSnapshot.dateTo = dateTo;
+      if (statusFilter) currentFilterSnapshot.status = statusFilter;
+
+      const result = await transferDonationsToKA(projectId, ids, targetId, true, false, Object.keys(currentFilterSnapshot).length > 0 ? currentFilterSnapshot : undefined);
 
       if (result.conflict) {
         setPendingConflict(result.conflict);
@@ -1245,6 +1298,33 @@ export default function BagisHavuzuPage() {
             </Button>
           </div>
 
+          {/* Activity Log + quick undo */}
+          <div className="flex items-center gap-0.5 border rounded-md px-0.5 h-8">
+            <Button
+              variant={activityLogOpen ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2 gap-1"
+              onClick={() => setActivityLogOpen(v => !v)}
+              title="Aktivite Günlüğü"
+            >
+              <History className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline text-xs">Günlük</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 gap-1"
+              onClick={handleUndoLastLog}
+              disabled={isUndoingLast}
+              title="Son işlemi geri al (Ctrl+Z)"
+            >
+              {isUndoingLast
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <RotateCcw className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline text-xs">Geri Al</span>
+            </Button>
+          </div>
+
           {/* Group 2: Import / Export */}
           <div className="flex items-center gap-0.5 border rounded-md px-0.5 h-8">
             <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setImportOpen(true)} title="Toplu Yükle">
@@ -1594,6 +1674,28 @@ export default function BagisHavuzuPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <ActivityLogPanel
+          projectId={projectId}
+          scope="havuz"
+          open={activityLogOpen}
+          onClose={() => {
+            setActivityLogOpen(false);
+          }}
+          onUndoSuccess={invalidatePool}
+          showUndoLastButton={true}
+          kesimAlanlariMap={kesimAlanlariMap}
+          onFilterRestore={(snapshot) => {
+            if (snapshot.search && typeof snapshot.search === "string") setSearch(snapshot.search);
+            if (Array.isArray(snapshot.donationTypes)) setDonationTypeFilter(snapshot.donationTypes as string[]);
+            if (Array.isArray(snapshot.tags)) setTagFilter(snapshot.tags as string[]);
+            if (snapshot.dateFrom && typeof snapshot.dateFrom === "string") setDateFrom(snapshot.dateFrom);
+            if (snapshot.dateTo && typeof snapshot.dateTo === "string") setDateTo(snapshot.dateTo);
+            if (snapshot.status && typeof snapshot.status === "string") setStatusFilter(snapshot.status);
+            setPage(0);
+            setActivityLogOpen(false);
+          }}
+        />
 
         <BulkDeleteFilteredDialog
           open={bulkDeleteFilteredOpen}

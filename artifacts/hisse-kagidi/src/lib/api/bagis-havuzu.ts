@@ -181,6 +181,7 @@ export async function transferDonationsToKA(
   targetKesimAlaniId: string,
   skipExisting?: boolean,
   force?: boolean,
+  filterSnapshot?: Record<string, unknown>,
 ): Promise<TransferDonationsResult> {
   const token = getApiKey();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -189,7 +190,7 @@ export async function transferDonationsToKA(
   const res = await fetch(`${API_BASE}/projects/${projectId}/donations/transfer`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ donationIds, targetKesimAlaniId, skipExisting, force }),
+    body: JSON.stringify({ donationIds, targetKesimAlaniId, skipExisting, force, filterSnapshot }),
   });
 
   if (res.status === 409) {
