@@ -192,7 +192,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
               )}
               {d.vekalet && projectId ? (
                 <a
-                  href={`/bagis-havuzu/${projectId}?vekalet=${encodeURIComponent(d.vekalet)}`}
+                  href={`/bagis-havuzu/${projectId}?q=${encodeURIComponent(d.vekalet)}&ka=all`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`${inputH} flex items-center text-primary hover:underline cursor-pointer`}

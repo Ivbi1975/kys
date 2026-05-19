@@ -298,7 +298,7 @@ const AnimalRow = memo(function AnimalRow({
                   </span>
                   {projectId && (
                     <a
-                      href={`/bagis-havuzu/${projectId}?vekalet=${encodeURIComponent(group.donors[0].vekalet)}`}
+                      href={`/bagis-havuzu/${projectId}?q=${encodeURIComponent(group.donors[0].vekalet)}&ka=all`}
                       target="_blank"
                       rel="noreferrer"
                       className="text-[10px] font-medium uppercase select-text hover:underline"

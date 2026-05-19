@@ -230,7 +230,7 @@ function DonorRowInner({
     <td className="p-2">
       {d.vekalet && projectId ? (
         <a
-          href={`/bagis-havuzu/${projectId}?vekalet=${encodeURIComponent(d.vekalet)}`}
+          href={`/bagis-havuzu/${projectId}?q=${encodeURIComponent(d.vekalet)}&ka=all`}
           target="_blank"
           rel="noreferrer"
           className="block px-1 py-0.5 uppercase select-text text-blue-600 hover:underline"
