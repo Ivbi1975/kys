@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import type { Donation, TagCategory } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  AlertTriangle, ChevronDown, ChevronRight, Eye, EyeOff, Flag, MoreHorizontal, Phone, ShoppingBag, StickyNote, Trash2, Wand2,
+  AlertTriangle, Eye, EyeOff, Flag, MoreHorizontal, Phone, ShoppingBag, StickyNote, Trash2, Wand2,
 } from "lucide-react";
 import { turkishTitleCase } from "@/lib/formatting";
 import { groupTagsByCategory } from "@/lib/groupTags";
@@ -27,8 +27,6 @@ interface DonorRowProps {
   globalTags: Array<{ id: string; name: string; color: string; categoryId?: string | null }>;
   tagCategories: TagCategory[];
   tagPopoverOpen: boolean;
-  expandAllState: boolean;
-  expandAllVersion: number;
   onToggleSelect: (id: string) => void;
   onStartEditing: (id: string, field: string) => void;
   onSetEditDraft: (v: string) => void;
@@ -255,22 +253,12 @@ function DonorRowOverflowMenu({
 function DonorRowInner({
   d, idx, descCount, effectiveShare, isSelected, isEditing, editField, editDraft,
   isInBasket, isGrouped, canSplit, splitShares, globalTags, tagCategories, tagPopoverOpen,
-  expandAllState, expandAllVersion,
   onToggleSelect, onStartEditing, onSetEditDraft, onCommitEdit, onKeyDown,
   onSetPersonEditDesc, onUpdateField, onToggleTag, onSetTagPopover,
   onAddToBasket, onRemoveFromBasket, onSmartPlace, onSplitShare, onDelete,
   onFlagDonation, onUnflagDonation, projectId,
 }: DonorRowProps) {
   const [notePopoverOpen, setNotePopoverOpen] = useState(false);
-  const [expanded, setExpanded] = useState(true);
-  const prevVersionRef = useRef(0);
-
-  useEffect(() => {
-    if (prevVersionRef.current !== expandAllVersion) {
-      setExpanded(expandAllState);
-      prevVersionRef.current = expandAllVersion;
-    }
-  }, [expandAllVersion, expandAllState]);
 
   const { rowAttrs, rowClassName } = useVirtuosoRowContext();
 
@@ -281,34 +269,18 @@ function DonorRowInner({
     d.excluded ? "line-through" : "",
   ].filter(Boolean).join(" ");
 
-  const detailRowClass = [
-    "border-b",
-    d.isFlagged ? "border-l-[3px] border-l-amber-500 bg-amber-50/30 dark:bg-amber-950/20" : "bg-muted/20",
-  ].filter(Boolean).join(" ");
-
   return (
     <>
       <tr
         {...(rowAttrs as React.HTMLAttributes<HTMLTableRowElement>)}
         className={mainRowClass}
       >
-        <td className="p-2 w-12">
+        <td className="p-2 w-10">
           <div className="flex items-center gap-1">
-            <button
-              className="flex-shrink-0 text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-              onClick={() => setExpanded(e => !e)}
-              title={expanded ? "Detayı daralt" : "Detayı genişlet"}
-              aria-label={expanded ? "Detayı daralt" : "Detayı genişlet"}
-            >
-              {expanded
-                ? <ChevronDown className="w-3.5 h-3.5" />
-                : <ChevronRight className="w-3.5 h-3.5" />
-              }
-            </button>
             <input type="checkbox" checked={isSelected} onChange={() => onToggleSelect(d.id)} className="rounded" />
             {d.isFlagged && (
               <span title={d.flagReason || "Sorunlu bağış"}>
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
               </span>
             )}
           </div>
@@ -356,10 +328,55 @@ function DonorRowInner({
             </Select>
           )}
         </td>
-        <td className="p-2">
-          <div className="flex items-center gap-0.5 flex-wrap min-w-[160px]">
+        <td className="p-1 w-16 text-xs text-center text-muted-foreground">{d.birim || <span className="text-muted-foreground/30">—</span>}</td>
+        <td className="p-1 w-16 text-xs text-center text-muted-foreground">{d.fiyat || <span className="text-muted-foreground/30">—</span>}</td>
+        <td className="p-1 w-16 text-xs text-center text-muted-foreground">{d.ozellik || <span className="text-muted-foreground/30">—</span>}</td>
+        <td className="p-1 w-16 text-xs text-center text-muted-foreground">{d.yerTalebi || <span className="text-muted-foreground/30">—</span>}</td>
+        <td className="p-1 w-16 text-xs text-center text-muted-foreground">{d.gunTalebi || <span className="text-muted-foreground/30">—</span>}</td>
+        <td className="p-1 w-20 text-xs text-center text-muted-foreground">{d.ilkHayvan || <span className="text-muted-foreground/30">—</span>}</td>
+        <td className="p-1 w-14 text-xs text-center text-muted-foreground">{d.safi || <span className="text-muted-foreground/30">—</span>}</td>
+        <td className="p-1 w-28 text-xs">
+          {d.phone ? (
+            <a href={`tel:${d.phone}`} className="flex items-center gap-0.5 text-blue-600 hover:underline whitespace-nowrap">
+              <Phone className="w-3 h-3 flex-shrink-0" />{d.phone}
+            </a>
+          ) : <span className="text-muted-foreground/30">—</span>}
+        </td>
+        <td className="p-1 min-w-[90px] max-w-[160px] text-xs">
+          {d.notes?.trim() ? (
+            <Popover open={notePopoverOpen} onOpenChange={setNotePopoverOpen}>
+              <PopoverTrigger asChild>
+                <button className="text-left text-muted-foreground hover:text-foreground truncate block max-w-full" title={d.notes.trim()}>
+                  <StickyNote className="w-3 h-3 inline-block mr-0.5 text-amber-500 relative -top-px" />
+                  {d.notes.trim()}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-3" align="end" side="top">
+                <p className="text-xs font-semibold mb-1.5">Not</p>
+                <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">{d.notes.trim()}</p>
+              </PopoverContent>
+            </Popover>
+          ) : <span className="text-muted-foreground/30">—</span>}
+        </td>
+        <td className="p-1 min-w-[120px]">
+          <div className="flex flex-wrap gap-0.5">
+            {(d.aiCategories && d.aiCategories.length > 0) ? d.aiCategories.map(cat => (
+              <span key={cat} className="px-1.5 leading-[16px] rounded text-[9px] font-medium bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 whitespace-nowrap">
+                {cat}
+              </span>
+            )) : null}
+            {d.aiWarnings?.trim() && (
+              <span className="px-1.5 leading-[16px] rounded text-[9px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700 flex items-center gap-0.5 whitespace-nowrap" title={d.aiWarnings}>
+                <AlertTriangle className="w-2.5 h-2.5" />Uyarı
+              </span>
+            )}
+            {!d.aiCategories?.length && !d.aiWarnings?.trim() && <span className="text-muted-foreground/30 text-xs">—</span>}
+          </div>
+        </td>
+        <td className="p-1">
+          <div className="flex items-center gap-0.5 flex-wrap">
             {(d.tags || []).length > 0 && globalTags.length > 0 && (
-              <div className="flex gap-0.5 flex-wrap mr-1">
+              <div className="flex gap-0.5 flex-wrap">
                 {(d.tags || []).map(tagId => {
                   const tag = globalTags.find(t => t.id === tagId);
                   if (!tag) return null;
@@ -371,26 +388,6 @@ function DonorRowInner({
                 })}
               </div>
             )}
-            <Popover open={notePopoverOpen} onOpenChange={setNotePopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={`h-7 w-7 p-0 ${d.notes?.trim() ? "text-amber-500 hover:text-amber-600" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
-                  title={d.notes?.trim() ? "Notu Gör" : "Not yok"}
-                >
-                  <StickyNote className="w-3.5 h-3.5" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-72 p-3" align="end" side="top">
-                <p className="text-xs font-semibold mb-1.5 text-foreground">Not</p>
-                {d.notes?.trim() ? (
-                  <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">{d.notes.trim()}</p>
-                ) : (
-                  <p className="text-xs text-muted-foreground/50 italic">Not eklenmemiş</p>
-                )}
-              </PopoverContent>
-            </Popover>
             {!d.excluded && (
               <Button
                 variant="ghost"
@@ -424,89 +421,6 @@ function DonorRowInner({
           </div>
         </td>
       </tr>
-
-      {expanded && (
-        <tr className={detailRowClass}>
-          <td colSpan={9} className="px-4 py-2">
-            <div className="flex flex-wrap items-start gap-x-1 gap-y-0.5">
-              <DetailField label="Fiyat" value={d.fiyat} />
-              <DetailField label="Birim" value={d.birim} />
-              <DetailField label="Özellik" value={d.ozellik} />
-              <DetailField label="Yer Talebi" value={d.yerTalebi} />
-              <DetailField label="Gün Talebi" value={d.gunTalebi} />
-              <DetailField label="İlk Hayvan" value={d.ilkHayvan} />
-              <DetailField label="Şafi" value={d.safi} />
-
-              {d.phone ? (
-                <span className="inline-flex items-baseline gap-1 mr-3 mb-1">
-                  <span className="text-[10px] font-medium text-muted-foreground/70 whitespace-nowrap">Telefon:</span>
-                  <a
-                    href={`tel:${d.phone}`}
-                    className="text-[10px] text-blue-600 hover:underline whitespace-nowrap flex items-center gap-0.5"
-                  >
-                    <Phone className="w-2.5 h-2.5 inline-block relative -top-px" />
-                    {d.phone}
-                  </a>
-                </span>
-              ) : (
-                <DetailField label="Telefon" value={undefined} />
-              )}
-
-              {(d.notes?.trim()) ? (
-                <span className="inline-flex items-baseline gap-1 mr-3 mb-1 max-w-sm">
-                  <span className="text-[10px] font-medium text-muted-foreground/70 whitespace-nowrap">Not:</span>
-                  <span className="text-[10px] text-foreground leading-snug">{d.notes.trim()}</span>
-                </span>
-              ) : (
-                <DetailField label="Not" value={undefined} />
-              )}
-
-              {(d.aiCategories && d.aiCategories.length > 0) && (
-                <span className="inline-flex items-center gap-1 mr-3 mb-1 flex-wrap">
-                  <span className="text-[10px] font-medium text-muted-foreground/70 whitespace-nowrap">AI:</span>
-                  {d.aiCategories.map(cat => (
-                    <span
-                      key={cat}
-                      className="px-1.5 leading-[16px] rounded text-[9px] font-medium bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 whitespace-nowrap"
-                    >
-                      {cat}
-                    </span>
-                  ))}
-                </span>
-              )}
-
-              {d.aiWarnings?.trim() && (
-                <span className="inline-flex items-baseline gap-1 mr-3 mb-1 max-w-xs">
-                  <span className="text-[10px] font-medium text-muted-foreground/70 whitespace-nowrap">Uyarı:</span>
-                  <span
-                    className="text-[10px] text-amber-700 dark:text-amber-400 truncate leading-snug"
-                    title={d.aiWarnings}
-                  >
-                    <AlertTriangle className="w-2.5 h-2.5 inline-block mr-0.5 relative -top-px" />
-                    {d.aiWarnings}
-                  </span>
-                </span>
-              )}
-
-              {d.aiConfidenceScore != null && (
-                <span className="inline-flex items-center gap-1 mr-3 mb-1">
-                  <span className="text-[10px] font-medium text-muted-foreground/70 whitespace-nowrap">Güven:</span>
-                  <span className="px-1.5 py-0 leading-[16px] rounded text-[9px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                    %{Math.round(d.aiConfidenceScore * 100)}
-                  </span>
-                </span>
-              )}
-
-              {d.isFlagged && d.flagReason && (
-                <span className="inline-flex items-baseline gap-1 mr-3 mb-1 max-w-sm">
-                  <span className="text-[10px] font-medium text-amber-700 dark:text-amber-500 whitespace-nowrap">Sorun:</span>
-                  <span className="text-[10px] text-amber-800 dark:text-amber-400 leading-snug font-medium">{d.flagReason}</span>
-                </span>
-              )}
-            </div>
-          </td>
-        </tr>
-      )}
     </>
   );
 }
@@ -526,6 +440,5 @@ export const DonorRow = React.memo(DonorRowInner, (prev, next) => {
   if (prev.splitShares !== next.splitShares) return false;
   if (prev.tagPopoverOpen !== next.tagPopoverOpen) return false;
   if (prev.globalTags !== next.globalTags) return false;
-  if (prev.expandAllVersion !== next.expandAllVersion) return false;
   return true;
 });
