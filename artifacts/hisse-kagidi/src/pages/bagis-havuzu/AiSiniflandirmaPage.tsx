@@ -143,7 +143,10 @@ export default function AiSiniflandirmaPage() {
     refetchInterval: 30000,
   });
 
-  const allItems = useMemo(() => donationsData?.items ?? [], [donationsData]);
+  const allItems = useMemo(
+    () => (donationsData?.items ?? []).filter(d => !d.kesimAlaniName || d.kesimAlaniName === "__havuz__"),
+    [donationsData],
+  );
   const itemsWithNotes = useMemo(
     () => allItems.filter(d => (d.notes || "").trim() !== ""),
     [allItems],
