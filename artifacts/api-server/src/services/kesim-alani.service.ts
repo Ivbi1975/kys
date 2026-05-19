@@ -112,7 +112,7 @@ export function assembleKesimAlani(
       safi: d.safi || "",
       excluded: d.excluded,
       tags: tagsByDonation[d.id] || [],
-      aiCategories: d.aiCategories ? JSON.parse(d.aiCategories) : [],
+      aiCategories: (d.aiCategories && d.aiCategories.trim()) ? JSON.parse(d.aiCategories) : [],
       aiWarnings: d.aiWarnings || "",
       aiConfidenceScore: d.aiConfidenceScore ?? null,
       isFlagged: d.isFlagged,
