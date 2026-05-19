@@ -9,9 +9,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tags, Pencil, Check, Bot } from "lucide-react";
+import { Plus, Trash2, Settings, ImagePlus, X, Sun, Moon, Monitor, Download, Upload, Tags, Pencil, Check, Bot, Info } from "lucide-react";
 import type { ThemeMode } from "@/lib/useTheme";
-import { TAG_COLORS } from "@/lib/constants";
+import { TAG_COLORS, MANAGED_SEED_TAG_IDS } from "@/lib/constants";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { IntegrityReport } from "@/lib/api";
 import type { CustomTag } from "@/lib/types";
 import { turkishTitleCase } from "@/lib/formatting";
@@ -408,6 +409,20 @@ export function SettingsDialog({
                             {tag.aiNotes && <Bot className="w-3 h-3" />}
                             {(tag.notes || tag.vekaletId) && <span className="w-1 h-1 rounded-full bg-muted-foreground inline-block" />}
                           </span>
+                        )}
+                        {MANAGED_SEED_TAG_IDS.has(tag.id) && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="flex-shrink-0 text-muted-foreground cursor-default">
+                                  <Info className="w-3.5 h-3.5" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="max-w-[220px] text-center">
+                                Sistem etiketi — renk, sunucu yeniden başlatıldığında sıfırlanabilir.
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
                         <Button variant="ghost" size="sm" className="h-6 w-6 p-0 flex-shrink-0" onClick={() => onStartEditTag(tag)}>
                           <Pencil className="w-3 h-3" />

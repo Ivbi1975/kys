@@ -34,3 +34,19 @@ export type NoteStatus = (typeof NoteStatus)[keyof typeof NoteStatus];
 
 export const MAX_SHARES_PER_ANIMAL = 7;
 export const HISTORY_LIMIT = 80;
+
+export const MANAGED_SEED_TAG_IDS = new Set([
+  "seed-tag-uganda",
+  "seed-tag-somali",
+  "seed-tag-cad",
+  "seed-tag-afganistan",
+  "seed-tag-hindistan",
+  "seed-tag-ayni-hayvan",
+  "seed-tag-koc",
+  "seed-tag-koyun",
+  "seed-tag-1gun",
+  "seed-tag-2gun",
+  "seed-tag-3gun",
+  "seed-tag-dikkat",
+  "seed-tag-mevta-kurbani",
+]);
