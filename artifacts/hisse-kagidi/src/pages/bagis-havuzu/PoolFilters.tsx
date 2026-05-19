@@ -19,9 +19,6 @@ interface PoolFiltersProps {
   setBirimFilter: (v: string[]) => void;
   temsilciFilter: string[];
   setTemsilciFilter: (v: string[]) => void;
-  aiCategoryFilter: string[];
-  setAiCategoryFilter: (v: string[]) => void;
-  aiCategoryDistribution: { category: string; count: number }[];
   ozellikFilter: string[];
   setOzellikFilter: (v: string[]) => void;
   fiyatFilter: string[];
@@ -327,7 +324,6 @@ export function PoolFilters({
   donationTypeFilter, setDonationTypeFilter,
   birimFilter, setBirimFilter,
   temsilciFilter, setTemsilciFilter,
-  aiCategoryFilter, setAiCategoryFilter, aiCategoryDistribution,
   ozellikFilter, setOzellikFilter,
   fiyatFilter, setFiyatFilter,
   yerTalebiFilter, setYerTalebiFilter,
@@ -383,8 +379,7 @@ export function PoolFilters({
   const showGun = !!(optStats && ((optStats.gunTalebiDistribution && optStats.gunTalebiDistribution.length > 0) || (optStats.empty_gun_talebi_count ?? 0) > 0 || gunTalebiFilter.length > 0));
   const showIlkHayvan = !!(optStats && ((optStats.ilkHayvanDistribution && optStats.ilkHayvanDistribution.length > 0) || (optStats.empty_ilk_hayvan_count ?? 0) > 0 || ilkHayvanFilter.length > 0));
   const showSafi = !!(optStats && ((optStats.safiDistribution && optStats.safiDistribution.length > 0) || (optStats.empty_safi_count ?? 0) > 0 || safiFilter.length > 0));
-  const showAiCategory = aiCategoryDistribution.length > 0 || aiCategoryFilter.length > 0;
-  const hasFacets = showCinsi || showBirim || showTemsilci || showOzellik || showFiyat || showYer || showGun || showIlkHayvan || showSafi || globalTags.length > 0 || showAiCategory;
+  const hasFacets = showCinsi || showBirim || showTemsilci || showOzellik || showFiyat || showYer || showGun || showIlkHayvan || showSafi || globalTags.length > 0;
 
   const descriptionCountOptions = useMemo(() => {
     const countFreq = new Map<number, number>();
@@ -713,23 +708,6 @@ export function PoolFilters({
               </div>
             )}
 
-            {showAiCategory && (
-              <div>
-                <span className="block text-[10px] text-muted-foreground mb-0.5">AI Etiketi</span>
-                <MultiSelectDropdown
-                  label="AI Etiketi"
-                  options={aiCategoryDistribution.map(d => ({
-                    value: d.category,
-                    label: d.category.replace(/_/g, " "),
-                    count: d.count,
-                  }))}
-                  selected={aiCategoryFilter}
-                  onChange={setAiCategoryFilter}
-                  excluded={excludeFields.has("aiCategory")}
-                  onToggleExclude={() => toggleExcludeField("aiCategory")}
-                />
-              </div>
-            )}
           </div>
         </div>
       )}

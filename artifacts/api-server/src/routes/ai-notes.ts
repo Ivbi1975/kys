@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { appSettingsTable, donationsTable, aiJobsTable, kesimAlanlariTable, aiJobLogsTable } from "@workspace/db/schema";
-import { eq, lt, or, desc, and, inArray, ne, isNull } from "drizzle-orm";
+import { appSettingsTable, donationsTable, aiJobsTable, kesimAlanlariTable, aiJobLogsTable, customTagsTable, tagCategoriesTable, donationTagsTable } from "@workspace/db/schema";
+import { eq, lt, or, desc, and, inArray, ne, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import crypto from "crypto";
@@ -832,7 +832,41 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
     return { ...c, warnings };
   });
 
+  // Collect all distinct category names up front so custom_tags can be upserted
+  // before the main transaction (DDL-like upsert outside transaction avoids deadlocks).
+  const allCategoryNames = new Set<string>();
+  for (const c of enrichedClassifications) {
+    for (const cat of c.categories) {
+      if (cat && typeof cat === "string") allCategoryNames.add(cat);
+    }
+  }
+
+  // Ensure the "AI" tag category and all referenced custom_tags exist before the
+  // transactional write so the FK constraint on donation_tags is always satisfied.
+  await db.insert(tagCategoriesTable)
+    .values({ id: "__ai_category__", name: "AI", sortOrder: 999 })
+    .onConflictDoNothing();
+  for (const catName of allCategoryNames) {
+    const tagId = `__ai_tag__${crypto.createHash("md5").update(catName).digest("hex")}`;
+    await db.insert(customTagsTable)
+      .values({ id: tagId, name: catName, color: "#8b5cf6", aiNotes: "AI tarafından oluşturuldu", categoryId: "__ai_category__" })
+      .onConflictDoNothing();
+  }
+
+  // Single transaction: write ai_categories + donation_tags atomically.
   await db.transaction(async (tx) => {
+    const processedDonationIds = enrichedClassifications.map(c => c.donationId);
+
+    // Remove stale AI-category donation_tags for all processed donations
+    for (let i = 0; i < processedDonationIds.length; i += TX_BATCH_SIZE) {
+      const chunk = processedDonationIds.slice(i, i + TX_BATCH_SIZE);
+      await tx.execute(sql`
+        DELETE FROM donation_tags
+        WHERE donation_id IN (${sql.join(chunk.map(id => sql`${id}`), sql`, `)})
+          AND tag_id IN (SELECT id FROM custom_tags WHERE category_id = '__ai_category__')
+      `);
+    }
+
     for (let i = 0; i < enrichedClassifications.length; i += TX_BATCH_SIZE) {
       const chunk = enrichedClassifications.slice(i, i + TX_BATCH_SIZE);
       for (const c of chunk) {
@@ -845,6 +879,17 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
             aiConfidenceScore: c.confidence ?? null,
           })
           .where(eq(donationsTable.id, c.donationId));
+
+        // Write new donation_tags for this classification
+        const tagRows = c.categories
+          .filter((cat): cat is string => typeof cat === "string" && cat.length > 0)
+          .map(cat => ({
+            donationId: c.donationId,
+            tagId: `__ai_tag__${crypto.createHash("md5").update(cat).digest("hex")}`,
+          }));
+        if (tagRows.length > 0) {
+          await tx.insert(donationTagsTable).values(tagRows).onConflictDoNothing();
+        }
       }
     }
   }, { isolationLevel: "repeatable read" });
@@ -897,19 +942,57 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
         if (nonPoolKas.length === 0) continue;
         const nonPoolKaIds = nonPoolKas.map(k => k.id);
 
+        // Parse source categories for donation_tags propagation
+        const srcCategories: string[] = [];
+        try {
+          const parsed = JSON.parse(src.aiCategories ?? "[]");
+          if (Array.isArray(parsed)) {
+            for (const cat of parsed) {
+              if (typeof cat === "string" && cat.length > 0) srcCategories.push(cat);
+            }
+          }
+        } catch { /* ignore parse errors */ }
+
         for (let j = 0; j < nonPoolKaIds.length; j += SYNC_CHUNK) {
           const kaChunk = nonPoolKaIds.slice(j, j + SYNC_CHUNK);
+
+          // Find target donation IDs for this vekalet + KA chunk
+          const targetDonations = await db.select({ id: donationsTable.id })
+            .from(donationsTable)
+            .where(and(
+              eq(donationsTable.vekalet, src.vekalet),
+              inArray(donationsTable.kesimAlaniId, kaChunk),
+              isNull(donationsTable.deletedAt),
+            ));
+
+          if (targetDonations.length === 0) continue;
+          const targetIds = targetDonations.map(d => d.id);
+
           await db.update(donationsTable)
             .set({
               aiCategories: src.aiCategories,
               aiWarnings: src.aiWarnings,
               updatedAt: new Date(),
             })
-            .where(and(
-              eq(donationsTable.vekalet, src.vekalet),
-              inArray(donationsTable.kesimAlaniId, kaChunk),
-              isNull(donationsTable.deletedAt),
-            ));
+            .where(inArray(donationsTable.id, targetIds));
+
+          // Propagate donation_tags: delete old AI tags, insert new ones
+          if (targetIds.length > 0) {
+            await db.execute(sql`
+              DELETE FROM donation_tags
+              WHERE donation_id IN (${sql.join(targetIds.map(id => sql`${id}`), sql`, `)})
+                AND tag_id IN (SELECT id FROM custom_tags WHERE category_id = '__ai_category__')
+            `);
+            if (srcCategories.length > 0) {
+              const tagRows = targetIds.flatMap(donationId =>
+                srcCategories.map(cat => ({
+                  donationId,
+                  tagId: `__ai_tag__${crypto.createHash("md5").update(cat).digest("hex")}`,
+                }))
+              );
+              await db.insert(donationTagsTable).values(tagRows).onConflictDoNothing();
+            }
+          }
         }
       }
     }

@@ -147,19 +147,6 @@ function buildStatsFilterSQL(projectId: string, query: Record<string, unknown>) 
   if (shareCountMin !== null && !isNaN(shareCountMin)) parts.push(sql`d.share_count >= ${shareCountMin}`);
   if (shareCountMax !== null && !isNaN(shareCountMax)) parts.push(sql`d.share_count <= ${shareCountMax}`);
 
-  const aiCategoryValues = parseMultiValue(query.aiCategory);
-  if (aiCategoryValues.length > 0) {
-    if (excludeSet.has("aiCategory")) {
-      for (const cat of aiCategoryValues) {
-        parts.push(sql`(d.ai_categories IS NULL OR d.ai_categories::text = '[]' OR NOT (d.ai_categories::text ILIKE ${'%' + cat + '%'}))`);
-      }
-    } else {
-      for (const cat of aiCategoryValues) {
-        parts.push(sql`d.ai_categories::text ILIKE ${'%' + cat + '%'}`);
-      }
-    }
-  }
-
   const notesFilter = typeof query.notesFilter === "string" ? query.notesFilter.trim() : "";
   if (notesFilter) {
     const noteTerms = notesFilter.split(",").map((t: string) => t.trim()).filter(Boolean);
@@ -219,7 +206,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   const birimValues = parseMultiValue(req.query.birim);
   const temsilciValues = parseMultiValue(req.query.temsilci);
   const kesimAlaniId = typeof req.query.kesimAlaniId === "string" ? req.query.kesimAlaniId.trim() : "";
-  const aiCategoryValues = parseMultiValue(req.query.aiCategory);
+  // aiCategory param removed — AI tags are now filtered via tagIds (donation_tags)
   const ozellikValues = parseMultiValue(req.query.ozellik);
   const fiyatValues = parseMultiValue(req.query.fiyat);
   const yerTalebiValues = parseMultiValue(req.query.yerTalebi);
@@ -416,24 +403,6 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     conditions.push(eq(donationsTable.excluded, true));
   } else if (status === "active") {
     conditions.push(eq(donationsTable.excluded, false));
-  }
-
-  if (aiCategoryValues.length > 0) {
-    if (excludeSet.has("aiCategory")) {
-      for (const cat of aiCategoryValues) {
-        conditions.push(
-          or(
-            sql`${donationsTable.aiCategories} IS NULL`,
-            sql`${donationsTable.aiCategories}::text = '[]'`,
-            sql`NOT (${donationsTable.aiCategories}::text ILIKE ${'%' + cat + '%'})`,
-          )!
-        );
-      }
-    } else {
-      for (const cat of aiCategoryValues) {
-        conditions.push(sql`${donationsTable.aiCategories}::text ILIKE ${'%' + cat + '%'}`);
-      }
-    }
   }
 
   if (notesFilter) {
