@@ -243,7 +243,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   const sortBy3 = typeof req.query.sortBy3 === "string" ? req.query.sortBy3 : "";
   const sortDir3 = typeof req.query.sortDir3 === "string" && req.query.sortDir3 === "desc" ? "desc" : "asc";
 
-  const kaRows = await db.select({ id: kesimAlanlariTable.id, name: kesimAlanlariTable.name })
+  const kaRows = await db.select({ id: kesimAlanlariTable.id, name: kesimAlanlariTable.name, kesimListeId: kesimAlanlariTable.kesimListeId })
     .from(kesimAlanlariTable)
     .where(and(eq(kesimAlanlariTable.projectId, projectId), isNull(kesimAlanlariTable.deletedAt)));
 
@@ -254,7 +254,11 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
 
   const kaIds = kaRows.map(k => k.id);
   const kaNameMap: Record<string, string> = {};
-  for (const k of kaRows) kaNameMap[k.id] = k.name;
+  const kaKesimListeIdMap: Record<string, string | null> = {};
+  for (const k of kaRows) {
+    kaNameMap[k.id] = k.name;
+    kaKesimListeIdMap[k.id] = k.kesimListeId ?? null;
+  }
 
   const conditions: ReturnType<typeof eq>[] = [
     inArray(donationsTable.kesimAlaniId, kaIds),
@@ -563,6 +567,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     // kaNameMap[d.kesimAlaniId] will always resolve — the "" fallback is purely
     // defensive and should never be reached in practice.
     kesimAlaniName: kaNameMap[d.kesimAlaniId] || "",
+    kesimListeId: kaKesimListeIdMap[d.kesimAlaniId] ?? null,
     tags: tagsByDonation[d.id] || [],
     aiCategories: parseAiCategories(d.aiCategories),
     aiWarnings: d.aiWarnings || "",

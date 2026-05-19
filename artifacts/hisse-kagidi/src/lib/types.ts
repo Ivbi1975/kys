@@ -38,6 +38,7 @@ export interface Donation {
 export interface PoolDonation extends Donation {
   kesimAlaniId: string;
   kesimAlaniName: string;
+  kesimListeId?: string | null;
 }
 
 export interface PoolStats {
