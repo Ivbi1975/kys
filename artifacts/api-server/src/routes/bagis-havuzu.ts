@@ -925,24 +925,24 @@ router.post("/projects/:id/donations/siblings", asyncHandler(async (req, res) =>
 
   const { donationIds } = parsed.data;
 
-  // Only look within the pool kesim alanı (__havuz__) — never across placed kesim listeleri
-  const poolKARows = await db.select({ id: kesimAlanlariTable.id })
+  // Get ALL kesim alanı IDs for this project (pool + assigned)
+  const allKARows = await db.select({ id: kesimAlanlariTable.id, name: kesimAlanlariTable.name })
     .from(kesimAlanlariTable)
     .where(and(
       eq(kesimAlanlariTable.projectId, projectId),
-      eq(kesimAlanlariTable.name, "__havuz__"),
       isNull(kesimAlanlariTable.deletedAt),
     ));
 
-  if (poolKARows.length === 0) { res.json({ siblings: [] }); return; }
-  const poolKAIds = poolKARows.map(k => k.id);
+  if (allKARows.length === 0) { res.json({ siblings: [] }); return; }
+  const allKAIds = allKARows.map(k => k.id);
+  const kaNameMap = new Map(allKARows.map(k => [k.id, k.name]));
 
-  // Verify selected donations belong to pool KAs
+  // Verify selected donations belong to this project
   const selectedDonations = await db.select({ id: donationsTable.id, name: donationsTable.name })
     .from(donationsTable)
     .where(and(
       inArray(donationsTable.id, donationIds),
-      inArray(donationsTable.kesimAlaniId, poolKAIds),
+      inArray(donationsTable.kesimAlaniId, allKAIds),
       isNull(donationsTable.deletedAt),
     ));
 
@@ -950,7 +950,7 @@ router.post("/projects/:id/donations/siblings", asyncHandler(async (req, res) =>
 
   if (donorNames.length === 0) { res.json({ siblings: [] }); return; }
 
-  // Find other pool donations with same donor names not in the selection
+  // Find ALL project donations with same donor names not in the selection (pool + kesim listesi)
   const siblingRows = await db.select({
     id: donationsTable.id,
     name: donationsTable.name,
@@ -964,10 +964,11 @@ router.post("/projects/:id/donations/siblings", asyncHandler(async (req, res) =>
     fiyat: donationsTable.fiyat,
     phone: donationsTable.phone,
     notes: donationsTable.notes,
+    kesimAlaniId: donationsTable.kesimAlaniId,
   })
     .from(donationsTable)
     .where(and(
-      inArray(donationsTable.kesimAlaniId, poolKAIds),
+      inArray(donationsTable.kesimAlaniId, allKAIds),
       isNull(donationsTable.deletedAt),
       inArray(donationsTable.name, donorNames),
       notInArray(donationsTable.id, donationIds),
@@ -977,12 +978,13 @@ router.post("/projects/:id/donations/siblings", asyncHandler(async (req, res) =>
     id: string; name: string; description: string; vekalet: string | null;
     shareCount: number; donationType: string | null;
     birim: string; temsilci: string; ozellik: string; fiyat: string;
-    phone: string; notes: string;
+    phone: string; notes: string; kesimAlaniName: string | null;
   };
   const grouped = new Map<string, SiblingDonation[]>();
   for (const s of siblingRows) {
     if (!s.name) continue;
     if (!grouped.has(s.name)) grouped.set(s.name, []);
+    const kaName = s.kesimAlaniId ? (kaNameMap.get(s.kesimAlaniId) ?? null) : null;
     grouped.get(s.name)!.push({
       id: s.id,
       name: s.name,
@@ -996,6 +998,7 @@ router.post("/projects/:id/donations/siblings", asyncHandler(async (req, res) =>
       fiyat: s.fiyat || "",
       phone: s.phone || "",
       notes: s.notes || "",
+      kesimAlaniName: kaName === "__havuz__" ? null : (kaName ?? null),
     });
   }
 

@@ -172,6 +172,9 @@ function SiblingsBadge({ donationId, donorName, missedCount, projectId }: {
                 {d.name && d.name !== donorName && (
                   <p className="text-[10px] text-muted-foreground mt-0.5">{d.name}</p>
                 )}
+                {d.kesimAlaniName && (
+                  <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5 font-medium">{d.kesimAlaniName}</p>
+                )}
               </div>
             ))}
           </div>

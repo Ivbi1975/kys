@@ -323,6 +323,7 @@ export interface SiblingDonation {
   fiyat: string;
   phone: string;
   notes: string;
+  kesimAlaniName: string | null;
 }
 
 export interface DonorSiblings {
