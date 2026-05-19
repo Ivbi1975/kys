@@ -46,13 +46,6 @@ export async function saveAiSettings(settings: Partial<AiSettings>): Promise<{ s
   });
 }
 
-export async function classifyNotes(donations: AiDonationInput[]): Promise<{ results: AiClassificationResult[] }> {
-  return apiFetch<{ results: AiClassificationResult[] }>("/ai-notes/classify", {
-    method: "POST",
-    body: JSON.stringify({ donations }),
-  });
-}
-
 const AI_CHUNK_SIZE = 5000;
 
 export async function classifyNotesAsync(

@@ -254,7 +254,7 @@ export default function PasswordGate({ children }: { children: React.ReactNode }
                     onFocus={() => setFocus1(true)}
                     onBlur={() => setFocus1(false)}
                     placeholder="1. şifreyi girin"
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     autoFocus
                     style={{
                       width: "100%",
@@ -323,7 +323,7 @@ export default function PasswordGate({ children }: { children: React.ReactNode }
                     onFocus={() => setFocus2(true)}
                     onBlur={() => setFocus2(false)}
                     placeholder="2. şifreyi girin"
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     style={{
                       width: "100%",
                       height: "100%",

@@ -1,5 +1,5 @@
 import { db } from "@workspace/db";
-import { kesimAlanlariTable, projectsTable, donationsTable, donationTagsTable, animalGroupDonationsTable } from "@workspace/db/schema";
+import { kesimAlanlariTable, projectsTable, donationsTable, donationTagsTable } from "@workspace/db/schema";
 import { eq, isNull, isNotNull, inArray, and, ne } from "drizzle-orm";
 import crypto from "crypto";
 import { serviceError, serviceOk, type ServiceResult } from "./result";
@@ -279,44 +279,22 @@ export async function deleteKesimAlani(id: string, permanent: boolean): Promise<
     // Permanent delete: cascades handle all related data (donations, groups, teams, notes, photos)
     await db.delete(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, id));
   } else {
-    // Soft delete: move donations to __havuz__ pool to preserve them, then soft-delete the KA
+    // Soft delete: cascade soft-delete all active donations in the same transaction
+    // so no active donations remain tied to a deleted KA (prevents integrity warnings).
     await db.transaction(async (tx) => {
-      if (existing.projectId) {
-        let [pool] = await tx.select({ id: kesimAlanlariTable.id })
-          .from(kesimAlanlariTable)
-          .where(and(
-            eq(kesimAlanlariTable.projectId, existing.projectId),
-            eq(kesimAlanlariTable.name, "__havuz__"),
-            isNull(kesimAlanlariTable.deletedAt),
-          ));
+      const donations = await tx.select({ id: donationsTable.id })
+        .from(donationsTable)
+        .where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)));
 
-        if (!pool) {
-          const poolId = crypto.randomBytes(16).toString("hex");
-          await tx.insert(kesimAlanlariTable).values({
-            id: poolId,
-            name: "__havuz__",
-            projectId: existing.projectId,
-            trackingToken: crypto.randomBytes(16).toString("hex"),
-            createdAt: new Date(),
-          });
-          pool = { id: poolId };
-        }
-
-        const donations = await tx.select({ id: donationsTable.id })
-          .from(donationsTable)
-          .where(and(eq(donationsTable.kesimAlaniId, id), isNull(donationsTable.deletedAt)));
-
-        if (donations.length > 0) {
-          const donationIds = donations.map(d => d.id);
-          const BATCH = 500;
-          for (let i = 0; i < donationIds.length; i += BATCH) {
-            const batch = donationIds.slice(i, i + BATCH);
-            await tx.delete(animalGroupDonationsTable)
-              .where(inArray(animalGroupDonationsTable.donationId, batch));
-            await tx.update(donationsTable)
-              .set({ kesimAlaniId: pool.id })
-              .where(inArray(donationsTable.id, batch));
-          }
+      if (donations.length > 0) {
+        const donationIds = donations.map(d => d.id);
+        const BATCH = 500;
+        const now = new Date();
+        for (let i = 0; i < donationIds.length; i += BATCH) {
+          const batch = donationIds.slice(i, i + BATCH);
+          await tx.update(donationsTable)
+            .set({ deletedAt: now })
+            .where(inArray(donationsTable.id, batch));
         }
       }
 

@@ -83,7 +83,6 @@ export type {
 export {
   fetchAiSettings,
   saveAiSettings,
-  classifyNotes,
   classifyNotesAsync,
   classifyNotesAsyncChunked,
   PartialChunkError,

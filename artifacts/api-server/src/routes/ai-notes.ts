@@ -163,16 +163,6 @@ async function getAiSettings(): Promise<{ prompt: string; categories: string[] }
   return { prompt, categories };
 }
 
-const classifySchema = z.object({
-  donations: z.array(z.object({
-    id: z.string(),
-    name: z.string().nullable().optional().transform(v => v ?? ""),
-    donationType: z.string().nullable().optional().transform(v => v ?? ""),
-    vekalet: z.string().nullable().optional().transform(v => v ?? ""),
-    notes: z.string().nullable().optional().transform(v => v ?? ""),
-  })).min(1).max(500),
-});
-
 function parseAiResults(content: string): unknown[] {
   try {
     const parsed = JSON.parse(content);
@@ -256,48 +246,11 @@ router.put("/ai-notes/settings", asyncHandler(async (req, res) => {
   res.json({ success: true });
 }));
 
-router.post("/ai-notes/classify", asyncHandler(async (req, res) => {
-  try {
-    assertOpenAiConfigured();
-  } catch {
-    res.status(503).json({ error: "AI entegrasyonu yapılandırılmamış." });
-    return;
-  }
-
-  const parsed = classifySchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: ERROR_MESSAGES.INVALID_DATA, details: parsed.error.issues });
-    return;
-  }
-
-  const { donations } = parsed.data;
-  const { prompt, categories } = await getAiSettings();
-
-  const systemPrompt = prompt.replace("{{CATEGORIES}}", categories.join(", "));
-
-  const userContent = donations.map(d => ({
-    donationId: d.id,
-    isim: d.name,
-    cinsi: d.donationType,
-    vekalet: d.vekalet,
-    not: d.notes,
-  }));
-
-  const dynamicTokens = Math.min(donations.length * 700 + 2000, 32768);
-  const response = await openai.chat.completions.create({
-    model: "gpt-5-mini",
-    max_completion_tokens: dynamicTokens,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: JSON.stringify(userContent) },
-    ],
-    response_format: { type: "json_object" },
+router.post("/ai-notes/classify", asyncHandler(async (_req, res) => {
+  res.status(410).json({
+    error: "Bu endpoint kullanımdan kaldırıldı. Lütfen /api/ai-notes/classify-async endpoint'ini kullanın.",
+    asyncEndpoint: "/api/ai-notes/classify-async",
   });
-
-  const content = response.choices[0]?.message?.content || "{}";
-  const results = parseAiResults(content);
-
-  res.json({ results });
 }));
 
 const classifyAsyncSchema = z.object({
