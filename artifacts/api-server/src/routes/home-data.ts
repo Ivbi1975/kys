@@ -182,7 +182,14 @@ router.get("/home-data", asyncHandler(async (_req, res) => {
     (async () => {
       const cached = cacheGet<unknown[]>(TAGS_CACHE_KEY);
       if (cached) return cached;
-      const rows = await db.select().from(customTagsTable);
+      const rows = await db.select({
+        id: customTagsTable.id,
+        name: customTagsTable.name,
+        color: customTagsTable.color,
+        vekaletId: customTagsTable.vekaletId,
+        notes: customTagsTable.notes,
+        aiNotes: customTagsTable.aiNotes,
+      }).from(customTagsTable);
       cacheSet(TAGS_CACHE_KEY, rows, TAGS_TTL);
       return rows;
     })(),

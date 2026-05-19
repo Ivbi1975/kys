@@ -50,7 +50,15 @@ router.get("/tags", asyncHandler(async (_req, res) => {
     return;
   }
 
-  const tags = await db.select().from(customTagsTable);
+  const tags = await db.select({
+    id: customTagsTable.id,
+    name: customTagsTable.name,
+    color: customTagsTable.color,
+    vekaletId: customTagsTable.vekaletId,
+    notes: customTagsTable.notes,
+    aiNotes: customTagsTable.aiNotes,
+    categoryId: customTagsTable.categoryId,
+  }).from(customTagsTable);
   const collator = new Intl.Collator("tr", { sensitivity: "base" });
   tags.sort((a, b) => collator.compare(a.name, b.name));
   cacheSet(TAGS_CACHE_KEY, tags, TAGS_TTL);

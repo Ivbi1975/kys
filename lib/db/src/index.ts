@@ -146,28 +146,98 @@ export const db = drizzle(pool, { schema });
 
 export * from "./schema";
 
+const PENDING_MIGRATIONS: { tag: string; sql: string }[] = [
+  {
+    tag: "0030_batch_id_transfers",
+    sql: `
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='donation_transfers' AND column_name='batch_id') THEN
+          ALTER TABLE "donation_transfers" ADD COLUMN "batch_id" text;
+        END IF;
+      END $$;
+      CREATE INDEX IF NOT EXISTS "idx_donation_transfers_batch_id" ON "donation_transfers" USING btree ("batch_id");
+    `,
+  },
+  {
+    tag: "0031_tag_categories",
+    sql: `
+      CREATE TABLE IF NOT EXISTS "tag_categories" (
+        "id" text PRIMARY KEY NOT NULL,
+        "name" text NOT NULL,
+        "sort_order" integer NOT NULL DEFAULT 0,
+        "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS "idx_tag_categories_sort" ON "tag_categories" ("sort_order");
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='custom_tags' AND column_name='category_id') THEN
+          ALTER TABLE "custom_tags" ADD COLUMN "category_id" text;
+          ALTER TABLE "custom_tags" ADD CONSTRAINT "custom_tags_category_id_tag_categories_id_fk"
+            FOREIGN KEY ("category_id") REFERENCES "tag_categories"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
+        END IF;
+      END $$;
+      CREATE INDEX IF NOT EXISTS "idx_custom_tags_category_id" ON "custom_tags" ("category_id");
+    `,
+  },
+  {
+    tag: "0032_merge_mevta_tags",
+    sql: `
+      INSERT INTO custom_tags (id, name, color, updated_at)
+      VALUES ('seed-tag-mevta-kurbani', 'Mevta Kurbanı', '#0e7490', now())
+      ON CONFLICT (id) DO NOTHING;
+
+      INSERT INTO donation_tags (donation_id, tag_id, updated_at)
+      SELECT dt.donation_id, 'seed-tag-mevta-kurbani', now()
+      FROM donation_tags dt
+      JOIN custom_tags ct ON ct.id = dt.tag_id
+      WHERE lower(ct.name) IN ('mevta', 'mevta kurbani', 'mevta kurbanı')
+        AND ct.id != 'seed-tag-mevta-kurbani'
+      ON CONFLICT DO NOTHING;
+
+      DELETE FROM donation_tags
+      WHERE tag_id IN (
+        SELECT id FROM custom_tags
+        WHERE lower(name) IN ('mevta', 'mevta kurbani', 'mevta kurbanı')
+          AND id != 'seed-tag-mevta-kurbani'
+      );
+
+      DELETE FROM custom_tags
+      WHERE lower(name) IN ('mevta', 'mevta kurbani', 'mevta kurbanı')
+        AND id != 'seed-tag-mevta-kurbani';
+    `,
+  },
+];
+
 export async function runMigrations(): Promise<void> {
-  const { migrate } = await import("drizzle-orm/node-postgres/migrator");
-  const { fileURLToPath } = await import("node:url");
-  const { dirname, resolve } = await import("node:path");
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS __kys_applied_migrations (
+      tag text PRIMARY KEY,
+      applied_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
 
-  // Works for both the source layout and the built dist layout.
-  // Source: lib/db/src/index.ts  → migrationsFolder = lib/db/drizzle
-  // Built:  artifacts/api-server/dist/index.mjs → migrationsFolder = artifacts/api-server/dist/migrations
-  let migrationsFolder: string;
-  try {
-    const thisFile = fileURLToPath(import.meta.url);
-    const thisDir = dirname(thisFile);
-    const candidate = resolve(thisDir, "../../db/drizzle");
-    const { access } = await import("node:fs/promises");
-    await access(candidate);
-    migrationsFolder = candidate;
-  } catch {
-    const thisFile = fileURLToPath(import.meta.url);
-    migrationsFolder = resolve(dirname(thisFile), "migrations");
+  const { rows: appliedRows } = await pool.query<{ tag: string }>(
+    "SELECT tag FROM __kys_applied_migrations"
+  );
+  const applied = new Set(appliedRows.map((r: { tag: string }) => r.tag));
+
+  for (const m of PENDING_MIGRATIONS) {
+    if (applied.has(m.tag)) {
+      dbLog.debug(`Migration already applied: ${m.tag}`);
+      continue;
+    }
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(m.sql);
+      await client.query("INSERT INTO __kys_applied_migrations (tag) VALUES ($1)", [m.tag]);
+      await client.query("COMMIT");
+      dbLog.info(`Migration applied: ${m.tag}`);
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
+      dbLog.warn(`Migration ${m.tag} skipped: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      client.release();
+    }
   }
-
-  dbLog.info(`Running DB migrations from: ${migrationsFolder}`);
-  await migrate(db, { migrationsFolder });
-  dbLog.info("DB migrations complete.");
+  dbLog.info("DB migrations check complete.");
 }
