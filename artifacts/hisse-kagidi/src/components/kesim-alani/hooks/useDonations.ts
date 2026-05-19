@@ -234,6 +234,26 @@ export function useDonations({
     saveSingleDonationField(id, { [field]: value });
   }
 
+  function toggleDonationAiCategory(donationId: string, category: string) {
+    if (!kesim) return;
+    const updated = produce(kesim, (draft) => {
+      const toggle = (d: { id: string; aiCategories?: string[] }) => {
+        if (d.id !== donationId) return;
+        const existing = d.aiCategories || [];
+        const has = existing.includes(category);
+        d.aiCategories = has ? existing.filter((c) => c !== category) : [...existing, category];
+      };
+      draft.donations.forEach(toggle);
+      for (const g of draft.animalGroups) {
+        g.donations.forEach(toggle);
+      }
+    });
+    const donor = updated.donations.find(d => d.id === donationId);
+    setKesim(updated);
+    history.push(updated, `AI Kategori güncellendi`);
+    saveSingleDonationField(donationId, { aiCategories: donor?.aiCategories || [] });
+  }
+
   function toggleDonationTag(donationId: string, tagId: string) {
     if (!kesim) return;
     const updated = produce(kesim, (draft) => {
@@ -534,6 +554,7 @@ export function useDonations({
     toggleSelectAll,
     updateDonationField,
     toggleDonationTag,
+    toggleDonationAiCategory,
     bulkExcludeByDesc,
     bulkDeleteByDesc,
     applyBulkEdit,

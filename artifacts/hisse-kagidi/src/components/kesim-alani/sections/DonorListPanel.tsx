@@ -29,6 +29,7 @@ export function DonorListPanel() {
     setSelectedIds, setShowAdvancedFilter, setShowRemovedFilter, setSmartPlacePopover,
     setSplitShareDialog, setTagPopoverDonorId, showAdvancedFilter, showRemovedFilter,
     sortDir, sortField, startEditing, tagPopoverDonorId, toggleDonationTag,
+    toggleDonationAiCategory, availableAiCategories,
     toggleSelect, toggleSelectAll, updateDonationField, virtuosoTableComponents,
   } = ctx;
 
@@ -197,6 +198,8 @@ export function DonorListPanel() {
                     onSetPersonEditDesc={setPersonEditDesc}
                     onUpdateField={updateDonationField}
                     onToggleTag={toggleDonationTag}
+                    onToggleAiCategory={toggleDonationAiCategory}
+                    availableAiCategories={availableAiCategories}
                     onSetTagPopover={setTagPopoverDonorId}
                     onAddToBasket={addDonorToBasket}
                     onRemoveFromBasket={removeFromBasket}

@@ -1,5 +1,5 @@
 import { useState, useMemo, useTransition } from "react";
-import { turkishNormalize } from "@/lib/utils";
+import { turkishNormalize, normalizeDonationType } from "@/lib/utils";
 import type { Donation } from "@/lib/types";
 
 type SortField = "name" | "description" | "donationType" | "shareCount";
@@ -135,7 +135,7 @@ export function useKesimAlaniFilters({ donations, groupedDonorIds, removedFromGr
     const advFiltered = preFiltered.filter(d => {
       if (filterStatus === "active" && d.excluded) return false;
       if (filterStatus === "excluded" && !d.excluded) return false;
-      if (filterCinsi !== "all" && turkishNormalize(d.donationType) !== turkishNormalize(filterCinsi)) return false;
+      if (filterCinsi !== "all" && normalizeDonationType(d.donationType.trim()) !== filterCinsi) return false;
       if (filterHisseMin > 0 && d.shareCount < filterHisseMin) return false;
       if (filterHisseMax > 0 && d.shareCount > filterHisseMax) return false;
       if (filterTags.length > 0) {
@@ -160,7 +160,7 @@ export function useKesimAlaniFilters({ donations, groupedDonorIds, removedFromGr
 
   const uniqueDonationTypes = useMemo(() =>
     Array.from(new Set(
-      donations.map(d => d.donationType.trim()).filter(Boolean)
+      donations.map(d => normalizeDonationType(d.donationType.trim())).filter(Boolean)
     )).sort(),
     [donations]
   );

@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag } from "@/lib/types";
 import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, fetchTags, fetchTagCategories, fetchPhotoCountsAdmin, fetchGroupPhotosAdmin, fetchKesimAlaniMeta, fetchAllDonations, fetchAllGroupsCompact } from "@/lib/api";
 import { sortTagsTr } from "@/lib/formatting";
+import { normalizeDonationType } from "@/lib/utils";
 import type { CompactGroupItem } from "@/lib/api/kesim-alanlari";
 import { getTotalShares, getRequiredAnimals, computeEffectiveShares, trCollator } from "@/lib/grouping";
 import { useGroupingWorker } from "@/lib/useGroupingWorker";
@@ -518,7 +519,7 @@ export function useKesimAlaniState() {
     for (const group of kesim.animalGroups) {
       for (const d of group.donations) {
         const t = d.donationType?.trim();
-        if (t) types.add(t);
+        if (t) types.add(normalizeDonationType(t));
       }
     }
     return Array.from(types).sort((a, b) => trCollator.compare(a, b));
@@ -541,7 +542,7 @@ export function useKesimAlaniState() {
         if (ui.groupCinsFilter.size > 0) {
           const hasMatchingType = group.donations.some(d => {
             const t = d.donationType?.trim();
-            return t && ui.groupCinsFilter.has(t);
+            return t && ui.groupCinsFilter.has(normalizeDonationType(t));
           });
           if (!hasMatchingType) return false;
         }

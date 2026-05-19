@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useKesimAlaniContext } from "../KesimAlaniContext";
 import type { Donation } from "@/lib/types";
+import { normalizeDonationType } from "@/lib/utils";
 
 function useCollapsible(storageKey: string, defaultOpen = false) {
   const [open, setOpen] = useState<boolean>(() => {
@@ -109,7 +110,15 @@ export function StatsCards() {
 
   const activeDonations = kesim.donations.filter(d => !d.excluded);
 
-  const donationTypeMap = countByField(activeDonations, "donationType");
+  const donationTypeMap = (() => {
+    const raw = countByField(activeDonations, "donationType");
+    const normalized = new Map<string, number>();
+    for (const [key, count] of raw) {
+      const k = normalizeDonationType(key);
+      normalized.set(k, (normalized.get(k) || 0) + count);
+    }
+    return normalized;
+  })();
   const birimMap = countByField(activeDonations, "birim");
   const temsilciMap = countByField(activeDonations, "temsilci");
   const ozellikMap = countByField(activeDonations, "ozellik");

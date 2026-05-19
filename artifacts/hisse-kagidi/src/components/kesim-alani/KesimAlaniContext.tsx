@@ -33,7 +33,7 @@ export type DragDropContextValue = Pick<KesimAlaniContextValue,
 >;
 
 export type DonationContextValue = Pick<KesimAlaniContextValue,
-  "addDonation" | "deleteDonation" | "handleFlagDonation" | "handleUnflagDonation" | "updateDonationField" | "toggleDonationTag" |
+  "addDonation" | "deleteDonation" | "handleFlagDonation" | "handleUnflagDonation" | "updateDonationField" | "toggleDonationTag" | "toggleDonationAiCategory" |
   "addDonorToBasket" | "removeFromBasket" | "updateBasketItemShareCount" | "toggleSelect" | "toggleSelectAll" |
   "startEditing" | "commitEdit" | "cancelEdit" | "editingCell" | "editDraft" | "setEditDraft" |
   "handleDonorCellKeyDown" | "handleSort" | "saveSingleDonationField" |
@@ -165,6 +165,7 @@ export function KesimAlaniProvider({
     addDonation: value.addDonation, deleteDonation: value.deleteDonation,
     handleFlagDonation: value.handleFlagDonation, handleUnflagDonation: value.handleUnflagDonation,
     updateDonationField: value.updateDonationField, toggleDonationTag: value.toggleDonationTag,
+    toggleDonationAiCategory: value.toggleDonationAiCategory,
     addDonorToBasket: value.addDonorToBasket, removeFromBasket: value.removeFromBasket,
     updateBasketItemShareCount: value.updateBasketItemShareCount,
     toggleSelect: value.toggleSelect, toggleSelectAll: value.toggleSelectAll,
@@ -195,7 +196,7 @@ export function KesimAlaniProvider({
     handleAutoGroupSelected: value.handleAutoGroupSelected,
   }), [
     value.addDonation, value.deleteDonation, value.handleFlagDonation, value.handleUnflagDonation,
-    value.updateDonationField, value.toggleDonationTag,
+    value.updateDonationField, value.toggleDonationTag, value.toggleDonationAiCategory,
     value.addDonorToBasket, value.removeFromBasket,
     value.updateBasketItemShareCount,
     value.toggleSelect, value.toggleSelectAll,

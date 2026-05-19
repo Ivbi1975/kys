@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  AlertTriangle, Eye, EyeOff, Flag, MoreHorizontal, Phone, ShoppingBag, StickyNote, Trash2, Wand2,
+  AlertTriangle, Eye, EyeOff, Flag, MoreHorizontal, Phone, Plus, ShoppingBag, StickyNote, Trash2, Wand2,
 } from "lucide-react";
 import { turkishTitleCase } from "@/lib/formatting";
 import { groupTagsByCategory } from "@/lib/groupTags";
@@ -44,6 +44,8 @@ interface DonorRowProps {
   onFlagDonation?: (id: string, reason: string) => void;
   onUnflagDonation?: (id: string) => void;
   projectId?: string;
+  onToggleAiCategory: (donationId: string, category: string) => void;
+  availableAiCategories: string[];
 }
 
 function EditableCell({ displayValue }: {
@@ -68,6 +70,69 @@ function DetailField({ label, value, muted }: { label: string; value?: string | 
         <span className={`text-[10px] ${muted ? "text-muted-foreground" : "text-foreground"} whitespace-nowrap`}>{value}</span>
       )}
     </span>
+  );
+}
+
+function AiCategoryAddPopover({
+  donationId, currentCategories, availableCategories, onToggle,
+}: {
+  donationId: string;
+  currentCategories: string[];
+  availableCategories: string[];
+  onToggle: (id: string, cat: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [customInput, setCustomInput] = useState("");
+
+  const remaining = availableCategories.filter(c => !currentCategories.includes(c));
+
+  function addCustom() {
+    const val = customInput.trim();
+    if (!val || currentCategories.includes(val)) return;
+    onToggle(donationId, val);
+    setCustomInput("");
+    setOpen(false);
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="w-4 h-4 rounded-full flex items-center justify-center bg-muted hover:bg-violet-100 dark:hover:bg-violet-900/40 text-muted-foreground hover:text-violet-700 dark:hover:text-violet-300 transition-all border border-border flex-shrink-0"
+          title="AI etiketi ekle"
+        >
+          <Plus className="w-2.5 h-2.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-52 p-2" side="top" align="start">
+        <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">AI Etiketi Ekle</p>
+        {remaining.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {remaining.map(cat => (
+              <button
+                key={cat}
+                onClick={() => { onToggle(donationId, cat); setOpen(false); }}
+                className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 hover:brightness-110 transition-all"
+              >{cat}</button>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-1">
+          <Input
+            className="h-6 text-[10px] px-1.5"
+            placeholder="Özel etiket..."
+            value={customInput}
+            onChange={e => setCustomInput(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") addCustom(); }}
+          />
+          <button
+            onClick={addCustom}
+            disabled={!customInput.trim() || currentCategories.includes(customInput.trim())}
+            className="px-2 py-0.5 rounded text-[9px] font-medium bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 transition-colors whitespace-nowrap"
+          >Ekle</button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -257,6 +322,7 @@ function DonorRowInner({
   onSetPersonEditDesc, onUpdateField, onToggleTag, onSetTagPopover,
   onAddToBasket, onRemoveFromBasket, onSmartPlace, onSplitShare, onDelete,
   onFlagDonation, onUnflagDonation, projectId,
+  onToggleAiCategory, availableAiCategories,
 }: DonorRowProps) {
   const [notePopoverOpen, setNotePopoverOpen] = useState(false);
 
@@ -359,18 +425,29 @@ function DonorRowInner({
           ) : <span className="text-muted-foreground/30">—</span>}
         </td>
         <td className="p-1 min-w-[120px]">
-          <div className="flex flex-wrap gap-0.5">
+          <div className="flex flex-wrap gap-0.5 items-center">
             {(d.aiCategories && d.aiCategories.length > 0) ? d.aiCategories.map(cat => (
-              <span key={cat} className="px-1.5 leading-[16px] rounded text-[9px] font-medium bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 whitespace-nowrap">
+              <span key={cat} className="group inline-flex items-center gap-0.5 px-1.5 leading-[16px] rounded text-[9px] font-medium bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 whitespace-nowrap">
                 {cat}
+                <button
+                  className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-violet-900 dark:hover:text-violet-100 leading-none ml-0.5"
+                  onClick={() => onToggleAiCategory(d.id, cat)}
+                  title={`"${cat}" etiketini kaldır`}
+                >×</button>
               </span>
             )) : null}
+            <AiCategoryAddPopover
+              donationId={d.id}
+              currentCategories={d.aiCategories || []}
+              availableCategories={availableAiCategories}
+              onToggle={onToggleAiCategory}
+            />
             {d.aiWarnings?.trim() && (
               <span className="px-1.5 leading-[16px] rounded text-[9px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700 flex items-center gap-0.5 whitespace-nowrap" title={d.aiWarnings}>
                 <AlertTriangle className="w-2.5 h-2.5" />Uyarı
               </span>
             )}
-            {!d.aiCategories?.length && !d.aiWarnings?.trim() && <span className="text-muted-foreground/30 text-xs">—</span>}
+            {!d.aiCategories?.length && !d.aiWarnings?.trim() && <span className="text-muted-foreground/30 text-xs ml-1">—</span>}
           </div>
         </td>
         <td className="p-1">
@@ -440,5 +517,6 @@ export const DonorRow = React.memo(DonorRowInner, (prev, next) => {
   if (prev.splitShares !== next.splitShares) return false;
   if (prev.tagPopoverOpen !== next.tagPopoverOpen) return false;
   if (prev.globalTags !== next.globalTags) return false;
+  if (prev.availableAiCategories !== next.availableAiCategories) return false;
   return true;
 });
