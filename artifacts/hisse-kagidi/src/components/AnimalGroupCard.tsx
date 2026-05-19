@@ -29,9 +29,10 @@ import {
   ArrowUp,
   ArrowDown,
   StickyNote,
+  Phone,
 } from "lucide-react";
 
-const SORTABLE_COLUMNS: ColumnKey[] = ["vekalet", "description", "temsilci", "name", "donationType"];
+const SORTABLE_COLUMNS: ColumnKey[] = ["vekalet", "description", "temsilci", "name", "donationType", "birim", "fiyat", "ozellik", "yerTalebi", "gunTalebi", "ilkHayvan", "safi"];
 
 interface AnimalGroupCardProps {
   group: AnimalGroup;
@@ -230,7 +231,69 @@ const GroupDonationRow = memo(function GroupDonationRow({
             <span className={`${inputH} flex items-center select-text`}>{turkishTitleCase(d.donationType) || "—"}</span>
           </td>
         );
+      case "birim":
+        return (
+          <td key={colKey} className={`${cellPad} text-center`}>
+            <span className={`${inputH} flex items-center justify-center text-muted-foreground`}>{d.birim || <span className="text-muted-foreground/30">—</span>}</span>
+          </td>
+        );
+      case "fiyat":
+        return (
+          <td key={colKey} className={`${cellPad} text-center`}>
+            <span className={`${inputH} flex items-center justify-center text-muted-foreground`}>{d.fiyat || <span className="text-muted-foreground/30">—</span>}</span>
+          </td>
+        );
+      case "ozellik":
+        return (
+          <td key={colKey} className={`${cellPad} text-center`}>
+            <span className={`${inputH} flex items-center justify-center text-muted-foreground`}>{d.ozellik || <span className="text-muted-foreground/30">—</span>}</span>
+          </td>
+        );
+      case "yerTalebi":
+        return (
+          <td key={colKey} className={`${cellPad} text-center`}>
+            <span className={`${inputH} flex items-center justify-center text-muted-foreground`}>{d.yerTalebi || <span className="text-muted-foreground/30">—</span>}</span>
+          </td>
+        );
+      case "gunTalebi":
+        return (
+          <td key={colKey} className={`${cellPad} text-center`}>
+            <span className={`${inputH} flex items-center justify-center text-muted-foreground`}>{d.gunTalebi || <span className="text-muted-foreground/30">—</span>}</span>
+          </td>
+        );
+      case "ilkHayvan":
+        return (
+          <td key={colKey} className={`${cellPad} text-center`}>
+            <span className={`${inputH} flex items-center justify-center text-muted-foreground`}>{d.ilkHayvan || <span className="text-muted-foreground/30">—</span>}</span>
+          </td>
+        );
+      case "safi":
+        return (
+          <td key={colKey} className={`${cellPad} text-center`}>
+            <span className={`${inputH} flex items-center justify-center text-muted-foreground`}>{d.safi || <span className="text-muted-foreground/30">—</span>}</span>
+          </td>
+        );
+      case "telefon":
+        return (
+          <td key={colKey} className={cellPad}>
+            {d.phone ? (
+              <a href={`tel:${d.phone}`} className={`${inputH} flex items-center gap-0.5 text-blue-600 hover:underline whitespace-nowrap`} onClick={e => e.stopPropagation()}>
+                <Phone className="w-2.5 h-2.5 flex-shrink-0" />{d.phone}
+              </a>
+            ) : <span className="text-muted-foreground/30">—</span>}
+          </td>
+        );
       case "notes":
+        return (
+          <td key={colKey} className={cellPad}>
+            {d.notes?.trim() ? (
+              <span className={`${inputH} flex items-center text-muted-foreground truncate max-w-[100px]`} title={d.notes.trim()}>
+                <StickyNote className="w-2.5 h-2.5 mr-0.5 text-amber-500 flex-shrink-0" />{d.notes.trim()}
+              </span>
+            ) : <span className="text-muted-foreground/30">—</span>}
+          </td>
+        );
+      case "aiTags":
         return (
           <td key={colKey} className={cellPad}>
             <div className="flex gap-0.5 flex-wrap items-center min-h-[1.25rem]">
@@ -246,7 +309,7 @@ const GroupDonationRow = memo(function GroupDonationRow({
                   )}
                 </>
               ) : (
-                <span className="text-muted-foreground text-[10px]">—</span>
+                <span className="text-muted-foreground/30">—</span>
               )}
             </div>
           </td>
@@ -814,7 +877,8 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
       </div>
       {!isCollapsed && (
         <>
-          <table className={`w-full ${compact ? "text-[10px]" : "text-xs"}`}>
+          <div className="overflow-x-auto">
+          <table className={`w-full min-w-max ${compact ? "text-[10px]" : "text-xs"}`}>
             <thead>
               <tr className="border-b bg-muted/30">
                 <th className={`${compact ? "p-0.5" : "p-1.5"} w-6`}>
@@ -886,6 +950,7 @@ export const AnimalGroupCard = memo(function AnimalGroupCard(props: AnimalGroupC
               ))}
             </tbody>
           </table>
+          </div>
           <div className={`${compact ? "p-1" : "p-2"} border-t flex items-center gap-2`}>
             <LocalInput
               value={group.notes || ""}

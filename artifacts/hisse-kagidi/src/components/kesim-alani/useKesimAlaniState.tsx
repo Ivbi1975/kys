@@ -643,12 +643,23 @@ export function useKesimAlaniState() {
 
   const columnHeaderWidth = useCallback((key: ColumnKey): string => {
     switch (key) {
-      case "drag": return "w-6";
-      case "index": return "w-6";
-      case "vekalet": return "w-16";
-      case "temsilci": return "w-24";
-      case "donationType": return "w-16";
-      case "notes": return "w-20";
+      case "drag": return "w-5";
+      case "index": return "w-5";
+      case "vekalet": return "w-14";
+      case "description": return "min-w-[90px]";
+      case "temsilci": return "w-20";
+      case "name": return "min-w-[90px]";
+      case "donationType": return "w-14";
+      case "birim": return "w-14";
+      case "fiyat": return "w-14";
+      case "ozellik": return "w-14";
+      case "yerTalebi": return "w-14";
+      case "gunTalebi": return "w-14";
+      case "ilkHayvan": return "w-14";
+      case "safi": return "w-12";
+      case "telefon": return "w-24";
+      case "notes": return "min-w-[70px]";
+      case "aiTags": return "min-w-[80px]";
       case "actions": return "w-8";
       default: return "";
     }
