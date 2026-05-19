@@ -31,7 +31,7 @@ import {
   StickyNote,
 } from "lucide-react";
 
-const SORTABLE_COLUMNS: ColumnKey[] = ["vekalet", "description", "name", "donationType", "fiyat", "ozellik", "yerTalebi", "gunTalebi", "ilkHayvan", "safi"];
+const SORTABLE_COLUMNS: ColumnKey[] = ["vekalet", "description", "name", "donationType", "fiyat", "yerTalebi", "gunTalebi", "ilkHayvan", "safi"];
 
 interface AnimalGroupCardProps {
   group: AnimalGroup;
@@ -228,12 +228,6 @@ const GroupDonationRow = memo(function GroupDonationRow({
         return (
           <td key={colKey} className={`${cellPad} text-center`}>
             <span className={`${inputH} flex items-center justify-center text-muted-foreground`}>{d.fiyat || <span className="text-muted-foreground/30">—</span>}</span>
-          </td>
-        );
-      case "ozellik":
-        return (
-          <td key={colKey} className={`${cellPad} text-center`}>
-            <span className={`${inputH} flex items-center justify-center text-muted-foreground`}>{d.ozellik || <span className="text-muted-foreground/30">—</span>}</span>
           </td>
         );
       case "yerTalebi":

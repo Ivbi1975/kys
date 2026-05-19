@@ -650,7 +650,6 @@ export function useKesimAlaniState() {
       case "name": return "min-w-[90px]";
       case "donationType": return "w-14";
       case "fiyat": return "w-14";
-      case "ozellik": return "w-14";
       case "yerTalebi": return "w-14";
       case "gunTalebi": return "w-14";
       case "ilkHayvan": return "w-14";

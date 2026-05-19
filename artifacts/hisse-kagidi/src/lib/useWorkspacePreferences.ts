@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-export type ColumnKey = "drag" | "index" | "vekalet" | "description" | "name" | "donationType" | "fiyat" | "ozellik" | "yerTalebi" | "gunTalebi" | "ilkHayvan" | "safi" | "notes" | "aiTags" | "actions";
+export type ColumnKey = "drag" | "index" | "vekalet" | "description" | "name" | "donationType" | "fiyat" | "yerTalebi" | "gunTalebi" | "ilkHayvan" | "safi" | "notes" | "aiTags" | "actions";
 
 export const ALL_GROUP_COLUMNS: { key: ColumnKey; label: string; alwaysVisible?: boolean }[] = [
   { key: "drag", label: "Sürükle" },
@@ -10,7 +10,6 @@ export const ALL_GROUP_COLUMNS: { key: ColumnKey; label: string; alwaysVisible?:
   { key: "name", label: "Adına Kesilen" },
   { key: "donationType", label: "Cinsi" },
   { key: "fiyat", label: "Fiyat" },
-  { key: "ozellik", label: "Özellik" },
   { key: "yerTalebi", label: "Yer Tal." },
   { key: "gunTalebi", label: "Gün Tal." },
   { key: "ilkHayvan", label: "İlk H." },
@@ -20,7 +19,7 @@ export const ALL_GROUP_COLUMNS: { key: ColumnKey; label: string; alwaysVisible?:
   { key: "actions", label: "İşlemler" },
 ];
 
-export const DEFAULT_COLUMN_ORDER: ColumnKey[] = ["drag", "index", "vekalet", "description", "name", "donationType", "fiyat", "ozellik", "yerTalebi", "gunTalebi", "ilkHayvan", "safi", "notes", "aiTags", "actions"];
+export const DEFAULT_COLUMN_ORDER: ColumnKey[] = ["drag", "index", "vekalet", "description", "name", "donationType", "fiyat", "yerTalebi", "gunTalebi", "ilkHayvan", "safi", "notes", "aiTags", "actions"];
 
 export interface WorkspacePreferences {
   columnCount: 1 | 2 | 3;
