@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { parseAiCategories } from "../lib/ai-categories";
 import crypto from "node:crypto";
 import { db } from "@workspace/db";
 import { refreshProjectStats } from "./projects";
@@ -121,7 +122,7 @@ router.post("/backup/export", asyncHandler(async (_req, res) => {
       notes: d.notes,
       excluded: d.excluded,
       tags: tagsByDonation[d.id] || [],
-      aiCategories: d.aiCategories ? JSON.parse(d.aiCategories) : undefined,
+      aiCategories: parseAiCategories(d.aiCategories) || undefined,
       aiWarnings: d.aiWarnings || undefined,
     };
   }

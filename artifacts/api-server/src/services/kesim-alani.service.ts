@@ -1,4 +1,5 @@
 import { db } from "@workspace/db";
+import { parseAiCategories } from "../lib/ai-categories";
 import {
   kesimAlanlariTable,
   donationsTable,
@@ -112,7 +113,7 @@ export function assembleKesimAlani(
       safi: d.safi || "",
       excluded: d.excluded,
       tags: tagsByDonation[d.id] || [],
-      aiCategories: (d.aiCategories && d.aiCategories.trim()) ? JSON.parse(d.aiCategories) : [],
+      aiCategories: parseAiCategories(d.aiCategories),
       aiWarnings: d.aiWarnings || "",
       aiConfidenceScore: d.aiConfidenceScore ?? null,
       isFlagged: d.isFlagged,
@@ -265,7 +266,7 @@ export async function getFullKesimAlaniList(kaRows: KesimAlaniRow[]) {
         sortOrder: d.sort_order,
         deletedAt: null,
         updatedAt: new Date(),
-        aiCategories: d.ai_categories ? JSON.parse(d.ai_categories) : [],
+        aiCategories: JSON.stringify(parseAiCategories(d.ai_categories)),
         aiWarnings: d.ai_warnings || "",
         aiRequests: d.ai_requests || null,
         aiSummary: d.ai_summary || null,
@@ -426,7 +427,7 @@ export async function getFullKesimAlani(id: string) {
       sortOrder: d.sort_order,
       deletedAt: null,
       updatedAt: new Date(),
-      aiCategories: d.ai_categories ? JSON.parse(d.ai_categories) : [],
+      aiCategories: JSON.stringify(parseAiCategories(d.ai_categories)),
       aiWarnings: d.ai_warnings || "",
       aiRequests: d.ai_requests || null,
       aiSummary: d.ai_summary || null,

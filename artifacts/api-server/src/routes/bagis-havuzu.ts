@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { parseAiCategories } from "../lib/ai-categories";
 import { db } from "@workspace/db";
 import {
   projectsTable,
@@ -563,7 +564,7 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     // defensive and should never be reached in practice.
     kesimAlaniName: kaNameMap[d.kesimAlaniId] || "",
     tags: tagsByDonation[d.id] || [],
-    aiCategories: d.aiCategories ? (() => { try { const p = JSON.parse(d.aiCategories); return Array.isArray(p) ? p.map(String) : []; } catch { return []; } })() : [],
+    aiCategories: parseAiCategories(d.aiCategories),
     aiWarnings: d.aiWarnings || "",
     aiConfidenceScore: d.aiConfidenceScore ?? null,
     isFlagged: d.isFlagged,
@@ -2079,7 +2080,7 @@ router.get("/projects/:id/flagged-donations", asyncHandler(async (req, res) => {
     isFlagged: d.isFlagged,
     flagReason: d.flagReason,
     aiWarnings: d.aiWarnings || "",
-    aiCategories: d.aiCategories ? (() => { try { const p = JSON.parse(d.aiCategories); return Array.isArray(p) ? p.map(String) : []; } catch { return []; } })() : [],
+    aiCategories: parseAiCategories(d.aiCategories),
     kesimAlaniId: d.kesimAlaniId,
     kesimAlaniName: kaNameMap[d.kesimAlaniId] || "",
     groups: groupInfoMap[d.id] || [],

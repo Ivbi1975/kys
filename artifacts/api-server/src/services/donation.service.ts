@@ -7,6 +7,7 @@ import {
 import { desc, gt, lt, or, count, ilike, asc } from "drizzle-orm";
 import { eq, inArray, isNull, isNotNull, and, ne } from "drizzle-orm";
 import { MAX_QUERY_LIMIT } from "../lib/constants";
+import { parseAiCategories } from "../lib/ai-categories";
 import { serviceError, serviceOk, type ServiceResult } from "./result";
 import { requireActiveKesimAlani, getFullKesimAlani } from "./kesim-alani.service";
 
@@ -84,7 +85,7 @@ function mapDonationRow(d: typeof donationsTable.$inferSelect, tags: string[]) {
     excluded: d.excluded,
     sortOrder: d.sortOrder,
     tags,
-    aiCategories: d.aiCategories ? JSON.parse(d.aiCategories) : [],
+    aiCategories: parseAiCategories(d.aiCategories),
     aiWarnings: d.aiWarnings || "",
     aiConfidenceScore: d.aiConfidenceScore ?? null,
     isFlagged: d.isFlagged,
@@ -346,7 +347,7 @@ export async function listDeletedDonations(kesimAlaniId: string) {
     excluded: d.excluded,
     deletedAt: d.deletedAt,
     tags: tagsByDonation[d.id] || [],
-    aiCategories: d.aiCategories ? JSON.parse(d.aiCategories) : [],
+    aiCategories: parseAiCategories(d.aiCategories),
     aiWarnings: d.aiWarnings || "",
     aiConfidenceScore: d.aiConfidenceScore ?? null,
   }));
