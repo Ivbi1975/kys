@@ -1,11 +1,152 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Loader2, RotateCcw, Wand2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Loader2, RotateCcw, Wand2, X } from "lucide-react";
 import type { useKesimAlaniState } from "./useKesimAlaniState";
-import { KesimAlaniProvider } from "./KesimAlaniContext";
+import { KesimAlaniProvider, useKesimAlaniContext } from "./KesimAlaniContext";
 import { KesimAlaniHeader, StatsCards, DonorListPanel, GroupListPanel } from "./sections";
 import { SonIslemlerKart } from "@/components/SonIslemlerKart";
+
+const MAX_LOG_VISIBLE = 10;
+
+function HistoryLogPanel() {
+  const { history, handleUndo, handleRedo, handleGoToStep, setHistoryPanelOpen } = useKesimAlaniContext();
+
+  const list = history.historyList;
+  const total = list.length;
+  const activeIdx = list.findIndex(e => e.isActive);
+  const currentStep = activeIdx + 1;
+
+  const windowStart = Math.max(0, Math.min(activeIdx - 4, total - MAX_LOG_VISIBLE));
+  const windowEnd = Math.min(total, windowStart + MAX_LOG_VISIBLE);
+  const displayList = list.slice(windowStart, windowEnd).map((e, i) => ({
+    ...e,
+    absoluteIdx: windowStart + i,
+  }));
+
+  const hiddenBefore = windowStart;
+  const hiddenAfter = total - windowEnd;
+
+  return (
+    <Card className="mb-4 overflow-hidden border-primary/20 shadow-sm">
+      <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
+        <div className="flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5 text-primary/70" />
+          <h3 className="text-xs font-semibold text-foreground">İşlem Geçmişi</h3>
+          {total > 0 && (
+            <span className="text-[10px] text-muted-foreground tabular-nums">
+              ({currentStep}/{total})
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost" size="sm" className="h-6 w-6 p-0"
+            onClick={handleUndo} disabled={!history.canUndo}
+            title={`Geri Al${history.canUndo ? ` — ${list[activeIdx - 1]?.description}` : ""}`}
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            variant="ghost" size="sm" className="h-6 w-6 p-0"
+            onClick={handleRedo} disabled={!history.canRedo}
+            title={`İleri Al${history.canRedo ? ` — ${list[activeIdx + 1]?.description}` : ""}`}
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Button>
+          <div className="w-px h-4 bg-border mx-1" />
+          <Button
+            variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+            onClick={() => setHistoryPanelOpen(false)}
+            title="Kapat"
+          >
+            <X className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="p-1.5 space-y-0.5">
+        {displayList.length === 0 && (
+          <p className="text-xs text-muted-foreground text-center py-4">Henüz işlem yok</p>
+        )}
+
+        {hiddenBefore > 0 && (
+          <p className="text-[10px] text-muted-foreground/50 text-center py-0.5 italic">
+            ↑ {hiddenBefore} önceki kayıt
+          </p>
+        )}
+
+        {displayList.map(({ description, timestamp, isActive, absoluteIdx }) => {
+          const isFuture = absoluteIdx > activeIdx;
+          return (
+            <button
+              key={absoluteIdx}
+              onClick={() => handleGoToStep(absoluteIdx)}
+              className={`w-full text-left text-xs px-2.5 py-1.5 rounded-md flex items-center justify-between gap-2 transition-colors group ${
+                isActive
+                  ? "bg-primary text-primary-foreground font-medium"
+                  : isFuture
+                    ? "text-muted-foreground/40 hover:bg-muted hover:text-muted-foreground"
+                    : "text-foreground hover:bg-muted"
+              }`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className={`text-[9px] tabular-nums w-4 text-right shrink-0 ${isActive ? "opacity-70" : "text-muted-foreground/40"}`}>
+                  {absoluteIdx + 1}
+                </span>
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isActive ? "bg-primary-foreground" : isFuture ? "bg-border" : "bg-muted-foreground/30 group-hover:bg-muted-foreground/60"}`} />
+                <span className="truncate">{description}</span>
+              </div>
+              <span className={`text-[10px] shrink-0 ${isActive ? "opacity-70" : "text-muted-foreground/40"}`}>
+                {new Date(timestamp).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            </button>
+          );
+        })}
+
+        {hiddenAfter > 0 && (
+          <p className="text-[10px] text-muted-foreground/50 text-center py-0.5 italic">
+            ↓ {hiddenAfter} sonraki kayıt
+          </p>
+        )}
+      </div>
+
+      {total > 1 && (
+        <div className="px-3 py-2 border-t bg-muted/10 flex items-center justify-between">
+          <Button
+            variant="ghost" size="sm"
+            className="h-6 px-2 text-[10px] text-muted-foreground gap-1 disabled:opacity-30"
+            onClick={handleUndo} disabled={!history.canUndo}
+          >
+            <ChevronLeft className="w-3 h-3" />
+            Geri Al
+          </Button>
+          <div className="flex items-center gap-1">
+            {list.slice(Math.max(0, total - MAX_LOG_VISIBLE)).map((_, i) => {
+              const absIdx = Math.max(0, total - MAX_LOG_VISIBLE) + i;
+              return (
+                <button
+                  key={absIdx}
+                  onClick={() => handleGoToStep(absIdx)}
+                  className={`transition-all rounded-full ${absIdx === activeIdx ? "bg-primary w-2.5 h-2.5" : "bg-muted-foreground/30 hover:bg-muted-foreground/60 w-1.5 h-1.5"}`}
+                  title={list[absIdx]?.description}
+                />
+              );
+            })}
+          </div>
+          <Button
+            variant="ghost" size="sm"
+            className="h-6 px-2 text-[10px] text-muted-foreground gap-1 disabled:opacity-30"
+            onClick={handleRedo} disabled={!history.canRedo}
+          >
+            İleri Al
+            <ChevronRight className="w-3 h-3" />
+          </Button>
+        </div>
+      )}
+    </Card>
+  );
+}
 
 type KesimAlaniStateReturn = ReturnType<typeof useKesimAlaniState>;
 
@@ -83,43 +224,8 @@ export function KesimAlaniContent(props: KesimAlaniStateReturn) {
           </div>
         )}
 
-        {/* ── İşlem Geçmişi Paneli ── */}
-        {historyPanelOpen && !fullscreenMode && (
-          <Card className="mb-4 overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
-              <h3 className="text-xs font-semibold text-foreground">İşlem Geçmişi</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                onClick={() => setHistoryPanelOpen(false)}
-              >
-                <X className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-            <div className="max-h-56 overflow-y-auto p-1.5 space-y-0.5">
-              {history.historyList.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-3">Henüz işlem yok</p>
-              )}
-              {history.historyList.map((item, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleGoToStep(i)}
-                  className={`w-full text-left text-xs px-2.5 py-1.5 rounded-md transition-colors ${
-                    item.isActive
-                      ? "bg-primary text-primary-foreground font-medium"
-                      : "text-foreground hover:bg-muted"
-                  }`}
-                >
-                  <span>{item.description}</span>
-                  <span className={`ml-2 text-[10px] ${item.isActive ? "opacity-70" : "text-muted-foreground"}`}>
-                    {new Date(item.timestamp).toLocaleTimeString("tr-TR")}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </Card>
-        )}
+        {/* ── İşlem Geçmişi Log Paneli ── */}
+        {historyPanelOpen && !fullscreenMode && <HistoryLogPanel />}
 
         {/* ── Mobil sekme seçici ── */}
         {!fullscreenMode && (
