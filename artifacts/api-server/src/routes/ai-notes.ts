@@ -263,6 +263,7 @@ const classifyAsyncSchema = z.object({
   })).min(1).max(50000),
   kesimAlaniId: z.string().optional(),
   batchSize: z.number().int().min(5).max(100).optional().default(25),
+  projectId: z.string().optional(),
 });
 
 router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
@@ -279,7 +280,7 @@ router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
     return;
   }
 
-  const { donations, kesimAlaniId, batchSize } = parsed.data;
+  const { donations, kesimAlaniId, batchSize, projectId: incomingProjectId } = parsed.data;
   const jobId = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + AI_JOB_TTL_MS);
 
@@ -294,7 +295,7 @@ router.post("/ai-notes/classify-async", asyncHandler(async (req, res) => {
 
   res.status(202).json({ jobId, status: AiJobStatus.PENDING, totalDonations: donations.length });
 
-  processClassifyJob(jobId, donations, batchSize).catch(err => {
+  processClassifyJob(jobId, donations, batchSize, incomingProjectId).catch(err => {
     logger.error({ err, jobId }, "AI job unhandled error");
   });
 }));
@@ -488,6 +489,7 @@ async function processClassifyJob(
   jobId: string,
   donations: Array<{ id: string; name: string; donationType: string; vekalet: string; notes: string }>,
   chunkSize: number = CHUNK_SIZE,
+  incomingProjectId?: string,
 ) {
   const jobStartedAt = new Date();
   try {
@@ -597,8 +599,8 @@ async function processClassifyJob(
     try {
       const [jobRow] = await db.select({ kesimAlaniId: aiJobsTable.kesimAlaniId })
         .from(aiJobsTable).where(eq(aiJobsTable.id, jobId));
-      let projectId: string | null = null;
-      if (jobRow?.kesimAlaniId) {
+      let projectId: string | null = incomingProjectId ?? null;
+      if (!projectId && jobRow?.kesimAlaniId) {
         const [kaRow] = await db.select({ projectId: kesimAlanlariTable.projectId })
           .from(kesimAlanlariTable).where(eq(kesimAlanlariTable.id, jobRow.kesimAlaniId));
         projectId = kaRow?.projectId ?? null;

@@ -10,7 +10,7 @@ import {
 import {
   Brain, ArrowLeft, Play, Square, CheckSquare, FastForward, RotateCcw,
   AlertTriangle, Loader2, X, Sparkles, CheckCircle2,
-  MessageSquare, FileText, Tag, Settings2, BarChart3, History, Pencil,
+  MessageSquare, FileText, Tag, Settings2, BarChart3, History, Pencil, Zap, Terminal,
 } from "lucide-react";
 import {
   fetchPoolDonations,
@@ -32,6 +32,78 @@ interface AiResult extends AiClassificationResult {
 }
 
 const AI_FAIL_MESSAGES = new Set(["AI bu bağışı sınıflandıramadı", "AI işlemi başarısız oldu", "AI sonuç eşleşmesi bulunamadı"]);
+
+type LiveLogEntry =
+  | { id: string; ts: Date; kind: "start"; total: number }
+  | { id: string; ts: Date; kind: "batch"; count: number; cats: [string, number][]; warnings: Array<{ name: string; msg: string }> }
+  | { id: string; ts: Date; kind: "complete"; processed: number; durationSec: number }
+  | { id: string; ts: Date; kind: "stop"; processed: number }
+  | { id: string; ts: Date; kind: "error"; message: string };
+
+type LiveLogInput =
+  | { kind: "start"; total: number }
+  | { kind: "batch"; count: number; cats: [string, number][]; warnings: Array<{ name: string; msg: string }> }
+  | { kind: "complete"; processed: number; durationSec: number }
+  | { kind: "stop"; processed: number }
+  | { kind: "error"; message: string };
+
+function LogEntry({ entry }: { entry: LiveLogEntry }) {
+  const ts = entry.ts.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return (
+    <div className="flex items-start gap-1.5 py-1 text-[11px] leading-relaxed border-b border-border/30 last:border-0">
+      <span className="text-muted-foreground/40 font-mono shrink-0 tabular-nums mt-0.5">{ts}</span>
+      <div className="min-w-0 flex-1">
+        {entry.kind === "start" && (
+          <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+            <Brain className="w-3 h-3 shrink-0" />
+            Başlatıldı — {entry.total} bağış işlenecek
+          </div>
+        )}
+        {entry.kind === "batch" && (
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1 text-foreground/80 font-medium">
+              <Zap className="w-3 h-3 shrink-0 text-amber-500" />
+              {entry.count} bağış işlendi
+            </div>
+            {entry.cats.length > 0 && (
+              <div className="flex flex-wrap gap-0.5 pl-4">
+                {entry.cats.map(([cat, n]) => (
+                  <span key={cat} className="px-1 rounded text-[9px] bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
+                    {cat.replace(/_/g, " ")} ×{n}
+                  </span>
+                ))}
+              </div>
+            )}
+            {entry.warnings.map((w, i) => (
+              <div key={i} className="flex items-start gap-0.5 pl-4 text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="w-2.5 h-2.5 mt-0.5 shrink-0" />
+                <span className="min-w-0 break-words"><span className="font-medium">{w.name}</span>: {w.msg}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {entry.kind === "complete" && (
+          <div className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
+            <CheckCircle2 className="w-3 h-3 shrink-0" />
+            Tamamlandı — {entry.processed} bağış · {entry.durationSec}s
+          </div>
+        )}
+        {entry.kind === "stop" && (
+          <div className="flex items-center gap-1 text-orange-500 dark:text-orange-400 font-medium">
+            <Square className="w-3 h-3 shrink-0" />
+            Durduruldu · {entry.processed} bağış işlendi
+          </div>
+        )}
+        {entry.kind === "error" && (
+          <div className="flex items-start gap-1 text-red-600 dark:text-red-400">
+            <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+            <span className="font-medium break-words">{entry.message}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function AiSiniflandirmaPage() {
   const params = useParams<{ id: string }>();
@@ -73,6 +145,21 @@ export default function AiSiniflandirmaPage() {
   });
 
   const [editingCategory, setEditingCategory] = useState<{ donationId: string; catIndex: number; value: string } | null>(null);
+
+  const [liveLogEntries, setLiveLogEntries] = useState<LiveLogEntry[]>([]);
+  const [liveLogTab, setLiveLogTab] = useState<"live" | "history">("live");
+  const [recentResults, setRecentResults] = useState<Array<{ donationId: string; name: string; cats: string[]; summary: string; warnings: string }>>([]);
+  const liveLogScrollRef = useRef<HTMLDivElement>(null);
+  const logIdRef = useRef(0);
+  const processedCountRef = useRef(0);
+
+  const addLogEntry = useCallback((entry: LiveLogInput) => {
+    const id = String(++logIdRef.current);
+    setLiveLogEntries(prev => [...prev.slice(-500), { ...entry, id, ts: new Date() } as LiveLogEntry]);
+    setTimeout(() => {
+      liveLogScrollRef.current?.scrollTo({ top: liveLogScrollRef.current.scrollHeight, behavior: "smooth" });
+    }, 50);
+  }, []);
 
   const removeCategory = (donationId: string, catIndex: number) => {
     setAiResults(prev => {
@@ -271,6 +358,8 @@ export default function AiSiniflandirmaPage() {
     let isSaving = false;
     let isPolling = false;
     let totalSavedCount = 0;
+    const loggedDonationIds = new Set<string>();
+    const jobStartedAt = Date.now();
 
     const drainQueue = async () => {
       if (isSaving) return;
@@ -350,7 +439,7 @@ export default function AiSiniflandirmaPage() {
 
           if (status.status === "completed" || status.status === "failed" || status.status === "cancelled") {
             finishedJobs.add(jid);
-            if (status.status === "cancelled") setAiStopped(true);
+            if (status.status === "cancelled") { setAiStopped(true); addLogEntry({ kind: "stop", processed: processedCountRef.current }); }
             if (status.status === "failed") {
               const isTimeout = status.error?.startsWith("Zaman aşımı");
               toast({
@@ -361,17 +450,36 @@ export default function AiSiniflandirmaPage() {
                 variant: "destructive",
               });
               if (isTimeout) setAiStopped(true);
+              addLogEntry({ kind: "error", message: status.error || "AI işlemi başarısız oldu" });
             }
           }
         }
 
         if (newResultsThisPoll.length > 0) {
           enqueueNewResults(newResultsThisPoll);
+          const newToLog = newResultsThisPoll.filter(r => !loggedDonationIds.has(r.donationId));
+          if (newToLog.length > 0) {
+            for (const r of newToLog) loggedDonationIds.add(r.donationId);
+            const catMap = new Map<string, number>();
+            const batchWarnings: Array<{ name: string; msg: string }> = [];
+            const recentItems: Array<{ donationId: string; name: string; cats: string[]; summary: string; warnings: string }> = [];
+            for (const r of newToLog) {
+              const donor = allItems.find(d => d.id === r.donationId);
+              const dName = donor?.description || donor?.name || r.donationId;
+              for (const cat of r.categories) catMap.set(cat, (catMap.get(cat) ?? 0) + 1);
+              if (r.warnings) batchWarnings.push({ name: dName, msg: r.warnings });
+              recentItems.push({ donationId: r.donationId, name: dName, cats: r.categories, summary: r.summary || "", warnings: r.warnings || "" });
+            }
+            const cats = [...catMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5) as [string, number][];
+            addLogEntry({ kind: "batch", count: newToLog.length, cats, warnings: batchWarnings });
+            setRecentResults(prev => [...[...recentItems].reverse(), ...prev].slice(0, 8));
+          }
         }
 
         let totalDone = 0, totalAll = 0;
         for (const p of jobProgressMap.values()) { totalDone += p.done; totalAll += p.total; }
         setAiProgress({ done: totalDone, total: totalAll });
+        processedCountRef.current = totalDone;
 
         let totalErrors = 0;
         for (const e of jobErrorMap.values()) totalErrors += e;
@@ -412,8 +520,10 @@ export default function AiSiniflandirmaPage() {
           await drainQueue();
 
           queryClient.invalidateQueries({ queryKey: ["pool-donations-ai-page"] });
+          queryClient.invalidateQueries({ queryKey: ["ai-job-logs"] });
           const finalTotal = totalSavedCount;
           setSaved(true);
+          addLogEntry({ kind: "complete", processed: totalDone, durationSec: Math.round((Date.now() - jobStartedAt) / 1000) });
           toast({ title: "Tümü kaydedildi", description: `${finalTotal} bağışçı sınıflandırması güncellendi` });
         }
       } catch {} finally { isPolling = false; }
@@ -421,7 +531,7 @@ export default function AiSiniflandirmaPage() {
 
     poll();
     pollIntervalRef.current = setInterval(poll, 3000);
-  }, [stopPolling, toast, allItems, queryClient]);
+  }, [stopPolling, toast, allItems, queryClient, addLogEntry]);
 
   const handleStart = useCallback(async (resume = false) => {
     let toProcess = itemsWithNotes;
@@ -444,7 +554,8 @@ export default function AiSiniflandirmaPage() {
     setAiErrorBatches(0);
     setAiTotalBatches(0);
     setSaved(false);
-    if (!resume) setAiResults(new Map());
+    if (!resume) { setAiResults(new Map()); setLiveLogEntries([]); setRecentResults([]); setLiveLogTab("live"); }
+    addLogEntry({ kind: "start", total: toProcess.length });
 
     const previouslyDone = resume ? aiResults.size : 0;
     setAiProgress({ done: previouslyDone, total: previouslyDone + toProcess.length });
@@ -454,6 +565,7 @@ export default function AiSiniflandirmaPage() {
         toProcess.map(d => ({ id: d.id, name: d.description || d.name || "", donationType: d.donationType || "", vekalet: d.vekalet || "", notes: d.notes || "" })),
         undefined,
         batchSize,
+        projectId,
       );
       activeJobIdsRef.current = jobIds;
       startPollingJobs(jobIds, toProcess.length);
@@ -470,14 +582,15 @@ export default function AiSiniflandirmaPage() {
       const detailStr = details ? details.map((d: { path?: string[]; message?: string }) => `${(d.path || []).join(".")}: ${d.message || ""}`).join(", ") : "";
       toast({ title: "AI Başlatılamadı", description: detailStr ? `${msg} (${detailStr})` : msg, variant: "destructive" });
     }
-  }, [itemsWithNotes, skipClassified, aiResults, toast, startPollingJobs]);
+  }, [itemsWithNotes, skipClassified, aiResults, toast, startPollingJobs, addLogEntry, projectId]);
 
   const handleStop = useCallback(async () => {
     const jobIds = activeJobIdsRef.current;
     if (jobIds.length > 0) await Promise.all(jobIds.map(id => cancelJob(id).catch(() => {})));
     setAiStopped(true);
     setAiRunning(false);
-  }, []);
+    addLogEntry({ kind: "stop", processed: processedCountRef.current });
+  }, [addLogEntry]);
 
   const handleSaveNow = useCallback(async () => {
     if (aiResults.size === 0) return;
@@ -573,7 +686,7 @@ export default function AiSiniflandirmaPage() {
       </div>
 
       <div className="flex flex-1 min-h-0">
-        <div className="w-72 shrink-0 border-r flex flex-col gap-4 p-4 overflow-y-auto">
+        <div className="w-64 shrink-0 border-r flex flex-col gap-4 p-4 overflow-y-auto">
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground mb-3">
               <Settings2 className="w-4 h-4" />Ayarlar
@@ -705,69 +818,6 @@ export default function AiSiniflandirmaPage() {
             </div>
           )}
 
-          {(jobLogsData?.logs ?? []).length > 0 && (
-            <div className="space-y-2 pt-2 border-t">
-              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                <History className="w-3.5 h-3.5" />Geçmiş İşler
-              </p>
-              <div className="space-y-1.5">
-                {(jobLogsData?.logs ?? []).map((log: AiJobLog) => {
-                  const completedDate = log.completedAt ? new Date(log.completedAt) : null;
-                  const durationSec = log.durationMs != null ? Math.round(log.durationMs / 1000) : null;
-                  let topCats: [string, number][] = [];
-                  if (log.categoryDistribution) {
-                    try {
-                      const dist = JSON.parse(log.categoryDistribution) as Record<string, number>;
-                      topCats = Object.entries(dist).slice(0, 3);
-                    } catch {}
-                  }
-                  return (
-                    <div key={log.id} className="rounded-md bg-muted/40 border px-2.5 py-2 text-[11px] space-y-1">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="font-medium text-foreground">
-                          {log.donationCount} bağış
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          {log.avgConfidenceScore != null && (
-                            <span className={`font-semibold ${
-                              log.avgConfidenceScore >= 7 ? "text-green-600 dark:text-green-400"
-                              : log.avgConfidenceScore >= 4 ? "text-amber-600 dark:text-amber-400"
-                              : "text-red-600 dark:text-red-400"
-                            }`}>
-                              ★{log.avgConfidenceScore.toFixed(1)}
-                            </span>
-                          )}
-                          {log.warningCount > 0 && (
-                            <span className="text-destructive font-semibold flex items-center gap-0.5">
-                              <AlertTriangle className="w-3 h-3" />{log.warningCount} uyarı
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {topCats.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {topCats.map(([cat, count]) => (
-                            <span key={cat} className="bg-muted rounded px-1 text-muted-foreground">
-                              {cat.replace(/_/g, " ")} ({count})
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <div className="text-muted-foreground flex items-center gap-2 flex-wrap">
-                        {completedDate && (
-                          <span>{completedDate.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })} {completedDate.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</span>
-                        )}
-                        {durationSec != null && <span>{durationSec}s</span>}
-                        {log.errorBatchCount > 0 && (
-                          <span className="text-amber-600">{log.errorBatchCount}/{log.totalBatches} batch hata</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="flex-1 min-w-0 overflow-y-auto p-4 space-y-4">
@@ -1098,6 +1148,113 @@ export default function AiSiniflandirmaPage() {
                 })}
               </div>
             </Card>
+          )}
+        </div>
+
+        {/* Right Log Panel */}
+        <div className="w-[300px] shrink-0 border-l flex flex-col bg-background">
+          <div className="flex items-center border-b shrink-0">
+            <button
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium border-b-2 transition-colors ${liveLogTab === "live" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              onClick={() => setLiveLogTab("live")}
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              Canlı Log
+              {aiRunning && <span className="ml-0.5 w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />}
+            </button>
+            <button
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium border-b-2 transition-colors ${liveLogTab === "history" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              onClick={() => setLiveLogTab("history")}
+            >
+              <History className="w-3.5 h-3.5" />
+              Geçmiş
+            </button>
+          </div>
+
+          {liveLogTab === "live" ? (
+            <div className="flex flex-col flex-1 min-h-0">
+              {aiRunning && recentResults.length > 0 && (
+                <div className="border-b bg-muted/30 p-2 space-y-1 shrink-0 max-h-[220px] overflow-y-auto">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5 mb-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin" />Son İşlenen
+                  </p>
+                  {recentResults.map(r => (
+                    <div key={r.donationId} className={`text-[10px] rounded p-1.5 ${r.warnings ? "bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50" : "bg-muted/60"}`}>
+                      <div className="font-medium text-foreground/80 truncate">{r.name}</div>
+                      {r.cats.length > 0 && (
+                        <div className="flex flex-wrap gap-0.5 mt-0.5">
+                          {r.cats.slice(0, 4).map(c => (
+                            <span key={c} className="px-1 rounded text-[9px] bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300">{c.replace(/_/g, " ")}</span>
+                          ))}
+                        </div>
+                      )}
+                      {r.summary && <p className="text-muted-foreground/60 mt-0.5 line-clamp-1 italic">{r.summary}</p>}
+                      {r.warnings && <p className="text-amber-600 dark:text-amber-400 mt-0.5 font-medium">⚠ {r.warnings}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div ref={liveLogScrollRef} className="flex-1 overflow-y-auto p-2">
+                {liveLogEntries.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center gap-2 py-8">
+                    <Terminal className="w-8 h-8 text-muted-foreground/20" />
+                    <p className="text-xs text-muted-foreground/50">Sınıflandırma başlatıldığında<br />işlem logları burada görünür</p>
+                  </div>
+                ) : (
+                  liveLogEntries.map(entry => <LogEntry key={entry.id} entry={entry} />)
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+              {(jobLogsData?.logs ?? []).length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center gap-2 py-8">
+                  <History className="w-8 h-8 text-muted-foreground/20" />
+                  <p className="text-xs text-muted-foreground/50">Henüz tamamlanmış<br />bir sınıflandırma işi yok</p>
+                </div>
+              ) : (jobLogsData?.logs ?? []).map((log: AiJobLog) => {
+                const completedDate = log.completedAt ? new Date(log.completedAt) : null;
+                const durationSec = log.durationMs != null ? Math.round(log.durationMs / 1000) : null;
+                let topCats: [string, number][] = [];
+                if (log.categoryDistribution) {
+                  try {
+                    const dist = JSON.parse(log.categoryDistribution) as Record<string, number>;
+                    topCats = Object.entries(dist).slice(0, 3);
+                  } catch {}
+                }
+                return (
+                  <div key={log.id} className="rounded-md bg-muted/40 border px-2.5 py-2 text-[11px] space-y-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-medium text-foreground">{log.donationCount} bağış</span>
+                      <div className="flex items-center gap-1.5">
+                        {log.avgConfidenceScore != null && (
+                          <span className={`font-semibold ${log.avgConfidenceScore >= 7 ? "text-green-600 dark:text-green-400" : log.avgConfidenceScore >= 4 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
+                            ★{log.avgConfidenceScore.toFixed(1)}
+                          </span>
+                        )}
+                        {log.warningCount > 0 && (
+                          <span className="text-destructive font-semibold flex items-center gap-0.5">
+                            <AlertTriangle className="w-3 h-3" />{log.warningCount}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {topCats.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {topCats.map(([cat, count]) => (
+                          <span key={cat} className="bg-muted rounded px-1 text-muted-foreground">{cat.replace(/_/g, " ")} ({count})</span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="text-muted-foreground flex items-center gap-2 flex-wrap">
+                      {completedDate && <span>{completedDate.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })} {completedDate.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</span>}
+                      {durationSec != null && <span>{durationSec}s</span>}
+                      {log.errorBatchCount > 0 && <span className="text-amber-600">{log.errorBatchCount}/{log.totalBatches} hata</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>

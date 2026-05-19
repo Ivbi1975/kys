@@ -52,10 +52,11 @@ export async function classifyNotesAsync(
   donations: AiDonationInput[],
   kesimAlaniId?: string,
   batchSize?: number,
+  projectId?: string,
 ): Promise<{ jobId: string; status: string; totalDonations: number }> {
   return apiFetch<{ jobId: string; status: string; totalDonations: number }>("/ai-notes/classify-async", {
     method: "POST",
-    body: JSON.stringify({ donations, kesimAlaniId, ...(batchSize ? { batchSize } : {}) }),
+    body: JSON.stringify({ donations, kesimAlaniId, ...(batchSize ? { batchSize } : {}), ...(projectId ? { projectId } : {}) }),
   });
 }
 
@@ -79,9 +80,10 @@ export async function classifyNotesAsyncChunked(
   donations: AiDonationInput[],
   kesimAlaniId?: string,
   batchSize?: number,
+  projectId?: string,
 ): Promise<{ jobIds: string[]; totalDonations: number }> {
   if (donations.length <= AI_CHUNK_SIZE) {
-    const result = await classifyNotesAsync(donations, kesimAlaniId, batchSize);
+    const result = await classifyNotesAsync(donations, kesimAlaniId, batchSize, projectId);
     return { jobIds: [result.jobId], totalDonations: result.totalDonations };
   }
 
@@ -92,7 +94,7 @@ export async function classifyNotesAsyncChunked(
     const chunkIndex = Math.floor(i / AI_CHUNK_SIZE);
     const chunk = donations.slice(i, i + AI_CHUNK_SIZE);
     try {
-      const result = await classifyNotesAsync(chunk, kesimAlaniId, batchSize);
+      const result = await classifyNotesAsync(chunk, kesimAlaniId, batchSize, projectId);
       jobIds.push(result.jobId);
       totalDonations += result.totalDonations;
     } catch (err) {
