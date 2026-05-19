@@ -17,6 +17,27 @@ env = { "CI" = "true" }
 [workflows]
 runButton = "Project"
 
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "artifacts/api-server: local-test"
+
+[[workflows.workflow]]
+name = "artifacts/api-server: local-test"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd artifacts/api-server && env -u DB_HOST -u DB_POSTGRESQL_PASS -u DB_NAME APP_PASSWORD=Muratabi12 PORT=3001 HOST=0.0.0.0 DB_DISABLE_WARMUP=1 node keepalive.mjs"
+waitForPort = 3001
+
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true

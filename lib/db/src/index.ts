@@ -60,7 +60,7 @@ const sslConfig = resolveSsl();
 export const pool = new Pool({
   connectionString,
   max: poolMax,
-  idleTimeoutMillis: 30_000,
+  idleTimeoutMillis: process.env.DB_DISABLE_WARMUP === "1" ? 0 : 30_000,
   connectionTimeoutMillis: 15_000,
   statement_timeout: 60_000,
   ssl: sslConfig,
@@ -73,9 +73,10 @@ pool.on("error", (err) => {
   ensureMinConnections().catch(() => {});
 });
 
-const MIN_POOL_SIZE = 2;
+const MIN_POOL_SIZE = process.env.DB_DISABLE_WARMUP === "1" ? 0 : 2;
 
 async function ensureMinConnections() {
+  if (MIN_POOL_SIZE === 0) return;
   const deficit = MIN_POOL_SIZE - pool.totalCount;
   if (deficit <= 0) return;
   const clients: pg.PoolClient[] = [];
