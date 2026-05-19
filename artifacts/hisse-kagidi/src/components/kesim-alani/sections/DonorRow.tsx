@@ -1,14 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { Donation, TagCategory } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  AlertTriangle, Eye, EyeOff, Flag, MoreHorizontal, ShoppingBag, StickyNote, Tag, Trash2, Wand2,
+  AlertTriangle, ChevronDown, ChevronRight, Eye, EyeOff, Flag, MoreHorizontal, Phone, ShoppingBag, StickyNote, Trash2, Wand2,
 } from "lucide-react";
 import { turkishTitleCase } from "@/lib/formatting";
 import { groupTagsByCategory } from "@/lib/groupTags";
+import { useVirtuosoRowContext } from "../VirtuosoRowContext";
 
 interface DonorRowProps {
   d: Donation;
@@ -26,6 +27,8 @@ interface DonorRowProps {
   globalTags: Array<{ id: string; name: string; color: string; categoryId?: string | null }>;
   tagCategories: TagCategory[];
   tagPopoverOpen: boolean;
+  expandAllState: boolean;
+  expandAllVersion: number;
   onToggleSelect: (id: string) => void;
   onStartEditing: (id: string, field: string) => void;
   onSetEditDraft: (v: string) => void;
@@ -56,8 +59,22 @@ function EditableCell({ displayValue }: {
   );
 }
 
+function DetailField({ label, value, muted }: { label: string; value?: string | number | null; muted?: boolean }) {
+  const isEmpty = value === undefined || value === null || value === "";
+  return (
+    <span className="inline-flex items-baseline gap-1 mr-3 mb-1">
+      <span className="text-[10px] font-medium text-muted-foreground/70 whitespace-nowrap">{label}:</span>
+      {isEmpty ? (
+        <span className="text-[10px] text-muted-foreground/35 italic">yok</span>
+      ) : (
+        <span className={`text-[10px] ${muted ? "text-muted-foreground" : "text-foreground"} whitespace-nowrap`}>{value}</span>
+      )}
+    </span>
+  );
+}
+
 function DonorRowOverflowMenu({
-  d, isGrouped, canSplit, splitShares, globalTags, tagPopoverOpen,
+  d, isGrouped, canSplit, splitShares, globalTags, tagCategories, tagPopoverOpen,
   onSetPersonEditDesc, onUpdateField, onToggleTag, onSetTagPopover,
   onSmartPlace, onSplitShare, onDelete, onFlagDonation, onUnflagDonation,
 }: {
@@ -65,7 +82,8 @@ function DonorRowOverflowMenu({
   isGrouped: boolean;
   canSplit: boolean;
   splitShares: number;
-  globalTags: Array<{ id: string; name: string; color: string }>;
+  globalTags: Array<{ id: string; name: string; color: string; categoryId?: string | null }>;
+  tagCategories: TagCategory[];
   tagPopoverOpen: boolean;
   onSetPersonEditDesc: (desc: string) => void;
   onUpdateField: (id: string, field: keyof Donation, value: string | number | boolean) => void;
@@ -236,178 +254,261 @@ function DonorRowOverflowMenu({
 
 function DonorRowInner({
   d, idx, descCount, effectiveShare, isSelected, isEditing, editField, editDraft,
-  isInBasket, isGrouped, canSplit, splitShares, globalTags, tagPopoverOpen,
+  isInBasket, isGrouped, canSplit, splitShares, globalTags, tagCategories, tagPopoverOpen,
+  expandAllState, expandAllVersion,
   onToggleSelect, onStartEditing, onSetEditDraft, onCommitEdit, onKeyDown,
   onSetPersonEditDesc, onUpdateField, onToggleTag, onSetTagPopover,
   onAddToBasket, onRemoveFromBasket, onSmartPlace, onSplitShare, onDelete,
   onFlagDonation, onUnflagDonation, projectId,
 }: DonorRowProps) {
   const [notePopoverOpen, setNotePopoverOpen] = useState(false);
-  return (<>
-    <td className="p-2">
-      <div className="flex items-center gap-1">
-        <input type="checkbox" checked={isSelected} onChange={() => onToggleSelect(d.id)} className="rounded" />
-        {d.isFlagged && (
-          <span title={d.flagReason || "Sorunlu bağış"}>
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-          </span>
-        )}
-      </div>
-    </td>
-    <td className="p-2 text-muted-foreground">{idx + 1}</td>
-    <td className="p-2">
-      {d.vekalet && projectId ? (
-        <a
-          href={`/bagis-havuzu/${projectId}?q=${encodeURIComponent(d.vekalet)}&ka=all`}
-          target="_blank"
-          rel="noreferrer"
-          className="block px-1 py-0.5 uppercase select-text text-blue-600 hover:underline"
-        >
-          {d.vekalet}
-        </a>
-      ) : (
-        <EditableCell d={d} field="vekalet" isEditing={isEditing && editField === "vekalet"}
-          editDraft={editDraft} onSetEditDraft={onSetEditDraft} onCommitEdit={onCommitEdit}
-          onKeyDown={onKeyDown} onStartEditing={onStartEditing} displayValue={d.vekalet} />
-      )}
-    </td>
-    <td className="p-2">
-      <span className="block px-1 py-0.5 uppercase select-text">{d.description || "—"}</span>
-    </td>
-    <td className="p-2">
-      <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text">{d.temsilci || "—"}</span>
-    </td>
-    <td className="p-2">
-      <EditableCell d={d} field="name" isEditing={isEditing && editField === "name"}
-        editDraft={editDraft} onSetEditDraft={onSetEditDraft} onCommitEdit={onCommitEdit}
-        onKeyDown={onKeyDown} onStartEditing={onStartEditing} displayValue={d.name} />
-    </td>
-    <td className="p-2">
-      <EditableCell d={d} field="donationType" isEditing={isEditing && editField === "donationType"}
-        editDraft={editDraft} onSetEditDraft={onSetEditDraft} onCommitEdit={onCommitEdit}
-        onKeyDown={onKeyDown} onStartEditing={onStartEditing} displayValue={d.donationType} />
-    </td>
-    <td className="p-2">
-      <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text truncate max-w-[90px]">{d.birim || "—"}</span>
-    </td>
-    <td className="p-2">
-      <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text truncate max-w-[90px]">{d.ozellik || "—"}</span>
-    </td>
-    <td className="p-2">
-      <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text">{d.fiyat || "—"}</span>
-    </td>
-    <td className="p-2">
-      <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text truncate max-w-[90px]">{d.yerTalebi || "—"}</span>
-    </td>
-    <td className="p-2">
-      <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text truncate max-w-[90px]">{d.gunTalebi || "—"}</span>
-    </td>
-    <td className="p-2">
-      <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text truncate max-w-[90px]">{d.ilkHayvan || "—"}</span>
-    </td>
-    <td className="p-2">
-      <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text">{d.safi || "—"}</span>
-    </td>
-    <td className="p-2 text-center">
-      {descCount > 1 ? (
-        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 text-sm font-bold border border-amber-200 dark:border-amber-800">{effectiveShare}</span>
-      ) : (
-        <Select value={String(d.shareCount)} onValueChange={(v) => onUpdateField(d.id, "shareCount", parseInt(v))}>
-          <SelectTrigger className="h-8 w-16 text-sm font-bold mx-auto"><SelectValue /></SelectTrigger>
-          <SelectContent>{[1, 2, 3, 4, 5, 6, 7].map((n) => (<SelectItem key={n} value={String(n)}>{n}</SelectItem>))}</SelectContent>
-        </Select>
-      )}
-    </td>
-    <td className="p-2">
-      <span
-        className="block px-1 py-0.5 text-xs text-muted-foreground truncate max-w-[130px] select-text"
-        title={d.notes || ""}
-      >{d.notes || "—"}</span>
-    </td>
-    <td className="p-2">
-      <div className="flex gap-0.5 flex-wrap">
-        {(d.aiCategories && d.aiCategories.length > 0) ? (
-          <>
-            {d.aiCategories.map(cat => (
-              <span
-                key={cat}
-                className="px-1.5 leading-[18px] rounded text-[9px] font-medium bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 whitespace-nowrap"
-              >
-                {cat}
-              </span>
-            ))}
-            {d.aiWarnings && d.aiWarnings.trim() && (
-              <span
-                className="leading-[18px] px-1 rounded text-[9px] font-medium bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700 flex items-center gap-0.5"
-                title={d.aiWarnings}
-              >
-                <AlertTriangle className="w-2.5 h-2.5" />
-              </span>
-            )}
-          </>
-        ) : (
-          <span className="text-muted-foreground/40 text-xs">—</span>
-        )}
-      </div>
-    </td>
-    <td className="p-2">
-      <div className="flex items-center gap-0.5">
-        <Popover open={notePopoverOpen} onOpenChange={setNotePopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`h-7 w-7 p-0 ${d.notes?.trim() ? "text-amber-500 hover:text-amber-600" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
-              title={d.notes?.trim() ? "Notu Gör" : "Not yok"}
+  const [expanded, setExpanded] = useState(true);
+  const prevVersionRef = useRef(0);
+
+  useEffect(() => {
+    if (prevVersionRef.current !== expandAllVersion) {
+      setExpanded(expandAllState);
+      prevVersionRef.current = expandAllVersion;
+    }
+  }, [expandAllVersion, expandAllState]);
+
+  const { rowAttrs, rowClassName } = useVirtuosoRowContext();
+
+  const mainRowClass = [
+    "border-b",
+    rowClassName,
+    d.isFlagged ? "border-l-[3px] border-l-amber-500" : "",
+    d.excluded ? "line-through" : "",
+  ].filter(Boolean).join(" ");
+
+  const detailRowClass = [
+    "border-b",
+    d.isFlagged ? "border-l-[3px] border-l-amber-500 bg-amber-50/30 dark:bg-amber-950/20" : "bg-muted/20",
+  ].filter(Boolean).join(" ");
+
+  return (
+    <>
+      <tr
+        {...(rowAttrs as React.HTMLAttributes<HTMLTableRowElement>)}
+        className={mainRowClass}
+      >
+        <td className="p-2 w-12">
+          <div className="flex items-center gap-1">
+            <button
+              className="flex-shrink-0 text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+              onClick={() => setExpanded(e => !e)}
+              title={expanded ? "Detayı daralt" : "Detayı genişlet"}
+              aria-label={expanded ? "Detayı daralt" : "Detayı genişlet"}
             >
-              <StickyNote className="w-3.5 h-3.5" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-72 p-3" align="end" side="top">
-            <p className="text-xs font-semibold mb-1.5 text-foreground">Not</p>
-            {d.notes?.trim() ? (
-              <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">{d.notes.trim()}</p>
-            ) : (
-              <p className="text-xs text-muted-foreground/50 italic">Not eklenmemiş</p>
+              {expanded
+                ? <ChevronDown className="w-3.5 h-3.5" />
+                : <ChevronRight className="w-3.5 h-3.5" />
+              }
+            </button>
+            <input type="checkbox" checked={isSelected} onChange={() => onToggleSelect(d.id)} className="rounded" />
+            {d.isFlagged && (
+              <span title={d.flagReason || "Sorunlu bağış"}>
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+              </span>
             )}
-          </PopoverContent>
-        </Popover>
-        {(d.tags || []).length > 0 && globalTags.length > 0 && (
-          <div className="flex gap-0.5 flex-wrap mr-1">
-            {(d.tags || []).map(tagId => {
-              const tag = globalTags.find(t => t.id === tagId);
-              if (!tag) return null;
-              return (<span key={tagId} className="px-1.5 py-0 rounded-full text-[9px] font-medium text-white leading-4" style={{ backgroundColor: tag.color }}>{turkishTitleCase(tag.name)}</span>);
-            })}
           </div>
-        )}
-        {!d.excluded && (
-          <Button variant="ghost" size="sm" className={`h-7 w-7 p-0 ${isInBasket ? "bg-emerald-100 dark:bg-emerald-900 ring-1 ring-emerald-300" : ""}`}
-            title={isInBasket ? "Sepetten Çıkar" : "Sepete Ekle"} aria-label={isInBasket ? "Sepetten Çıkar" : "Sepete Ekle"}
-            onClick={() => isInBasket ? onRemoveFromBasket(d.id) : onAddToBasket(d.id)}>
-            <ShoppingBag className={`w-3.5 h-3.5 ${isInBasket ? "text-emerald-600" : "text-muted-foreground"}`} />
-          </Button>
-        )}
-        <DonorRowOverflowMenu
-          d={d}
-          isGrouped={isGrouped}
-          canSplit={canSplit}
-          splitShares={splitShares}
-          globalTags={globalTags}
-          tagPopoverOpen={tagPopoverOpen}
-          onSetPersonEditDesc={onSetPersonEditDesc}
-          onUpdateField={onUpdateField}
-          onToggleTag={onToggleTag}
-          onSetTagPopover={onSetTagPopover}
-          onSmartPlace={onSmartPlace}
-          onSplitShare={onSplitShare}
-          onDelete={onDelete}
-          onFlagDonation={onFlagDonation}
-          onUnflagDonation={onUnflagDonation}
-        />
-      </div>
-    </td>
-  </>);
+        </td>
+        <td className="p-2 text-muted-foreground w-8 text-xs">{idx + 1}</td>
+        <td className="p-2 w-20">
+          {d.vekalet && projectId ? (
+            <a
+              href={`/bagis-havuzu/${projectId}?q=${encodeURIComponent(d.vekalet)}&ka=all`}
+              target="_blank"
+              rel="noreferrer"
+              className="block px-1 py-0.5 uppercase select-text text-blue-600 hover:underline text-xs"
+            >
+              {d.vekalet}
+            </a>
+          ) : (
+            <EditableCell d={d} field="vekalet" isEditing={isEditing && editField === "vekalet"}
+              editDraft={editDraft} onSetEditDraft={onSetEditDraft} onCommitEdit={onCommitEdit}
+              onKeyDown={onKeyDown} onStartEditing={onStartEditing} displayValue={d.vekalet} />
+          )}
+        </td>
+        <td className="p-2 min-w-[130px]">
+          <span className="block px-1 py-0.5 uppercase select-text text-sm font-medium">{d.description || "—"}</span>
+        </td>
+        <td className="p-2 w-24">
+          <span className="block px-1 py-0.5 text-xs text-muted-foreground select-text">{d.temsilci || "—"}</span>
+        </td>
+        <td className="p-2 min-w-[130px]">
+          <EditableCell d={d} field="name" isEditing={isEditing && editField === "name"}
+            editDraft={editDraft} onSetEditDraft={onSetEditDraft} onCommitEdit={onCommitEdit}
+            onKeyDown={onKeyDown} onStartEditing={onStartEditing} displayValue={d.name} />
+        </td>
+        <td className="p-2 w-20">
+          <EditableCell d={d} field="donationType" isEditing={isEditing && editField === "donationType"}
+            editDraft={editDraft} onSetEditDraft={onSetEditDraft} onCommitEdit={onCommitEdit}
+            onKeyDown={onKeyDown} onStartEditing={onStartEditing} displayValue={d.donationType} />
+        </td>
+        <td className="p-2 w-16 text-center">
+          {descCount > 1 ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 text-sm font-bold border border-amber-200 dark:border-amber-800">{effectiveShare}</span>
+          ) : (
+            <Select value={String(d.shareCount)} onValueChange={(v) => onUpdateField(d.id, "shareCount", parseInt(v))}>
+              <SelectTrigger className="h-8 w-16 text-sm font-bold mx-auto"><SelectValue /></SelectTrigger>
+              <SelectContent>{[1, 2, 3, 4, 5, 6, 7].map((n) => (<SelectItem key={n} value={String(n)}>{n}</SelectItem>))}</SelectContent>
+            </Select>
+          )}
+        </td>
+        <td className="p-2">
+          <div className="flex items-center gap-0.5 flex-wrap min-w-[160px]">
+            {(d.tags || []).length > 0 && globalTags.length > 0 && (
+              <div className="flex gap-0.5 flex-wrap mr-1">
+                {(d.tags || []).map(tagId => {
+                  const tag = globalTags.find(t => t.id === tagId);
+                  if (!tag) return null;
+                  return (
+                    <span key={tagId} className="px-1.5 py-0 rounded-full text-[9px] font-medium text-white leading-4" style={{ backgroundColor: tag.color }}>
+                      {turkishTitleCase(tag.name)}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            <Popover open={notePopoverOpen} onOpenChange={setNotePopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`h-7 w-7 p-0 ${d.notes?.trim() ? "text-amber-500 hover:text-amber-600" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
+                  title={d.notes?.trim() ? "Notu Gör" : "Not yok"}
+                >
+                  <StickyNote className="w-3.5 h-3.5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-3" align="end" side="top">
+                <p className="text-xs font-semibold mb-1.5 text-foreground">Not</p>
+                {d.notes?.trim() ? (
+                  <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">{d.notes.trim()}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground/50 italic">Not eklenmemiş</p>
+                )}
+              </PopoverContent>
+            </Popover>
+            {!d.excluded && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`h-7 w-7 p-0 ${isInBasket ? "bg-emerald-100 dark:bg-emerald-900 ring-1 ring-emerald-300" : ""}`}
+                title={isInBasket ? "Sepetten Çıkar" : "Sepete Ekle"}
+                aria-label={isInBasket ? "Sepetten Çıkar" : "Sepete Ekle"}
+                onClick={() => isInBasket ? onRemoveFromBasket(d.id) : onAddToBasket(d.id)}
+              >
+                <ShoppingBag className={`w-3.5 h-3.5 ${isInBasket ? "text-emerald-600" : "text-muted-foreground"}`} />
+              </Button>
+            )}
+            <DonorRowOverflowMenu
+              d={d}
+              isGrouped={isGrouped}
+              canSplit={canSplit}
+              splitShares={splitShares}
+              globalTags={globalTags}
+              tagCategories={tagCategories}
+              tagPopoverOpen={tagPopoverOpen}
+              onSetPersonEditDesc={onSetPersonEditDesc}
+              onUpdateField={onUpdateField}
+              onToggleTag={onToggleTag}
+              onSetTagPopover={onSetTagPopover}
+              onSmartPlace={onSmartPlace}
+              onSplitShare={onSplitShare}
+              onDelete={onDelete}
+              onFlagDonation={onFlagDonation}
+              onUnflagDonation={onUnflagDonation}
+            />
+          </div>
+        </td>
+      </tr>
+
+      {expanded && (
+        <tr className={detailRowClass}>
+          <td colSpan={9} className="px-4 py-2">
+            <div className="flex flex-wrap items-start gap-x-1 gap-y-0.5">
+              <DetailField label="Fiyat" value={d.fiyat} />
+              <DetailField label="Birim" value={d.birim} />
+              <DetailField label="Özellik" value={d.ozellik} />
+              <DetailField label="Yer Talebi" value={d.yerTalebi} />
+              <DetailField label="Gün Talebi" value={d.gunTalebi} />
+              <DetailField label="İlk Hayvan" value={d.ilkHayvan} />
+              <DetailField label="Şafi" value={d.safi} />
+
+              {d.phone ? (
+                <span className="inline-flex items-baseline gap-1 mr-3 mb-1">
+                  <span className="text-[10px] font-medium text-muted-foreground/70 whitespace-nowrap">Telefon:</span>
+                  <a
+                    href={`tel:${d.phone}`}
+                    className="text-[10px] text-blue-600 hover:underline whitespace-nowrap flex items-center gap-0.5"
+                  >
+                    <Phone className="w-2.5 h-2.5 inline-block relative -top-px" />
+                    {d.phone}
+                  </a>
+                </span>
+              ) : (
+                <DetailField label="Telefon" value={undefined} />
+              )}
+
+              {(d.notes?.trim()) ? (
+                <span className="inline-flex items-baseline gap-1 mr-3 mb-1 max-w-sm">
+                  <span className="text-[10px] font-medium text-muted-foreground/70 whitespace-nowrap">Not:</span>
+                  <span className="text-[10px] text-foreground leading-snug">{d.notes.trim()}</span>
+                </span>
+              ) : (
+                <DetailField label="Not" value={undefined} />
+              )}
+
+              {(d.aiCategories && d.aiCategories.length > 0) && (
+                <span className="inline-flex items-center gap-1 mr-3 mb-1 flex-wrap">
+                  <span className="text-[10px] font-medium text-muted-foreground/70 whitespace-nowrap">AI:</span>
+                  {d.aiCategories.map(cat => (
+                    <span
+                      key={cat}
+                      className="px-1.5 leading-[16px] rounded text-[9px] font-medium bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 whitespace-nowrap"
+                    >
+                      {cat}
+                    </span>
+                  ))}
+                </span>
+              )}
+
+              {d.aiWarnings?.trim() && (
+                <span className="inline-flex items-baseline gap-1 mr-3 mb-1 max-w-xs">
+                  <span className="text-[10px] font-medium text-muted-foreground/70 whitespace-nowrap">Uyarı:</span>
+                  <span
+                    className="text-[10px] text-amber-700 dark:text-amber-400 truncate leading-snug"
+                    title={d.aiWarnings}
+                  >
+                    <AlertTriangle className="w-2.5 h-2.5 inline-block mr-0.5 relative -top-px" />
+                    {d.aiWarnings}
+                  </span>
+                </span>
+              )}
+
+              {d.aiConfidenceScore != null && (
+                <span className="inline-flex items-center gap-1 mr-3 mb-1">
+                  <span className="text-[10px] font-medium text-muted-foreground/70 whitespace-nowrap">Güven:</span>
+                  <span className="px-1.5 py-0 leading-[16px] rounded text-[9px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                    %{Math.round(d.aiConfidenceScore * 100)}
+                  </span>
+                </span>
+              )}
+
+              {d.isFlagged && d.flagReason && (
+                <span className="inline-flex items-baseline gap-1 mr-3 mb-1 max-w-sm">
+                  <span className="text-[10px] font-medium text-amber-700 dark:text-amber-500 whitespace-nowrap">Sorun:</span>
+                  <span className="text-[10px] text-amber-800 dark:text-amber-400 leading-snug font-medium">{d.flagReason}</span>
+                </span>
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
 }
 
 export const DonorRow = React.memo(DonorRowInner, (prev, next) => {
@@ -425,5 +526,6 @@ export const DonorRow = React.memo(DonorRowInner, (prev, next) => {
   if (prev.splitShares !== next.splitShares) return false;
   if (prev.tagPopoverOpen !== next.tagPopoverOpen) return false;
   if (prev.globalTags !== next.globalTags) return false;
+  if (prev.expandAllVersion !== next.expandAllVersion) return false;
   return true;
 });

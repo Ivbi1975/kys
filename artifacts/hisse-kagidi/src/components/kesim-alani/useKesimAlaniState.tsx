@@ -28,6 +28,7 @@ import { useUIState } from "./hooks/useUIState";
 import { useNotifications } from "./hooks/useNotifications";
 import { loadBasketFromStorage, generateId } from "./hooks/types";
 import type { SortField } from "./hooks/types";
+import { VirtuosoRowContext } from "./VirtuosoRowContext";
 
 const emptyDonations: Donation[] = [];
 const emptyGroups: AnimalGroup[] = [];
@@ -616,13 +617,21 @@ export function useKesimAlaniState() {
     () => ({
       Table: VirtuosoTable,
       TableHead: VirtuosoTableHead,
-      TableRow: ({ item: d, ...props }: React.HTMLAttributes<HTMLTableRowElement> & { item?: Donation }) => (
-        <tr
-          {...props}
-          data-donation-id={d?.id}
-          className={`border-b hover:bg-muted/30 transition-colors ${d && selectedIds.has(d.id) ? "bg-primary/5" : ""} ${d?.excluded ? "opacity-40 line-through" : ""} ${d && donationsHook.highlightDonationId === d.id ? "ring-2 ring-yellow-400 bg-yellow-100 dark:bg-yellow-900/40 animate-pulse" : ""}`}
-        />
-      ),
+      TableRow: ({ item: d, children, ...rowAttrs }: React.HTMLAttributes<HTMLTableRowElement> & { item?: Donation; children?: React.ReactNode }) => {
+        const rowClassName = [
+          "hover:bg-muted/30 transition-colors",
+          d && selectedIds.has(d.id) ? "bg-primary/5" : "",
+          d?.excluded ? "opacity-40" : "",
+          d && donationsHook.highlightDonationId === d.id
+            ? "ring-2 ring-yellow-400 bg-yellow-100 dark:bg-yellow-900/40 animate-pulse"
+            : "",
+        ].filter(Boolean).join(" ");
+        return (
+          <VirtuosoRowContext.Provider value={{ rowAttrs: { ...rowAttrs, "data-donation-id": d?.id }, rowClassName }}>
+            {children}
+          </VirtuosoRowContext.Provider>
+        );
+      },
     }),
     [selectedIds, donationsHook.highlightDonationId]
   );
