@@ -4,6 +4,7 @@ import { useParams, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag } from "@/lib/types";
 import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, fetchTags, fetchPhotoCountsAdmin, fetchGroupPhotosAdmin, fetchKesimAlaniMeta, fetchAllDonations, fetchAllGroupsCompact } from "@/lib/api";
+import { sortTagsTr } from "@/lib/formatting";
 import type { CompactGroupItem } from "@/lib/api/kesim-alanlari";
 import { getTotalShares, getRequiredAnimals, computeEffectiveShares, trCollator } from "@/lib/grouping";
 import { useGroupingWorker } from "@/lib/useGroupingWorker";
@@ -310,7 +311,7 @@ export function useKesimAlaniState() {
             const stored = loadBasketFromStorage(fallback.projectId, true);
             basket.setBasketItems(stored);
             fetchPhotoCountsAdmin(fallback.id).then(notifications.setPhotoCounts).catch(() => {});
-            fetchTags().then(tags => ui.setGlobalTags(tags)).catch(() => {});
+            fetchTags().then(tags => ui.setGlobalTags(sortTagsTr(tags))).catch(() => {});
           } else {
             setLocation("/");
           }
@@ -416,7 +417,7 @@ export function useKesimAlaniState() {
             } catch {}
           }
 
-          try { ui.setGlobalTags(await fetchTags()); } catch {}
+          try { ui.setGlobalTags(sortTagsTr(await fetchTags())); } catch {}
         })();
       } catch (err) {
         if (requestId !== loadRequestIdRef.current) return;

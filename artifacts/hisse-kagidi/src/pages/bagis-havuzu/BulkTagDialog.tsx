@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tags, Plus, Loader2, PlusCircle, MinusCircle } from "lucide-react";
 import type { CustomTag } from "@/lib/types";
-import { turkishTitleCase } from "@/lib/formatting";
+import { turkishTitleCase, sortTagsTr } from "@/lib/formatting";
 
 interface BulkTagDialogProps {
   open: boolean;
@@ -84,7 +84,7 @@ export function BulkTagDialog({
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Etiket seç:</label>
             <div className="space-y-1">
-              {tags.map(tag => {
+              {sortTagsTr(tags).map(tag => {
                 const addKey = `${tag.id}:add`;
                 const removeKey = `${tag.id}:remove`;
                 return (

@@ -1,3 +1,9 @@
+const _trCollator = new Intl.Collator("tr", { sensitivity: "base" });
+
+export function sortTagsTr<T extends { name: string }>(tags: T[]): T[] {
+  return [...tags].sort((a, b) => _trCollator.compare(a.name, b.name));
+}
+
 export function turkishTitleCase(str: string | null | undefined): string {
   if (!str) return str ?? "";
   return str

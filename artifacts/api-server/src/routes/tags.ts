@@ -37,6 +37,8 @@ router.get("/tags", asyncHandler(async (_req, res) => {
   }
 
   const tags = await db.select().from(customTagsTable);
+  const collator = new Intl.Collator("tr", { sensitivity: "base" });
+  tags.sort((a, b) => collator.compare(a.name, b.name));
   cacheSet(TAGS_CACHE_KEY, tags, TAGS_TTL);
   res.json(tags);
 }));

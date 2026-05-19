@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { X, Plus, ChevronDown, Check, Ban } from "lucide-react";
 import type { PoolStats, CustomTag } from "@/lib/types";
+import { sortTagsTr } from "@/lib/formatting";
 
 interface PoolFiltersProps {
   statusFilter: string;
@@ -661,7 +662,7 @@ export function PoolFilters({
                 <MultiSelectDropdown
                   label="Etiket"
                   options={[
-                    ...globalTags.map(t => ({
+                    ...sortTagsTr(globalTags).map(t => ({
                       value: t.id,
                       count: tagCountMap.get(t.id) ?? undefined,
                       label: t.name,

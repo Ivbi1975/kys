@@ -1,6 +1,6 @@
 import { db } from "@workspace/db";
-import { customTagsTable, automationRulesTable, projectsTable } from "@workspace/db/schema";
-import { eq, isNull, and } from "drizzle-orm";
+import { customTagsTable, automationRulesTable, projectsTable, donationTagsTable } from "@workspace/db/schema";
+import { eq, inArray, isNull, and, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 export const SEED_TAG_IDS = {
@@ -16,14 +16,15 @@ export const SEED_TAG_IDS = {
   GUN2: "seed-tag-2gun",
   GUN3: "seed-tag-3gun",
   DIKKAT: "seed-tag-dikkat",
+  MEVTA_KURBANI: "seed-tag-mevta-kurbani",
 };
 
 const SEED_TAGS = [
-  { id: SEED_TAG_IDS.UGANDA, name: "Uganda", color: "#b45309" },
-  { id: SEED_TAG_IDS.SOMALI, name: "Somali", color: "#15803d" },
-  { id: SEED_TAG_IDS.CAD, name: "Çad", color: "#c2410c" },
-  { id: SEED_TAG_IDS.AFGANISTAN, name: "Afganistan", color: "#166534" },
-  { id: SEED_TAG_IDS.HINDISTAN, name: "Hindistan", color: "#ea580c" },
+  { id: SEED_TAG_IDS.UGANDA, name: "Uganda", color: "#D90000" },
+  { id: SEED_TAG_IDS.SOMALI, name: "Somali", color: "#4189DD" },
+  { id: SEED_TAG_IDS.CAD, name: "Çad", color: "#003082" },
+  { id: SEED_TAG_IDS.AFGANISTAN, name: "Afganistan", color: "#007A36" },
+  { id: SEED_TAG_IDS.HINDISTAN, name: "Hindistan", color: "#FF9933" },
   { id: SEED_TAG_IDS.AYNI_HAYVAN, name: "Aynı Hayvan", color: "#7c3aed" },
   { id: SEED_TAG_IDS.KOC, name: "Koç", color: "#0284c7" },
   { id: SEED_TAG_IDS.KOYUN, name: "Koyun", color: "#9333ea" },
@@ -31,6 +32,7 @@ const SEED_TAGS = [
   { id: SEED_TAG_IDS.GUN2, name: "2. Gün", color: "#374151" },
   { id: SEED_TAG_IDS.GUN3, name: "3. Gün", color: "#374151" },
   { id: SEED_TAG_IDS.DIKKAT, name: "Dikkat", color: "#ef4444" },
+  { id: SEED_TAG_IDS.MEVTA_KURBANI, name: "Mevta Kurbanı", color: "#0e7490" },
 ];
 
 function buildSeedRulesForProject(projectId: string) {
@@ -140,14 +142,60 @@ function buildSeedRulesForProject(projectId: string) {
   ];
 }
 
+async function migrateMevtaTags(): Promise<void> {
+  try {
+    const canonicalId = SEED_TAG_IDS.MEVTA_KURBANI;
+
+    const oldTags = await db.select({ id: customTagsTable.id, name: customTagsTable.name })
+      .from(customTagsTable)
+      .where(
+        sql`lower(${customTagsTable.name}) IN ('mevta', 'mevta kurbani', 'mevta kurbanı') AND ${customTagsTable.id} != ${canonicalId}`
+      );
+
+    if (oldTags.length === 0) {
+      return;
+    }
+
+    const oldIds = oldTags.map(t => t.id);
+    logger.info({ oldIds }, "[seed] Migrating Mevta tags to Mevta Kurbanı");
+
+    for (const oldId of oldIds) {
+      const oldDonationTags = await db.select({ donationId: donationTagsTable.donationId })
+        .from(donationTagsTable)
+        .where(eq(donationTagsTable.tagId, oldId));
+
+      for (const dt of oldDonationTags) {
+        await db.insert(donationTagsTable)
+          .values({ donationId: dt.donationId, tagId: canonicalId, updatedAt: new Date() })
+          .onConflictDoNothing();
+      }
+
+      await db.delete(donationTagsTable)
+        .where(eq(donationTagsTable.tagId, oldId));
+    }
+
+    await db.delete(customTagsTable)
+      .where(inArray(customTagsTable.id, oldIds));
+
+    logger.info({ oldIds }, "[seed] Mevta tags merged into Mevta Kurbanı");
+  } catch (err) {
+    logger.error({ err }, "[seed] Failed to migrate Mevta tags");
+  }
+}
+
 export async function seedTagsAndRules(): Promise<void> {
   try {
     for (const tag of SEED_TAGS) {
       await db.insert(customTagsTable)
         .values({ id: tag.id, name: tag.name, color: tag.color, updatedAt: new Date() })
-        .onConflictDoNothing();
+        .onConflictDoUpdate({
+          target: customTagsTable.id,
+          set: { color: tag.color, name: tag.name, updatedAt: new Date() },
+        });
     }
     logger.info("[seed] Custom tags seeded");
+
+    await migrateMevtaTags();
 
     const projects = await db.select({ id: projectsTable.id })
       .from(projectsTable)

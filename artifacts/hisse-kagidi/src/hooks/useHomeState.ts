@@ -36,7 +36,7 @@ import { useTheme } from "@/lib/useTheme";
 import { useToast } from "@/hooks/use-toast";
 import { useMinLoadingTime } from "@/hooks/useMinLoadingTime";
 import { useKesimAlaniActions } from "@/hooks/useKesimAlaniActions";
-import { turkishTitleCase } from "@/lib/formatting";
+import { turkishTitleCase, sortTagsTr } from "@/lib/formatting";
 
 export function useHomeState() {
   const [, setLocation] = useLocation();
@@ -121,7 +121,7 @@ export function useHomeState() {
     try {
       const homeData = await fetchHomeData();
       setKesimAlanlari(homeData.kesimAlanlari);
-      setGlobalTags(homeData.tags);
+      setGlobalTags(sortTagsTr(homeData.tags));
       setLogoPreview(homeData.logo);
       setProjects(homeData.projects);
       setDeletedKesimAlanlari(homeData.deletedKesimAlanlari);
@@ -580,7 +580,7 @@ export function useHomeState() {
       const homeData = await fetchHomeData();
       setKesimAlanlari(homeData.kesimAlanlari);
       setLogoPreview(homeData.logo);
-      setGlobalTags(homeData.tags);
+      setGlobalTags(sortTagsTr(homeData.tags));
       toast({
         title: "Yedek başarıyla yüklendi",
         description: `${result.count} kesim alanı ${mode === "merge" ? "birleştirildi" : "değiştirildi"}`,
