@@ -482,7 +482,7 @@ export default function AiSiniflandirmaPage() {
         map.set(cat, (map.get(cat) ?? 0) + 1);
       }
     }
-    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], "tr"));
   }, [aiResults]);
 
   const warningResults = useMemo(

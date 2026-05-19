@@ -1185,7 +1185,7 @@ export default function BagisHavuzuPage() {
       warningDonors: withWarnings,
       warningCount: withWarnings.length,
       requestCount: withRequests.length,
-      categoryDistribution: Array.from(categoryMap.entries()).sort((a, b) => b[1] - a[1]),
+      categoryDistribution: Array.from(categoryMap.entries()).sort((a, b) => a[0].localeCompare(b[0], "tr")),
       errorBatches: aiErrorBatches,
       totalBatches: aiTotalBatches,
     };

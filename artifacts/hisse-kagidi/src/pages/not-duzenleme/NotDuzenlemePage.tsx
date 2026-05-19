@@ -765,7 +765,7 @@ export default function NotDuzenlemePage() {
         categoryMap.set(canonical, (categoryMap.get(canonical) || 0) + 1);
       }
     }
-    return { totalProcessed: results.length, warningDonors: withWarnings, warningCount: withWarnings.length, requestCount: withRequests.length, categoryDistribution: Array.from(categoryMap.entries()).sort((a, b) => b[1] - a[1]), errorBatches: aiErrorBatches, totalBatches: aiTotalBatches };
+    return { totalProcessed: results.length, warningDonors: withWarnings, warningCount: withWarnings.length, requestCount: withRequests.length, categoryDistribution: Array.from(categoryMap.entries()).sort((a, b) => a[0].localeCompare(b[0], "tr")), errorBatches: aiErrorBatches, totalBatches: aiTotalBatches };
   })();
 
   if (loading) return <div className="flex items-center justify-center h-screen"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>;
