@@ -675,6 +675,15 @@ export default function AiSiniflandirmaPage() {
         {warningResults.length > 0 && (
           <Badge variant="destructive" className="text-xs">{warningResults.length} uyarı</Badge>
         )}
+        {aiResults.size > 0 && (
+          <Badge
+            variant="outline"
+            className={`text-xs tabular-nums font-mono ${selectedResultIds.size > 0 ? "border-green-500 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30" : "text-muted-foreground"}`}
+          >
+            <CheckSquare className="w-3 h-3 mr-1" />
+            {selectedResultIds.size}/{filteredResults.length}
+          </Badge>
+        )}
         <div className="ml-auto flex items-center gap-2">
           {aiResults.size > 0 && !aiRunning && (
             <Button size="sm" variant={saved ? "outline" : "default"} onClick={handleSaveNow} disabled={saving || saved}>
