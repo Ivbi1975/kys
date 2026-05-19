@@ -95,9 +95,19 @@ function buildStatsFilterSQL(projectId: string, query: Record<string, unknown>) 
 
   const kesimAlaniId = typeof query.kesimAlaniId === "string" ? query.kesimAlaniId.trim() : "";
   if (kesimAlaniId === "none") {
-    parts.push(sql`d.kesim_alani_id IN (SELECT id FROM kesim_alanlari WHERE project_id = ${projectId} AND name = '__havuz__')`);
+    parts.push(sql`d.kesim_alani_id IN (SELECT id FROM kesim_alanlari WHERE project_id = ${projectId} AND name = '__havuz__' AND deleted_at IS NULL)`);
   } else if (kesimAlaniId) {
     parts.push(sql`d.kesim_alani_id = ${kesimAlaniId}`);
+  } else {
+    // "Tümü": scope to havuz-originated donations (in havuz OR transferred from havuz).
+    parts.push(sql`(
+      d.kesim_alani_id IN (SELECT id FROM kesim_alanlari WHERE project_id = ${projectId} AND name = '__havuz__' AND deleted_at IS NULL)
+      OR d.id IN (
+        SELECT dt.donation_id FROM donation_transfers dt
+        JOIN kesim_alanlari ka ON ka.id = dt.from_kesim_alani_id AND ka.name = '__havuz__' AND ka.project_id = ${projectId}
+        WHERE dt.project_id = ${projectId}
+      )
+    )`);
   }
 
   const tagIdValues = parseMultiValue(query.tagIds);
@@ -298,11 +308,10 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   addMultiFilter(donationsTable.ilkHayvan, ilkHayvanValues, "ilkHayvan");
   addMultiFilter(donationsTable.safi, safiValues, "safi");
 
+  const havuzKaIds = kaRows.filter(k => k.name === "__havuz__").map(k => k.id);
+
   if (kesimAlaniId === "none") {
-    // Use ALL __havuz__ KA IDs (consistent with stats endpoint approach).
-    // Using find() would only match the first one — any donation in a secondary
-    // __havuz__ KA would escape the filter and appear incorrectly.
-    const havuzKaIds = kaRows.filter(k => k.name === "__havuz__").map(k => k.id);
+    // Show only donations currently in havuz
     if (havuzKaIds.length > 0) {
       conditions.push(inArray(donationsTable.kesimAlaniId, havuzKaIds));
     } else {
@@ -310,6 +319,24 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     }
   } else if (kesimAlaniId) {
     conditions.push(eq(donationsTable.kesimAlaniId, kesimAlaniId));
+  } else {
+    // "Tümü": scope to havuz-originated donations only.
+    // Include donations currently in havuz OR donations that were transferred FROM havuz.
+    // This excludes records imported directly into a kesim listesi without going through havuz.
+    if (havuzKaIds.length > 0) {
+      conditions.push(
+        or(
+          inArray(donationsTable.kesimAlaniId, havuzKaIds),
+          sql`${donationsTable.id} IN (
+            SELECT dt.donation_id FROM donation_transfers dt
+            WHERE dt.from_kesim_alani_id IN (${sql.join(havuzKaIds.map(id => sql`${id}`), sql`, `)})
+              AND dt.project_id = ${projectId}
+          )`,
+        )!,
+      );
+    } else {
+      conditions.push(sql`false`);
+    }
   }
 
   if (tagIdValues.length > 0) {
