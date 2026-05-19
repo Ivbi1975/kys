@@ -145,3 +145,29 @@ export async function shutdownPool(): Promise<void> {
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";
+
+export async function runMigrations(): Promise<void> {
+  const { migrate } = await import("drizzle-orm/node-postgres/migrator");
+  const { fileURLToPath } = await import("node:url");
+  const { dirname, resolve } = await import("node:path");
+
+  // Works for both the source layout and the built dist layout.
+  // Source: lib/db/src/index.ts  → migrationsFolder = lib/db/drizzle
+  // Built:  artifacts/api-server/dist/index.mjs → migrationsFolder = artifacts/api-server/dist/migrations
+  let migrationsFolder: string;
+  try {
+    const thisFile = fileURLToPath(import.meta.url);
+    const thisDir = dirname(thisFile);
+    const candidate = resolve(thisDir, "../../db/drizzle");
+    const { access } = await import("node:fs/promises");
+    await access(candidate);
+    migrationsFolder = candidate;
+  } catch {
+    const thisFile = fileURLToPath(import.meta.url);
+    migrationsFolder = resolve(dirname(thisFile), "migrations");
+  }
+
+  dbLog.info(`Running DB migrations from: ${migrationsFolder}`);
+  await migrate(db, { migrationsFolder });
+  dbLog.info("DB migrations complete.");
+}

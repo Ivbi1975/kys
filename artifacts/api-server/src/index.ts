@@ -1,6 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { startPoolMonitoring, shutdownPool } from "@workspace/db";
+import { startPoolMonitoring, shutdownPool, runMigrations } from "@workspace/db";
 import { syncAiSettingsToDb } from "./routes/ai-notes";
 import { startPurgeScheduler } from "./services/purge.service";
 import { startAuditLogPurgeScheduler } from "./services/audit-log.service";
@@ -23,23 +23,37 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 let isShuttingDown = false;
+let server: Server;
 
-const server: Server = app.listen({ port, host }, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
+async function start() {
+  try {
+    await runMigrations();
+  } catch (err) {
+    logger.error({ err }, "DB migration failed — server will still start");
   }
 
-  logger.info({ host, port }, "Server listening");
-  startPoolMonitoring();
-  startPurgeScheduler();
-  startAuditLogPurgeScheduler();
-  syncAiSettingsToDb()
-    .then(() => logger.info("AI settings synced to DB"))
-    .catch((err) => logger.error({ err }, "Failed to sync AI settings to DB"));
-  seedTagsAndRules()
-    .then(() => logger.info("Tags and rules seeded"))
-    .catch((err) => logger.error({ err }, "Failed to seed tags and rules"));
+  server = app.listen({ port, host }, (err) => {
+    if (err) {
+      logger.error({ err }, "Error listening on port");
+      process.exit(1);
+    }
+
+    logger.info({ host, port }, "Server listening");
+    startPoolMonitoring();
+    startPurgeScheduler();
+    startAuditLogPurgeScheduler();
+    syncAiSettingsToDb()
+      .then(() => logger.info("AI settings synced to DB"))
+      .catch((err) => logger.error({ err }, "Failed to sync AI settings to DB"));
+    seedTagsAndRules()
+      .then(() => logger.info("Tags and rules seeded"))
+      .catch((err) => logger.error({ err }, "Failed to seed tags and rules"));
+  });
+}
+
+start().catch((err) => {
+  logger.error({ err }, "Fatal startup error");
+  process.exit(1);
 });
 
 function gracefulShutdown(signal: string) {
