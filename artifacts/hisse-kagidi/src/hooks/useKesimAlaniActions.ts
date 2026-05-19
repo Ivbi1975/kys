@@ -53,7 +53,7 @@ export function useKesimAlaniActions({
     if (!current) return;
     try {
       await apiDeleteKesimAlani(current.id);
-      onDeletedRef.current?.(current.id);
+      await onDeletedRef.current?.(current.id);
       toast({
         title: "Kesim alanı silindi",
         description: `"${current.name}" çöp kutusuna taşındı.`,

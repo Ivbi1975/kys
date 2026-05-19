@@ -18,6 +18,7 @@ import {
   fetchConflictLog,
   fetchPendingEditRequests,
   splitKesimAlani,
+  invalidateHomeDataCache,
   renameKesimAlani,
 } from "@/lib/api";
 import { makeUndoToastAction } from "@/hooks/makeUndoToastAction";
@@ -100,6 +101,7 @@ export function useProjeDetayState() {
   }, [projectId, toast]);
 
   const onDeleted = useCallback(async () => {
+    invalidateHomeDataCache();
     await loadDataFn();
     if (showConflictsRef.current) await loadConflicts();
   }, [loadDataFn, loadConflicts]);

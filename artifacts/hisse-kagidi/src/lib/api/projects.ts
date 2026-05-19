@@ -21,6 +21,7 @@ const HOME_DATA_TTL_MS = 30_000;
 
 export function invalidateHomeDataCache(): void {
   homeDataCache = null;
+  window.dispatchEvent(new Event("homedata-invalidated"));
 }
 
 export async function fetchHomeData(): Promise<HomeData> {

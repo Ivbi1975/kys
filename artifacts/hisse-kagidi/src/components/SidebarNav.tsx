@@ -16,6 +16,10 @@ function useHomeData() {
     fetchHomeData().then(setData).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    window.addEventListener("homedata-invalidated", load);
+    return () => window.removeEventListener("homedata-invalidated", load);
+  }, [load]);
   return data;
 }
 
