@@ -10,7 +10,7 @@ import {
 import {
   Brain, ArrowLeft, Play, Square, CheckSquare, FastForward, RotateCcw,
   AlertTriangle, Loader2, X, Sparkles, CheckCircle2,
-  MessageSquare, FileText, Tag, Settings2, BarChart3, History,
+  MessageSquare, FileText, Tag, Settings2, BarChart3, History, Pencil,
 } from "lucide-react";
 import {
   fetchPoolDonations,
@@ -69,8 +69,38 @@ export default function AiSiniflandirmaPage() {
   };
 
   const [colWidths, setColWidths] = useState<Record<string, number>>({
-    checkbox: 32, vekalet: 144, name: 144, cinsi: 80, ozellik: 96, kategoriler: 180, ozet: 224, istekler: 176, uyarilar: 176,
+    rowNum: 36, checkbox: 32, vekalet: 160, name: 144, cinsi: 80, ozellik: 96, kategoriler: 200, orijinalNotlar: 200, aiOzet: 200, istekler: 176, uyarilar: 176,
   });
+
+  const [editingCategory, setEditingCategory] = useState<{ donationId: string; catIndex: number; value: string } | null>(null);
+
+  const removeCategory = (donationId: string, catIndex: number) => {
+    setAiResults(prev => {
+      const next = new Map(prev);
+      const entry = next.get(donationId);
+      if (!entry) return prev;
+      const updatedCats = entry.categories.filter((_, i) => i !== catIndex);
+      const updated = { ...entry, categories: updatedCats };
+      next.set(donationId, updated);
+      aiResultsRef.current = next;
+      return next;
+    });
+  };
+
+  const confirmRenameCategory = (donationId: string, catIndex: number, newLabel: string) => {
+    setAiResults(prev => {
+      const next = new Map(prev);
+      const entry = next.get(donationId);
+      if (!entry) return prev;
+      const updatedCats = entry.categories.map((c, i) => i === catIndex ? newLabel.trim() || c : c);
+      const updated = { ...entry, categories: updatedCats };
+      next.set(donationId, updated);
+      aiResultsRef.current = next;
+      return next;
+    });
+    setEditingCategory(null);
+  };
+
   const resizingRef = useRef<{ col: string; startX: number; startW: number } | null>(null);
 
   useEffect(() => {
@@ -808,20 +838,22 @@ export default function AiSiniflandirmaPage() {
               <div className="overflow-x-auto">
                 <table className="text-sm" style={{ tableLayout: "fixed", width: Object.values(colWidths).reduce((a, b) => a + b, 0) }}>
                   <colgroup>
-                    {(["checkbox","vekalet","name","cinsi","ozellik","kategoriler","ozet","istekler","uyarilar"] as const).map(col => (
+                    {(["rowNum","checkbox","vekalet","name","cinsi","ozellik","kategoriler","orijinalNotlar","aiOzet","istekler","uyarilar"] as const).map(col => (
                       <col key={col} style={{ width: colWidths[col] }} />
                     ))}
                   </colgroup>
                   <thead className="bg-muted/50 text-xs text-muted-foreground">
                     <tr>
                       {([
+                        { key: "rowNum", label: "#" },
                         { key: "checkbox", label: "" },
                         { key: "vekalet", label: "Vekaleti Veren" },
                         { key: "name", label: "Adına Kesilen" },
                         { key: "cinsi", label: "Cinsi" },
                         { key: "ozellik", label: "Özellik" },
                         { key: "kategoriler", label: "Kategoriler" },
-                        { key: "ozet", label: "Özet / Notlar" },
+                        { key: "orijinalNotlar", label: "Orijinal Notlar" },
+                        { key: "aiOzet", label: "AI Özeti" },
                         { key: "istekler", label: "Özel İstekler" },
                         { key: "uyarilar", label: "Uyarılar" },
                       ] as const).map(({ key, label }) => (
@@ -853,6 +885,9 @@ export default function AiSiniflandirmaPage() {
                           className={`cursor-pointer transition-colors ${isSelected ? "bg-green-100/80 dark:bg-green-900/40" : isAiFailed ? "bg-red-50 dark:bg-red-950/20" : idx % 2 === 0 ? "bg-background" : "bg-muted/20"} ${hasWarning && !isSelected ? "border-l-2 border-l-destructive" : ""}`}
                           onClick={() => toggleResultSelect(r.donationId)}
                         >
+                          <td className="px-2 py-2.5 text-center text-[11px] text-muted-foreground/60 font-mono select-none">
+                            {idx + 1}
+                          </td>
                           <td className="px-2 py-2.5 text-center" onClick={e => e.stopPropagation()}>
                             <button onClick={() => toggleResultSelect(r.donationId)} className="text-muted-foreground hover:text-foreground">
                               {isSelected
@@ -860,18 +895,58 @@ export default function AiSiniflandirmaPage() {
                                 : <Square className="w-4 h-4" />}
                             </button>
                           </td>
-                          <td className="px-3 py-2.5 font-medium text-xs truncate max-w-[144px]" title={(donor?.description || r.donationId).toUpperCase()}>
-                            {(donor?.description || r.donationId).toUpperCase()}
-                            {isAiFailed && <span className="ml-1 text-[10px] text-destructive font-semibold">[hata]</span>}
+                          <td className="px-3 py-2.5 font-medium text-xs" title={(donor?.description || r.donationId).toUpperCase()}>
+                            <div className="truncate">{(donor?.description || r.donationId).toUpperCase()}
+                              {isAiFailed && <span className="ml-1 text-[10px] text-destructive font-semibold">[hata]</span>}
+                            </div>
+                            {donor?.vekalet != null && donor.vekalet !== "" && (
+                              <div className="text-[10px] text-muted-foreground/60 font-normal truncate mt-0.5">
+                                #{donor.vekalet}
+                              </div>
+                            )}
                           </td>
                           <td className="px-3 py-2.5 text-xs text-muted-foreground truncate max-w-[144px]" title={(donor?.name || "").toUpperCase()}>{donor?.name ? donor.name.toUpperCase() : "—"}</td>
                           <td className="px-3 py-2.5 text-xs text-muted-foreground">{donor?.donationType || "—"}</td>
                           <td className="px-3 py-2.5 text-xs text-muted-foreground">{donor?.ozellik || donor?.birim || "—"}</td>
-                          <td className="px-3 py-2.5">
+                          <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
                             <div className="flex flex-wrap gap-1">
                               {r.categories.length > 0 ? (
-                                r.categories.map(cat => (
-                                  <CategoryBadge key={cat} cat={cat} onClick={() => setCategoryFilter(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])} />
+                                r.categories.map((cat, catIdx) => (
+                                  editingCategory?.donationId === r.donationId && editingCategory.catIndex === catIdx ? (
+                                    <span key={catIdx} className="inline-flex items-center gap-0.5">
+                                      <input
+                                        autoFocus
+                                        value={editingCategory.value}
+                                        onChange={e => setEditingCategory({ ...editingCategory, value: e.target.value })}
+                                        onKeyDown={e => {
+                                          if (e.key === "Enter") confirmRenameCategory(r.donationId, catIdx, editingCategory.value);
+                                          if (e.key === "Escape") setEditingCategory(null);
+                                        }}
+                                        onBlur={() => confirmRenameCategory(r.donationId, catIdx, editingCategory.value)}
+                                        className="text-[10px] border rounded px-1 py-0.5 w-24 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                                      />
+                                    </span>
+                                  ) : (
+                                    <span key={catIdx} className="inline-flex items-center gap-0.5 group/cat">
+                                      <CategoryBadge cat={cat} onClick={() => setCategoryFilter(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])} />
+                                      <button
+                                        title="Yeniden adlandır"
+                                        onMouseDown={e => e.preventDefault()}
+                                        onClick={e => { e.stopPropagation(); setEditingCategory({ donationId: r.donationId, catIndex: catIdx, value: cat }); }}
+                                        className="opacity-0 group-hover/cat:opacity-100 transition-opacity ml-0.5 text-muted-foreground hover:text-foreground"
+                                      >
+                                        <Pencil className="w-2.5 h-2.5" />
+                                      </button>
+                                      <button
+                                        title="Kaldır"
+                                        onMouseDown={e => e.preventDefault()}
+                                        onClick={e => { e.stopPropagation(); removeCategory(r.donationId, catIdx); }}
+                                        className="opacity-0 group-hover/cat:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                                      >
+                                        <X className="w-2.5 h-2.5" />
+                                      </button>
+                                    </span>
+                                  )
                                 ))
                               ) : (
                                 <span className="text-xs text-muted-foreground/50">—</span>
@@ -952,7 +1027,7 @@ export default function AiSiniflandirmaPage() {
                               <div>
                                 {donor?.notes?.trim() ? (
                                   <p
-                                    className="mb-1 text-foreground/70 italic border-b border-border/40 pb-1 cursor-text hover:bg-muted/30 rounded px-1 -mx-1 transition-colors"
+                                    className="text-foreground/70 italic cursor-text hover:bg-muted/30 rounded px-1 -mx-1 transition-colors whitespace-pre-wrap"
                                     title="Düzenlemek için tıklayın"
                                     onClick={() => setEditingNote({ donationId: r.donationId, value: donor.notes?.trim() || "" })}
                                   >
@@ -966,9 +1041,11 @@ export default function AiSiniflandirmaPage() {
                                     + not ekle
                                   </button>
                                 )}
-                                {r.summary && <p className="mt-0.5">{r.summary}</p>}
                               </div>
                             )}
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground/80 italic">
+                            {r.summary?.trim() ? r.summary : "—"}
                           </td>
                           <td className="px-3 py-2.5 text-xs">
                             {r.requests?.trim() ? (
