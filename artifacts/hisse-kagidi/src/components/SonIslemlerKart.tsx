@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { fetchAuditLogs, type AuditLogEntry } from "@/lib/api/audit-logs";
 import { formatDateTime } from "@/lib/formatting";
-import { formatAuditLogDescription } from "@/lib/audit-log-formatter";
+import { formatAuditLogDescription, isBulkDelete } from "@/lib/audit-log-formatter";
 
 const ACTION_LABELS: Record<string, string> = {
   create: "Oluşturma",
@@ -162,24 +162,38 @@ export function SonIslemlerKart({
           ) : (
             <>
               <div className="divide-y">
-                {logs.map(entry => (
-                  <div key={entry.id} className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-muted/20 transition-colors">
-                    <Badge
-                      variant="outline"
-                      className={`flex-shrink-0 text-[10px] px-1.5 py-0 mt-0.5 ${ACTION_COLORS[entry.action] || ""}`}
-                    >
-                      {ACTION_LABELS[entry.action] || entry.action}
-                    </Badge>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-foreground leading-snug">
-                        {formatAuditLogDescription(entry)}
-                      </p>
+                {logs.map(entry => {
+                  const bulkDel = isBulkDelete(entry);
+                  const badgeColor = bulkDel
+                    ? "bg-red-200 text-red-900 dark:bg-red-800 dark:text-red-100 font-semibold"
+                    : (ACTION_COLORS[entry.action] || "");
+                  const badgeLabel = bulkDel
+                    ? "Toplu Silme"
+                    : (ACTION_LABELS[entry.action] || entry.action);
+                  return (
+                    <div key={entry.id} className={`flex items-start gap-2.5 px-3 py-2.5 hover:bg-muted/20 transition-colors${bulkDel ? " bg-red-50/40 dark:bg-red-950/20" : ""}`}>
+                      <Badge
+                        variant="outline"
+                        className={`flex-shrink-0 text-[10px] px-1.5 py-0 mt-0.5 ${badgeColor}`}
+                      >
+                        {badgeLabel}
+                      </Badge>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-foreground leading-snug">
+                          {formatAuditLogDescription(entry)}
+                        </p>
+                        {bulkDel && entry.affectedCount != null && entry.affectedCount > 0 && (
+                          <p className="text-[10px] font-semibold text-red-700 dark:text-red-400 mt-0.5">
+                            {entry.affectedCount} bağış silindi
+                          </p>
+                        )}
+                      </div>
+                      <span className="flex-shrink-0 text-[10px] text-muted-foreground whitespace-nowrap pt-0.5">
+                        {formatDateTime(entry.createdAt)}
+                      </span>
                     </div>
-                    <span className="flex-shrink-0 text-[10px] text-muted-foreground whitespace-nowrap pt-0.5">
-                      {formatDateTime(entry.createdAt)}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="px-3 py-2 border-t bg-muted/10">
                 <button

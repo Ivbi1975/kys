@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { fetchAuditLogs, type AuditLogEntry } from "@/lib/api/audit-logs";
 import { formatDateTime } from "@/lib/formatting";
+import { isBulkDelete, formatFiltersText } from "@/lib/audit-log-formatter";
 
 const ACTION_LABELS: Record<string, string> = {
   create: "Oluşturma",
@@ -189,20 +190,7 @@ function FiltersDisplay({
   projectId: string;
   onNavigate: (path: string) => void;
 }) {
-  if (!filters || typeof filters !== "object") return null;
-  const f = filters as Record<string, unknown>;
-  const parts: string[] = [];
-  const label = (val: unknown): string => Array.isArray(val) ? (val as unknown[]).join(", ") : String(val);
-  if (f.search) parts.push(`Arama: "${f.search}"`);
-  if (f.status) parts.push(`Durum: ${f.status}`);
-  if (f.donationType && (!Array.isArray(f.donationType) || (f.donationType as unknown[]).length > 0)) parts.push(`Tür: ${label(f.donationType)}`);
-  if (f.birim && (!Array.isArray(f.birim) || (f.birim as unknown[]).length > 0)) parts.push(`Birim: ${label(f.birim)}`);
-  if (f.temsilci && (!Array.isArray(f.temsilci) || (f.temsilci as unknown[]).length > 0)) parts.push(`Temsilci: ${label(f.temsilci)}`);
-  if (f.kesimAlaniId) parts.push(`KA: ${f.kesimAlaniId}`);
-  if (f.flagFilter) parts.push(`Bayrak: ${f.flagFilter}`);
-  if (f.notesFilter) parts.push(`Not: ${f.notesFilter}`);
-  if (f.aiCategory) parts.push(`AI: ${label(f.aiCategory)}`);
-  if (f.tagIds && (!Array.isArray(f.tagIds) || (f.tagIds as unknown[]).length > 0)) parts.push(`Etiket: ${label(f.tagIds)}`);
+  const parts = formatFiltersText(filters);
   if (parts.length === 0) return null;
 
   const url = buildFilterUrl(projectId, filters);
@@ -259,24 +247,37 @@ function LogEntryRow({
   onNavigate: (path: string) => void;
 }) {
   const meta = entry.metadata as Record<string, unknown> | null;
+  const bulkDel = isBulkDelete(entry);
+  const badgeColor = bulkDel
+    ? "bg-red-200 text-red-900 dark:bg-red-800 dark:text-red-100 font-semibold"
+    : (ACTION_COLORS[entry.action] || "");
+  const badgeLabel = bulkDel
+    ? "Toplu Silme"
+    : (ACTION_LABELS[entry.action] || entry.action);
 
   return (
-    <div className="border-b last:border-b-0 py-2 px-1">
+    <div className={`border-b last:border-b-0 py-2 px-1${bulkDel ? " bg-red-50/40 dark:bg-red-950/20" : ""}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5 flex-wrap min-w-0">
           <Badge
             variant="outline"
-            className={`text-[10px] px-1.5 py-0 flex-shrink-0 ${ACTION_COLORS[entry.action] || ""}`}
+            className={`text-[10px] px-1.5 py-0 flex-shrink-0 ${badgeColor}`}
           >
-            {ACTION_LABELS[entry.action] || entry.action}
+            {badgeLabel}
           </Badge>
           <span className="text-[10px] text-muted-foreground flex-shrink-0">
             {ENTITY_LABELS[entry.entityType] || entry.entityType}
           </span>
-          {entry.affectedCount != null && entry.affectedCount > 0 && (
-            <span className="text-[10px] font-medium text-foreground">
-              ({entry.affectedCount} kayıt)
+          {bulkDel && entry.affectedCount != null && entry.affectedCount > 0 ? (
+            <span className="text-[10px] font-semibold text-red-700 dark:text-red-400">
+              {entry.affectedCount} bağış silindi
             </span>
+          ) : (
+            entry.affectedCount != null && entry.affectedCount > 0 && (
+              <span className="text-[10px] font-medium text-foreground">
+                ({entry.affectedCount} kayıt)
+              </span>
+            )
           )}
         </div>
         <span className="text-[10px] text-muted-foreground whitespace-nowrap flex-shrink-0">

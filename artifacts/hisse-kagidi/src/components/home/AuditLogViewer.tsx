@@ -16,8 +16,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ClipboardList, ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
+import { ClipboardList, ChevronDown, ChevronRight, RefreshCw, Filter } from "lucide-react";
 import { fetchAuditLogs, type AuditLogEntry, type AuditLogFilters } from "@/lib/api/audit-logs";
+import { isBulkDelete, formatFiltersText } from "@/lib/audit-log-formatter";
 
 const ACTION_LABELS: Record<string, string> = {
   create: "Oluşturma",
@@ -102,13 +103,36 @@ function JsonPreview({ data }: { data: unknown }) {
   );
 }
 
-function LogRow({ entry }: { entry: AuditLogEntry }) {
+function BulkDeleteFiltersInline({ filters }: { filters: unknown }) {
+  const parts = formatFiltersText(filters);
+  if (parts.length === 0) return null;
   return (
-    <div className="border-b last:border-b-0 py-2.5 px-1">
+    <div className="flex flex-wrap items-center gap-1 mt-1">
+      <Filter className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+      {parts.map((p, i) => (
+        <span key={i} className="text-[10px] bg-muted px-1 py-0.5 rounded text-muted-foreground">
+          {p}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function LogRow({ entry }: { entry: AuditLogEntry }) {
+  const bulkDel = isBulkDelete(entry);
+  const badgeColor = bulkDel
+    ? "bg-red-200 text-red-900 dark:bg-red-800 dark:text-red-100 font-semibold"
+    : (ACTION_COLORS[entry.action] || "");
+  const badgeLabel = bulkDel
+    ? "Toplu Silme"
+    : (ACTION_LABELS[entry.action] || entry.action);
+
+  return (
+    <div className={`border-b last:border-b-0 py-2.5 px-1${bulkDel ? " bg-red-50/40 dark:bg-red-950/20" : ""}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${ACTION_COLORS[entry.action] || ""}`}>
-            {ACTION_LABELS[entry.action] || entry.action}
+          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${badgeColor}`}>
+            {badgeLabel}
           </Badge>
           <span className="text-xs text-muted-foreground">
             {ENTITY_LABELS[entry.entityType] || entry.entityType}
@@ -118,12 +142,18 @@ function LogRow({ entry }: { entry: AuditLogEntry }) {
               {entry.entityName}
             </span>
           )}
+          {bulkDel && entry.affectedCount != null && entry.affectedCount > 0 && (
+            <span className="text-[10px] font-semibold text-red-700 dark:text-red-400">
+              {entry.affectedCount} bağış
+            </span>
+          )}
         </div>
         <span className="text-[10px] text-muted-foreground whitespace-nowrap flex-shrink-0">
           {formatDate(entry.createdAt)}
         </span>
       </div>
-      {entry.entityId && (
+      {bulkDel && <BulkDeleteFiltersInline filters={entry.filters} />}
+      {entry.entityId && !bulkDel && (
         <div className="text-[10px] text-muted-foreground mt-0.5">
           ID: {entry.entityId}
         </div>

@@ -1,5 +1,55 @@
 import type { AuditLogEntry } from "@/lib/api/audit-logs";
 
+export function isBulkDelete(entry: AuditLogEntry): boolean {
+  if (entry.action === "bulk_action" && entry.entityType === "donation") {
+    const m = entry.metadata as Record<string, unknown> | null;
+    const action = m?.action ?? m?.bulkActionType;
+    if (action === "delete") return true;
+  }
+  if (entry.action === "delete" && entry.entityType === "donation" && (entry.affectedCount ?? 0) > 1) {
+    return true;
+  }
+  return false;
+}
+
+export function formatFiltersText(filters: unknown): string[] {
+  if (!filters || typeof filters !== "object") return [];
+  const f = filters as Record<string, unknown>;
+  const parts: string[] = [];
+  const label = (val: unknown): string =>
+    Array.isArray(val) ? (val as unknown[]).filter(Boolean).join(", ") : String(val);
+  const hasValue = (val: unknown): boolean =>
+    val != null && val !== "" && (!Array.isArray(val) || (val as unknown[]).length > 0);
+
+  if (hasValue(f.search)) parts.push(`Arama: "${f.search}"`);
+  if (hasValue(f.status)) parts.push(`Durum: ${f.status}`);
+  if (hasValue(f.donationType)) parts.push(`Tür: ${label(f.donationType)}`);
+  if (hasValue(f.birim)) parts.push(`Birim: ${label(f.birim)}`);
+  if (hasValue(f.temsilci)) parts.push(`Temsilci: ${label(f.temsilci)}`);
+  if (hasValue(f.kesimAlaniId)) parts.push(`KA: ${f.kesimAlaniId}`);
+  if (hasValue(f.ozellik)) parts.push(`Özellik: ${label(f.ozellik)}`);
+  if (hasValue(f.fiyat)) parts.push(`Fiyat: ${label(f.fiyat)}`);
+  if (hasValue(f.yerTalebi)) parts.push(`Yer: ${label(f.yerTalebi)}`);
+  if (hasValue(f.gunTalebi)) parts.push(`Gün: ${label(f.gunTalebi)}`);
+  if (hasValue(f.ilkHayvan)) parts.push(`Hayvan: ${label(f.ilkHayvan)}`);
+  if (hasValue(f.safi)) parts.push(`Safi: ${label(f.safi)}`);
+  if (hasValue(f.flagFilter)) parts.push(`Bayrak: ${f.flagFilter}`);
+  if (hasValue(f.notesFilter)) parts.push(`Not: ${f.notesFilter}`);
+  if (hasValue(f.aiCategory)) parts.push(`AI: ${label(f.aiCategory)}`);
+  if (hasValue(f.tagIds)) parts.push(`Etiket: ${label(f.tagIds)}`);
+  if (hasValue(f.dateFrom) || hasValue(f.dateTo)) {
+    const from = f.dateFrom ?? "";
+    const to = f.dateTo ?? "";
+    parts.push(`Tarih: ${from}${from && to ? " – " : ""}${to}`);
+  }
+  if (hasValue(f.shareCountMin) || hasValue(f.shareCountMax)) {
+    const min = f.shareCountMin ?? "";
+    const max = f.shareCountMax ?? "";
+    parts.push(`Hisse: ${min}${min && max ? "–" : ""}${max}`);
+  }
+  return parts;
+}
+
 function meta(entry: AuditLogEntry): Record<string, unknown> {
   if (entry.metadata && typeof entry.metadata === "object") {
     return entry.metadata as Record<string, unknown>;
@@ -177,7 +227,7 @@ export function formatAuditLogDescription(entry: AuditLogEntry): string {
       return `Toplu kayıt oluşturuldu`;
 
     case "bulk_action": {
-      const actionDetail = str(m.bulkActionType) || str(m.field);
+      const actionDetail = str(m.bulkActionType) || str(m.action) || str(m.field);
       const c = n || 0;
       if (actionDetail === "delete") return `${c > 0 ? `${c} ` : ""}${entityLabelPlural(entry.entityType)} toplu silindi`;
       if (actionDetail === "restore") return `${c > 0 ? `${c} ` : ""}${entityLabelPlural(entry.entityType)} toplu geri yüklendi`;

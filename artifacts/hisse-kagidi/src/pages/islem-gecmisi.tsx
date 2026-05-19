@@ -14,7 +14,7 @@ import {
 import { fetchAuditLogs, type AuditLogEntry } from "@/lib/api/audit-logs";
 import { fetchKesimAlanlari } from "@/lib/api";
 import { formatDateTime } from "@/lib/formatting";
-import { formatAuditLogDescription } from "@/lib/audit-log-formatter";
+import { formatAuditLogDescription, isBulkDelete, formatFiltersText } from "@/lib/audit-log-formatter";
 import { useQuery } from "@tanstack/react-query";
 
 const ACTION_LABELS: Record<string, string> = {
@@ -113,23 +113,52 @@ function hasActiveFilters(f: Filters): boolean {
   return !!(f.action || f.kesimAlaniId || f.datePreset !== "all" || f.poolScope);
 }
 
+function BulkDeleteFiltersInline({ filters }: { filters: unknown }) {
+  const parts = formatFiltersText(filters);
+  if (parts.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1 mt-1">
+      <Filter className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+      {parts.map((p, i) => (
+        <span key={i} className="text-[11px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+          {p}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function LogRow({ entry }: { entry: AuditLogEntry }) {
   const description = formatAuditLogDescription(entry);
+  const bulkDel = isBulkDelete(entry);
+  const badgeColor = bulkDel
+    ? "bg-red-200 text-red-900 dark:bg-red-800 dark:text-red-100 font-semibold"
+    : (ACTION_COLORS[entry.action] || "bg-gray-100 text-gray-700");
+  const badgeLabel = bulkDel
+    ? "Toplu Silme"
+    : (ACTION_LABELS[entry.action] || entry.action);
+
   return (
-    <div className="flex items-start gap-3 py-3 px-4 border-b last:border-b-0 hover:bg-muted/30 transition-colors">
+    <div className={`flex items-start gap-3 py-3 px-4 border-b last:border-b-0 hover:bg-muted/30 transition-colors${bulkDel ? " bg-red-50/40 dark:bg-red-950/20" : ""}`}>
       <div className="flex-shrink-0 mt-0.5">
         <Badge
           variant="outline"
-          className={`text-[11px] px-1.5 py-0 whitespace-nowrap ${ACTION_COLORS[entry.action] || "bg-gray-100 text-gray-700"}`}
+          className={`text-[11px] px-1.5 py-0 whitespace-nowrap ${badgeColor}`}
         >
-          {ACTION_LABELS[entry.action] || entry.action}
+          {badgeLabel}
         </Badge>
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm text-foreground leading-snug">{description}</p>
-        {entry.affectedCount != null && entry.affectedCount > 1 && (
+        {bulkDel && entry.affectedCount != null && entry.affectedCount > 0 && (
+          <p className="text-xs font-semibold text-red-700 dark:text-red-400 mt-0.5">
+            {entry.affectedCount} bağış silindi
+          </p>
+        )}
+        {!bulkDel && entry.affectedCount != null && entry.affectedCount > 1 && (
           <p className="text-xs text-muted-foreground mt-0.5">{entry.affectedCount} kayıt etkilendi</p>
         )}
+        {bulkDel && <BulkDeleteFiltersInline filters={entry.filters} />}
       </div>
       <span className="flex-shrink-0 text-xs text-muted-foreground whitespace-nowrap">
         {formatDateTime(entry.createdAt)}
