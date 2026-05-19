@@ -299,9 +299,12 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
   addMultiFilter(donationsTable.safi, safiValues, "safi");
 
   if (kesimAlaniId === "none") {
-    const havuzKa = kaRows.find(k => k.name === "__havuz__");
-    if (havuzKa) {
-      conditions.push(eq(donationsTable.kesimAlaniId, havuzKa.id));
+    // Use ALL __havuz__ KA IDs (consistent with stats endpoint approach).
+    // Using find() would only match the first one — any donation in a secondary
+    // __havuz__ KA would escape the filter and appear incorrectly.
+    const havuzKaIds = kaRows.filter(k => k.name === "__havuz__").map(k => k.id);
+    if (havuzKaIds.length > 0) {
+      conditions.push(inArray(donationsTable.kesimAlaniId, havuzKaIds));
     } else {
       conditions.push(sql`false`);
     }
