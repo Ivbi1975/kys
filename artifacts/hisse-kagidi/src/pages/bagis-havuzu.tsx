@@ -461,13 +461,12 @@ export default function BagisHavuzuPage() {
   const filteredItems = useMemo(() => {
     if (descriptionShareCountFilter.length === 0) return items;
     const filterSet = new Set(descriptionShareCountFilter);
-    const source = allDescData?.items || items;
-    return source.filter(item => {
+    return items.filter(item => {
       const key = (item.description || "").trim().toLocaleLowerCase("tr");
       const cnt = key ? (allDescriptionCountMap[key] ?? 1) : 1;
       return filterSet.has(cnt);
     });
-  }, [items, descriptionShareCountFilter, allDescriptionCountMap, allDescData]);
+  }, [items, descriptionShareCountFilter, allDescriptionCountMap]);
 
   const effectiveSelectedIds = useMemo(() => {
     if (selectAllPages && allFilteredIds.length > 0) {
@@ -542,6 +541,7 @@ export default function BagisHavuzuPage() {
     queryClient.invalidateQueries({ queryKey: ["pool-stats"] });
     queryClient.invalidateQueries({ queryKey: ["pool-stats-base"] });
     queryClient.invalidateQueries({ queryKey: ["pool-assigned-vekalets"] });
+    queryClient.invalidateQueries({ queryKey: ["pool-all-descriptions"] });
   }, [queryClient]);
 
   const handleFlagDonation = useCallback(async (id: string, reason: string) => {

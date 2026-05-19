@@ -516,6 +516,10 @@ router.get("/projects/:id/donations", asyncHandler(async (req, res) => {
     excluded: d.excluded,
     sortOrder: d.sortOrder,
     kesimAlaniId: d.kesimAlaniId,
+    // kaNameMap is built from kaIds (non-deleted KAs for this project) and the
+    // first condition already restricts donations to those same kaIds, so
+    // kaNameMap[d.kesimAlaniId] will always resolve — the "" fallback is purely
+    // defensive and should never be reached in practice.
     kesimAlaniName: kaNameMap[d.kesimAlaniId] || "",
     tags: tagsByDonation[d.id] || [],
     aiCategories: d.aiCategories ? (() => { try { const p = JSON.parse(d.aiCategories); return Array.isArray(p) ? p.map(String) : []; } catch { return []; } })() : [],
@@ -1095,6 +1099,13 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
     let poolSourceIds: string[] = [];
     let nonPoolSourceIds: string[] = [];
 
+    if (!poolKAId) {
+      // No __havuz__ KA found for this project. All donations fall to the
+      // non-pool path which uses the broader sourceKAIds filter. Log a warning
+      // so this edge case is visible in server logs.
+      console.warn(`[transfer] poolKAId is undefined for project ${projectId}. All ${donationIds.length} donation(s) will be treated as non-pool.`);
+    }
+
     if (poolKAId) {
       const DETECT_CHUNK = 1000;
       const poolSet = new Set<string>();
@@ -1112,6 +1123,9 @@ router.post("/projects/:id/donations/transfer", asyncHandler(async (req, res) =>
       poolSourceIds = donationIds.filter(id => poolSet.has(id));
       nonPoolSourceIds = donationIds.filter(id => !poolSet.has(id));
     } else {
+      // sourceKAIds already includes every non-deleted KA for this project
+      // (excluding targetKesimAlaniId), so the non-pool UPDATE below will
+      // still move donations that are in any KA — including any pool-like KA.
       nonPoolSourceIds = donationIds;
     }
 
