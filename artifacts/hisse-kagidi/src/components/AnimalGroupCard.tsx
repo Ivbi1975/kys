@@ -29,10 +29,9 @@ import {
   ArrowUp,
   ArrowDown,
   StickyNote,
-  Phone,
 } from "lucide-react";
 
-const SORTABLE_COLUMNS: ColumnKey[] = ["vekalet", "description", "temsilci", "name", "donationType", "birim", "fiyat", "ozellik", "yerTalebi", "gunTalebi", "ilkHayvan", "safi"];
+const SORTABLE_COLUMNS: ColumnKey[] = ["vekalet", "description", "name", "donationType", "fiyat", "ozellik", "yerTalebi", "gunTalebi", "ilkHayvan", "safi"];
 
 interface AnimalGroupCardProps {
   group: AnimalGroup;
@@ -219,22 +218,10 @@ const GroupDonationRow = memo(function GroupDonationRow({
             <span className={`${inputH} flex items-center select-text`}>{turkishTitleCase(d.name) || "—"}</span>
           </td>
         );
-      case "temsilci":
-        return (
-          <td key={colKey} className={cellPad}>
-            <span className={`${inputH} flex items-center select-text`}>{turkishTitleCase(d.temsilci || "") || "—"}</span>
-          </td>
-        );
       case "donationType":
         return (
           <td key={colKey} className={cellPad}>
             <span className={`${inputH} flex items-center select-text`}>{turkishTitleCase(d.donationType) || "—"}</span>
-          </td>
-        );
-      case "birim":
-        return (
-          <td key={colKey} className={`${cellPad} text-center`}>
-            <span className={`${inputH} flex items-center justify-center text-muted-foreground`}>{d.birim || <span className="text-muted-foreground/30">—</span>}</span>
           </td>
         );
       case "fiyat":
@@ -271,16 +258,6 @@ const GroupDonationRow = memo(function GroupDonationRow({
         return (
           <td key={colKey} className={`${cellPad} text-center`}>
             <span className={`${inputH} flex items-center justify-center text-muted-foreground`}>{d.safi || <span className="text-muted-foreground/30">—</span>}</span>
-          </td>
-        );
-      case "telefon":
-        return (
-          <td key={colKey} className={cellPad}>
-            {d.phone ? (
-              <a href={`tel:${d.phone}`} className={`${inputH} flex items-center gap-0.5 text-blue-600 hover:underline whitespace-nowrap`} onClick={e => e.stopPropagation()}>
-                <Phone className="w-2.5 h-2.5 flex-shrink-0" />{d.phone}
-              </a>
-            ) : <span className="text-muted-foreground/30">—</span>}
           </td>
         );
       case "notes":

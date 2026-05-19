@@ -1,29 +1,26 @@
 import { useState, useEffect, useCallback } from "react";
 
-export type ColumnKey = "drag" | "index" | "vekalet" | "description" | "temsilci" | "name" | "donationType" | "birim" | "fiyat" | "ozellik" | "yerTalebi" | "gunTalebi" | "ilkHayvan" | "safi" | "telefon" | "notes" | "aiTags" | "actions";
+export type ColumnKey = "drag" | "index" | "vekalet" | "description" | "name" | "donationType" | "fiyat" | "ozellik" | "yerTalebi" | "gunTalebi" | "ilkHayvan" | "safi" | "notes" | "aiTags" | "actions";
 
 export const ALL_GROUP_COLUMNS: { key: ColumnKey; label: string; alwaysVisible?: boolean }[] = [
   { key: "drag", label: "Sürükle" },
   { key: "index", label: "Sıra", alwaysVisible: true },
   { key: "vekalet", label: "Vekalet" },
   { key: "description", label: "Vekaleti Veren" },
-  { key: "temsilci", label: "Temsilci" },
   { key: "name", label: "Adına Kesilen" },
   { key: "donationType", label: "Cinsi" },
-  { key: "birim", label: "Birim" },
   { key: "fiyat", label: "Fiyat" },
   { key: "ozellik", label: "Özellik" },
   { key: "yerTalebi", label: "Yer Tal." },
   { key: "gunTalebi", label: "Gün Tal." },
   { key: "ilkHayvan", label: "İlk H." },
   { key: "safi", label: "Şafi" },
-  { key: "telefon", label: "Telefon" },
   { key: "notes", label: "Notlar" },
   { key: "aiTags", label: "AI Etiketleri" },
   { key: "actions", label: "İşlemler" },
 ];
 
-export const DEFAULT_COLUMN_ORDER: ColumnKey[] = ["drag", "index", "vekalet", "description", "temsilci", "name", "donationType", "birim", "fiyat", "ozellik", "yerTalebi", "gunTalebi", "ilkHayvan", "safi", "telefon", "notes", "aiTags", "actions"];
+export const DEFAULT_COLUMN_ORDER: ColumnKey[] = ["drag", "index", "vekalet", "description", "name", "donationType", "fiyat", "ozellik", "yerTalebi", "gunTalebi", "ilkHayvan", "safi", "notes", "aiTags", "actions"];
 
 export interface WorkspacePreferences {
   columnCount: 1 | 2 | 3;
