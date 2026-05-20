@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  AlertTriangle, Eye, EyeOff, Flag, MoreHorizontal, Phone, Plus, ShoppingBag, StickyNote, Trash2, Undo2, Wand2,
+  AlertTriangle, Eye, EyeOff, Flag, History, MoreHorizontal, Phone, Plus, ShoppingBag, StickyNote, Trash2, Undo2, Wand2,
 } from "lucide-react";
 import { turkishTitleCase } from "@/lib/formatting";
 import { groupTagsByCategory } from "@/lib/groupTags";
 import { useVirtuosoRowContext } from "../VirtuosoRowContext";
+import { fetchDonationTransferHistory, type DonationTransferHistoryEntry } from "@/lib/api";
 
 interface DonorRowProps {
   d: Donation;
@@ -132,6 +133,91 @@ function AiCategoryAddPopover({
             className="px-2 py-0.5 rounded text-[9px] font-medium bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 transition-colors whitespace-nowrap"
           >Ekle</button>
         </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function TransferHistoryPopover({ donationId, projectId }: { donationId: string; projectId?: string }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [transfers, setTransfers] = useState<DonationTransferHistoryEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    if (!projectId || transfers !== null) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await fetchDonationTransferHistory(projectId, donationId);
+      setTransfers(result.transfers);
+    } catch {
+      setError("Geçmiş yüklenemedi");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (next) load();
+  }
+
+  const count = transfers?.length ?? 0;
+  const hasHistory = transfers !== null && count > 0;
+
+  if (!projectId) return null;
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <button
+          className="relative flex items-center justify-center w-7 h-7 rounded hover:bg-muted transition-colors"
+          title="Transfer geçmişi"
+          aria-label="Transfer geçmişini göster"
+        >
+          <History className={`w-3.5 h-3.5 ${hasHistory ? "text-blue-500 dark:text-blue-400" : "text-muted-foreground/50"}`} />
+          {hasHistory && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-blue-500 text-white text-[9px] font-bold px-0.5 leading-none">
+              {count}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-3" align="end" side="top">
+        <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
+          <History className="w-3.5 h-3.5 text-blue-500" />
+          Transfer Geçmişi
+          {transfers !== null && (
+            <span className="ml-auto text-[10px] font-normal text-muted-foreground">{count} kayıt</span>
+          )}
+        </p>
+        {loading && <p className="text-xs text-muted-foreground py-2 text-center">Yükleniyor...</p>}
+        {error && <p className="text-xs text-destructive py-2 text-center">{error}</p>}
+        {!loading && !error && transfers !== null && count === 0 && (
+          <p className="text-xs text-muted-foreground py-2 text-center italic">Transfer geçmişi yok</p>
+        )}
+        {!loading && !error && transfers !== null && count > 0 && (
+          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+            {transfers.map((t) => {
+              const fromName = t.fromKesimAlaniName === "__havuz__" ? "Bağış Havuzu" : (t.fromKesimAlaniName || "—");
+              const toName = t.toKesimAlaniName === "__havuz__" ? "Bağış Havuzu" : (t.toKesimAlaniName || "—");
+              const date = new Date(t.createdAt);
+              const dateStr = date.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" });
+              const timeStr = date.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+              return (
+                <div key={t.id} className="flex flex-col gap-0.5 py-1.5 border-b border-border last:border-0">
+                  <div className="flex items-start gap-1.5 text-[11px]">
+                    <span className="text-muted-foreground shrink-0 font-medium min-w-[48px]">{fromName}</span>
+                    <span className="text-muted-foreground/50">→</span>
+                    <span className="text-foreground font-medium">{toName}</span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground/70">{dateStr} {timeStr}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );
@@ -511,6 +597,7 @@ function DonorRowInner({
                 <ShoppingBag className={`w-3.5 h-3.5 ${isInBasket ? "text-emerald-600" : "text-muted-foreground"}`} />
               </Button>
             )}
+            <TransferHistoryPopover donationId={d.id} projectId={projectId} />
             <DonorRowOverflowMenu
               d={d}
               isGrouped={isGrouped}

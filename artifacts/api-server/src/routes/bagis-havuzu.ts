@@ -1046,6 +1046,38 @@ router.post("/projects/:id/donations/siblings", asyncHandler(async (req, res) =>
   res.json({ siblings });
 }));
 
+router.get("/projects/:id/donations/:donationId/transfers", asyncHandler(async (req, res) => {
+  const projectId = req.params.id;
+  const donationId = req.params.donationId;
+
+  const [project] = await db.select({ id: projectsTable.id }).from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: ERROR_MESSAGES.PROJECT_NOT_FOUND }); return; }
+
+  const [donation] = await db.select({ id: donationsTable.id, kesimAlaniId: donationsTable.kesimAlaniId })
+    .from(donationsTable)
+    .where(and(eq(donationsTable.id, donationId), isNull(donationsTable.deletedAt)));
+  if (!donation) { res.status(404).json({ error: "Bağış bulunamadı" }); return; }
+
+  const transfers = await db.select({
+    id: donationTransfersTable.id,
+    fromKesimAlaniId: donationTransfersTable.fromKesimAlaniId,
+    fromKesimAlaniName: donationTransfersTable.fromKesimAlaniName,
+    toKesimAlaniId: donationTransfersTable.toKesimAlaniId,
+    toKesimAlaniName: donationTransfersTable.toKesimAlaniName,
+    transferType: donationTransfersTable.transferType,
+    batchId: donationTransfersTable.batchId,
+    createdAt: donationTransfersTable.createdAt,
+  })
+    .from(donationTransfersTable)
+    .where(and(
+      eq(donationTransfersTable.donationId, donationId),
+      eq(donationTransfersTable.projectId, projectId),
+    ))
+    .orderBy(desc(donationTransfersTable.createdAt));
+
+  res.json({ transfers, count: transfers.length });
+}));
+
 const transferSchema = z.object({
   donationIds: z.array(z.string()).min(1).max(50000),
   targetKesimAlaniId: z.string().min(1),

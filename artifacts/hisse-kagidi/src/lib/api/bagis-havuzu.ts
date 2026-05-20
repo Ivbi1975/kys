@@ -370,6 +370,26 @@ export async function bulkDeleteFiltered(
   });
 }
 
+export interface DonationTransferHistoryEntry {
+  id: string;
+  fromKesimAlaniId: string | null;
+  fromKesimAlaniName: string | null;
+  toKesimAlaniId: string | null;
+  toKesimAlaniName: string | null;
+  transferType: string | null;
+  batchId: string | null;
+  createdAt: string;
+}
+
+export async function fetchDonationTransferHistory(
+  projectId: string,
+  donationId: string,
+): Promise<{ transfers: DonationTransferHistoryEntry[]; count: number }> {
+  return apiFetch<{ transfers: DonationTransferHistoryEntry[]; count: number }>(
+    `/projects/${projectId}/donations/${donationId}/transfers`
+  );
+}
+
 export async function logFilterApplied(
   projectId: string,
   filters: Record<string, unknown>,
