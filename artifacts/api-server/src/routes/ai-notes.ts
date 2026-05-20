@@ -1000,6 +1000,121 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
   res.json({ success: true, count: enrichedClassifications.length });
 }));
 
+router.post("/ai-notes/sync-to-kesim/:kaId", asyncHandler(async (req, res) => {
+  const { kaId } = req.params;
+
+  const [ka] = await db.select({ id: kesimAlanlariTable.id, projectId: kesimAlanlariTable.projectId })
+    .from(kesimAlanlariTable)
+    .where(and(eq(kesimAlanlariTable.id, kaId), isNull(kesimAlanlariTable.deletedAt)));
+  if (!ka || !ka.projectId) {
+    res.status(404).json({ error: ERROR_MESSAGES.NOT_FOUND });
+    return;
+  }
+
+  const [poolKa] = await db.select({ id: kesimAlanlariTable.id })
+    .from(kesimAlanlariTable)
+    .where(and(
+      eq(kesimAlanlariTable.projectId, ka.projectId),
+      eq(kesimAlanlariTable.name, "__havuz__"),
+      isNull(kesimAlanlariTable.deletedAt),
+    ));
+  if (!poolKa) {
+    res.json({ synced: 0 });
+    return;
+  }
+
+  const aiTagRows = await db.select({ id: customTagsTable.id, name: customTagsTable.name })
+    .from(customTagsTable)
+    .where(eq(customTagsTable.categoryId, "__ai_category__"));
+  if (aiTagRows.length === 0) {
+    res.json({ synced: 0 });
+    return;
+  }
+  const aiTagIdSet = new Set(aiTagRows.map(t => t.id));
+
+  const poolDonationTagRows = await db.execute(sql`
+    SELECT dt.donation_id, dt.tag_id, d.vekalet
+    FROM donation_tags dt
+    JOIN donations d ON d.id = dt.donation_id
+    WHERE d.kesim_alani_id = ${poolKa.id}
+      AND d.deleted_at IS NULL
+      AND dt.tag_id IN (SELECT id FROM custom_tags WHERE category_id = '__ai_category__')
+      AND d.vekalet IS NOT NULL AND d.vekalet != ''
+  `);
+
+  type PoolTagRow = { donation_id: string; tag_id: string; vekalet: string };
+  const poolRows = poolDonationTagRows.rows as PoolTagRow[];
+  if (poolRows.length === 0) {
+    res.json({ synced: 0 });
+    return;
+  }
+
+  const tagsByVekalet = new Map<string, string[]>();
+  for (const row of poolRows) {
+    if (!tagsByVekalet.has(row.vekalet)) tagsByVekalet.set(row.vekalet, []);
+    tagsByVekalet.get(row.vekalet)!.push(row.tag_id);
+  }
+
+  const warningsByVekalet = new Map<string, string>();
+  const poolWarningRows = await db.execute(sql`
+    SELECT vekalet, ai_warnings
+    FROM donations
+    WHERE kesim_alani_id = ${poolKa.id}
+      AND deleted_at IS NULL
+      AND vekalet IS NOT NULL AND vekalet != ''
+      AND ai_warnings IS NOT NULL AND ai_warnings != ''
+  `);
+  for (const row of poolWarningRows.rows as { vekalet: string; ai_warnings: string }[]) {
+    warningsByVekalet.set(row.vekalet, row.ai_warnings);
+  }
+
+  const kaDonations = await db.execute(sql`
+    SELECT id, vekalet FROM donations
+    WHERE kesim_alani_id = ${kaId}
+      AND deleted_at IS NULL
+      AND vekalet IS NOT NULL AND vekalet != ''
+  `);
+  type KaDonationRow = { id: string; vekalet: string };
+  const kaDonationRows = kaDonations.rows as KaDonationRow[];
+
+  const toSync = kaDonationRows.filter(d => tagsByVekalet.has(d.vekalet));
+  if (toSync.length === 0) {
+    res.json({ synced: 0 });
+    return;
+  }
+
+  const toSyncIds = toSync.map(d => d.id);
+  await db.execute(sql`
+    DELETE FROM donation_tags
+    WHERE donation_id IN (${sql.join(toSyncIds.map(id => sql`${id}`), sql`, `)})
+      AND tag_id IN (SELECT id FROM custom_tags WHERE category_id = '__ai_category__')
+  `);
+
+  const tagRows: { donationId: string; tagId: string }[] = [];
+  for (const d of toSync) {
+    const tags = tagsByVekalet.get(d.vekalet) || [];
+    for (const tagId of tags) {
+      if (aiTagIdSet.has(tagId)) tagRows.push({ donationId: d.id, tagId });
+    }
+  }
+  if (tagRows.length > 0) {
+    for (let i = 0; i < tagRows.length; i += TX_BATCH_SIZE) {
+      await db.insert(donationTagsTable).values(tagRows.slice(i, i + TX_BATCH_SIZE)).onConflictDoNothing();
+    }
+  }
+
+  for (const d of toSync) {
+    const warnings = warningsByVekalet.get(d.vekalet);
+    if (warnings) {
+      await db.update(donationsTable)
+        .set({ aiWarnings: warnings, updatedAt: new Date() })
+        .where(eq(donationsTable.id, d.id));
+    }
+  }
+
+  res.json({ synced: toSync.length });
+}));
+
 router.put("/ai-notes/bulk-update", asyncHandler(async (req, res) => {
   const parsed = z.object({
     kesimAlaniId: z.string(),

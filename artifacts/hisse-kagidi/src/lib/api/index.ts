@@ -169,6 +169,7 @@ export {
   fetchFlaggedDonations,
   undoTransfer,
   restoreNotes,
+  syncAiTagsToKesim,
 } from "./misc";
 export type {
   ConflictEntry,

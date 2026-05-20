@@ -3,7 +3,7 @@ import type { VirtuosoHandle } from "react-virtuoso";
 import { useParams, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { Donation, AnimalGroup, KesimAlani, ColorTag } from "@/lib/types";
-import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, fetchTags, fetchTagCategories, fetchPhotoCountsAdmin, fetchGroupPhotosAdmin, fetchKesimAlaniMeta, fetchAllDonations, fetchAllGroupsCompact } from "@/lib/api";
+import { fetchKesimAlani, fetchKesimAlanlari, fetchProjects, fetchTags, fetchTagCategories, fetchPhotoCountsAdmin, fetchGroupPhotosAdmin, fetchKesimAlaniMeta, fetchAllDonations, fetchAllGroupsCompact, syncAiTagsToKesim } from "@/lib/api";
 import { sortTagsTr } from "@/lib/formatting";
 import { normalizeDonationType } from "@/lib/utils";
 import type { CompactGroupItem } from "@/lib/api/kesim-alanlari";
@@ -391,6 +391,17 @@ export function useKesimAlaniState() {
         if (requestId !== loadRequestIdRef.current) return;
 
         updateKesimState();
+
+        syncAiTagsToKesim(params.id).then(({ synced }) => {
+          if (synced > 0 && requestId === loadRequestIdRef.current) {
+            fetchAllDonations(params.id).then((refreshed) => {
+              if (requestId !== loadRequestIdRef.current) return;
+              donationsById.clear();
+              for (const d of refreshed) donationsById.set(d.id, d);
+              updateKesimState();
+            }).catch(() => {});
+          }
+        }).catch(() => {});
 
         const stored = loadBasketFromStorage(meta.projectId, true);
         basket.setBasketItems(stored);

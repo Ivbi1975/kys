@@ -348,3 +348,9 @@ export async function restoreNotes(
     body: JSON.stringify({ restores }),
   });
 }
+
+export async function syncAiTagsToKesim(kaId: string): Promise<{ synced: number }> {
+  return apiFetch<{ synced: number }>(`/ai-notes/sync-to-kesim/${kaId}`, {
+    method: "POST",
+  });
+}
