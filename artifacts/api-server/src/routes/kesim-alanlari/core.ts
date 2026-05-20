@@ -181,7 +181,7 @@ router.post("/kesim-alanlari", asyncHandler(async (req, res) => {
   const result = await createKesimAlani(parsed.data);
   res.status(201).json(result.data);
   refreshProjectStats();
-  auditLog({ action: "create", entityType: "kesim_alani", entityId: parsed.data.id, entityName: parsed.data.name, newValue: { name: parsed.data.name, projectId: parsed.data.projectId }, projectId: parsed.data.projectId, req });
+  auditLog({ action: "create", entityType: "kesim_alani", entityId: parsed.data.id, entityName: parsed.data.name, newValue: { name: parsed.data.name, projectId: parsed.data.projectId }, projectId: parsed.data.projectId ?? undefined, req });
 }));
 
 router.put("/kesim-alanlari/:id/move", asyncHandler(async (req, res) => {
