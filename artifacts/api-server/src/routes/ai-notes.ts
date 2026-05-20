@@ -909,6 +909,7 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
         id: donationsTable.id,
         vekalet: donationsTable.vekalet,
         aiWarnings: donationsTable.aiWarnings,
+        notes: donationsTable.notes,
         kesimAlaniId: donationsTable.kesimAlaniId,
       })
         .from(donationsTable)
@@ -935,6 +936,7 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
 
         const srcCategories = categoryByDonationId.get(src.id) ?? [];
         const srcWarnings = warningByDonationId.get(src.id) ?? null;
+        const srcNotes = src.notes ?? null;
 
         const nonPoolKas = await db.select({ id: kesimAlanlariTable.id })
           .from(kesimAlanlariTable)
@@ -965,6 +967,7 @@ router.put("/ai-notes/save-classifications", asyncHandler(async (req, res) => {
           await db.update(donationsTable)
             .set({
               aiWarnings: srcWarnings || null,
+              notes: srcNotes || null,
               updatedAt: new Date(),
             })
             .where(inArray(donationsTable.id, targetIds));
@@ -1056,16 +1059,17 @@ router.post("/ai-notes/sync-to-kesim/:kaId", asyncHandler(async (req, res) => {
   }
 
   const warningsByVekalet = new Map<string, string>();
-  const poolWarningRows = await db.execute(sql`
-    SELECT vekalet, ai_warnings
+  const notesByVekalet = new Map<string, string>();
+  const poolDataRows = await db.execute(sql`
+    SELECT vekalet, ai_warnings, notes
     FROM donations
     WHERE kesim_alani_id = ${poolKa.id}
       AND deleted_at IS NULL
       AND vekalet IS NOT NULL AND vekalet != ''
-      AND ai_warnings IS NOT NULL AND ai_warnings != ''
   `);
-  for (const row of poolWarningRows.rows as { vekalet: string; ai_warnings: string }[]) {
-    warningsByVekalet.set(row.vekalet, row.ai_warnings);
+  for (const row of poolDataRows.rows as { vekalet: string; ai_warnings: string | null; notes: string | null }[]) {
+    if (row.ai_warnings?.trim()) warningsByVekalet.set(row.vekalet, row.ai_warnings);
+    if (row.notes?.trim()) notesByVekalet.set(row.vekalet, row.notes);
   }
 
   const kaDonations = await db.execute(sql`
@@ -1077,7 +1081,9 @@ router.post("/ai-notes/sync-to-kesim/:kaId", asyncHandler(async (req, res) => {
   type KaDonationRow = { id: string; vekalet: string };
   const kaDonationRows = kaDonations.rows as KaDonationRow[];
 
-  const toSync = kaDonationRows.filter(d => tagsByVekalet.has(d.vekalet));
+  const toSync = kaDonationRows.filter(d =>
+    tagsByVekalet.has(d.vekalet) || warningsByVekalet.has(d.vekalet) || notesByVekalet.has(d.vekalet)
+  );
   if (toSync.length === 0) {
     res.json({ synced: 0 });
     return;
@@ -1105,9 +1111,13 @@ router.post("/ai-notes/sync-to-kesim/:kaId", asyncHandler(async (req, res) => {
 
   for (const d of toSync) {
     const warnings = warningsByVekalet.get(d.vekalet);
-    if (warnings) {
+    const notes = notesByVekalet.get(d.vekalet);
+    if (warnings || notes) {
+      const updateObj: { aiWarnings?: string; notes?: string; updatedAt: Date } = { updatedAt: new Date() };
+      if (warnings) updateObj.aiWarnings = warnings;
+      if (notes) updateObj.notes = notes;
       await db.update(donationsTable)
-        .set({ aiWarnings: warnings, updatedAt: new Date() })
+        .set(updateObj)
         .where(eq(donationsTable.id, d.id));
     }
   }
