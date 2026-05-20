@@ -264,11 +264,13 @@ const GroupDonationRow = memo(function GroupDonationRow({
             ) : <span className="text-muted-foreground/30">—</span>}
           </td>
         );
-      case "aiTags":
+      case "aiTags": {
+        const hasAiData = (d.aiCategories && d.aiCategories.length > 0) || !!(d.aiWarnings && d.aiWarnings.trim());
+        const hasNote = !!d.notes?.trim();
         return (
           <td key={colKey} className={cellPad}>
             <div className="flex gap-0.5 flex-wrap items-center min-h-[1.25rem]">
-              {(d.aiCategories && d.aiCategories.length > 0) || (d.aiWarnings && d.aiWarnings.trim()) ? (
+              {hasAiData && (
                 <>
                   {(d.aiCategories || []).map(cat => (
                     <CategoryBadge key={cat} cat={cat} size="sm" />
@@ -279,12 +281,23 @@ const GroupDonationRow = memo(function GroupDonationRow({
                     </span>
                   )}
                 </>
-              ) : (
+              )}
+              {hasNote && (
+                <span
+                  className={`${inputH} flex items-center text-muted-foreground max-w-[120px] overflow-hidden`}
+                  title={d.notes!.trim()}
+                >
+                  <StickyNote className="w-2.5 h-2.5 mr-0.5 text-amber-500 flex-shrink-0" />
+                  <span className="truncate">{d.notes!.trim()}</span>
+                </span>
+              )}
+              {!hasAiData && !hasNote && (
                 <span className="text-muted-foreground/30">—</span>
               )}
             </div>
           </td>
         );
+      }
       case "actions":
         return (
           <td key={colKey} className={cellPad}>

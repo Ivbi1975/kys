@@ -15,7 +15,7 @@ export const ALL_GROUP_COLUMNS: { key: ColumnKey; label: string; alwaysVisible?:
   { key: "ilkHayvan", label: "İlk H." },
   { key: "safi", label: "Şafi" },
   { key: "notes", label: "Notlar" },
-  { key: "aiTags", label: "AI Etiketleri" },
+  { key: "aiTags", label: "AI Etiketi / Not" },
   { key: "actions", label: "İşlemler" },
 ];
 
