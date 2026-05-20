@@ -199,7 +199,7 @@ describe("D06–D08 — KA izolasyonu ve silinmiş bağış güncelleme", () => 
     expect(check.body.count).toBeGreaterThanOrEqual(1);
   });
 
-  it("D08 — soft-deleted bağış güncelleme girişimi [BUG TESPITI]", async () => {
+  it("D08 — soft-deleted bağış güncelleme girişimi 404 döner", async () => {
     const softId = `${TEST_PREFIX}-d08-${TS}`;
     await post(`/api/kesim-alanlari/${kaId}/donations`).send({
       id: softId, name: "D08 Orijinal", description: "Test", shareCount: 1,
@@ -210,11 +210,7 @@ describe("D06–D08 — KA izolasyonu ve silinmiş bağış güncelleme", () => 
       name: "D08 Güncellendi",
     });
 
-    if (updateRes.status === 200) {
-      console.warn("BUG TESPIT: Soft-deleted bağış güncellenebiliyor! updateDonation deletedAt filtresi yok.");
-    } else {
-      expect(updateRes.status).toBe(404);
-    }
+    expect(updateRes.status).toBe(404);
 
     await del(`/api/kesim-alanlari/${kaId}/donations/${softId}?permanent=true`);
   });

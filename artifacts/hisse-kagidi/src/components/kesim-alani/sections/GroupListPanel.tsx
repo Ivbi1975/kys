@@ -1,4 +1,4 @@
-import React, { Profiler, useState, useCallback, useEffect, useRef } from "react";
+import React, { Profiler, useState, useCallback, useEffect, useRef, useMemo, memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -38,7 +38,7 @@ function ColorDot({ bg }: { bg?: string }) {
   return <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: bg }} />;
 }
 
-export function GroupListPanel() {
+export const GroupListPanel = memo(function GroupListPanelComponent() {
   const ctx = useKesimAlaniContext();
   const groupsListBottomRef = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(false);
@@ -183,18 +183,39 @@ export function GroupListPanel() {
     saveSingleGroupField, swapLabels,
   ]);
 
-  if (!kesim) return null;
-
-  const gridClassName = `grid gap-4 ${
+  const gridClassName = useMemo(() => `grid gap-4 ${
     effectiveColumnCount === 3 ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" :
     effectiveColumnCount === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
-  }`;
+  }`, [effectiveColumnCount]);
+
+  const lockedCount = useMemo(
+    () => (kesim?.animalGroups ?? []).filter(g => g.locked).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [kesim?.animalGroups]
+  );
+
+  const activeColorTag = useMemo(
+    () => COLOR_TAGS.find(c => c.key === colorTagFilter) ?? COLOR_TAGS[0],
+    [colorTagFilter]
+  );
+  const colorTagActive = colorTagFilter !== "all";
+
+  const visibleItems = useMemo(
+    () => filteredGroupItems.slice(0, visibleGroupCount),
+    [filteredGroupItems, visibleGroupCount]
+  );
+
+  const visibleRows = useMemo<{ group: NonNullable<typeof kesim>["animalGroups"][0]; groupIdx: number }[][]>(() => {
+    const rows: { group: NonNullable<typeof kesim>["animalGroups"][0]; groupIdx: number }[][] = [];
+    for (let i = 0; i < visibleItems.length; i += effectiveColumnCount) {
+      rows.push(visibleItems.slice(i, i + effectiveColumnCount));
+    }
+    return rows;
+  }, [visibleItems, effectiveColumnCount]);
+
+  if (!kesim) return null;
 
   const hasGroups = kesim.animalGroups.length > 0;
-  const lockedCount = kesim.animalGroups.filter(g => g.locked).length;
-
-  const activeColorTag = COLOR_TAGS.find(c => c.key === colorTagFilter) ?? COLOR_TAGS[0];
-  const colorTagActive = colorTagFilter !== "all";
 
   return (
     <Profiler id="GroupListPanel" onRender={onRenderCallback}>
@@ -598,23 +619,16 @@ export function GroupListPanel() {
           <Wand2 className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
           <p className="text-muted-foreground">Bağışçı listesini doldurup "Otomatik Grupla" butonuna tıklayın</p>
         </Card>
-      ) : (() => {
-        const visibleItems = filteredGroupItems.slice(0, visibleGroupCount);
-        const visibleRows: { group: NonNullable<typeof kesim>["animalGroups"][0]; groupIdx: number }[][] = [];
-        for (let i = 0; i < visibleItems.length; i += effectiveColumnCount) {
-          visibleRows.push(visibleItems.slice(i, i + effectiveColumnCount));
-        }
-        return (
-          <>
-            {visibleRows.map((row, rowIdx) => (
-              <div key={rowIdx} className={`${gridClassName} pb-4`}>
-                {row.map(renderGroupCard)}
-              </div>
-            ))}
-            <div ref={groupsListBottomRef} />
-          </>
-        );
-      })()}
+      ) : (
+        <>
+          {visibleRows.map((row, rowIdx) => (
+            <div key={rowIdx} className={`${gridClassName} pb-4`}>
+              {row.map(renderGroupCard)}
+            </div>
+          ))}
+          <div ref={groupsListBottomRef} />
+        </>
+      )}
     </Profiler>
   );
-}
+});

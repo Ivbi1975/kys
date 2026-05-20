@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo, forwardRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { useParams, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -30,16 +30,10 @@ import { useNotifications } from "./hooks/useNotifications";
 import { loadBasketFromStorage, generateId } from "./hooks/types";
 import type { SortField } from "./hooks/types";
 import { VirtuosoRowContext } from "./VirtuosoRowContext";
+import { VirtuosoTable, VirtuosoTableHead } from "./VirtuosoComponents";
 
 const emptyDonations: Donation[] = [];
 const emptyGroups: AnimalGroup[] = [];
-
-const VirtuosoTable = forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>((props, ref) => (
-  <table {...props} ref={ref} className="w-full text-sm" />
-));
-const VirtuosoTableHead = forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>((props, ref) => (
-  <thead {...props} ref={ref} className="bg-background sticky top-0 z-10" />
-));
 
 export function useKesimAlaniState() {
   const params = useParams<{ id: string }>();

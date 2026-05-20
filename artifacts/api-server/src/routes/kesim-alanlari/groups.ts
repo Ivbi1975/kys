@@ -3,6 +3,7 @@ import { z } from "zod";
 import { refreshProjectStats } from "../projects";
 import { asyncHandler } from "../../middleware/error-handler";
 import { ERROR_MESSAGES } from "../../lib/constants";
+import { cacheInvalidatePrefix } from "../../lib/cache";
 import {
   listGroups,
   countGroups,
@@ -225,6 +226,7 @@ router.put("/kesim-alanlari/:id/animal-groups/:groupId", asyncHandler(async (req
   refreshProjectStats();
   getKAProjectId(req.params.id).then(projectId => {
     if (parsed.data.kesildi !== undefined) {
+      if (projectId) cacheInvalidatePrefix(`dashboard:${projectId}`);
       auditLog({ action: "toggle_kesildi", entityType: "animal_group", entityId: req.params.groupId, newValue: { kesildi: parsed.data.kesildi }, req, projectId: projectId ?? undefined, targetKesimAlaniId: req.params.id });
     } else {
       auditLog({ action: "update", entityType: "animal_group", entityId: req.params.groupId, newValue: parsed.data, req, projectId: projectId ?? undefined, targetKesimAlaniId: req.params.id });

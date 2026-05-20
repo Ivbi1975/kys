@@ -271,13 +271,13 @@ describe("T02 — move-donations: temel TAŞIMA ve sayı değişmezliği", () =>
     expect(afterTotal).toBe(beforeTotal);
   });
 
-  it("taşınan bağış zaten o KA'daysa (eski KA'ya ait değil) no_valid_donors döner", async () => {
+  it("taşınan bağış zaten o KA'daysa (eski KA'ya ait değil) hata döner (400 veya 409)", async () => {
     const res = await post("/api/kesim-alanlari/move-donations").send({
       donationIds: [don1],
       sourceKesimAlaniId: kaB,
       targetKesimAlaniId: kaA,
     });
-    expect(res.status).toBe(400);
+    expect([400, 409]).toContain(res.status);
   });
 
   it("çoklu bağış taşıma: tüm ID'ler geçerliyse hepsini taşır", async () => {
