@@ -168,7 +168,7 @@ router.post("/projects", asyncHandler(async (req, res) => {
   await refreshProjectStatsImmediate();
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
   res.status(201).json({ ...project, stats: emptyStats });
-  auditLog({ action: "create", entityType: "project", entityId: id, entityName: name, req });
+  auditLog({ action: "create", entityType: "project", entityId: id, entityName: name, projectId: id, req });
   seedRulesForProject(id).catch(err => logger.error({ err, projectId: id }, "Failed to seed rules for new project"));
 }));
 

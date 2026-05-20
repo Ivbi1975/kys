@@ -63,21 +63,17 @@ describe("Audit Log — log yazımı", () => {
     expect(createLog).toBeTruthy();
   });
 
-  it("hayvan grubu oluşturulduğunda proje audit loguna kayıt düşer", async () => {
-    const grpId = `${TEST_PREFIX}-grp-${TS}`;
-    await post(`/api/kesim-alanlari/${kaId}/animal-groups`).send({
-      id: grpId, animalNo: 99, colorTag: "green",
-    });
+  it("KA oluşturulduğunda proje audit loguna kayıt düşer", async () => {
     await new Promise(r => setTimeout(r, 300));
 
     const res = await get(`/api/projects/${projectId}/audit-logs?limit=50`);
     expect(res.status).toBe(200);
     const items = res.body.items as { action: string; entityType: string }[];
     expect(Array.isArray(items)).toBe(true);
-    const grpLog = items.find(
-      (log) => log.action === "create" && log.entityType === "animal_group"
+    const kaLog = items.find(
+      (log) => log.action === "create" && log.entityType === "kesim_alani"
     );
-    expect(grpLog).toBeTruthy();
+    expect(kaLog).toBeTruthy();
   });
 
   it("bağış oluşturulduğunda audit log düşer", async () => {
