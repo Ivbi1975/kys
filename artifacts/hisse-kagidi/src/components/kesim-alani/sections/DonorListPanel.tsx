@@ -191,7 +191,7 @@ export function DonorListPanel() {
                   <th className="p-1 text-center w-14 text-xs font-medium text-muted-foreground">Şafi</th>
                   <th className="p-1 text-left w-28 text-xs font-medium text-muted-foreground">Telefon</th>
                   <th className="p-1 text-left min-w-[90px] text-xs font-medium text-muted-foreground">Notlar</th>
-                  <th className="p-1 text-left min-w-[120px] text-xs font-medium text-muted-foreground">AI Etiketleri</th>
+                  <th className="p-1 text-left min-w-[140px] text-xs font-medium text-muted-foreground">AI Etiketi / Not</th>
                   <th className="p-1 text-xs font-medium text-muted-foreground">Etiket / Aksiyon</th>
                 </tr>
               )}

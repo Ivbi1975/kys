@@ -342,6 +342,7 @@ function DonorRowInner({
   onToggleAiCategory, availableAiCategories,
 }: DonorRowProps) {
   const [notePopoverOpen, setNotePopoverOpen] = useState(false);
+  const [aiNotePopoverOpen, setAiNotePopoverOpen] = useState(false);
 
   const { rowAttrs, rowClassName } = useVirtuosoRowContext();
 
@@ -441,30 +442,46 @@ function DonorRowInner({
             </Popover>
           ) : <span className="text-muted-foreground/30">—</span>}
         </td>
-        <td className="p-1 min-w-[120px]">
-          <div className="flex flex-wrap gap-0.5 items-center">
-            {(d.aiCategories && d.aiCategories.length > 0) ? d.aiCategories.map(cat => (
-              <span key={cat} className="group inline-flex items-center gap-0.5 px-1.5 leading-[16px] rounded text-[9px] font-medium bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 whitespace-nowrap">
-                {cat}
-                <button
-                  className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-violet-900 dark:hover:text-violet-100 leading-none ml-0.5"
-                  onClick={() => onToggleAiCategory(d.id, cat)}
-                  title={`"${cat}" etiketini kaldır`}
-                >×</button>
-              </span>
-            )) : null}
-            <AiCategoryAddPopover
-              donationId={d.id}
-              currentCategories={d.aiCategories || []}
-              availableCategories={availableAiCategories}
-              onToggle={onToggleAiCategory}
-            />
-            {d.aiWarnings?.trim() && (
-              <span className="px-1.5 leading-[16px] rounded text-[9px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700 flex items-center gap-0.5 whitespace-nowrap" title={d.aiWarnings}>
-                <AlertTriangle className="w-2.5 h-2.5" />Uyarı
-              </span>
+        <td className="p-1 min-w-[140px]">
+          <div className="flex flex-col gap-0.5">
+            <div className="flex flex-wrap gap-0.5 items-center">
+              {(d.aiCategories && d.aiCategories.length > 0) ? d.aiCategories.map(cat => (
+                <span key={cat} className="group inline-flex items-center gap-0.5 px-1.5 leading-[16px] rounded text-[9px] font-medium bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 whitespace-nowrap">
+                  {cat}
+                  <button
+                    className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-violet-900 dark:hover:text-violet-100 leading-none ml-0.5"
+                    onClick={() => onToggleAiCategory(d.id, cat)}
+                    title={`"${cat}" etiketini kaldır`}
+                  >×</button>
+                </span>
+              )) : null}
+              <AiCategoryAddPopover
+                donationId={d.id}
+                currentCategories={d.aiCategories || []}
+                availableCategories={availableAiCategories}
+                onToggle={onToggleAiCategory}
+              />
+              {d.aiWarnings?.trim() && (
+                <span className="px-1.5 leading-[16px] rounded text-[9px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700 flex items-center gap-0.5 whitespace-nowrap" title={d.aiWarnings}>
+                  <AlertTriangle className="w-2.5 h-2.5" />Uyarı
+                </span>
+              )}
+              {!d.aiCategories?.length && !d.aiWarnings?.trim() && !d.notes?.trim() && <span className="text-muted-foreground/30 text-xs ml-1">—</span>}
+            </div>
+            {d.notes?.trim() && (
+              <Popover open={aiNotePopoverOpen} onOpenChange={setAiNotePopoverOpen}>
+                <PopoverTrigger asChild>
+                  <button className="flex items-center gap-0.5 text-left w-full group" title={d.notes.trim()}>
+                    <StickyNote className="w-2.5 h-2.5 flex-shrink-0 text-amber-500" />
+                    <span className="text-[9px] text-muted-foreground/70 italic truncate max-w-[130px] group-hover:text-muted-foreground transition-colors">{d.notes.trim()}</span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-3" align="end" side="top">
+                  <p className="text-xs font-semibold mb-1.5">Not</p>
+                  <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">{d.notes.trim()}</p>
+                </PopoverContent>
+              </Popover>
             )}
-            {!d.aiCategories?.length && !d.aiWarnings?.trim() && <span className="text-muted-foreground/30 text-xs ml-1">—</span>}
           </div>
         </td>
         <td className="p-1">
