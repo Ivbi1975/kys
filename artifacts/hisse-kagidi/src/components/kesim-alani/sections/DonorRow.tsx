@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  AlertTriangle, Eye, EyeOff, Flag, MoreHorizontal, Phone, Plus, ShoppingBag, StickyNote, Trash2, Wand2,
+  AlertTriangle, Eye, EyeOff, Flag, MoreHorizontal, Phone, Plus, ShoppingBag, StickyNote, Trash2, Undo2, Wand2,
 } from "lucide-react";
 import { turkishTitleCase } from "@/lib/formatting";
 import { groupTagsByCategory } from "@/lib/groupTags";
@@ -43,6 +43,7 @@ interface DonorRowProps {
   onDelete: (id: string) => void;
   onFlagDonation?: (id: string, reason: string) => void;
   onUnflagDonation?: (id: string) => void;
+  onSendToPool?: (id: string) => void;
   projectId?: string;
   onToggleAiCategory: (donationId: string, category: string) => void;
   availableAiCategories: string[];
@@ -139,7 +140,7 @@ function AiCategoryAddPopover({
 function DonorRowOverflowMenu({
   d, isGrouped, canSplit, splitShares, globalTags, tagCategories, tagPopoverOpen,
   onSetPersonEditDesc, onUpdateField, onToggleTag, onSetTagPopover,
-  onSmartPlace, onSplitShare, onDelete, onFlagDonation, onUnflagDonation,
+  onSmartPlace, onSplitShare, onDelete, onFlagDonation, onUnflagDonation, onSendToPool,
 }: {
   d: Donation;
   isGrouped: boolean;
@@ -157,6 +158,7 @@ function DonorRowOverflowMenu({
   onDelete: (id: string) => void;
   onFlagDonation?: (id: string, reason: string) => void;
   onUnflagDonation?: (id: string) => void;
+  onSendToPool?: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [flagReasonInput, setFlagReasonInput] = useState("");
@@ -302,6 +304,21 @@ function DonorRowOverflowMenu({
             )
           )}
 
+          {onSendToPool && (
+            <>
+              <div className="h-px bg-border my-1" />
+              <button
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
+                onClick={() => { onSendToPool(d.id); setOpen(false); }}
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+                Havuza Geri Gönder
+              </button>
+            </>
+          )}
+
+          <div className="h-px bg-border my-1" />
+
           <button
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-destructive hover:bg-destructive/10 transition-colors"
             onClick={() => { onDelete(d.id); setOpen(false); }}
@@ -321,7 +338,7 @@ function DonorRowInner({
   onToggleSelect, onStartEditing, onSetEditDraft, onCommitEdit, onKeyDown,
   onSetPersonEditDesc, onUpdateField, onToggleTag, onSetTagPopover,
   onAddToBasket, onRemoveFromBasket, onSmartPlace, onSplitShare, onDelete,
-  onFlagDonation, onUnflagDonation, projectId,
+  onFlagDonation, onUnflagDonation, onSendToPool, projectId,
   onToggleAiCategory, availableAiCategories,
 }: DonorRowProps) {
   const [notePopoverOpen, setNotePopoverOpen] = useState(false);
@@ -494,6 +511,7 @@ function DonorRowInner({
               onDelete={onDelete}
               onFlagDonation={onFlagDonation}
               onUnflagDonation={onUnflagDonation}
+              onSendToPool={onSendToPool}
             />
           </div>
         </td>

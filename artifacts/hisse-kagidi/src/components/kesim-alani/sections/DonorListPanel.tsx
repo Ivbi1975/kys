@@ -5,8 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { TableVirtuoso } from "react-virtuoso";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   ArrowDown, ArrowUp, ArrowUpDown,
-  FileText, Filter, Search, Trash2, X,
+  FileText, Filter, Loader2, Search, Trash2, Undo2, X,
 } from "lucide-react";
 import { DonorRow } from "./DonorRow";
 import { useKesimAlaniContext } from "../KesimAlaniContext";
@@ -31,7 +35,26 @@ export function DonorListPanel() {
     sortDir, sortField, startEditing, tagPopoverDonorId, toggleDonationTag,
     toggleDonationAiCategory, availableAiCategories,
     toggleSelect, toggleSelectAll, updateDonationField, virtuosoTableComponents,
+    sendDonationsToPool,
   } = ctx;
+
+  const [pendingSendToPoolId, setPendingSendToPoolId] = useState<string | null>(null);
+  const [sendingToPool, setSendingToPool] = useState(false);
+
+  const handleSendToPool = useCallback((id: string) => {
+    setPendingSendToPoolId(id);
+  }, []);
+
+  const handleSendToPoolConfirm = useCallback(async () => {
+    if (!pendingSendToPoolId) return;
+    setSendingToPool(true);
+    try {
+      await sendDonationsToPool([pendingSendToPoolId]);
+    } finally {
+      setSendingToPool(false);
+      setPendingSendToPoolId(null);
+    }
+  }, [pendingSendToPoolId, sendDonationsToPool]);
 
 
   const visibleDonations = useMemo(
@@ -208,6 +231,7 @@ export function DonorListPanel() {
                     onDelete={deleteDonation}
                     onFlagDonation={handleFlagDonation}
                     onUnflagDonation={handleUnflagDonation}
+                    onSendToPool={handleSendToPool}
                     projectId={kesim.projectId ?? undefined}
                   />
                 );
@@ -216,6 +240,33 @@ export function DonorListPanel() {
           </div>
         )}
       </Card>
+
+      <AlertDialog open={!!pendingSendToPoolId} onOpenChange={(open) => { if (!open && !sendingToPool) setPendingSendToPoolId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Undo2 className="w-5 h-5 text-blue-600" />
+              Havuza Geri Gönder
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Bu bağışçı bağış havuzuna geri taşınacak. İşlem geri alınabilir ve bağışçı havuz sayfasında tekrar görünür hale gelecek.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={sendingToPool}>İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleSendToPoolConfirm(); }}
+              disabled={sendingToPool}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {sendingToPool
+                ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Gönderiliyor…</>
+                : <><Undo2 className="w-4 h-4 mr-1" />Havuza Gönder</>
+              }
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Profiler>
   );
 }

@@ -46,7 +46,8 @@ export type DonationContextValue = Pick<KesimAlaniContextValue,
   "findDeleteValue" | "setFindDeleteValue" | "findDeleteConfirm" | "setFindDeleteConfirm" |
   "findDeleteColumnLabel" | "getFindDeleteMatches" | "executeFindDelete" |
   "basketItemIds" |
-  "addSelectedToBasket" | "groupingInProgress" | "handleAutoGroupSelected"
+  "addSelectedToBasket" | "groupingInProgress" | "handleAutoGroupSelected" |
+  "sendDonationsToPool"
 >;
 
 export type GroupContextValue = Pick<KesimAlaniContextValue,
@@ -194,6 +195,7 @@ export function KesimAlaniProvider({
     addSelectedToBasket: value.addSelectedToBasket,
     groupingInProgress: value.groupingInProgress,
     handleAutoGroupSelected: value.handleAutoGroupSelected,
+    sendDonationsToPool: value.sendDonationsToPool,
   }), [
     value.addDonation, value.deleteDonation, value.handleFlagDonation, value.handleUnflagDonation,
     value.updateDonationField, value.toggleDonationTag, value.toggleDonationAiCategory,
@@ -214,6 +216,7 @@ export function KesimAlaniProvider({
     value.findDeleteColumnLabel, value.getFindDeleteMatches, value.executeFindDelete,
     value.basketItemIds,
     value.addSelectedToBasket, value.groupingInProgress, value.handleAutoGroupSelected,
+    value.sendDonationsToPool,
   ]);
 
   const groupValue = useMemo<GroupContextValue>(() => ({

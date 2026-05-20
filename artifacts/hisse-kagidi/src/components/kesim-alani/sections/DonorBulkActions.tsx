@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Settings2, ShoppingBag, Trash2, Wand2 } from "lucide-react";
+import { AlertTriangle, Loader2, Settings2, ShoppingBag, Trash2, Undo2, Wand2 } from "lucide-react";
 import { useSelectionContext, useDonationContext } from "../KesimAlaniContext";
 
 export function DonorBulkActions() {
@@ -12,15 +12,28 @@ export function DonorBulkActions() {
     addSelectedToBasket, applyBulkEdit, bulkEditField, bulkEditOpen, bulkEditValue,
     deleteSelected, groupingInProgress, handleAutoGroupSelected,
     setBulkEditField, setBulkEditOpen, setBulkEditValue,
+    sendDonationsToPool,
   } = useDonationContext();
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [poolConfirmOpen, setPoolConfirmOpen] = useState(false);
+  const [sendingToPool, setSendingToPool] = useState(false);
 
   if (selectedIds.size === 0) return null;
 
   const handleDeleteConfirm = () => {
     deleteSelected();
     setDeleteConfirmOpen(false);
+  };
+
+  const handleSendToPoolConfirm = async () => {
+    setSendingToPool(true);
+    try {
+      await sendDonationsToPool([...selectedIds]);
+    } finally {
+      setSendingToPool(false);
+      setPoolConfirmOpen(false);
+    }
   };
 
   return (
@@ -66,6 +79,47 @@ export function DonorBulkActions() {
       <Button variant="outline" size="sm" onClick={handleAutoGroupSelected} disabled={groupingInProgress} aria-label={`${selectedIds.size} seçili bağışçıyı otomatik grupla`}>
         <Wand2 className="w-3 h-3 mr-1" aria-hidden="true" />Seçilenleri Grupla
       </Button>
+
+      <Dialog open={poolConfirmOpen} onOpenChange={setPoolConfirmOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm" className="text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950" aria-label={`${selectedIds.size} seçili bağışçıyı havuza gönder`}>
+            <Undo2 className="w-3 h-3 mr-1" aria-hidden="true" />Havuza Geri Gönder
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Undo2 className="w-5 h-5 text-blue-600" aria-hidden="true" />
+              Havuza Geri Gönder
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-foreground">
+              <strong>{selectedIds.size}</strong> bağışçı bağış havuzuna geri taşınacak.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Bu işlem geri alınabilir. Bağışçılar havuz sayfasında tekrar görünür hale gelecek.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPoolConfirmOpen(false)} disabled={sendingToPool}>
+              İptal
+            </Button>
+            <Button
+              onClick={handleSendToPoolConfirm}
+              disabled={sendingToPool}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              aria-label={`${selectedIds.size} bağışçıyı havuza gönder`}
+            >
+              {sendingToPool
+                ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Gönderiliyor…</>
+                : <><Undo2 className="w-4 h-4 mr-1" />{selectedIds.size} Bağışçıyı Havuza Gönder</>
+              }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
         <DialogTrigger asChild>
           <Button variant="outline" size="sm" aria-label={`${selectedIds.size} seçili bağışçıyı toplu düzenle`}>

@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { produce } from "immer";
 import type { Donation, KesimAlani } from "@/lib/types";
 import { turkishNormalize } from "@/lib/utils";
-import { apiSoftDeleteDonation, apiUpdateSingleDonation, flagDonation as apiFlagDonation, unflagDonation as apiUnflagDonation } from "@/lib/api";
+import { apiSoftDeleteDonation, apiUpdateSingleDonation, flagDonation as apiFlagDonation, unflagDonation as apiUnflagDonation, transferDonationsToKA, fetchKesimAlanlari } from "@/lib/api";
 import { trCollator } from "@/lib/grouping";
 import { MAX_SHARES_PER_ANIMAL } from "@/lib/constants";
 import type { ColumnKey } from "@/lib/useWorkspacePreferences";
@@ -119,6 +119,39 @@ export function useDonations({
         description: err instanceof Error ? err.message : "Bilinmeyen hata",
         variant: "destructive",
       });
+    }
+  }
+
+  async function sendDonationsToPool(ids: string[]): Promise<void> {
+    if (!kesim || !kesim.projectId || ids.length === 0) return;
+    try {
+      const allKAs = await fetchKesimAlanlari(kesim.projectId);
+      const havuzKA = allKAs.find((ka) => ka.name === "__havuz__");
+      if (!havuzKA) {
+        toast({ title: "Havuz bulunamadı", description: "Bu proje için bağış havuzu tanımlanmamış.", variant: "destructive" });
+        return;
+      }
+      const result = await transferDonationsToKA(kesim.projectId, ids, havuzKA.id);
+      if ("conflict" in result && result.conflict) {
+        toast({ title: "Çakışma", description: "Bazı bağışçılar havuzda zaten mevcut.", variant: "destructive" });
+        return;
+      }
+      const idSet = new Set(ids);
+      const updated = produce(kesim, (draft) => {
+        draft.donations = draft.donations.filter((d) => !idSet.has(d.id));
+        for (const g of draft.animalGroups) {
+          g.donations = g.donations.filter((d) => !idSet.has(d.id));
+        }
+      });
+      setKesim(updated);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+      toast({ title: "Havuza gönderildi", description: `${ids.length} bağışçı bağış havuzuna geri gönderildi.` });
+    } catch (err) {
+      toast({ title: "Hata", description: err instanceof Error ? err.message : "Bilinmeyen hata", variant: "destructive" });
     }
   }
 
@@ -545,6 +578,7 @@ export function useDonations({
     saveSingleDonationField,
     addDonation,
     deleteDonation,
+    sendDonationsToPool,
     handleFlagDonation,
     handleUnflagDonation,
     deleteSelected,
