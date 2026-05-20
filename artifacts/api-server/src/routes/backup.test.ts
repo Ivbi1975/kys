@@ -18,6 +18,9 @@ function post(url: string) {
   if (ADMIN_KEY) req.set("X-Admin-Key", ADMIN_KEY);
   return req;
 }
+function postNoAdmin(url: string) {
+  return agent.post(url).set("X-API-Key", API_KEY);
+}
 function del(url: string) {
   const req = agent.delete(url).set("X-API-Key", API_KEY);
   if (ADMIN_KEY) req.set("X-Admin-Key", ADMIN_KEY);
@@ -113,14 +116,23 @@ describe("Backup Import — dryRun ve validasyon testleri", () => {
     expect(res.body).toHaveProperty("summary");
   });
 
-  it("dryRun import admin key olmadan 403 döner", async () => {
-    if (hasAdminKey) return;
-    const res = await post("/api/backup/import").send({
+  it.skipIf(!hasAdminKey)("admin key olmadan import 403 döner", async () => {
+    const res = await postNoAdmin("/api/backup/import").send({
       mode: "merge",
       dryRun: true,
       data: exportedData,
     });
     expect(res.status).toBe(403);
+  });
+
+  it.skipIf(!hasAdminKey)("admin key ile dryRun import 200 döner", async () => {
+    const res = await post("/api/backup/import").send({
+      mode: "merge",
+      dryRun: true,
+      data: exportedData,
+    });
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("dryRun", true);
   });
 
   it("replace modu confirmReplace olmadan 403 veya 409 döner", async () => {

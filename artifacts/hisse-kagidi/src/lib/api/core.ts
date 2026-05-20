@@ -20,6 +20,18 @@ export function getApiKey(): string {
   return sessionStorage.getItem("app_session_token") || "";
 }
 
+export function getAdminKey(): string {
+  return sessionStorage.getItem("admin_key") || "";
+}
+
+export function setAdminKey(key: string): void {
+  if (key) {
+    sessionStorage.setItem("admin_key", key);
+  } else {
+    sessionStorage.removeItem("admin_key");
+  }
+}
+
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getApiKey();
   const headers: Record<string, string> = {

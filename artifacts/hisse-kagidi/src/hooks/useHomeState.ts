@@ -657,7 +657,28 @@ export function useHomeState() {
   }, [toast]);
 
   const executeImport = useCallback(async (json: string, mode: "replace" | "merge") => {
-    const result = await importBackupApi(json, mode);
+    let result = await importBackupApi(json, mode);
+
+    if (!result.success && result.adminKeyRequired) {
+      const enteredKey = window.prompt(
+        "Bu işlem için yönetici anahtarı (Admin Key) gerekli.\nLütfen yönetici anahtarını girin:"
+      );
+      if (enteredKey && enteredKey.trim()) {
+        const { setAdminKey } = await import("@/lib/api/core");
+        setAdminKey(enteredKey.trim());
+        result = await importBackupApi(json, mode, enteredKey.trim());
+      } else {
+        toast({
+          title: "Yedek yükleme iptal edildi",
+          description: "Yönetici anahtarı girilmedi.",
+          variant: "destructive",
+        });
+        setPendingImportJson(null);
+        setImportModeOpen(false);
+        return;
+      }
+    }
+
     if (result.success) {
       invalidateHomeDataCache();
       const homeData = await fetchHomeData();

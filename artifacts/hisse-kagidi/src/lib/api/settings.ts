@@ -1,5 +1,5 @@
 import type { KesimAlani, CustomTag, TagCategory } from "../types";
-import { apiFetch } from "./core";
+import { apiFetch, getAdminKey } from "./core";
 import { fetchKesimAlanlari, createKesimAlani } from "./kesim-alanlari";
 
 export async function fetchTags(): Promise<CustomTag[]> {
@@ -75,17 +75,22 @@ export async function exportBackupApi(): Promise<string> {
   return JSON.stringify(data, null, 2);
 }
 
-export async function importBackupApi(json: string, mode: "replace" | "merge" = "replace"): Promise<{ success: boolean; count: number; error?: string }> {
+export async function importBackupApi(json: string, mode: "replace" | "merge" = "replace", adminKey?: string): Promise<{ success: boolean; count: number; error?: string; adminKeyRequired?: boolean }> {
   try {
     const parsed: unknown = JSON.parse(json);
+    const key = adminKey ?? getAdminKey();
+    const extraHeaders: Record<string, string> = {};
+    if (key) extraHeaders["X-Admin-Key"] = key;
     const data = await apiFetch<{ success: boolean; count: number }>("/backup/import", {
       method: "POST",
+      headers: extraHeaders,
       body: JSON.stringify({ mode, data: parsed }),
     });
     return data;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Dosya okunamadı";
-    return { success: false, count: 0, error: message };
+    const isAdminRequired = message.includes("yönetici") || message.includes("403");
+    return { success: false, count: 0, error: message, adminKeyRequired: isAdminRequired };
   }
 }
 
