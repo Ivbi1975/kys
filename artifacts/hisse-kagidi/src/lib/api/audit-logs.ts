@@ -23,6 +23,7 @@ export interface AuditLogResponse {
   items: AuditLogEntry[];
   hasMore: boolean;
   nextCursor: number | null;
+  creationLog?: AuditLogEntry | null;
 }
 
 export interface AuditLogFilters {

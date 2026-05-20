@@ -11,7 +11,7 @@ import {
   X,
   ChevronDown,
 } from "lucide-react";
-import { fetchAuditLogs, type AuditLogEntry } from "@/lib/api/audit-logs";
+import { fetchProjectAuditLogs, type AuditLogEntry } from "@/lib/api/audit-logs";
 import { fetchKesimAlanlari } from "@/lib/api";
 import { formatDateTime } from "@/lib/formatting";
 import { formatAuditLogDescription, isBulkDelete, formatFiltersText } from "@/lib/audit-log-formatter";
@@ -183,6 +183,7 @@ export default function IslemGecmisiPage() {
   };
 
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+  const [creationLog, setCreationLog] = useState<AuditLogEntry | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
@@ -204,20 +205,29 @@ export default function IslemGecmisiPage() {
       const f = filtersOverride ?? filters;
       const cursor = append ? nextCursor ?? undefined : undefined;
       const { startDate, endDate } = resolveDates(f);
-      const result = await fetchAuditLogs({
-        projectId,
+      const result = await fetchProjectAuditLogs(projectId, {
         limit: 50,
         cursor,
         action: f.action || undefined,
         startDate,
         endDate,
         kesimAlaniId: f.kesimAlaniId || undefined,
-        poolScope: f.poolScope || undefined,
+        scope: f.poolScope ? "havuz" : undefined,
       }, abortRef.current.signal);
+
+      if (!append && result.creationLog !== undefined) {
+        setCreationLog(result.creationLog ?? null);
+      }
+
+      const creationId = result.creationLog?.id;
+      const filteredItems = creationId != null
+        ? result.items.filter(e => e.id !== creationId)
+        : result.items;
+
       if (append) {
-        setLogs(prev => [...prev, ...result.items]);
+        setLogs(prev => [...prev, ...filteredItems]);
       } else {
-        setLogs(result.items);
+        setLogs(filteredItems);
       }
       setHasMore(result.hasMore);
       setNextCursor(result.nextCursor);
@@ -381,7 +391,7 @@ export default function IslemGecmisiPage() {
               <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
               Yükleniyor...
             </div>
-          ) : logs.length === 0 ? (
+          ) : logs.length === 0 && !creationLog ? (
             <div className="py-16 text-center text-sm text-muted-foreground">
               {hasActiveFilters(filters)
                 ? "Bu filtrelere uyan işlem bulunamadı."
@@ -414,6 +424,28 @@ export default function IslemGecmisiPage() {
               {!hasMore && logs.length > 0 && (
                 <div className="py-3 text-center text-xs text-muted-foreground border-t">
                   {logs.length} işlem listelendi · tümü gösteriliyor
+                </div>
+              )}
+
+              {creationLog && !hasActiveFilters(filters) && (
+                <div className="border-t">
+                  <div className="flex items-start gap-3 py-3 px-4 bg-green-50/40 dark:bg-green-950/10">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <span className="inline-flex items-center rounded border px-1.5 py-0 text-[11px] whitespace-nowrap bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 font-medium">
+                        Proje Oluşturuldu
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-foreground leading-snug">
+                        {creationLog.entityName
+                          ? `"${creationLog.entityName}" projesi oluşturuldu`
+                          : "Proje oluşturuldu"}
+                      </p>
+                    </div>
+                    <span className="flex-shrink-0 text-xs text-muted-foreground whitespace-nowrap">
+                      {formatDateTime(creationLog.createdAt)}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>

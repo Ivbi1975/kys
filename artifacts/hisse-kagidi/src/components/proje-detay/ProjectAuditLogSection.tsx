@@ -11,7 +11,7 @@ import {
   Filter,
   X,
 } from "lucide-react";
-import { fetchAuditLogs, type AuditLogEntry } from "@/lib/api/audit-logs";
+import { fetchProjectAuditLogs, type AuditLogEntry } from "@/lib/api/audit-logs";
 import { formatDateTime } from "@/lib/formatting";
 import { isBulkDelete, formatFiltersText } from "@/lib/audit-log-formatter";
 
@@ -430,6 +430,7 @@ export function ProjectAuditLogSection({
 }: ProjectAuditLogSectionProps) {
   const [open, setOpen] = useState(false);
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+  const [creationLog, setCreationLog] = useState<AuditLogEntry | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
@@ -447,8 +448,7 @@ export function ProjectAuditLogSection({
       const cursor = append ? nextCursor ?? undefined : undefined;
       const { startDate, endDate } = resolveDates(f);
 
-      const result = await fetchAuditLogs({
-        projectId,
+      const result = await fetchProjectAuditLogs(projectId, {
         limit: 30,
         cursor,
         action: f.action || undefined,
@@ -457,10 +457,19 @@ export function ProjectAuditLogSection({
         kesimAlaniId: f.kesimAlaniId || undefined,
       }, abortRef.current.signal);
 
+      if (!append && result.creationLog !== undefined) {
+        setCreationLog(result.creationLog ?? null);
+      }
+
+      const creationId = result.creationLog?.id;
+      const filteredItems = creationId != null
+        ? result.items.filter(e => e.id !== creationId)
+        : result.items;
+
       if (append) {
-        setLogs(prev => [...prev, ...result.items]);
+        setLogs(prev => [...prev, ...filteredItems]);
       } else {
-        setLogs(result.items);
+        setLogs(filteredItems);
       }
       setHasMore(result.hasMore);
       setNextCursor(result.nextCursor);
@@ -545,7 +554,7 @@ export function ProjectAuditLogSection({
               <RefreshCw className="w-4 h-4 animate-spin mx-auto mb-2" />
               Yükleniyor...
             </div>
-          ) : logs.length === 0 ? (
+          ) : logs.length === 0 && !creationLog ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
               {hasActiveFilters(activeFilters)
                 ? "Bu filtrelere uyan işlem bulunamadı."
@@ -574,6 +583,27 @@ export function ProjectAuditLogSection({
                       >
                         {loading ? "Yükleniyor..." : "Daha Fazla Göster"}
                       </Button>
+                    </div>
+                  )}
+                  {creationLog && !hasActiveFilters(activeFilters) && (
+                    <div className="border-t mt-1 pt-1">
+                      <div className="py-2 px-1 bg-green-50/40 dark:bg-green-950/10 rounded">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="inline-flex items-center rounded border px-1.5 py-0 text-[10px] whitespace-nowrap bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 font-medium">
+                              Proje Oluşturuldu
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap flex-shrink-0">
+                            {formatDateTime(creationLog.createdAt)}
+                          </span>
+                        </div>
+                        {creationLog.entityName && (
+                          <div className="text-[10px] text-foreground mt-0.5 truncate">
+                            {creationLog.entityName}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

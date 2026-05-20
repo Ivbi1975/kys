@@ -54,8 +54,24 @@ router.get("/projects/:projectId/audit-logs", asyncHandler(async (req, res) => {
     filters.kesimAlaniId = kesimAlaniId;
   }
 
-  const result = await listAuditLogs(filters);
-  res.json(result);
+  const [result, creationRows] = await Promise.all([
+    listAuditLogs(filters),
+    db.select()
+      .from(auditLogsTable)
+      .where(
+        and(
+          eq(auditLogsTable.projectId, projectId),
+          eq(auditLogsTable.action, "create"),
+          eq(auditLogsTable.entityType, "project"),
+        ),
+      )
+      .orderBy(auditLogsTable.id)
+      .limit(1),
+  ]);
+
+  const creationLog = creationRows[0] ?? null;
+
+  res.json({ ...result, creationLog });
 }));
 
 router.post("/projects/:projectId/audit-logs/:logId/undo", asyncHandler(async (req, res) => {
